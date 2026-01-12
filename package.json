@@ -1,0 +1,15 @@
+{
+  "name": "cab-booking-system",
+  "private": true,
+  "workspaces": [
+    "libs/*",
+    "services/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:infra": "docker compose -f infra/docker-compose.dev.yml up -d",
+    "down:infra": "docker compose -f infra/docker-compose.dev.yml down -v",
+    "logs:kafka": "docker compose -f infra/docker-compose.dev.yml logs -f kafka",
+    "health": "node scripts/healthcheck.js"
+  }
+}

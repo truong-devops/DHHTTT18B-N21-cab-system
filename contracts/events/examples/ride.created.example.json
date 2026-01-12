@@ -1,0 +1,7 @@
+{
+  "eventId": "uuid",
+  "type": "RideCreated",
+  "rideId": "r123",
+  "pickup": { "lat": 10.7, "lng": 106.6 },
+  "timestamp": "2025-01-01T10:00:00Z"
+}
