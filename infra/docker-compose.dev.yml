@@ -1,4 +1,7 @@
 services:
+  # =========================
+  # Infra: Kafka + Zookeeper
+  # =========================
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
     environment:
@@ -30,16 +33,24 @@ services:
     depends_on:
       - kafka
     ports:
-      - "8080:8080"
+      - "8088:8080" # đổi port host để không đụng API Gateway 8080
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
 
+  # =========================
+  # Infra: Redis
+  # =========================
   redis:
     image: redis:7-alpine
+    container_name: cab-redis
     ports:
       - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
 
+  # =========================
+  # Infra: Postgres (demo future)
+  # =========================
   postgres:
     image: postgres:16-alpine
     environment:
@@ -50,6 +61,73 @@ services:
       - "5432:5432"
     volumes:
       - cab_postgres_data:/var/lib/postgresql/data
+
+  # =========================
+  # App services for LOGIN DEMO
+  # =========================
+
+  auth-service:
+    build:
+      context: ..
+      dockerfile: services/auth-service/Dockerfile
+    depends_on:
+      - redis
+    environment:
+      PORT: 4001
+      CORS_ORIGIN: "http://localhost:5173"
+      REDIS_URL: "redis://redis:6379"
+      JWT_ACCESS_SECRET: "dev_access_secret"
+      JWT_REFRESH_SECRET: "dev_refresh_secret"
+      ACCESS_TOKEN_TTL_SECONDS: 60
+      REFRESH_TOKEN_TTL_SECONDS: 604800
+      # optional kafka bootstrap for future
+      KAFKA_BROKERS: "kafka:9092"
+    ports:
+      - "4001:4001"
+
+  user-service:
+    build:
+      context: ..
+      dockerfile: services/user-service/Dockerfile
+    environment:
+      PORT: 4002
+      CORS_ORIGIN: "http://localhost:5173"
+      JWT_ACCESS_SECRET: "dev_access_secret"
+      # optional db for future
+      DATABASE_URL: "postgres://cab:cabpass@postgres:5432/cab_booking"
+      KAFKA_BROKERS: "kafka:9092"
+    depends_on:
+      - postgres
+    ports:
+      - "4002:4002"
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile
+    depends_on:
+      - auth-service
+      - user-service
+    environment:
+      PORT: 8080
+      CORS_ORIGIN: "http://localhost:5173"
+      JWT_ACCESS_SECRET: "dev_access_secret"
+      AUTH_SERVICE_URL: "http://auth-service:4001"
+      USER_SERVICE_URL: "http://user-service:4002"
+    ports:
+      - "8080:8080"
+
+  admin-dashboard:
+    build:
+      context: ..
+      dockerfile: apps/admin-dashboard/Dockerfile
+    depends_on:
+      - api-gateway
+    environment:
+      # Vite đọc biến có prefix VITE_
+      VITE_API_BASE_URL: "http://localhost:8080"
+    ports:
+      - "5173:5173"
 
 volumes:
   cab_postgres_data:
