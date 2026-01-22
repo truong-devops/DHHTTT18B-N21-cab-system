@@ -6,16 +6,26 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "jest"
+    "test": "jest",
+    "db:migrate": "dbmate --migrations-dir ./migrations up",
+    "db:rollback": "dbmate --migrations-dir ./migrations down",
+    "db:status": "dbmate --migrations-dir ./migrations status"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "helmet": "^7.1.0",
     "express": "^4.19.2",
     "pino": "^8.19.0",
-    "pino-http": "^9.0.0"
+    "pino-http": "^9.0.0",
+    "ajv": "^8.17.1",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.13.3",
+    "jsonwebtoken": "^9.0.2",
+    "@libs/http": "0.1.0",
+    "@libs/validation": "0.1.0"
   },
   "devDependencies": {
+    "dbmate": "^2.14.0",
     "jest": "^29.7.0",
     "jest-openapi": "^0.14.2",
     "nock": "^13.5.5",

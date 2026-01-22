@@ -49,6 +49,12 @@ class ConflictError extends AppError {
   }
 }
 
+class InvalidStateTransitionError extends AppError {
+  constructor(message = "Invalid state transition.", details = []) {
+    super(message, { status: 409, code: "INVALID_STATE_TRANSITION", details });
+  }
+}
+
 class RateLimitedError extends AppError {
   constructor(message = "Rate limited.", details = []) {
     super(message, { status: 429, code: "RATE_LIMITED", details });
@@ -68,6 +74,7 @@ module.exports = {
   ForbiddenError,
   NotFoundError,
   ConflictError,
+  InvalidStateTransitionError,
   RateLimitedError,
   InternalError,
   errorCodeForStatus

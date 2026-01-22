@@ -24,6 +24,7 @@ describe("proxy service", () => {
       get: (key) => {
         const map = {
           authorization: "Bearer token",
+          "x-trace-id": "trace-from-header",
           "x-request-id": "req-1",
           "content-type": "application/json"
         };
@@ -36,5 +37,19 @@ describe("proxy service", () => {
     expect(headers["x-trace-id"]).toBe("trace-1");
     expect(headers["x-request-id"]).toBe("req-1");
     expect(headers["content-type"]).toBe("application/json");
+  });
+
+  it("falls back to x-trace-id header when traceId is missing", () => {
+    const req = {
+      get: (key) => {
+        const map = {
+          "x-trace-id": "trace-header-only"
+        };
+        return map[key];
+      }
+    };
+
+    const headers = buildForwardHeaders(req);
+    expect(headers["x-trace-id"]).toBe("trace-header-only");
   });
 });

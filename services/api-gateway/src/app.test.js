@@ -54,10 +54,12 @@ describe("api-gateway proxy", () => {
 
     const response = await request(app)
       .post("/v1/auth/ping")
+      .set("Idempotency-Key", "idem-timeout")
       .send({ ok: true })
       .expect(504);
 
     expect(response.body.error.code).toBe("INTERNAL");
+    expect(Array.isArray(response.body.error.details)).toBe(true);
     expect(response.body.traceId).toBeTruthy();
   });
 
@@ -71,5 +73,6 @@ describe("api-gateway proxy", () => {
       .expect(502);
 
     expect(response.body.error.code).toBe("INTERNAL");
+    expect(Array.isArray(response.body.error.details)).toBe(true);
   });
 });

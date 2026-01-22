@@ -8,19 +8,16 @@ const errorHandler = (err, req, res, _next) => {
   const status = err && err.status ? err.status : 500;
   const code = err && err.code ? err.code : errorCodeForStatus(status);
   const message = err && err.message ? err.message : "Internal server error.";
-  const details = Array.isArray(err && err.details) ? err.details : undefined;
+  const details = Array.isArray(err && err.details) ? err.details : [];
 
   const payload = {
     error: {
       code,
-      message
+      message,
+      details
     },
     traceId
   };
-
-  if (details && details.length > 0) {
-    payload.error.details = details;
-  }
 
   res.status(status).json(payload);
 };

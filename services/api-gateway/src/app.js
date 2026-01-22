@@ -8,6 +8,9 @@ const pinoHttp = require("pino-http");
 const logger = require("./logger");
 const { proxyRequest } = require("./services/proxy-service");
 const { health } = require("./controllers/health-controller");
+const { idempotencyMiddleware } = require("./middleware/idempotency");
+const { requireAuth } = require("./middleware/require-auth");
+const { requireMePath } = require("./middleware/require-me");
 
 const app = express();
 app.use((req, res, next) => {
@@ -33,7 +36,16 @@ app.get("/health", health);
 app.get("/healthz", health);
 app.get("/readyz", health);
 
-app.use("/v1/:domain", async (req, res, next) => {
+app.use((req, res, next) => {
+  const path = req.path || req.originalUrl || "";
+  if (/^\/v1\/[^/]+\/me(\/|$)/.test(path)) {
+    return requireAuth(req, res, next);
+  }
+  return next();
+});
+app.use(requireMePath);
+
+app.use("/v1/:domain", idempotencyMiddleware, async (req, res, next) => {
   const { domain } = req.params;
   if (!domain) return next();
 

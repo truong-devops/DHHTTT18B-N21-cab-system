@@ -24,6 +24,12 @@ describe("api-gateway contract", () => {
     expect(res).toSatisfyApiSpec();
   });
 
+  it("matches /health response schema", async () => {
+    const res = await request(app).get("/health");
+    expect(res.status).toBe(200);
+    expect(res).toSatisfyApiSpec();
+  });
+
   it("matches /readyz response schema", async () => {
     const res = await request(app).get("/readyz");
     expect(res.status).toBe(200);

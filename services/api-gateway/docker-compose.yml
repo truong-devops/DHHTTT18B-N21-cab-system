@@ -1,8 +1,8 @@
 services:
   api-gateway:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/api-gateway/Dockerfile
     environment:
       SERVICE_NAME: api-gateway
       PORT: 3000
