@@ -2,4 +2,73 @@ openapi: 3.0.3
 info:
   title: driver-service
   version: 0.1.0
-paths: {}
+paths:
+  /v1/drivers:
+    post:
+      summary: Create driver
+      responses:
+        "201":
+          description: Created
+    get:
+      summary: List drivers
+      responses:
+        "200":
+          description: OK
+  /v1/drivers/{id}:
+    get:
+      summary: Get driver by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    patch:
+      summary: Update driver
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Delete driver
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+  /v1/drivers/{id}/status:
+    patch:
+      summary: Update driver status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /v1/drivers/{id}/location:
+    patch:
+      summary: Update driver location
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK

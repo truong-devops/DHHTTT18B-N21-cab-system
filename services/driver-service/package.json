@@ -5,15 +5,28 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "db:migrate": "node-pg-migrate up -m migrations",
+    "db:rollback": "node-pg-migrate down -m migrations",
+    "db:status": "node-pg-migrate status -m migrations",
+    "test": "node --test"
   },
   "dependencies": {
-    "express": "^4.19.2",
+    "ajv": "^8.12.0",
     "cors": "^2.8.5",
+    "express": "^4.19.2",
     "helmet": "^7.1.0",
-    "morgan": "^1.10.0"
+    "ioredis": "^5.4.2",
+    "jsonwebtoken": "^9.0.2",
+    "kafkajs": "^2.2.4",
+    "morgan": "^1.10.0",
+    "pg": "^8.11.5",
+    "pino": "^8.20.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.3"
+    "js-yaml": "^4.1.0",
+    "node-pg-migrate": "^8.0.4",
+    "nodemon": "^3.0.3",
+    "supertest": "^6.3.4"
   }
 }
