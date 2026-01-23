@@ -61,6 +61,7 @@ services:
       - "5432:5432"
     volumes:
       - cab_postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
 
   # =========================
   # App services for LOGIN DEMO
