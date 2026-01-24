@@ -1,3 +1,6 @@
+# Scrum team members
+<img width="1081" height="261" alt="image" src="https://github.com/user-attachments/assets/a987320a-297a-485d-ae9c-782eb5d0eac4" />
+
 # CAB Booking System (Monorepo)
 
 Hệ thống đặt xe (ride-hailing/cab booking) theo kiến trúc **Microservices + Event-driven** (Kafka), hướng tới realtime, dễ mở rộng và giảm coupling giữa các domain.
@@ -35,3 +38,4 @@ Hệ thống đặt xe (ride-hailing/cab booking) theo kiến trúc **Microservi
 ├── docs/                 # Tài liệu kiến trúc, ADR, sequence diagrams, runbooks
 ├── package.json          # Root scripts/workspaces (nếu có)
 └── README.md
+
