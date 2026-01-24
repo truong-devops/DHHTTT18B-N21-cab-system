@@ -1,0 +1,10 @@
+CREATE DATABASE "api-gateway_db";
+CREATE DATABASE "auth-service_db";
+CREATE DATABASE "booking-service_db";
+CREATE DATABASE "driver-service_db";
+CREATE DATABASE "notification-service_db";
+CREATE DATABASE "payment-service_db";
+CREATE DATABASE "pricing-service_db";
+CREATE DATABASE "review-service_db";
+CREATE DATABASE "ride-service_db";
+CREATE DATABASE "user-service_db";
