@@ -1,0 +1,49 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Arial;}}
+\f0\fs24
+\b Bao cao tong quan he thong cab-booking-system\b0\par
+\par
+\b Nguon thong tin\b0\par
+- Cau truc thu muc du an hien tai.\par
+- contracts/events/topics.md (Kafka topics va producer/consumer).\par
+- contracts/openapi/*.yaml (phan lon dang scaffold, chua co endpoint cu the ngoai ride-service).\par
+\par
+\b Cau truc thu muc cap cao\b0\par
+- apps/: ung dung client/edge (hien chua chi ro).\par
+- services/: tap hop microservice (10 service).\par
+- libs/: thu vien dung chung (http, kafka, validation, observability, ...).\par
+- contracts/: OpenAPI va event schema-registry.\par
+- docs/: tai lieu kien truc, ADR, runbooks.\par
+- infra/: ha tang docker compose, patch.\par
+\par
+\b Danh sach service va chuc nang (dua tren ten + contracts)\b0\par
+1) api-gateway: cong vao chung, dinh tuyen REST toi cac service con.\par
+2) auth-service: xac thuc/uy quyen, phat hanh va kiem tra token.\par
+3) user-service: quan ly nguoi dung (ho so, thong tin khach hang).\par
+4) driver-service: quan ly tai xe (ho so, trang thai, vi tri).\par
+5) booking-service: tao yeu cau dat xe (booking).\par
+6) ride-service: quan ly vong doi chuyen xe (ride), state machine, cap nhat trang thai.\par
+7) pricing-service: tinh gia/bao gia cho chuyen xe.\par
+8) payment-service: thu tien, xac nhan/that bai giao dich.\par
+9) notification-service: gui thong bao (SMS/Email/Push) theo su kien.\par
+10) review-service: danh gia chuyen di va tai xe.\par
+\par
+\b Moi quan he va cach giao tiep\b0\par
+1) REST qua api-gateway\par
+- Nguoi dung/driver goi REST vao api-gateway.\par
+- api-gateway chuyen tiep toi auth/user/booking/ride/pricing/payment/... (tuy thuoc endpoint).\par
+\par
+2) Kafka event-driven (contracts/events/topics.md)\par
+- ride.created: booking-service phat su kien khi tao booking. Consumer du kien: ride/notification/pricing/eta (dang TBD).\par
+- ride.assigned: producer TBD. notification-service la consumer.\par
+- driver.location.updated: ride-service la producer. Consumer du kien: eta/monitoring (TBD).\par
+- payment.completed: payment-service phat su kien thanh toan thanh cong. Consumer du kien: ride/notification (TBD).\par
+- payment.failed: payment-service phat su kien that bai. notification-service la consumer.\par
+\par
+3) He thong traceId/requestId\par
+- Cac service du kien propagate Authorization, x-trace-id, x-request-id qua REST va event envelope.\par
+\par
+\b Ghi chu quan trong\b0\par
+- contracts/openapi cua phan lon service hien chua dinh nghia endpoint, nen phan mo ta chuc nang duoc suy luan theo ten service va flow thong thuong cua he thong dat xe.\par
+- Neu ban cap nhat OpenAPI hoac event schema chi tiet, bao cao co the duoc nang cap de chinh xac hon.\par
+}
