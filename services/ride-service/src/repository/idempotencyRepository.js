@@ -65,8 +65,7 @@ async function createKey({
           response_status: null,
           response_headers: null,
           response_body: null,
-          created_at: now,
-          updated_at: now
+          created_at: now
         }
       },
       { upsert: true, returnDocument: "after" }

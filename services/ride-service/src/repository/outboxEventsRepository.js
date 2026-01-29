@@ -36,7 +36,7 @@ async function claimPendingEvents(limit = 50) {
       }
     );
 
-    if (!result.value) {
+    if (!result || !result.value) {
       break;
     }
 

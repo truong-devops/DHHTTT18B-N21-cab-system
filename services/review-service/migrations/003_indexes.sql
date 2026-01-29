@@ -1,4 +1,3 @@
--- migrate:up
 CREATE UNIQUE INDEX IF NOT EXISTS reviews_ride_rider_uq
   ON reviews (ride_id, rider_id);
 
@@ -28,15 +27,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS outbox_events_event_id_uq
 
 CREATE INDEX IF NOT EXISTS outbox_events_status_occurred_at_idx
   ON outbox_events (status, occurred_at DESC);
-
--- migrate:down
-DROP INDEX IF EXISTS outbox_events_status_occurred_at_idx;
-DROP INDEX IF EXISTS outbox_events_event_id_uq;
-DROP INDEX IF EXISTS inbox_events_topic_received_at_idx;
-DROP INDEX IF EXISTS inbox_events_event_consumer_uq;
-DROP INDEX IF EXISTS idempotency_keys_route_user_key_uq;
-DROP INDEX IF EXISTS reviews_status_history_reviews_id_occurred_at_idx;
-DROP INDEX IF EXISTS review_status_history_review_id_status_updated_at_idx;
-DROP INDEX IF EXISTS reviews_status_created_at_idx;
-DROP INDEX IF EXISTS reviews_rider_id_created_at_idx;
-DROP INDEX IF EXISTS reviews_ride_rider_uq;
