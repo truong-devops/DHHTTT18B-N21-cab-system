@@ -1,4 +1,3 @@
--- migrate:up
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -103,19 +102,3 @@ FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_updated_at_outbox_events
 BEFORE UPDATE ON outbox_events
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- migrate:down
-DROP TRIGGER IF EXISTS set_updated_at_outbox_events ON outbox_events;
-DROP TRIGGER IF EXISTS set_updated_at_inbox_events ON inbox_events;
-DROP TRIGGER IF EXISTS set_updated_at_idempotency_keys ON idempotency_keys;
-DROP TRIGGER IF EXISTS set_updated_at_review_status_history ON review_status_history;
-DROP TRIGGER IF EXISTS set_updated_at_reviews ON reviews;
-
-DROP TABLE IF EXISTS outbox_events;
-DROP TABLE IF EXISTS inbox_events;
-DROP TABLE IF EXISTS idempotency_keys;
-DROP TABLE IF EXISTS review_status_history;
-DROP TABLE IF EXISTS reviews_status_history;
-DROP TABLE IF EXISTS reviews;
-
-DROP FUNCTION IF EXISTS set_updated_at();

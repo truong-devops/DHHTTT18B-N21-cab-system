@@ -4,41 +4,32 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
+    networks:
+      - backend
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     depends_on:
       - zookeeper
-    ports:
-      - "9092:9092"
-      - "29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    depends_on:
-      - kafka
-    ports:
-      - "8080:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    networks:
+      - backend
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    volumes:
+      - cab_redis_data:/data
+    networks:
+      - backend
 
   api-gateway:
     build:
@@ -48,21 +39,19 @@ services:
     environment:
       SERVICE_NAME: api-gateway
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
-      RIDE_SERVICE_URL: ${RIDE_SERVICE_URL:-http://host.docker.internal:3005}
-      USER_SERVICE_URL: ${USER_SERVICE_URL:-http://host.docker.internal:3002}
-      DRIVER_SERVICE_URL: ${DRIVER_SERVICE_URL:-http://host.docker.internal:3003}
-      BOOKING_SERVICE_URL: ${BOOKING_SERVICE_URL:-http://host.docker.internal:3004}
-      PRICING_SERVICE_URL: ${PRICING_SERVICE_URL:-http://host.docker.internal:3006}
-      PAYMENT_SERVICE_URL: ${PAYMENT_SERVICE_URL:-http://host.docker.internal:3007}
-      REVIEW_SERVICE_URL: ${REVIEW_SERVICE_URL:-http://host.docker.internal:3009}
-      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://host.docker.internal:4001}
-      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://host.docker.internal:3010}
+      AUTH_SERVICE_URL: http://auth-service:4001
+      RIDE_SERVICE_URL: http://ride-service:3005
+      REVIEW_SERVICE_URL: http://review-service:3009
+    depends_on:
+      - auth-service
+      - ride-service
+      - review-service
+    networks:
+      - backend
 
   auth-service:
     build:
       context: ../services/auth-service
-    ports:
-      - "4001:4001"
     environment:
       SERVICE_NAME: auth-service
       PORT: 4001
@@ -70,6 +59,42 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
     depends_on:
       - postgres
+    networks:
+      - backend
+
+  ride-service:
+    build:
+      context: ..
+      dockerfile: services/ride-service/Dockerfile
+    environment:
+      SERVICE_NAME: ride-service
+      PORT: 3005
+      MONGODB_URI: mongodb://mongo:27017/ride_service
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on:
+      - mongo
+      - redis
+      - kafka
+    networks:
+      - backend
+
+  review-service:
+    build:
+      context: ..
+      dockerfile: services/review-service/Dockerfile
+    environment:
+      SERVICE_NAME: review-service
+      PORT: 3009
+      DATABASE_URL: postgres://cab:cabpass@postgres:5432/review-service_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - backend
 
   postgres:
     image: postgres:16-alpine
@@ -77,11 +102,24 @@ services:
       POSTGRES_USER: cab
       POSTGRES_PASSWORD: cabpass
       POSTGRES_DB: cab_booking
-    ports:
-      - "5432:5432"
     volumes:
       - cab_postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - backend
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - cab_mongo_data:/data/db
+    networks:
+      - backend
 
 volumes:
   cab_postgres_data:
+  cab_redis_data:
+  cab_mongo_data:
+
+networks:
+  backend:
+    driver: bridge

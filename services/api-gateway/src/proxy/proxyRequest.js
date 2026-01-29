@@ -60,6 +60,28 @@ async function attemptRequest(targetUrl, options) {
   }
 }
 
+const DOMAIN_PREFIX_MAP = {
+  auth: "/auth"
+};
+
+function buildTargetUrl(req, baseUrl) {
+  const domain = req.params.domain;
+  const original = req.originalUrl || req.url || "/";
+  const prefix = `/v1/${domain}`;
+  const mappedPrefix = DOMAIN_PREFIX_MAP[domain];
+
+  if (mappedPrefix && original.startsWith(prefix)) {
+    const suffix = original.slice(prefix.length);
+    const path =
+      suffix && suffix.startsWith("/")
+        ? `${mappedPrefix}${suffix}`
+        : `${mappedPrefix}${suffix ? `/${suffix}` : ""}`;
+    return new URL(path || mappedPrefix, baseUrl);
+  }
+
+  return new URL(original, baseUrl);
+}
+
 async function proxyRequest(req, res) {
   const domain = req.params.domain;
   const baseUrl = SERVICE_URLS[domain];
@@ -73,7 +95,7 @@ async function proxyRequest(req, res) {
     );
   }
 
-  const targetUrl = new URL(req.originalUrl, baseUrl);
+  const targetUrl = buildTargetUrl(req, baseUrl);
   const headers = buildUpstreamHeaders(req);
   const method = req.method.toUpperCase();
 
