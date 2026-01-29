@@ -1,4 +1,5 @@
-const pool = require("../db/pool");
+const crypto = require("crypto");
+const { getDb } = require("../db/mongo");
 
 async function insertInboxEvent({
   eventId,
@@ -7,24 +8,29 @@ async function insertInboxEvent({
   eventType,
   payload
 }) {
-  const result = await pool.query(
-    `
-      INSERT INTO inbox_events (
-        event_id,
-        consumer,
-        topic,
-        event_type,
-        payload,
-        received_at
-      )
-      VALUES ($1, $2, $3, $4, $5, now())
-      ON CONFLICT (event_id, consumer) DO NOTHING
-      RETURNING id
-    `,
-    [eventId, consumer, topic, eventType, payload]
-  );
+  const db = await getDb();
+  const now = new Date();
 
-  return result.rowCount > 0;
+  try {
+    const result = await db.collection("inbox_events").insertOne({
+      _id: crypto.randomUUID(),
+      event_id: eventId,
+      consumer,
+      topic,
+      event_type: eventType,
+      payload,
+      received_at: now,
+      processed_at: null,
+      created_at: now,
+      updated_at: now
+    });
+    return Boolean(result.insertedId);
+  } catch (error) {
+    if (error?.code === 11000) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 module.exports = { insertInboxEvent };

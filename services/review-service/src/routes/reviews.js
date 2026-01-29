@@ -179,8 +179,7 @@ router.post(
         driverId: req.body.driverId,
         rating: req.body.rating,
         comment: req.body.comment,
-        status: req.body.status || "submitted",
-        traceId: req.traceId
+        status: req.body.status || "submitted"
       });
 
       responseBody = { data: toReviewResponse(review) };
