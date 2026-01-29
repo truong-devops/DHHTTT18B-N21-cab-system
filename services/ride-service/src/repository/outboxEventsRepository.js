@@ -1,47 +1,72 @@
-const pool = require("../db/pool");
+const { getDb } = require("../db/mongo");
+
+function mapOutbox(doc) {
+  if (!doc) {
+    return null;
+  }
+
+  return {
+    id: doc._id,
+    event_id: doc.event_id,
+    aggregate_type: doc.aggregate_type,
+    aggregate_id: doc.aggregate_id,
+    event_type: doc.event_type,
+    payload: doc.payload,
+    status: doc.status,
+    occurred_at: doc.occurred_at,
+    published_at: doc.published_at,
+    created_at: doc.created_at,
+    updated_at: doc.updated_at
+  };
+}
 
 async function claimPendingEvents(limit = 50) {
-  const result = await pool.query(
-    `
-      WITH candidates AS (
-        SELECT id
-        FROM outbox_events
-        WHERE status = 'pending'
-        ORDER BY occurred_at ASC
-        LIMIT $1
-        FOR UPDATE SKIP LOCKED
-      )
-      UPDATE outbox_events
-      SET status = 'processing'
-      WHERE id IN (SELECT id FROM candidates)
-      RETURNING *
-    `,
-    [limit]
-  );
+  const db = await getDb();
+  const collection = db.collection("outbox_events");
+  const claimed = [];
 
-  return result.rows;
+  for (let i = 0; i < limit; i += 1) {
+    const now = new Date();
+    const result = await collection.findOneAndUpdate(
+      { status: "pending" },
+      { $set: { status: "processing", updated_at: now } },
+      {
+        sort: { occurred_at: 1, _id: 1 },
+        returnDocument: "after"
+      }
+    );
+
+    if (!result.value) {
+      break;
+    }
+
+    claimed.push(mapOutbox(result.value));
+  }
+
+  return claimed;
 }
 
 async function markPublished(id) {
-  await pool.query(
-    `
-      UPDATE outbox_events
-      SET status = 'published',
-          published_at = now()
-      WHERE id = $1
-    `,
-    [id]
+  const db = await getDb();
+  const now = new Date();
+  await db.collection("outbox_events").updateOne(
+    { _id: id },
+    {
+      $set: {
+        status: "published",
+        published_at: now,
+        updated_at: now
+      }
+    }
   );
 }
 
 async function markFailed(id) {
-  await pool.query(
-    `
-      UPDATE outbox_events
-      SET status = 'failed'
-      WHERE id = $1
-    `,
-    [id]
+  const db = await getDb();
+  const now = new Date();
+  await db.collection("outbox_events").updateOne(
+    { _id: id },
+    { $set: { status: "failed", updated_at: now } }
   );
 }
 

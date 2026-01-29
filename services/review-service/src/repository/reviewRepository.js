@@ -1,4 +1,3 @@
-const crypto = require("crypto");
 const { applyCursorQuery } = require("@libs/http");
 const pool = require("../db/pool");
 
@@ -8,8 +7,7 @@ async function createReview({
   driverId,
   rating,
   comment = null,
-  status,
-  traceId = null
+  status
 }) {
   const client = await pool.connect();
   try {
@@ -37,41 +35,6 @@ async function createReview({
       await client.query("ROLLBACK");
       return null;
     }
-
-    const eventId = crypto.randomUUID();
-    const eventPayload = {
-      reviewId: review.id,
-      rideId: review.ride_id,
-      riderId: review.rider_id,
-      driverId: review.driver_id,
-      rating: review.rating,
-      comment: review.comment,
-      status: review.status,
-      createdAt: review.created_at
-    };
-
-    await client.query(
-      `
-        INSERT INTO outbox_events (
-          event_id,
-          aggregate_type,
-          aggregate_id,
-          event_type,
-          payload,
-          status,
-          occurred_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, now())
-      `,
-      [
-        eventId,
-        "review",
-        review.id,
-        "ReviewCreated",
-        { traceId, payload: eventPayload },
-        "pending"
-      ]
-    );
 
     await client.query("COMMIT");
     return review;

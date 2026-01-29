@@ -25,10 +25,6 @@ jest.mock("../src/idempotency/store", () => ({
   releaseLock: jest.fn(() => Promise.resolve())
 }));
 
-jest.mock("../src/messaging/producer", () => ({
-  publish: jest.fn(() => Promise.resolve({ published: true }))
-}));
-
 const app = require("../src/app");
 const reviewRepository = require("../src/repository/reviewRepository");
 const idempotencyRepository = require("../src/repository/idempotencyRepository");

@@ -1,6 +1,57 @@
 const crypto = require("crypto");
-const { applyCursorQuery } = require("@libs/http");
-const pool = require("../db/pool");
+const {
+  getDb,
+  runWithOptionalTransaction
+} = require("../db/mongo");
+
+function mapRide(doc) {
+  if (!doc) {
+    return null;
+  }
+
+  return {
+    id: doc._id,
+    external_ride_id: doc.external_ride_id,
+    booking_id: doc.booking_id || null,
+    rider_id: doc.rider_id || null,
+    driver_id: doc.driver_id || null,
+    pickup_lat: doc.pickup_lat,
+    pickup_lng: doc.pickup_lng,
+    dropoff_lat: doc.dropoff_lat ?? null,
+    dropoff_lng: doc.dropoff_lng ?? null,
+    status: doc.status,
+    status_updated_at: doc.status_updated_at,
+    created_at: doc.created_at,
+    updated_at: doc.updated_at
+  };
+}
+
+function buildCursorFilter({ cursor, isDesc }) {
+  if (!cursor?.createdAt || !cursor?.id) {
+    return null;
+  }
+
+  const createdAt = new Date(cursor.createdAt);
+  if (Number.isNaN(createdAt.valueOf())) {
+    return null;
+  }
+
+  if (isDesc) {
+    return {
+      $or: [
+        { created_at: { $lt: createdAt } },
+        { created_at: createdAt, _id: { $lt: cursor.id } }
+      ]
+    };
+  }
+
+  return {
+    $or: [
+      { created_at: { $gt: createdAt } },
+      { created_at: createdAt, _id: { $gt: cursor.id } }
+    ]
+  };
+}
 
 async function createRide({
   externalRideId,
@@ -14,100 +65,68 @@ async function createRide({
   status,
   traceId = null
 }) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  const db = await getDb();
+  const now = new Date();
+  const rideId = crypto.randomUUID();
+  const rideDoc = {
+    _id: rideId,
+    external_ride_id: externalRideId,
+    booking_id: bookingId,
+    rider_id: riderId,
+    driver_id: driverId,
+    pickup_lat: pickupLat,
+    pickup_lng: pickupLng,
+    dropoff_lat: dropoffLat,
+    dropoff_lng: dropoffLng,
+    status,
+    status_updated_at: now,
+    created_at: now,
+    updated_at: now
+  };
 
-    const result = await client.query(
-      `
-        INSERT INTO rides (
-          external_ride_id,
-          booking_id,
-          rider_id,
-          driver_id,
-          pickup_lat,
-          pickup_lng,
-          dropoff_lat,
-          dropoff_lng,
-          status,
-          status_updated_at
-        )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
-        RETURNING *
-      `,
-      [
-        externalRideId,
-        bookingId,
-        riderId,
-        driverId,
-        pickupLat,
-        pickupLng,
-        dropoffLat,
-        dropoffLng,
-        status
-      ]
-    );
+  const eventId = crypto.randomUUID();
+  const eventPayload = {
+    rideId,
+    pickup: { lat: pickupLat, lng: pickupLng },
+    timestamp: now
+  };
+  const outboxDoc = {
+    _id: crypto.randomUUID(),
+    event_id: eventId,
+    aggregate_type: "ride",
+    aggregate_id: rideId,
+    event_type: "RideCreated",
+    payload: { traceId, payload: eventPayload },
+    status: "pending",
+    occurred_at: now,
+    created_at: now,
+    updated_at: now
+  };
 
-    const ride = result.rows[0];
-    if (!ride) {
-      await client.query("ROLLBACK");
-      return null;
-    }
+  await runWithOptionalTransaction(async (session) => {
+    const options = session ? { session } : {};
+    await db.collection("rides").insertOne(rideDoc, options);
+    await db
+      .collection("outbox_events")
+      .insertOne(outboxDoc, options);
+    return rideDoc;
+  });
 
-    const eventId = crypto.randomUUID();
-    const eventPayload = {
-      rideId: ride.id,
-      pickup: { lat: ride.pickup_lat, lng: ride.pickup_lng },
-      timestamp: ride.created_at
-    };
-
-    await client.query(
-      `
-        INSERT INTO outbox_events (
-          event_id,
-          aggregate_type,
-          aggregate_id,
-          event_type,
-          payload,
-          status,
-          occurred_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, now())
-      `,
-      [
-        eventId,
-        "ride",
-        ride.id,
-        "RideCreated",
-        { traceId, payload: eventPayload },
-        "pending"
-      ]
-    );
-
-    await client.query("COMMIT");
-    return ride;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  return mapRide(rideDoc);
 }
 
 async function getRideById(id) {
-  const result = await pool.query(
-    "SELECT * FROM rides WHERE id = $1",
-    [id]
-  );
-  return result.rows[0] || null;
+  const db = await getDb();
+  const doc = await db.collection("rides").findOne({ _id: id });
+  return mapRide(doc);
 }
 
 async function getRideByExternalId(externalRideId) {
-  const result = await pool.query(
-    "SELECT * FROM rides WHERE external_ride_id = $1",
-    [externalRideId]
-  );
-  return result.rows[0] || null;
+  const db = await getDb();
+  const doc = await db
+    .collection("rides")
+    .findOne({ external_ride_id: externalRideId });
+  return mapRide(doc);
 }
 
 async function updateRideStatus({
@@ -118,139 +137,127 @@ async function updateRideStatus({
   actorId = null,
   traceId = null
 }) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  const db = await getDb();
+  const now = new Date();
 
-    const rideResult = await client.query(
-      `
-        UPDATE rides
-        SET status = $2,
-            status_updated_at = now()
-        WHERE id = $1
-        RETURNING *
-      `,
-      [id, status]
-    );
+  const updatedRide = await runWithOptionalTransaction(
+    async (session) => {
+      const updateOptions = { returnDocument: "after" };
+      if (session) {
+        updateOptions.session = session;
+      }
 
-    const ride = rideResult.rows[0];
-    if (!ride) {
-      await client.query("ROLLBACK");
-      return null;
-    }
+      const rideResult = await db
+        .collection("rides")
+        .findOneAndUpdate(
+          { _id: id },
+          {
+            $set: {
+              status,
+              status_updated_at: now,
+              updated_at: now
+            }
+          },
+          updateOptions
+        );
 
-    await client.query(
-      `
-        INSERT INTO ride_status_history (
-          ride_id,
-          from_status,
-          to_status,
-          reason,
-          actor_id,
-          trace_id,
-          occurred_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, now())
-      `,
-      [
-        id,
-        fromStatus ? String(fromStatus).toLowerCase() : null,
-        String(status).toLowerCase(),
+      const rideDoc = rideResult.value;
+      if (!rideDoc) {
+        return null;
+      }
+
+      const historyDoc = {
+        _id: crypto.randomUUID(),
+        ride_id: id,
+        from_status: fromStatus
+          ? String(fromStatus).toLowerCase()
+          : null,
+        to_status: String(status).toLowerCase(),
         reason,
-        actorId,
-        traceId
-      ]
-    );
-
-    if (status === "assigned") {
-      const eventId = crypto.randomUUID();
-      const eventPayload = {
-        rideId: ride.id,
-        driverId: ride.driver_id,
-        assignedAt: ride.status_updated_at
+        actor_id: actorId,
+        trace_id: traceId,
+        occurred_at: now,
+        created_at: now,
+        updated_at: now
       };
 
-      await client.query(
-        `
-          INSERT INTO outbox_events (
-            event_id,
-            aggregate_type,
-            aggregate_id,
-            event_type,
-            payload,
-            status,
-            occurred_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, now())
-        `,
-        [
-          eventId,
-          "ride",
-          ride.id,
-          "RideAssigned",
-          { traceId, payload: eventPayload },
-          "pending"
-        ]
-      );
-    }
+      const insertOptions = session ? { session } : {};
+      await db
+        .collection("ride_status_history")
+        .insertOne(historyDoc, insertOptions);
 
-    await client.query("COMMIT");
-    return ride;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+      if (status === "assigned") {
+        const eventId = crypto.randomUUID();
+        const eventPayload = {
+          rideId: rideDoc._id,
+          driverId: rideDoc.driver_id,
+          assignedAt: rideDoc.status_updated_at
+        };
+
+        const outboxDoc = {
+          _id: crypto.randomUUID(),
+          event_id: eventId,
+          aggregate_type: "ride",
+          aggregate_id: rideDoc._id,
+          event_type: "RideAssigned",
+          payload: { traceId, payload: eventPayload },
+          status: "pending",
+          occurred_at: now,
+          created_at: now,
+          updated_at: now
+        };
+
+        await db
+          .collection("outbox_events")
+          .insertOne(outboxDoc, insertOptions);
+      }
+
+      return rideDoc;
+    }
+  );
+
+  return mapRide(updatedRide);
 }
 
 async function updateRideFields(id, fields) {
-  const columns = [];
-  const values = [];
-  let index = 1;
+  const updates = {};
 
   if (fields.driverId !== undefined) {
-    columns.push(`driver_id = $${index++}`);
-    values.push(fields.driverId);
+    updates.driver_id = fields.driverId;
   }
 
   if (fields.pickupLat !== undefined) {
-    columns.push(`pickup_lat = $${index++}`);
-    values.push(fields.pickupLat);
+    updates.pickup_lat = fields.pickupLat;
   }
 
   if (fields.pickupLng !== undefined) {
-    columns.push(`pickup_lng = $${index++}`);
-    values.push(fields.pickupLng);
+    updates.pickup_lng = fields.pickupLng;
   }
 
   if (fields.dropoffLat !== undefined) {
-    columns.push(`dropoff_lat = $${index++}`);
-    values.push(fields.dropoffLat);
+    updates.dropoff_lat = fields.dropoffLat;
   }
 
   if (fields.dropoffLng !== undefined) {
-    columns.push(`dropoff_lng = $${index++}`);
-    values.push(fields.dropoffLng);
+    updates.dropoff_lng = fields.dropoffLng;
   }
 
-  if (!columns.length) {
+  if (!Object.keys(updates).length) {
     return getRideById(id);
   }
 
-  values.push(id);
+  updates.updated_at = new Date();
 
-  const result = await pool.query(
-    `
-      UPDATE rides
-      SET ${columns.join(", ")}
-      WHERE id = $${index}
-      RETURNING *
-    `,
-    values
-  );
+  const db = await getDb();
+  const result = await db
+    .collection("rides")
+    .findOneAndUpdate(
+      { _id: id },
+      { $set: updates },
+      { returnDocument: "after" }
+    );
 
-  return result.rows[0] || null;
+  return mapRide(result.value);
 }
 
 async function addStatusHistory({
@@ -262,29 +269,20 @@ async function addStatusHistory({
   traceId = null,
   occurredAt = null
 }) {
-  await pool.query(
-    `
-      INSERT INTO ride_status_history (
-        ride_id,
-        from_status,
-        to_status,
-        reason,
-        actor_id,
-        trace_id,
-        occurred_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, now()))
-    `,
-    [
-      rideId,
-      fromStatus ? String(fromStatus).toLowerCase() : null,
-      String(toStatus).toLowerCase(),
-      reason,
-      actorId,
-      traceId,
-      occurredAt
-    ]
-  );
+  const db = await getDb();
+  const now = new Date();
+  await db.collection("ride_status_history").insertOne({
+    _id: crypto.randomUUID(),
+    ride_id: rideId,
+    from_status: fromStatus ? String(fromStatus).toLowerCase() : null,
+    to_status: String(toStatus).toLowerCase(),
+    reason,
+    actor_id: actorId,
+    trace_id: traceId,
+    occurred_at: occurredAt ? new Date(occurredAt) : now,
+    created_at: now,
+    updated_at: now
+  });
 }
 
 async function listRides({
@@ -294,35 +292,40 @@ async function listRides({
   riderId = null,
   sort = "-created_at"
 } = {}) {
-  const builder = {
-    values: [],
-    where: [],
-    orderBy: "",
-    limit
+  const db = await getDb();
+  const isDesc =
+    sort === "-created_at" || sort === "-createdAt";
+
+  const filter = {};
+  if (status) {
+    filter.status = status;
+  }
+  if (riderId) {
+    filter.rider_id = riderId;
+  }
+
+  const cursorFilter = buildCursorFilter({
+    cursor,
+    isDesc
+  });
+  if (cursorFilter) {
+    filter.$and = filter.$and || [];
+    filter.$and.push(cursorFilter);
+  }
+
+  const sortSpec = {
+    created_at: isDesc ? -1 : 1,
+    _id: isDesc ? -1 : 1
   };
 
-  if (status) {
-    builder.values.push(status);
-    builder.where.push(`status = $${builder.values.length}`);
-  }
+  const docs = await db
+    .collection("rides")
+    .find(filter)
+    .sort(sortSpec)
+    .limit(limit)
+    .toArray();
 
-  if (riderId) {
-    builder.values.push(riderId);
-    builder.where.push(`rider_id = $${builder.values.length}`);
-  }
-
-  applyCursorQuery(builder, { limit, cursor, sort });
-  builder.values.push(builder.limit);
-
-  const query = `
-    SELECT * FROM rides
-    ${builder.where.length ? `WHERE ${builder.where.join(" AND ")}` : ""}
-    ORDER BY ${builder.orderBy}
-    LIMIT $${builder.values.length}
-  `;
-
-  const result = await pool.query(query, builder.values);
-  return result.rows;
+  return docs.map(mapRide);
 }
 
 module.exports = {

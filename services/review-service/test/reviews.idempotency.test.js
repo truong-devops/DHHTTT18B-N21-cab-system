@@ -43,10 +43,6 @@ jest.mock("../src/idempotency/store", () => {
   };
 });
 
-jest.mock("../src/messaging/producer", () => ({
-  publish: jest.fn(() => Promise.resolve({ published: true }))
-}));
-
 const reviewRepository = require("../src/repository/reviewRepository");
 const idempotencyStore = require("../src/idempotency/store");
 
