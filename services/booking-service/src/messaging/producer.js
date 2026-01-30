@@ -6,9 +6,13 @@ const kafka = new Kafka({
 });
 
 const producer = kafka.producer();
+let isConnected = false;
 
 async function publish(topic, message) {
-  await producer.connect();
+  if (!isConnected) {
+    await producer.connect();
+    isConnected = true;
+  }
   await producer.send({
     topic,
     messages: [{ value: JSON.stringify(message) }]
