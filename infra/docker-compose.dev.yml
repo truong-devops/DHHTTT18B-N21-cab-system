@@ -42,10 +42,12 @@ services:
       AUTH_SERVICE_URL: http://auth-service:4001
       RIDE_SERVICE_URL: http://ride-service:3005
       REVIEW_SERVICE_URL: http://review-service:3009
+      USER_SERVICE_URL: http://user-service:4004
     depends_on:
       - auth-service
       - ride-service
       - review-service
+      - user-service
     networks:
       - backend
 
@@ -57,6 +59,20 @@ services:
       PORT: 4001
       DATABASE_URL: postgres://cab:cabpass@postgres:5432/auth-service_db
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
+  user-service:
+    build:
+      context: ../services/user-service
+    environment:
+      SERVICE_NAME: user-service
+      PORT: 4004
+      DATABASE_URL: postgres://cab:cabpass@postgres:5432/user-service_db
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       - postgres
     networks:

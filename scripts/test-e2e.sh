@@ -5,6 +5,9 @@ COMPOSE_FILE="${COMPOSE_FILE:-infra/docker-compose.dev.yml}"
 EMAIL="${EMAIL:-user1@test.com}"
 PASSWORD="${PASSWORD:-secret123}"
 ROLE="${ROLE:-user}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@test.com}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-secret123}"
+ADMIN_ROLE="${ADMIN_ROLE:-admin}"
 BASE_URL="${BASE_URL:-http://localhost:3000}"
 
 RESET=0
@@ -43,6 +46,11 @@ docker compose -f "$COMPOSE_FILE" exec -T postgres \
   | grep -q 1 || docker compose -f "$COMPOSE_FILE" exec -T postgres \
   psql -U cab -d postgres -c 'CREATE DATABASE "review-service_db";'
 
+docker compose -f "$COMPOSE_FILE" exec -T postgres \
+  psql -U cab -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='user-service_db'" \
+  | grep -q 1 || docker compose -f "$COMPOSE_FILE" exec -T postgres \
+  psql -U cab -d postgres -c 'CREATE DATABASE "user-service_db";'
+
 echo "[e2e] migrate auth-service"
 docker compose -f "$COMPOSE_FILE" exec -T postgres \
   psql -U cab -d auth-service_db < services/auth-service/migrations/001_init.sql
@@ -54,6 +62,14 @@ docker compose -f "$COMPOSE_FILE" exec -T postgres \
   psql -U cab -d review-service_db < services/review-service/migrations/002_init_schema.sql
 docker compose -f "$COMPOSE_FILE" exec -T postgres \
   psql -U cab -d review-service_db < services/review-service/migrations/003_indexes.sql
+
+echo "[e2e] migrate user-service"
+docker compose -f "$COMPOSE_FILE" exec -T postgres \
+  psql -U cab -d user-service_db < services/user-service/migrations/001_enable_extensions.sql
+docker compose -f "$COMPOSE_FILE" exec -T postgres \
+  psql -U cab -d user-service_db < services/user-service/migrations/002_init_schema.sql
+docker compose -f "$COMPOSE_FILE" exec -T postgres \
+  psql -U cab -d user-service_db < services/user-service/migrations/003_indexes.sql
 
 echo "[e2e] login or register"
 LOGIN_JSON=$(docker compose -f "$COMPOSE_FILE" exec -T auth-service \
@@ -76,6 +92,64 @@ if [ -z "$ACCESS" ]; then
   echo "$LOGIN_JSON"
   exit 1
 fi
+
+echo "[e2e] login or register admin"
+ADMIN_LOGIN_JSON=$(docker compose -f "$COMPOSE_FILE" exec -T auth-service \
+  node -e "const body={identifier:'$ADMIN_EMAIL',password:'$ADMIN_PASSWORD'};fetch('http://localhost:4001/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()).then(j=>console.log(JSON.stringify(j)))")
+echo "[e2e] admin login response:"
+echo "$ADMIN_LOGIN_JSON" | print_json
+
+ADMIN_ACCESS=$(echo "$ADMIN_LOGIN_JSON" | json_get "tokens.accessToken")
+if [ -z "$ADMIN_ACCESS" ]; then
+  ADMIN_REGISTER_JSON=$(docker compose -f "$COMPOSE_FILE" exec -T auth-service \
+    node -e "const body={email:'$ADMIN_EMAIL',password:'$ADMIN_PASSWORD',role:'$ADMIN_ROLE'};fetch('http://localhost:4001/auth/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()).then(j=>console.log(JSON.stringify(j)))")
+  echo "[e2e] admin register response:"
+  echo "$ADMIN_REGISTER_JSON" | print_json
+  ADMIN_ACCESS=$(echo "$ADMIN_REGISTER_JSON" | json_get "tokens.accessToken")
+fi
+
+if [ -z "$ADMIN_ACCESS" ]; then
+  echo "[e2e] failed to obtain admin access token"
+  exit 1
+fi
+
+echo "[e2e] user-service create user (admin)"
+USER_SUFFIX=$(date +%s)
+USER_EMAIL="user-${USER_SUFFIX}@test.com"
+USER_CREATE_JSON=$(curl -s -X POST "$BASE_URL/v1/users" \
+  -H "Authorization: Bearer $ADMIN_ACCESS" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$USER_EMAIL\",\"fullName\":\"User $USER_SUFFIX\",\"role\":\"customer\",\"status\":\"ACTIVE\"}")
+echo "$USER_CREATE_JSON" | print_json
+
+USER_ID=$(echo "$USER_CREATE_JSON" | json_get "data.id")
+if [ -z "$USER_ID" ]; then
+  echo "[e2e] user create failed"
+  exit 1
+fi
+
+echo "[e2e] user-service get user"
+USER_GET_JSON=$(curl -s "$BASE_URL/v1/users/$USER_ID" \
+  -H "Authorization: Bearer $ADMIN_ACCESS")
+echo "$USER_GET_JSON" | print_json
+
+echo "[e2e] user-service list users (admin)"
+USER_LIST_JSON=$(curl -s "$BASE_URL/v1/users?email=$USER_EMAIL&limit=5" \
+  -H "Authorization: Bearer $ADMIN_ACCESS")
+echo "$USER_LIST_JSON" | print_json
+
+echo "[e2e] user-service update user (admin)"
+USER_UPDATE_JSON=$(curl -s -X PATCH "$BASE_URL/v1/users/$USER_ID" \
+  -H "Authorization: Bearer $ADMIN_ACCESS" \
+  -H "Content-Type: application/json" \
+  -d '{"fullName":"User Updated","status":"SUSPENDED"}')
+echo "$USER_UPDATE_JSON" | print_json
+
+echo "[e2e] user-service list users (non-admin should fail)"
+USER_LIST_FORBIDDEN=$(curl -s "$BASE_URL/v1/users?limit=1" \
+  -H "Authorization: Bearer $ACCESS")
+echo "$USER_LIST_FORBIDDEN" | print_json
+echo "$USER_LIST_FORBIDDEN" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);if(j.error&&j.error.code==='FORBIDDEN'){process.exit(0)}process.exit(1)})"
 
 echo "[e2e] create ride"
 RIDE_JSON=$(curl -s -X POST "$BASE_URL/v1/rides" \
