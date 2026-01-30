@@ -27,6 +27,9 @@ function buildUpstreamHeaders(req) {
   if (req.user?.id) {
     headers["x-user-id"] = req.user.id;
   }
+  if (req.user?.role) {
+    headers["x-user-role"] = req.user.role;
+  }
   if (req.user?.roles?.length) {
     headers["x-user-roles"] = req.user.roles.join(",");
   }

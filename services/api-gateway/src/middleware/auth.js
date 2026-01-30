@@ -63,11 +63,13 @@ function authMiddleware(req, res, next) {
       );
     }
 
+    const roles = Array.isArray(payload.roles)
+      ? payload.roles
+      : [];
     req.user = {
       id: userId,
-      roles: Array.isArray(payload.roles)
-        ? payload.roles
-        : [],
+      role: payload.role || roles[0] || null,
+      roles,
       scopes: Array.isArray(payload.scopes)
         ? payload.scopes
         : []
