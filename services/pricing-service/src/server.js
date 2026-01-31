@@ -1,6 +1,9 @@
-const app = require("./app");
+require("dotenv").config();
 
-const port = Number(process.env.PORT || 3000);
+const app = require("./app");
+const logger = require("./utils/logger");
+
+const port = Number(process.env.PORT || 3006);
 app.listen(port, () => {
-  console.log(`[${process.env.SERVICE_NAME || "service"}] listening on :${port}`);
+  logger.info({ port }, "[pricing-service] listening");
 });

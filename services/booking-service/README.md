@@ -37,7 +37,7 @@ ride.cancelled
 3. Kiến trúc & Luồng xử lý
 3.1 Create Booking Flow
 
-Client gọi POST /bookings
+Client gọi POST /v1/bookings
 
 Booking Service validate request
 
@@ -51,7 +51,7 @@ Trả response cho client
 
 3.2 Cancel Booking Flow
 
-Client gọi POST /bookings/{id}/cancel
+Client gọi POST /v1/bookings/{id}/cancel
 
 Booking Service update trạng thái booking → CANCELED
 
@@ -137,7 +137,7 @@ Response:
 
 8.2 Create Booking
 
-POST /bookings
+POST /v1/bookings
 
 Request body:
 
@@ -169,7 +169,7 @@ Publish Kafka event ride.created
 
 8.3 Cancel Booking
 
-POST /bookings/{bookingId}/cancel
+POST /v1/bookings/{bookingId}/cancel
 
 Response:
 
