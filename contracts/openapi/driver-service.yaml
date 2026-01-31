@@ -2,4 +2,263 @@ openapi: 3.0.3
 info:
   title: driver-service
   version: 0.1.0
-paths: {}
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  ok:
+                    type: boolean
+                required:
+                  - ok
+  /drivers:
+    post:
+      summary: Create driver
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDriverRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Driver"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Driver already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /drivers/{driverId}/status:
+    post:
+      summary: Update driver status
+      parameters:
+        - $ref: "#/components/parameters/DriverId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDriverStatusRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Driver"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Driver not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /drivers/{driverId}/location:
+    post:
+      summary: Update driver location
+      description: Publishes driver.location.updated event
+      parameters:
+        - $ref: "#/components/parameters/DriverId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDriverLocationRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Driver"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Driver not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  parameters:
+    DriverId:
+      name: driverId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+  schemas:
+    Location:
+      type: object
+      additionalProperties: false
+      required:
+        - lat
+        - lng
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+    Driver:
+      type: object
+      additionalProperties: false
+      required:
+        - driverId
+        - name
+        - phone
+        - status
+        - location
+        - createdAt
+        - updatedAt
+      properties:
+        driverId:
+          type: string
+          minLength: 1
+          maxLength: 64
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        phone:
+          type: string
+          minLength: 3
+          maxLength: 32
+        status:
+          type: string
+          enum:
+            - offline
+            - available
+            - on_trip
+        location:
+          $ref: "#/components/schemas/Location"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateDriverRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - driverId
+        - name
+        - phone
+        - status
+        - location
+      properties:
+        driverId:
+          type: string
+          minLength: 1
+          maxLength: 64
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        phone:
+          type: string
+          minLength: 3
+          maxLength: 32
+        status:
+          type: string
+          enum:
+            - offline
+            - available
+            - on_trip
+        location:
+          $ref: "#/components/schemas/Location"
+    UpdateDriverStatusRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - offline
+            - available
+            - on_trip
+    UpdateDriverLocationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - lat
+        - lng
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - path
+              - message
+            properties:
+              path:
+                type: string
+              message:
+                type: string

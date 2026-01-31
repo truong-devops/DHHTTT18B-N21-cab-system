@@ -1,0 +1,118 @@
+{
+  "info": {
+    "name": "driver-service (standalone)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Create driver (POST /v1/drivers)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  const json = pm.response.json();",
+              "  if (json && json.driverId) {",
+              "    pm.environment.set('driverId', json.driverId);",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{idemKeyCreate}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Nguyen Van A\",\n  \"phoneNumber\": \"0909123456\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/drivers",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "drivers"]
+        }
+      }
+    },
+    {
+      "name": "2. Update driver location (POST /v1/driver-locations)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{idemKeyLocation}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"driverId\": \"{{driverId}}\",\n  \"lat\": 10.762622,\n  \"lng\": 106.660172\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/driver-locations",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "driver-locations"]
+        }
+      }
+    },
+    {
+      "name": "3. Idempotency repeat (same Idempotency-Key)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{idemKeyLocation}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"driverId\": \"{{driverId}}\",\n  \"lat\": 10.762622,\n  \"lng\": 106.660172\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/driver-locations",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "driver-locations"]
+        }
+      }
+    },
+    {
+      "name": "4. Validation error (extra field)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{idemKeyValidation}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Nguyen Van A\",\n  \"phoneNumber\": \"0909123456\",\n  \"extra\": \"not-allowed\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/drivers",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "drivers"]
+        }
+      }
+    },
+    {
+      "name": "5. Missing Idempotency-Key",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Nguyen Van A\",\n  \"phoneNumber\": \"0909123456\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/drivers",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "drivers"]
+        }
+      }
+    }
+  ]
+}
