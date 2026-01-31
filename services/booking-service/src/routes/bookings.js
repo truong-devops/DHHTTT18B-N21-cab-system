@@ -9,8 +9,19 @@ const topics = require("../messaging/topics");
 
 const router = express.Router();
 
+function buildEnvelope({ eventId, type, traceId, payload }) {
+  return {
+    eventId,
+    traceId: traceId || null,
+    occurredAt: new Date().toISOString(),
+    type,
+    version: 1,
+    payload
+  };
+}
+
 /**
- * POST /bookings
+ * POST /v1/bookings
  * Body: { pickup, dropoff, vehicleType }
  * Header: Idempotency-Key (optional)
  */
@@ -43,19 +54,24 @@ router.post("/", async (req, res) => {
     bookingRepo.create(booking);
 
     // 4) Publish event ride.created (để ride-service consume)
-    const event = {
-      eventId: crypto.randomUUID(),
+    const traceId = req.header("x-trace-id");
+    const eventId = crypto.randomUUID();
+    const event = buildEnvelope({
+      eventId,
+      traceId,
       type: "RideCreated",
-      rideId,
-      pickup: { lat: pickup.lat, lng: pickup.lng },
-      timestamp: new Date().toISOString()
-    };
+      payload: {
+        rideId,
+        pickup: { lat: pickup.lat, lng: pickup.lng },
+        timestamp: new Date().toISOString()
+      }
+    });
     await publish(topics.RideCreated, event);
 
     // 5) Response
     return res.status(201).json({
       booking,
-      publishedEvent: { topic: topics.RideCreated, eventId: event.eventId }
+      publishedEvent: { topic: topics.RideCreated, eventId }
     });
   } catch (e) {
     console.error(e);
@@ -74,19 +90,24 @@ router.post("/:id/cancel", async (req, res) => {
     const canceled = bookingRepo.cancel(bookingId);
 
     // 2) Publish ride.cancelled event
-    const event = {
-      eventId: crypto.randomUUID(),
+    const traceId = req.header("x-trace-id");
+    const eventId = crypto.randomUUID();
+    const event = buildEnvelope({
+      eventId,
+      traceId,
       type: "RideCancelled",
-      rideId: canceled.rideId,
-      reason: "CANCELLED_BY_CUSTOMER",
-      timestamp: new Date().toISOString()
-    };
+      payload: {
+        rideId: canceled.rideId,
+        reason: "CANCELLED_BY_CUSTOMER",
+        timestamp: new Date().toISOString()
+      }
+    });
 
     await publish(topics.RideCancelled, event);
 
     return res.status(200).json({
       booking: canceled,
-      publishedEvent: { topic: topics.RideCancelled, eventId: event.eventId }
+      publishedEvent: { topic: topics.RideCancelled, eventId }
     });
   } catch (e) {
     console.error(e);

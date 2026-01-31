@@ -191,6 +191,44 @@ echo "[e2e] verify response:"
 echo "$VERIFY_JSON" | print_json
 echo "$VERIFY_JSON" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);if(!j.data||!j.data.userId){process.exit(1)}})"
 
+echo "[e2e] pricing-service create quote"
+PRICING_QUOTE_JSON=$(curl -s -X POST "$BASE_URL/v1/pricing/quotes" \
+  -H "Authorization: Bearer $ACCESS" \
+  -H "Content-Type: application/json" \
+  -d '{"pickup":{"lat":10.76,"lng":106.66},"dropoff":{"lat":10.78,"lng":106.68},"serviceType":"STANDARD"}')
+echo "$PRICING_QUOTE_JSON" | print_json
+
+QUOTE_ID=$(echo "$PRICING_QUOTE_JSON" | json_get "data.quoteId")
+if [ -z "$QUOTE_ID" ]; then
+  echo "[e2e] pricing quote failed"
+  exit 1
+fi
+
+echo "[e2e] pricing-service get quote"
+PRICING_QUOTE_GET_JSON=$(curl -s "$BASE_URL/v1/pricing/quotes/$QUOTE_ID" \
+  -H "Authorization: Bearer $ACCESS")
+echo "$PRICING_QUOTE_GET_JSON" | print_json
+
+QUOTE_ID_GET=$(echo "$PRICING_QUOTE_GET_JSON" | json_get "data.quoteId")
+if [ "$QUOTE_ID_GET" != "$QUOTE_ID" ]; then
+  echo "[e2e] pricing quote mismatch"
+  exit 1
+fi
+
+echo "[e2e] booking-service create booking"
+BOOKING_JSON=$(curl -s -X POST "$BASE_URL/v1/bookings" \
+  -H "Authorization: Bearer $ACCESS" \
+  -H "Content-Type: application/json" \
+  -d '{"pickup":{"lat":10.76,"lng":106.66},"dropoff":{"lat":10.78,"lng":106.68},"vehicleType":"CAR"}')
+echo "$BOOKING_JSON" | print_json
+
+BOOKING_ID=$(echo "$BOOKING_JSON" | json_get "booking.bookingId")
+BOOKING_QUOTE_ID=$(echo "$BOOKING_JSON" | json_get "booking.priceSnapshot.quoteId")
+if [ -z "$BOOKING_ID" ] || [ -z "$BOOKING_QUOTE_ID" ]; then
+  echo "[e2e] booking create failed"
+  exit 1
+fi
+
 echo "[e2e] list rides"
 RIDES_JSON=$(curl -s "$BASE_URL/v1/rides" \
   -H "Authorization: Bearer $ACCESS")

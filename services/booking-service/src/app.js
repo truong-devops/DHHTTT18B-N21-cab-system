@@ -12,7 +12,7 @@ app.use(morgan("dev"));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-app.use("/bookings", bookingsRouter);
+app.use("/v1/bookings", bookingsRouter);
 // DEMO endpoint: publish RideCreated event
 app.post("/demo/ride-created", async (_req, res) => {
   try {
