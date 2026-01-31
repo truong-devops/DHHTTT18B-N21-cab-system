@@ -2,5 +2,28 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "driver.location.updated",
   "type": "object",
-  "properties": {}
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "occurredAt", "data"],
+  "properties": {
+    "eventId": { "type": "string" },
+    "eventType": { "const": "driver.location.updated" },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["driverId", "location"],
+      "properties": {
+        "driverId": { "type": "string" },
+        "location": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lat", "lng"],
+          "properties": {
+            "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+            "lng": { "type": "number", "minimum": -180, "maximum": 180 }
+          }
+        }
+      }
+    }
+  }
 }
