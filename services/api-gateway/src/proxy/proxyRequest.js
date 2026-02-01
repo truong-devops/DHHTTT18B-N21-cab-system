@@ -64,7 +64,8 @@ async function attemptRequest(targetUrl, options) {
 }
 
 const DOMAIN_PREFIX_MAP = {
-  auth: "/auth"
+  auth: "/auth",
+  notifications: "/v1/notifications"
 };
 
 function buildTargetUrl(req, baseUrl) {
@@ -72,6 +73,14 @@ function buildTargetUrl(req, baseUrl) {
   const original = req.originalUrl || req.url || "/";
   const prefix = `/v1/${domain}`;
   const mappedPrefix = DOMAIN_PREFIX_MAP[domain];
+
+  if (
+    domain === "notifications" &&
+    original.startsWith("/v1/notifications/users")
+  ) {
+    const suffix = original.slice("/v1/notifications".length);
+    return new URL(`/v1${suffix}`, baseUrl);
+  }
 
   if (mappedPrefix && original.startsWith(prefix)) {
     const suffix = original.slice(prefix.length);

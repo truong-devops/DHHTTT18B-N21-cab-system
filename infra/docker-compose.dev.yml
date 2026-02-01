@@ -41,6 +41,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
       AUTH_SERVICE_URL: http://auth-service:4001
       BOOKING_SERVICE_URL: http://booking-service:3003
+      NOTIFICATION_SERVICE_URL: http://notification-service:3010
       PRICING_SERVICE_URL: http://pricing-service:3006
       RIDE_SERVICE_URL: http://ride-service:3005
       REVIEW_SERVICE_URL: http://review-service:3009
@@ -48,6 +49,7 @@ services:
     depends_on:
       - auth-service
       - booking-service
+      - notification-service
       - pricing-service
       - ride-service
       - review-service
@@ -111,6 +113,22 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
     depends_on:
       - kafka
+    networks:
+      - backend
+
+  notification-service:
+    build:
+      context: ../services/notification-service
+    environment:
+      SERVICE_NAME: notification-service
+      PORT: 3010
+      MONGODB_URI: mongodb://mongo:27017/notification_service
+      USER_SERVICE_BASE_URL: http://user-service:4004
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      AUTH_JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on:
+      - mongo
+      - user-service
     networks:
       - backend
 
