@@ -2,4 +2,177 @@ openapi: 3.0.3
 info:
   title: driver-service
   version: 0.1.0
-paths: {}
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        "200":
+          description: OK
+        "503":
+          description: Not ready
+  /v1/driver/me:
+    get:
+      summary: Get driver profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+    put:
+      summary: Update driver profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/driver/me/vehicle:
+    put:
+      summary: Upsert active vehicle
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/driver/me/online:
+    post:
+      summary: Go online
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/driver/me/offline:
+    post:
+      summary: Go offline
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/driver/me/location:
+    post:
+      summary: Update location
+      security:
+        - bearerAuth: []
+      responses:
+        "202":
+          description: Accepted
+  /v1/driver/me/heartbeat:
+    post:
+      summary: Heartbeat
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/internal/drivers/available:
+    get:
+      summary: List available drivers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/internal/drivers/{driverId}:
+    get:
+      summary: Get driver snapshot
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: driverId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /v1/internal/drivers/{driverId}/location:
+    get:
+      summary: Get driver location
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: driverId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /v1/internal/drivers/{driverId}/mark-busy:
+    post:
+      summary: Mark driver busy
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/internal/drivers/{driverId}/mark-available:
+    post:
+      summary: Mark driver available
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/internal/drivers/bulk:
+    post:
+      summary: Bulk driver snapshot
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/admin/drivers:
+    post:
+      summary: Create driver profile
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created
+    get:
+      summary: List drivers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/admin/drivers/{driverId}/approve:
+    patch:
+      summary: Approve driver
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+  /v1/admin/drivers/{driverId}/suspend:
+    patch:
+      summary: Suspend driver
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
