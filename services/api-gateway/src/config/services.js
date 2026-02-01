@@ -7,7 +7,8 @@ const SERVICE_URLS = {
   payments: process.env.PAYMENT_SERVICE_URL || "http://localhost:3007",
   reviews: process.env.REVIEW_SERVICE_URL || "http://localhost:3009",
   auth: process.env.AUTH_SERVICE_URL || "http://localhost:4001",
-  notifications: process.env.NOTIFICATION_SERVICE_URL || "http://localhost:3010"
+  notifications:
+    process.env.NOTIFICATION_SERVICE_URL || "http://localhost:3010"
 };
 
 module.exports = { SERVICE_URLS };
