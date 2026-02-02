@@ -1,0 +1,8 @@
+{
+  "rideId": "ride_12345",
+  "amount": "150000",
+  "currency": "VND",
+  "method": "CASH",
+  "userId": "user_12345",
+  "note": "Test payment"
+}

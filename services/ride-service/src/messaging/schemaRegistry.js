@@ -1,8 +1,10 @@
 const path = require("path");
 const Ajv = require("ajv");
+const addFormats = require("ajv-formats");
 const topics = require("./topics");
 
-const ajv = new Ajv({ allErrors: true });
+const ajv = new Ajv({ allErrors: true, strict: false });
+addFormats(ajv);
 const schemaDir = path.resolve(
   __dirname,
   "../../../../contracts/events/schema-registry"

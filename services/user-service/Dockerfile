@@ -1,6 +1,11 @@
 FROM node:20-alpine
+
 WORKDIR /app
-COPY package.json ./
-RUN npm i --omit=dev
-COPY . .
-CMD ["node", "src/server.js"]
+
+COPY services/user-service/package*.json ./
+RUN npm install
+
+COPY services/user-service ./
+
+EXPOSE 4002
+CMD ["npm", "run", "start"]
