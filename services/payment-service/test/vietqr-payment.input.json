@@ -1,0 +1,8 @@
+{
+  "rideId": "ride_vietqr_001",
+  "amount": "150000",
+  "currency": "VND",
+  "method": "VIETQR",
+  "userId": "user_demo_001",
+  "note": "Thanh toan cuoc xe"
+}
