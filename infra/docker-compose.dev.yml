@@ -102,6 +102,42 @@ services:
     ports:
       - "4002:4002"
 
+  payment-service:
+    build:
+      context: ..
+      dockerfile: services/payment-service/Dockerfile
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    environment:
+      PORT: 3004
+      SERVICE_NAME: payment-service
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: cab
+      PGPASSWORD: cabpass
+      PGDATABASE: payment-service_db
+      PGPOOL_MAX: 10
+      JWT_ACCESS_SECRET: "dev_access_secret"
+      REDIS_URL: "redis://redis:6379"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_CLIENT_ID: "payment-service"
+      KAFKA_CONSUMER_GROUP_ID: "payment-service-group"
+      KAFKA_CONSUME_TOPICS: ""
+      OUTBOX_PUBLISH_INTERVAL_MS: 5000
+      VIETQR_API_URL: "https://api.vietqr.io/v2/generate"
+      VIETQR_BANK_BIN: ""
+      VIETQR_ACCOUNT_NUMBER: ""
+      VIETQR_ACCOUNT_NAME: ""
+      VIETQR_MERCHANT_CITY: "HO CHI MINH"
+      VIETQR_FORMAT: "text"
+      VIETQR_CLIENT_ID: ""
+      VIETQR_API_KEY: ""
+      VIETQR_EXPIRES_IN_MINUTES: 15
+    ports:
+      - "3004:3004"
+
   api-gateway:
     build:
       context: ..
@@ -110,13 +146,13 @@ services:
       - auth-service
       - user-service
     environment:
-      PORT: 8080
+      PORT: 3000
       CORS_ORIGIN: "http://localhost:5173"
       JWT_ACCESS_SECRET: "dev_access_secret"
       AUTH_SERVICE_URL: "http://auth-service:4001"
       USER_SERVICE_URL: "http://user-service:4002"
     ports:
-      - "8080:8080"
+      - "3000:3000"
 
   admin-dashboard:
     build:
@@ -126,7 +162,7 @@ services:
       - api-gateway
     environment:
       # Vite đọc biến có prefix VITE_
-      VITE_API_BASE_URL: "http://localhost:8080"
+      VITE_API_BASE_URL: "http://localhost:3000"
     ports:
       - "5173:5173"
 

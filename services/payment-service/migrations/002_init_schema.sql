@@ -39,47 +39,6 @@ CREATE TABLE payment_status_history (
   )
 );
 
-CREATE TABLE idempotency_keys (
-  route_key text NOT NULL,
-  user_id text NOT NULL,
-  idem_key text NOT NULL,
-  request_hash text,
-  response_code integer NOT NULL,
-  response_headers jsonb NOT NULL DEFAULT '{}'::jsonb,
-  response_body jsonb NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (route_key, user_id, idem_key)
-);
-
-CREATE TABLE outbox_events (
-  id bigserial PRIMARY KEY,
-  event_id uuid NOT NULL,
-  trace_id text,
-  request_id text,
-  event_type text NOT NULL,
-  topic text NOT NULL,
-  payload jsonb NOT NULL,
-  occurred_at timestamptz NOT NULL,
-  status text NOT NULL DEFAULT 'PENDING',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  published_at timestamptz,
-  last_error text,
-  CONSTRAINT outbox_events_status_check CHECK (status IN ('PENDING', 'PUBLISHED', 'FAILED'))
-);
-
-CREATE TABLE inbox_events (
-  id bigserial PRIMARY KEY,
-  event_id uuid NOT NULL,
-  trace_id text,
-  event_type text NOT NULL,
-  payload jsonb NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  processed_at timestamptz
-);
-
 -- migrate:down
-DROP TABLE IF EXISTS inbox_events;
-DROP TABLE IF EXISTS outbox_events;
-DROP TABLE IF EXISTS idempotency_keys;
 DROP TABLE IF EXISTS payment_status_history;
 DROP TABLE IF EXISTS payments;
