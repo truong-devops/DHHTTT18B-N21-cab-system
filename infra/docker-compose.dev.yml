@@ -33,7 +33,8 @@ services:
 
   api-gateway:
     build:
-      context: ../services/api-gateway
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -43,6 +44,7 @@ services:
       BOOKING_SERVICE_URL: http://booking-service:3003
       DRIVER_SERVICE_URL: http://driver-service:3011
       NOTIFICATION_SERVICE_URL: http://notification-service:3010
+      PAYMENT_SERVICE_URL: http://payment-service:3007
       PRICING_SERVICE_URL: http://pricing-service:3006
       RIDE_SERVICE_URL: http://ride-service:3005
       REVIEW_SERVICE_URL: http://review-service:3009
@@ -52,6 +54,7 @@ services:
       - booking-service
       - driver-service
       - notification-service
+      - payment-service
       - pricing-service
       - ride-service
       - review-service
@@ -61,7 +64,8 @@ services:
 
   auth-service:
     build:
-      context: ../services/auth-service
+      context: ..
+      dockerfile: services/auth-service/Dockerfile
     environment:
       SERVICE_NAME: auth-service
       PORT: 4001
@@ -74,7 +78,8 @@ services:
 
   user-service:
     build:
-      context: ../services/user-service
+      context: ..
+      dockerfile: services/user-service/Dockerfile
     environment:
       SERVICE_NAME: user-service
       PORT: 4004
@@ -165,6 +170,31 @@ services:
     networks:
       - backend
 
+  payment-service:
+    build:
+      context: ..
+      dockerfile: services/payment-service/Dockerfile
+    environment:
+      SERVICE_NAME: payment-service
+      PORT: 3007
+      DATABASE_URL: postgres://cab:cabpass@postgres:5432/payment-service_db
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      JWT_ACCESS_SECRET: ${JWT_SECRET:-dev-secret}
+
+      VIETQR_BANK_BIN: "970418"
+      VIETQR_ACCOUNT_NUMBER: "123456789"
+      VIETQR_ACCOUNT_NAME: "NGUYEN VAN A"
+      VIETQR_CLIENT_ID: "your-client-id"
+      VIETQR_API_KEY: "your-api-key"
+      VIETQR_EXPIRES_IN_MINUTES: 15
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - backend
+
   review-service:
     build:
       context: ..
@@ -181,6 +211,9 @@ services:
     networks:
       - backend
 
+  # =========================
+  # Infra: Postgres (demo future)
+  # =========================
   postgres:
     image: postgres:16-alpine
     environment:

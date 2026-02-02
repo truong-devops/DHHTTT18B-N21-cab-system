@@ -1,0 +1,1 @@
+-- idempotency_keys table removed; migration kept as no-op for compatibility.

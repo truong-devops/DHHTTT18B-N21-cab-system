@@ -1,3 +1,6 @@
+const Ajv = require("ajv");
+const addFormats = require("ajv-formats");
+
 function isObject(value) {
   return (
     typeof value === "object" &&
@@ -46,4 +49,37 @@ function validate(schema, data) {
   return { ok: errors.length === 0, errors };
 }
 
-module.exports = { validate };
+function createAjv(options = {}) {
+  const ajv = new Ajv({
+    allErrors: true,
+    strict: false,
+    ...options
+  });
+  addFormats(ajv);
+  return ajv;
+}
+
+function normalizeInstancePath(instancePath) {
+  if (!instancePath) {
+    return "";
+  }
+  return instancePath.replace(/\//g, ".").replace(/^\./, "");
+}
+
+function formatAjvErrors(errors, prefix = "") {
+  if (!Array.isArray(errors)) {
+    return [];
+  }
+  return errors.map((error) => {
+    const instancePath = normalizeInstancePath(
+      error.instancePath || error.dataPath || ""
+    );
+    const path = [prefix, instancePath].filter(Boolean).join(".");
+    return {
+      path: path || prefix || "body",
+      message: error.message || "is invalid"
+    };
+  });
+}
+
+module.exports = { validate, createAjv, formatAjvErrors };

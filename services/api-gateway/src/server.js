@@ -1,6 +1,6 @@
 const app = require("./app");
+const config = require("./config");
 
-const port = Number(process.env.PORT || 3000);
-app.listen(port, () => {
-  console.log(`[${process.env.SERVICE_NAME || "service"}] listening on :${port}`);
+app.listen(config.port, () => {
+  console.log(`[${config.serviceName}] listening on :${config.port}`);
 });
