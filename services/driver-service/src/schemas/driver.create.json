@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DriverCreateRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["driverId", "name", "phone", "status"],
+  "properties": {
+    "driverId": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "phone": { "type": "string", "minLength": 3 },
+    "status": {
+      "type": "string",
+      "enum": ["offline", "available", "on_trip", "suspended"]
+    }
+  }
+}

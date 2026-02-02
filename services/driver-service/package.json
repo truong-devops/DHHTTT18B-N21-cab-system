@@ -5,15 +5,26 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
+    "ajv": "^8.12.0",
     "express": "^4.19.2",
     "cors": "^2.8.5",
+    "kafkajs": "^2.2.4",
     "helmet": "^7.1.0",
     "morgan": "^1.10.0"
   },
   "devDependencies": {
+    "jest": "^29.6.1",
+    "supertest": "^6.3.3",
     "nodemon": "^3.0.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": ["/node_modules/"],
+    "testTimeout": 10000
   }
 }

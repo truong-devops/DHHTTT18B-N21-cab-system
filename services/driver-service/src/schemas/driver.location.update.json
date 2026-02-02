@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DriverLocationUpdateRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["lat", "lng"],
+  "properties": {
+    "lat": { "type": "number" },
+    "lng": { "type": "number" },
+    "timestamp": { "type": "string" }
+  }
+}

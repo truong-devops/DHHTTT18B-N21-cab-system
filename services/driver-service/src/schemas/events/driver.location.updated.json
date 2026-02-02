@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DriverLocationUpdatedEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "traceId", "occurredAt", "type", "version", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "minLength": 1 },
+    "traceId": { "type": "string", "minLength": 1 },
+    "occurredAt": { "type": "string", "minLength": 1 },
+    "type": { "const": "driver.location.updated" },
+    "version": { "type": "integer", "const": 1 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["driverId", "location", "recordedAt"],
+      "properties": {
+        "driverId": { "type": "string", "minLength": 1 },
+        "location": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lat", "lng"],
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "recordedAt": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DriverLocationCreateRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "driverId", "lat", "lng"],
+  "properties": {
+    "eventId": { "type": "string", "minLength": 1 },
+    "traceId": { "type": "string" },
+    "driverId": { "type": "string", "minLength": 1 },
+    "lat": { "type": "number" },
+    "lng": { "type": "number" },
+    "recordedAt": { "type": "string" },
+    "occurredAt": { "type": "string" }
+  }
+}
