@@ -1,6 +1,18 @@
 const app = require("./app");
+const logger = require("./utils/logger");
+const { startDispatcher } = require("./dispatcher/notificationDispatcher");
+const { getDb } = require("./db/mongo");
 
-const port = Number(process.env.PORT || 3000);
+const port = Number(process.env.PORT || 3010);
+
 app.listen(port, () => {
-  console.log(`[${process.env.SERVICE_NAME || "service"}] listening on :${port}`);
+  logger.info(
+    `[${process.env.SERVICE_NAME || "notification-service"}] listening on :${port}`
+  );
 });
+
+getDb().catch((error) => {
+  logger.error({ err: error }, "[notification-service] mongo init failed");
+});
+
+startDispatcher();

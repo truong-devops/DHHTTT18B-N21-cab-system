@@ -1,0 +1,593 @@
+const redis = require("../cache/redis");
+const {
+  LOCATION_TTL_SECONDS,
+  ONLINE_TTL_SECONDS,
+  MAX_LOCATION_RATE_PER_SEC,
+  DEFAULT_SEARCH_RADIUS_METERS,
+  AVAILABLE_LIMIT_DEFAULT,
+  FORCE_OFFLINE_WHEN_BUSY
+} = require("../config/settings");
+const {
+  DRIVER_STATUS,
+  ONLINE_STATUS,
+  canGoOnline,
+  canTransitionOnlineStatus
+} = require("../domain/driverState");
+const { ApiError } = require("../utils/errors");
+const {
+  driverLocationKey,
+  driverOnlineKey,
+  driverBusyKey,
+  geoKey,
+  locationRateKey
+} = require("../utils/redisKeys");
+const {
+  mapDriver,
+  mapVehicle,
+  mapLocation
+} = require("../utils/mapper");
+const driverRepository = require("../repository/driverRepository");
+const vehicleRepository = require("../repository/vehicleRepository");
+const locationRepository = require("../repository/locationRepository");
+
+async function getDriverMe(userId) {
+  const driver = await driverRepository.getDriverByUserId(userId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(
+    driver.id
+  );
+  const location = await getLocationSnapshot(driver.id);
+
+  return {
+    driver: mapDriver(driver),
+    vehicle: mapVehicle(vehicle),
+    location
+  };
+}
+
+async function updateDriverProfile(userId, fields) {
+  const driver = await driverRepository.getDriverByUserId(userId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+  const updated = await driverRepository.updateDriverProfile(driver.id, fields);
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(
+    driver.id
+  );
+  const location = await getLocationSnapshot(driver.id);
+
+  return {
+    driver: mapDriver(updated),
+    vehicle: mapVehicle(vehicle),
+    location
+  };
+}
+
+async function upsertVehicle(userId, vehicleInput) {
+  const driver = await driverRepository.getDriverByUserId(userId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+
+  const vehicle = await vehicleRepository.upsertActiveVehicle({
+    driverId: driver.id,
+    vehicleType: vehicleInput.vehicleType,
+    plateNumber: vehicleInput.plateNumber,
+    brand: vehicleInput.brand || null,
+    model: vehicleInput.model || null,
+    color: vehicleInput.color || null,
+    isActive:
+      vehicleInput.isActive === undefined
+        ? true
+        : Boolean(vehicleInput.isActive)
+  });
+
+  return { vehicle: mapVehicle(vehicle) };
+}
+
+async function setOnline(userId, initialLocation) {
+  const driver = await driverRepository.getDriverByUserId(userId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+  if (!canGoOnline(driver.status)) {
+    throw new ApiError(403, "FORBIDDEN", "Driver not approved");
+  }
+
+  if (!canTransitionOnlineStatus(driver.online_status, ONLINE_STATUS.ONLINE)) {
+    throw new ApiError(409, "CONFLICT", "Invalid online status transition");
+  }
+
+  const updated = await driverRepository.updateOnlineStatus(
+    driver.id,
+    [ONLINE_STATUS.OFFLINE],
+    ONLINE_STATUS.ONLINE
+  );
+  if (!updated) {
+    throw new ApiError(409, "CONFLICT", "Driver already online");
+  }
+
+  await updateOnlineRedis(driver.id, ONLINE_STATUS.ONLINE);
+
+  if (initialLocation) {
+    await updateDriverLocation(driver.id, initialLocation);
+  }
+
+  return { driver: mapDriver(updated) };
+}
+
+async function setOffline(userId) {
+  const driver = await driverRepository.getDriverByUserId(userId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+
+  const allowForce = FORCE_OFFLINE_WHEN_BUSY;
+  if (!canTransitionOnlineStatus(driver.online_status, ONLINE_STATUS.OFFLINE, allowForce)) {
+    throw new ApiError(409, "CONFLICT", "Invalid online status transition");
+  }
+
+  const allowedCurrent = allowForce
+    ? [ONLINE_STATUS.ONLINE, ONLINE_STATUS.BUSY]
+    : [ONLINE_STATUS.ONLINE];
+
+  const updated = await driverRepository.updateOnlineStatus(
+    driver.id,
+    allowedCurrent,
+    ONLINE_STATUS.OFFLINE
+  );
+  if (!updated) {
+    throw new ApiError(409, "CONFLICT", "Driver already offline or busy");
+  }
+
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driver.id);
+  await clearOnlineRedis(driver.id, vehicle?.vehicle_type);
+
+  return { driver: mapDriver(updated) };
+}
+
+async function updateDriverLocation(driverId, input) {
+  const recordedAt = input.recordedAt
+    ? new Date(input.recordedAt)
+    : new Date();
+  if (Number.isNaN(recordedAt.getTime())) {
+    throw new ApiError(400, "VALIDATION_ERROR", "Invalid recordedAt");
+  }
+
+  await enforceLocationRateLimit(driverId);
+
+  const redisLocation = await getRedisLocation(driverId);
+  if (
+    redisLocation &&
+    redisLocation.ts &&
+    new Date(redisLocation.ts).getTime() >= recordedAt.getTime()
+  ) {
+    return { ignored: true };
+  }
+
+  await setRedisLocation(driverId, {
+    lat: input.lat,
+    lng: input.lng,
+    heading: input.heading,
+    speed: input.speed,
+    accuracy: input.accuracy,
+    ts: recordedAt.toISOString()
+  });
+
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
+  await updateGeo(driverId, input.lat, input.lng, vehicle?.vehicle_type);
+
+  await locationRepository.upsertLastLocation({
+    driverId,
+    lat: input.lat,
+    lng: input.lng,
+    heading: input.heading || null,
+    speed: input.speed || null,
+    accuracyM: input.accuracy || null,
+    recordedAt
+  });
+
+  return { updated: true };
+}
+
+async function heartbeat(userId) {
+  const driver = await driverRepository.getDriverByUserId(userId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+
+  await refreshOnlineRedis(driver.id, driver.online_status);
+  await refreshLocationTtl(driver.id);
+
+  return { ok: true };
+}
+
+async function getDriverInternal(driverId) {
+  const driver = await driverRepository.getDriverById(driverId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driver.id);
+  return { driver: mapDriver(driver), vehicle: mapVehicle(vehicle) };
+}
+
+async function getLocationInternal(driverId) {
+  const location = await getLocationSnapshot(driverId);
+  if (!location) {
+    throw new ApiError(404, "NOT_FOUND", "Location not found");
+  }
+  return { location };
+}
+
+async function listAvailableDrivers({
+  lat,
+  lng,
+  radiusMeters = DEFAULT_SEARCH_RADIUS_METERS,
+  limit = AVAILABLE_LIMIT_DEFAULT,
+  vehicleType
+}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 1, 1), 100);
+  const safeRadius = Math.max(Number(radiusMeters) || DEFAULT_SEARCH_RADIUS_METERS, 100);
+  const fallbackToPostgres = async () => {
+    const fallback = await locationRepository.listAvailableDriversFallback({
+      lat,
+      lng,
+      radiusMeters: safeRadius,
+      limit: safeLimit,
+      vehicleType
+    });
+
+    return fallback.map((row) => ({
+      driverId: row.driver_id,
+      distanceMeters: null,
+      location: {
+        lat: row.lat,
+        lng: row.lng,
+        recordedAt: row.recorded_at
+      },
+      vehicle: row.vehicle_type
+        ? { type: row.vehicle_type, plate: row.plate_number }
+        : null
+    }));
+  };
+
+  try {
+    const key = geoKey(vehicleType || "all");
+    const results = await redis.georadius(
+      key,
+      lng,
+      lat,
+      safeRadius,
+      "m",
+      "WITHDIST",
+      "COUNT",
+      safeLimit
+    );
+
+    if (!Array.isArray(results)) {
+      throw new Error("Redis geo query failed");
+    }
+
+    const filtered = [];
+    for (const entry of results) {
+      const [driverId, distance] = entry;
+      const online = await redis.get(driverOnlineKey(driverId));
+      const busy = await redis.get(driverBusyKey(driverId));
+      if (online !== ONLINE_STATUS.ONLINE) {
+        continue;
+      }
+      if (busy) {
+        continue;
+      }
+
+      const location = await getRedisLocation(driverId);
+      const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
+      filtered.push({
+        driverId,
+        distanceMeters: distance ? Math.round(Number(distance)) : null,
+        location: location
+          ? {
+              lat: location.lat,
+              lng: location.lng,
+              recordedAt: location.ts
+            }
+          : null,
+        vehicle: vehicle
+          ? {
+              type: vehicle.vehicle_type,
+              plate: vehicle.plate_number
+            }
+          : null
+      });
+    }
+
+    if (filtered.length) {
+      return filtered;
+    }
+  } catch (_err) {
+    return fallbackToPostgres();
+  }
+
+  return fallbackToPostgres();
+}
+
+async function markBusy(driverId, rideId) {
+  const driver = await driverRepository.getDriverById(driverId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+
+  if (driver.online_status === ONLINE_STATUS.BUSY) {
+    const currentRide = await redis.get(driverBusyKey(driverId));
+    if (currentRide && currentRide === rideId) {
+      return { driver: mapDriver(driver), rideId };
+    }
+  }
+
+  const updated = await driverRepository.updateOnlineStatus(
+    driverId,
+    [ONLINE_STATUS.ONLINE],
+    ONLINE_STATUS.BUSY
+  );
+  if (!updated) {
+    throw new ApiError(409, "CONFLICT", "Driver not available" );
+  }
+
+  await redis.set(driverBusyKey(driverId), rideId, "EX", ONLINE_TTL_SECONDS);
+  await updateOnlineRedis(driverId, ONLINE_STATUS.BUSY);
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
+  await removeFromGeo(driverId, vehicle?.vehicle_type);
+
+  return { driver: mapDriver(updated), rideId };
+}
+
+async function markAvailable(driverId, rideId) {
+  const driver = await driverRepository.getDriverById(driverId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+
+  const busyRide = await redis.get(driverBusyKey(driverId));
+  if (rideId && busyRide && busyRide !== rideId) {
+    throw new ApiError(409, "CONFLICT", "Driver busy with another ride");
+  }
+
+  const updated = await driverRepository.updateOnlineStatus(
+    driverId,
+    [ONLINE_STATUS.BUSY],
+    ONLINE_STATUS.ONLINE
+  );
+  if (!updated && driver.online_status === ONLINE_STATUS.ONLINE) {
+    await redis.del(driverBusyKey(driverId));
+    return { driver: mapDriver(driver) };
+  }
+
+  await redis.del(driverBusyKey(driverId));
+  await updateOnlineRedis(driverId, ONLINE_STATUS.ONLINE);
+
+  const location = await getRedisLocation(driverId);
+  if (location) {
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
+  await updateGeo(driverId, location.lat, location.lng, vehicle?.vehicle_type);
+  }
+
+  return { driver: mapDriver(updated || driver) };
+}
+
+async function bulkSnapshot(driverIds, fields) {
+  const result = [];
+  for (const driverId of driverIds) {
+    const driver = await driverRepository.getDriverById(driverId);
+    if (!driver) {
+      result.push({ driverId, found: false });
+      continue;
+    }
+
+    const entry = { driverId, found: true };
+    if (!fields || fields.includes("status") || fields.includes("online_status")) {
+      entry.status = driver.status;
+      entry.onlineStatus = driver.online_status;
+    }
+    if (!fields || fields.includes("vehicle")) {
+      const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
+      entry.vehicle = vehicle
+        ? {
+            type: vehicle.vehicle_type,
+            plate: vehicle.plate_number
+          }
+        : null;
+    }
+    if (!fields || fields.includes("location")) {
+      const location = await getLocationSnapshot(driverId);
+      entry.location = location;
+    }
+    result.push(entry);
+  }
+  return result;
+}
+
+async function createDriverAdmin({ userId, fullName, phone }) {
+  const existing = await driverRepository.getDriverByUserId(userId);
+  if (existing) {
+    return { driver: mapDriver(existing), created: false };
+  }
+  const driver = await driverRepository.createDriver({ userId, fullName, phone });
+  return { driver: mapDriver(driver), created: true };
+}
+
+async function approveDriver(driverId) {
+  const driver = await driverRepository.updateDriverStatus(driverId, DRIVER_STATUS.APPROVED);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+  return { driver: mapDriver(driver) };
+}
+
+async function suspendDriver(driverId) {
+  const driver = await driverRepository.updateDriverStatus(driverId, DRIVER_STATUS.SUSPENDED);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
+  await clearOnlineRedis(driverId, vehicle?.vehicle_type);
+  return { driver: mapDriver(driver) };
+}
+
+async function listDriversAdmin({ status, onlineStatus, page = 1, limit = 20 }) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const safePage = Math.max(Number(page) || 1, 1);
+  const offset = (safePage - 1) * safeLimit;
+
+  const rows = await driverRepository.listDrivers({
+    status,
+    onlineStatus,
+    limit: safeLimit,
+    offset
+  });
+
+  return {
+    items: rows.map(mapDriver),
+    page: safePage,
+    limit: safeLimit
+  };
+}
+
+async function getLocationSnapshot(driverId) {
+  const redisLocation = await getRedisLocation(driverId);
+  if (redisLocation) {
+    return {
+      lat: redisLocation.lat,
+      lng: redisLocation.lng,
+      heading: redisLocation.heading || null,
+      speed: redisLocation.speed || null,
+      accuracyM: redisLocation.accuracy || null,
+      recordedAt: redisLocation.ts || null
+    };
+  }
+  const persisted = await locationRepository.getLastLocationByDriverId(driverId);
+  return persisted ? mapLocation(persisted) : null;
+}
+
+async function getRedisLocation(driverId) {
+  try {
+    const raw = await redis.get(driverLocationKey(driverId));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (_err) {
+    return null;
+  }
+}
+
+async function setRedisLocation(driverId, location) {
+  try {
+    await redis.set(
+      driverLocationKey(driverId),
+      JSON.stringify(location),
+      "EX",
+      LOCATION_TTL_SECONDS
+    );
+  } catch (_err) {
+    // ignore redis failure
+  }
+}
+
+async function updateOnlineRedis(driverId, status) {
+  try {
+    await redis.set(
+      driverOnlineKey(driverId),
+      status,
+      "EX",
+      ONLINE_TTL_SECONDS
+    );
+  } catch (_err) {
+    // ignore redis failure
+  }
+}
+
+async function clearOnlineRedis(driverId, vehicleType) {
+  try {
+    await redis.del(driverOnlineKey(driverId));
+    await redis.del(driverBusyKey(driverId));
+    await removeFromGeo(driverId, vehicleType);
+  } catch (_err) {
+    // ignore redis failure
+  }
+}
+
+async function refreshOnlineRedis(driverId, status) {
+  if (!status) return;
+  await updateOnlineRedis(driverId, status);
+}
+
+async function refreshLocationTtl(driverId) {
+  try {
+    await redis.expire(driverLocationKey(driverId), LOCATION_TTL_SECONDS);
+  } catch (_err) {
+    // ignore
+  }
+}
+
+async function updateGeo(driverId, lat, lng, vehicleType) {
+  try {
+    await redis.geoadd(geoKey("all"), lng, lat, driverId);
+    if (vehicleType) {
+      await redis.geoadd(geoKey(vehicleType), lng, lat, driverId);
+    }
+  } catch (_err) {
+    // ignore
+  }
+}
+
+async function removeFromGeo(driverId, vehicleType) {
+  try {
+    await redis.zrem(geoKey("all"), driverId);
+    if (vehicleType) {
+      await redis.zrem(geoKey(vehicleType), driverId);
+    }
+  } catch (_err) {
+    // ignore
+  }
+}
+
+async function enforceLocationRateLimit(driverId) {
+  if (!Number.isFinite(MAX_LOCATION_RATE_PER_SEC) || MAX_LOCATION_RATE_PER_SEC <= 0) {
+    return;
+  }
+  try {
+    const key = locationRateKey(driverId);
+    const count = await redis.incr(key);
+    if (count === 1) {
+      await redis.expire(key, 1);
+    }
+    if (count > MAX_LOCATION_RATE_PER_SEC) {
+      throw new ApiError(429, "RATE_LIMITED", "Too many location updates");
+    }
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw err;
+    }
+    // ignore redis failure
+  }
+}
+
+module.exports = {
+  getDriverMe,
+  updateDriverProfile,
+  upsertVehicle,
+  setOnline,
+  setOffline,
+  updateDriverLocation,
+  heartbeat,
+  getDriverInternal,
+  getLocationInternal,
+  listAvailableDrivers,
+  markBusy,
+  markAvailable,
+  bulkSnapshot,
+  createDriverAdmin,
+  approveDriver,
+  suspendDriver,
+  listDriversAdmin
+};

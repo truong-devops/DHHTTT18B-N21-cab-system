@@ -1,0 +1,20 @@
+{
+  "data": {
+    "id": "pay_demo_vietqr",
+    "rideId": "ride_vietqr_001",
+    "userId": "user_demo_001",
+    "amount": "150000",
+    "currency": "VND",
+    "method": "VIETQR",
+    "status": "INITIATED",
+    "statusUpdatedAt": "2026-01-31T00:00:00.000Z",
+    "vietqr": {
+      "payload": "<base64-or-raw-payload>",
+      "qrUrl": "https://example.com/vietqr/pay_demo_vietqr.png",
+      "reference": "d3b0f3e8-1234-4c2b-9c7b-abcdef123456",
+      "expiresAt": "2026-01-31T00:15:00.000Z"
+    },
+    "createdAt": "2026-01-31T00:00:00.000Z",
+    "updatedAt": "2026-01-31T00:00:00.000Z"
+  }
+}
