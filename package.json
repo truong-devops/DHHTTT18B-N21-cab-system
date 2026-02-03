@@ -10,6 +10,15 @@
     "dev:infra": "docker compose -f infra/docker-compose.dev.yml up -d",
     "down:infra": "docker compose -f infra/docker-compose.dev.yml down -v",
     "logs:kafka": "docker compose -f infra/docker-compose.dev.yml logs -f kafka",
-    "health": "node scripts/healthcheck.js"
+    "health": "node scripts/healthcheck.js",
+    "generate:payment-types": "openapi-typescript contracts/openapi/payment-service.yaml -o libs/types/src/payment-service.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1",
+    "axios": "^1.6.7"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.10.1"
   }
 }

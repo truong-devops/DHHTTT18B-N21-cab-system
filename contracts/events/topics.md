@@ -7,3 +7,4 @@
 | driver.location.updated | ride-service | (TBD: eta/monitoring) |
 | payment.completed | payment-service | (TBD: ride/notification) |
 | payment.failed | payment-service | notification-service |
+| review.created | review-service | (TBD: notification/analytics) |

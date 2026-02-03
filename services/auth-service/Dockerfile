@@ -1,6 +1,13 @@
 FROM node:20-alpine
+
 WORKDIR /app
-COPY package.json ./
-RUN npm i --omit=dev
-COPY . .
-CMD ["node", "src/server.js"]
+
+# copy package
+COPY services/auth-service/package*.json ./
+RUN npm install
+
+# copy source
+COPY services/auth-service ./
+
+EXPOSE 4001
+CMD ["npm", "run", "start"]

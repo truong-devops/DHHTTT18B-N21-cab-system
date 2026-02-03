@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cab
+      POSTGRES_PASSWORD: cabpass
+      POSTGRES_DB: auth-service_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+
+  auth-service:
+    build:
+      context: .
+    ports:
+      - "4001:4001"
+    environment:
+      SERVICE_NAME: auth-service
+      PORT: 4001
+      DATABASE_URL: postgres://cab:cabpass@postgres:5432/auth-service_db
+      JWT_SECRET: dev-secret
+    depends_on:
+      - postgres
+
+volumes:
+  auth_postgres_data:
