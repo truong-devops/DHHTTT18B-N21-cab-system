@@ -1,470 +1,414 @@
-<div align="center">
+# CAB Booking System
 
-# 🚕 CAB Booking System (Student Project)
+![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-compose-2496ED?logo=docker&logoColor=white)
+![Microservices](https://img.shields.io/badge/architecture-microservices-blue)
+![Event-driven](https://img.shields.io/badge/messaging-event--driven-orange)
+![Real-time](https://img.shields.io/badge/realtime-websocket-purple)
+![Security](https://img.shields.io/badge/security-zero--trust-critical)
 
-**Microservices • Event-driven (Kafka) • Real-time GPS (WebSocket) • AI Matching (Architecture-level) • Zero Trust (Design)**
-
-<br/>
-
-![Monorepo](https://img.shields.io/badge/monorepo-yes-blue)
-![Backend](https://img.shields.io/badge/backend-Node.js%20%7C%20Express%2FNestJS-brightgreen)
-![Frontend](https://img.shields.io/badge/frontend-React%20(Vite%2FNext)-orange)
-![Kafka](https://img.shields.io/badge/event--bus-Kafka-purple)
-![Redis](https://img.shields.io/badge/cache-Redis-red)
-![PostgreSQL](https://img.shields.io/badge/db-PostgreSQL-4169E1)
-![Docker](https://img.shields.io/badge/docker-compose-available-2496ED)
-
-<br/>
-
-> **CAB Booking System** là đồ án sinh viên thiết kế & mô phỏng hệ thống đặt xe theo hướng kiến trúc hiện đại:  
-> **Microservices + Event-driven + Real-time + Zero Trust + AI-enabled**.  
-> Mục tiêu chính: thể hiện tư duy kiến trúc, luồng nghiệp vụ end-to-end, khả năng mở rộng và chịu lỗi.
-
-</div>
+> A real-time ride-hailing platform designed with **Microservices + Event-driven architecture**, supporting **booking**, **GPS tracking**, **smart driver matching**, **payments**, and **ratings** with strong focus on **scalability**, **fault tolerance**, and **Zero Trust security**.
 
 ---
 
-## 📌 Mục tiêu dự án
-CAB Booking System xây dựng nền tảng kết nối **Customer – Driver – Admin** theo thời gian thực, tập trung vào:
-- **Đặt xe** (booking/ride lifecycle) và quản lý chuyến đi
-- **Ghép tài xế thông minh** (AI matching + fallback rule-based)
-- **Theo dõi GPS & ETA real-time** (WebSocket + Redis Geo)
-- **Surge pricing** (giá động theo cung/cầu, zone)
-- **Thanh toán theo hướng Saga** (retry/backoff, idempotency, eventual consistency)
-- **Bảo mật Zero Trust** xuyên suốt hệ thống
-- **Observability** (metrics/logs/tracing) ở mức thiết kế hoặc mô phỏng
+## Mục lục
 
-> *Lưu ý*: Đây là đồ án sinh viên — một số phần có thể triển khai ở mức **mock/simplified** (AI model thật, payment provider thật, service mesh…).
+- [Tổng quan](#tổng-quan)
+- [Tính năng chính](#tính-năng-chính)
+- [Kiến trúc hệ thống](#kiến-trúc-hệ-thống)
+  - [Sơ đồ tổng quan](#sơ-đồ-tổng-quan)
+  - [Luồng đặt xe end-to-end](#luồng-đặt-xe-end-to-end)
+  - [Real-time GPS tracking](#real-time-gps-tracking)
+  - [Payment & Saga/Retry](#payment--sagaretry)
+- [Danh sách services](#danh-sách-services)
+- [Event bus & Topics](#event-bus--topics)
+- [Cấu trúc thư mục](#cấu-trúc-thư-mục)
+  - [Backend (services + gateway)](#backend-services--gateway)
+  - [Frontend (apps)](#frontend-apps)
+  - [Contracts / Libs / Infra](#contracts--libs--infra)
+- [Quickstart](#quickstart)
+  - [Chạy bằng Docker Compose (infra)](#chạy-bằng-docker-compose-infra)
+  - [Chạy từng service (dev)](#chạy-từng-service-dev)
+- [Biến môi trường (Environment Variables)](#biến-môi-trường-environment-variables)
+- [Scripts](#scripts)
+- [Observability](#observability)
+- [Security](#security)
+- [Resilience & Failure Handling](#resilience--failure-handling)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## ✨ Tính năng chính
-### Customer App
+## Tổng quan
+
+CAB Booking System hướng tới một nền tảng đặt xe thời gian thực với các đặc trưng:
+
+- **Microservices**: tách domain rõ ràng, mỗi service sở hữu dữ liệu của mình (data ownership).
+- **Event-driven**: đồng bộ hóa trạng thái giữa services bằng event (Kafka/RabbitMQ), hạn chế coupling.
+- **Real-time**: cập nhật vị trí tài xế / trạng thái chuyến qua WebSocket gần thời gian thực.
+- **Zero Trust**: bảo vệ API bằng token/JWT, rate limit, WAF, và nguyên tắc “deny by default”.
+- **Cloud-native thinking**: sẵn sàng scale ngang, triển khai container orchestration (Docker/K8s).
+
+---
+
+## Tính năng chính
+
+### Customer
 - Đăng ký/đăng nhập
-- Chọn điểm đón/điểm đến, ước lượng **giá + ETA**
-- Đặt xe, theo dõi tài xế trên bản đồ real-time
-- Thanh toán, lịch sử chuyến đi, đánh giá
+- Đặt xe theo điểm đón/điểm đến, ước tính giá
+- Theo dõi trạng thái chuyến và vị trí tài xế theo thời gian thực
+- Thanh toán (mở rộng nhiều cổng), lịch sử chuyến
+- Đánh giá chuyến đi
 
-### Driver App
-- Đăng nhập/KYC (mô phỏng), online/offline
-- Nhận chuyến (accept/reject), dẫn đường
-- Gửi vị trí GPS liên tục
-- Kết thúc chuyến, xem thu nhập & lịch sử
+### Driver
+- Online/offline, nhận/từ chối chuyến
+- Điều hướng, cập nhật vị trí liên tục
+- Theo dõi thu nhập/chuyến đã chạy
 
-### Admin Dashboard
-- Dashboard KPI, giám sát bản đồ real-time
-- Quản lý user/driver/ride
-- Điều chỉnh pricing/surge (mô phỏng vận hành)
-- Audit log (mô phỏng)
+### Admin
+- Dashboard quản trị người dùng/tài xế/chuyến
+- Theo dõi vận hành và sự cố
 
 ---
 
-## 🧠 Tổng quan kiến trúc (System Overview)
-Hệ thống theo hướng **Microservices + Event-driven**:
-- Mỗi service quản lý một **bounded context** (Auth/Booking/Ride/Payment…)
-- Giao tiếp:
-  - **Sync**: REST/gRPC (khi cần phản hồi tức thời)
-  - **Async**: Kafka events (fan-out, scale consumers, giảm coupling)
-- Dữ liệu:
-  - **PostgreSQL** cho transactional data
-  - **Redis** cho cache/hot-store + **Geo index**
-  - (Optional) **MongoDB** cho dữ liệu linh hoạt/analytics
+## Kiến trúc hệ thống
 
----
-
-## 🏗️ Architecture (High-level)
+### Sơ đồ tổng quan
 
 ```mermaid
 flowchart LR
   subgraph Clients
-    C[Customer App]
+    C[Customer App/Web]
     D[Driver App]
     A[Admin Dashboard]
   end
 
   C -->|HTTPS| G[API Gateway]
-  D -->|HTTPS / WebSocket| G
+  D -->|HTTPS| G
   A -->|HTTPS| G
 
-  subgraph Services
+  D -->|WebSocket| RT[Realtime Gateway]
+  C -->|WebSocket| RT
+
+  subgraph Core Services
     AUTH[Auth Service]
+    USER[User Service]
+    DRIVER[Driver Service]
     BOOK[Booking Service]
-    MATCH[AI Matching Service]
-    RIDE[Ride Service\n(WebSocket + GPS)]
-    ETA[ETA Service]
+    RIDE[Ride Service]
     PRICE[Pricing Service]
     PAY[Payment Service]
+    MATCH[Matching/Dispatch Service]
     NOTI[Notification Service]
-    WAL[Wallet Service]
+    REVIEW[Rating/Review Service]
   end
 
   G --> AUTH
+  G --> USER
+  G --> DRIVER
   G --> BOOK
-  G --> MATCH
   G --> RIDE
-  G --> ETA
   G --> PRICE
   G --> PAY
-  G --> NOTI
-  G --> WAL
+  G --> REVIEW
+
+  BOOK -->|publish| BUS[(Event Bus)]
+  MATCH -->|consume/publish| BUS
+  RIDE -->|publish| BUS
+  PAY -->|publish| BUS
+  NOTI -->|consume| BUS
+  RT <-->|consume/publish| BUS
 
   subgraph Data
     PG[(PostgreSQL)]
-    REDIS[(Redis: cache + geo)]
-    K[(Kafka)]
+    REDIS[(Redis / Geo Index)]
   end
 
-  BOOK -->|ride.created| K
-  MATCH -->|ride.assigned| K
-  RIDE -->|driver.location.updated| K
-  PAY -->|payment.*| K
+  AUTH --> PG
+  USER --> PG
+  DRIVER --> PG
+  BOOK --> PG
+  RIDE --> PG
+  PAY --> PG
+  REVIEW --> PG
 
-  K --> MATCH
-  K --> ETA
-  K --> NOTI
-  K --> WAL
+  RT --> REDIS
+  MATCH --> REDIS
 
-  AUTH <--> PG
-  BOOK <--> PG
-  RIDE <--> PG
-  PAY <--> PG
-  WAL <--> PG
+  subgraph Obs
+    LOG[Centralized Logging]
+    MET[Monitoring/Alerting]
+  end
 
-  RIDE <--> REDIS
-  ETA <--> REDIS
-  MATCH <--> REDIS
-🔁 Event-driven backbone (Kafka Topics)
-Topic	Producer	Consumer(s)	Ý nghĩa
-ride.created	Booking	Matching, ETA	Khách tạo yêu cầu chuyến
-ride.assigned	Matching	Notification	Gán tài xế thành công
-driver.location.updated	Ride	ETA, Monitoring	GPS driver cập nhật liên tục
-payment.completed	Payment	Ride, Wallet	Thanh toán thành công
-payment.failed	Payment	Notification	Thanh toán thất bại
-Sample event (ride.created)
+  G --> LOG
+  Core Services --> LOG
+  G --> MET
+  Core Services --> MET
+Gợi ý triển khai: API Gateway chịu trách nhiệm định tuyến, auth, rate limit, logging, versioning; Realtime Gateway chịu trách nhiệm WebSocket fan-out / pub-sub.
+
+Luồng đặt xe end-to-end
+sequenceDiagram
+  autonumber
+  actor Customer
+  participant Gateway as API Gateway
+  participant Booking as Booking Service
+  participant Bus as Event Bus
+  participant Matching as Matching Service
+  participant Ride as Ride Service
+  participant Noti as Notification Service
+  participant Driver as Driver App
+
+  Customer->>Gateway: POST /bookings
+  Gateway->>Booking: create booking
+  Booking->>Bus: publish BookingCreated / RideRequested
+
+  Matching->>Bus: consume RideRequested
+  Matching->>Matching: find nearest driver + scoring
+  Matching->>Bus: publish RideAssigned(driverId)
+
+  Ride->>Bus: consume RideAssigned
+  Ride->>Ride: create ride + state=ASSIGNED
+  Ride->>Bus: publish RideStateUpdated(ASSIGNED)
+
+  Noti->>Bus: consume RideAssigned
+  Noti->>Driver: push notification "New ride"
+
+  Driver->>Gateway: POST /rides/{id}/accept
+  Gateway->>Ride: accept ride
+  Ride->>Bus: publish RideStateUpdated(IN_PROGRESS)
+  Bus-->>Customer: (via realtime) state + driver info
+Real-time GPS tracking
+sequenceDiagram
+  autonumber
+  participant Driver as Driver App
+  participant RT as Realtime Gateway (WS)
+  participant Redis as Redis Geo
+  participant Bus as Event Bus
+  participant Customer as Customer App (WS)
+
+  loop every 1-3s
+    Driver->>RT: WS send {lat,lng,speed,heading}
+    RT->>Redis: GEOADD driver:{id} lat lng
+    RT->>Bus: publish DriverLocationUpdated
+  end
+
+  Bus-->>RT: DriverLocationUpdated
+  RT-->>Customer: WS broadcast location update
+Kỹ thuật chính:
+
+Redis Geo index dùng để truy vấn “nearest drivers” cực nhanh.
+
+Fan-out WebSocket ưu tiên broadcast theo “ride room” (chỉ những người liên quan mới nhận).
+
+Payment & Saga/Retry
+Thanh toán là domain nhạy cảm: cần idempotency, retry có kiểm soát, eventual consistency, và tránh double-charge.
+
+sequenceDiagram
+  autonumber
+  participant Ride as Ride Service
+  participant Pay as Payment Service
+  participant PSP as Payment Provider
+  participant Bus as Event Bus
+  participant Booking as Booking Service
+
+  Ride->>Pay: POST /payments (idempotencyKey)
+  Pay->>PSP: charge()
+  alt success
+    Pay->>Bus: publish PaymentCompleted
+  else failed
+    Pay->>Pay: retry w/ exponential backoff (bounded)
+    Pay->>Bus: publish PaymentFailed
+  end
+
+  Booking->>Bus: consume PaymentCompleted/Failed
+  Booking->>Booking: update booking/ride status (eventual consistency)
+Danh sách services
+Tên service có thể khác theo từng phiên bản repo; mục tiêu là phân ranh giới domain rõ ràng.
+
+Service	Trách nhiệm	Giao tiếp chính	Data ownership (ví dụ)
+api-gateway	Routing, auth middleware, rate limit, logging, API versioning	REST	-
+auth-service	Register/Login, JWT, refresh token/blacklist	REST	users_credentials, sessions
+user-service	Profile customer, history, preferences	REST/Event	users, profiles
+driver-service	Driver onboarding, trạng thái online, hồ sơ	REST/Event	drivers, availability
+booking-service	Booking lifecycle, quote request, cancel	REST/Event	bookings
+ride-service	Ride state machine: assigned → in_progress → completed	REST/Event	rides
+pricing-service	Fare estimate, surge rules	REST	pricing_rules
+matching-service	Dispatch: chọn tài xế phù hợp (geo + scoring/AI)	Event	- (cache in Redis)
+payment-service	Charge/refund, idempotency, ledger	REST/Event	payments, transactions
+notification-service	Push/email/SMS, templates	Event	notifications
+review-service	Rating, feedback moderation	REST/Event	reviews
+Event bus & Topics
+Sử dụng event để “cập nhật trạng thái” giữa các services mà không tạo coupling chặt.
+
+Ví dụ topics/events (gợi ý):
+
+BookingCreated
+
+RideRequested
+
+RideAssigned
+
+RideStateUpdated
+
+DriverLocationUpdated
+
+PaymentCompleted
+
+PaymentFailed
+
+Event payload mẫu
 
 {
-  "eventId": "uuid",
-  "type": "RideCreated",
-  "rideId": "r123",
-  "pickup": { "lat": 10.7, "lng": 106.6 },
-  "timestamp": "2025-01-01T10:00:00Z"
+  "eventId": "evt_01H...",
+  "eventType": "RideAssigned",
+  "occurredAt": "2026-02-02T10:10:10Z",
+  "data": {
+    "rideId": "ride_123",
+    "bookingId": "book_456",
+    "driverId": "drv_789",
+    "pickup": {"lat": 10.77, "lng": 106.68},
+    "etaSeconds": 240
+  }
 }
-⚡ Real-time GPS & ETA (WebSocket + Redis Geo)
-Ride Service là “realtime core”:
+Khuyến nghị: chuẩn hóa eventId, occurredAt, version schema, và consumer phải idempotent.
 
-Driver gửi GPS định kỳ qua WebSocket
+Cấu trúc thư mục
+Repo được tổ chức theo hướng monorepo (workspaces), gồm các nhóm: apps, services, libs, contracts, infra, docs, scripts.
 
-Ride Service cập nhật Redis Geo index để query nhanh (driver gần nhất, last-known-location)
-
-Ride Service publish driver.location.updated để ETA/Monitoring consume
-
-Customer nhận update vị trí/ETA gần real-time
-
-sequenceDiagram
-  autonumber
-  participant D as Driver App
-  participant R as Ride Service (WS)
-  participant Redis as Redis Geo
-  participant K as Kafka
-  participant ETA as ETA Service
-  participant C as Customer App
-
-  D->>R: WS GPS update (lat/lng)
-  R->>Redis: GEOADD driver location
-  R->>K: publish driver.location.updated
-  K-->>ETA: consume location update
-  ETA-->>C: WS update ETA/location
-💳 Payment (Saga mindset)
-Thanh toán là luồng “không tin cậy” (provider chậm/down), nên thiết kế:
-
-Payment Service là source of truth trạng thái thanh toán
-
-Idempotency key chống double-charge khi client retry
-
-Retry + exponential backoff
-
-Eventual consistency: phát payment.completed/payment.failed để services khác cập nhật
-
-sequenceDiagram
-  autonumber
-  participant C as Customer
-  participant G as Gateway
-  participant P as Payment Service
-  participant K as Kafka
-  participant R as Ride Service
-  participant W as Wallet Service
-  participant N as Notification Service
-
-  C->>G: POST /payments/checkout (rideId)
-  G->>P: forward request
-  alt success
-    P->>K: publish payment.completed
-    K-->>R: consume completed
-    K-->>W: consume completed
-  else failed
-    P->>K: publish payment.failed
-    K-->>N: consume failed
-  end
-  P-->>C: payment status
-🔐 Security — Zero Trust (Design)
-Gateway as PEP: verify JWT/OAuth2, role/scope, request validation, rate limit
-
-Service-to-service: hướng mTLS/service identity (planned)
-
-Least privilege: RBAC (Customer/Driver/Admin) + ABAC theo trạng thái ride (planned)
-
-Audit logging: login/payment/admin actions (planned/simplified)
-
-🧯 Reliability & Failure Handling (Design)
-Idempotency: tránh duplicate booking/payment
-
-Retry/Backoff: payment provider, transient errors
-
-Circuit breaker / timeout: service-to-service calls
-
-Consumer group scaling: Kafka lag → scale consumers
-
-Graceful degradation: AI matching down → fallback nearest-driver
-
-WS reconnect: mất kết nối → auto-reconnect + fallback polling
-
-Out-of-order GPS: discard theo timestamp/version
-
-🗂️ Cấu trúc dự án (Monorepo Structure)
-Root tree
+Backend (services + gateway)
 .
-├─ apps/                 # Frontend apps (customer/driver/admin)
-├─ services/             # Backend microservices (Node.js)
-├─ contracts/            # API contracts: OpenAPI, event schema, shared DTOs
-├─ libs/                 # Shared libs: logger, config, types, kafka client, utils
-├─ infra/                # Docker-compose / K8s manifests / IaC (tuỳ scope)
-├─ docs/                 # Architecture diagrams, sequence diagrams, ERD, ADR
-├─ scripts/              # Dev scripts: seed, migrate, tooling
-├─ package.json          # Monorepo scripts/workspaces (tuỳ repo)
-└─ README.md
-🎨 Frontend (apps/) — cây thư mục chi tiết
-3 ứng dụng: Customer, Driver, Admin. Đổi <app-name> cho khớp tên folder thật trong repo.
-
-apps/<app-name>/
-├─ public/
-├─ src/
-│  ├─ app/                     # bootstrap: router, providers, layouts
-│  ├─ pages/                   # route-level pages/screens
-│  ├─ components/              # UI components dùng lại
-│  ├─ features/                # feature modules: auth/booking/tracking/payment...
-│  ├─ services/                # API client, websocket client, map sdk wrapper
-│  ├─ store/                   # Redux/RTK (optional)
-│  ├─ hooks/                   # custom hooks
-│  ├─ utils/                   # helpers, constants, validators
-│  └─ types/                   # FE types (có thể generate từ contracts)
-├─ index.html
-├─ vite.config.ts (or next.config.js)
-└─ package.json
-Gợi ý module theo app
-Customer
-
-features/auth, features/booking, features/tracking, features/payment, features/history
-
-Driver
-
-features/availability, features/incoming-ride, features/navigation, features/gps-stream, features/earnings
-
-Admin
-
-modules/dashboard-kpi, modules/users, modules/drivers, modules/rides, modules/pricing, modules/audit
-
-🧱 Backend (services/) — cây thư mục & thiết kế service
-Template folder cho 1 service (khuyến nghị)
-services/<service-name>/
-├─ src/
-│  ├─ config/                 # env, config loader
-│  ├─ routes/                 # REST routes (Express)
-│  ├─ controllers/            # handlers
-│  ├─ services/               # domain logic
-│  ├─ repositories/           # DB access layer
-│  ├─ models/                 # entities/schemas
-│  ├─ middlewares/            # auth, validate, rate limit, tracing
-│  ├─ events/
-│  │  ├─ producers/           # publish Kafka events
-│  │  └─ consumers/           # consume Kafka topics
-│  ├─ clients/                # http/grpc clients (optional)
-│  └─ index.ts                # bootstrap
-├─ test/                      # unit/integration tests (optional)
-├─ Dockerfile
-└─ package.json
-Backend tree (10 services - theo thiết kế)
-Đổi tên folder cho khớp repo. Nếu service nào chưa implement thì vẫn để “planned”.
-
-services/
-├─ api-gateway/               # entrypoint + auth + rate limit + routing
-├─ auth-service/              # login/refresh/logout + token store
-├─ booking-service/           # create ride request + publish ride.created
-├─ matching-service/          # consume ride.created + geo filter + scoring + ride.assigned
-├─ ride-service/              # WS GPS + ride state machine + publish location updates
-├─ eta-service/               # consume ride.created/location + cache ETA
-├─ pricing-service/           # fare estimate + surge (planned/partial)
-├─ payment-service/           # checkout + retry/backoff + publish payment.*
-├─ wallet-service/            # consume payment.completed + ledger/balance (optional)
-└─ notification-service/      # consume ride.assigned/payment.failed + notify
-🧩 Service Catalog (mô tả chi tiết từng service)
-1) API Gateway
-Responsibility
-
-Single entrypoint cho client
-
-AuthN/AuthZ (JWT/OAuth2), rate limit, request validation
-
-Routing đến microservices
-Why
-
-Bảo mật và chính sách tập trung; giảm lặp middleware giữa services
-
-2) Auth Service
-Responsibility
-
-Login/refresh/logout
-
-Cấp access token (JWT) + refresh token
-
-Token rotation/revoke (design-level)
-Endpoints (gợi ý)
-
-POST /auth/login
-
-POST /auth/refresh
-
-POST /auth/logout
-
-3) Booking Service
-Responsibility
-
-Validate pickup/destination
-
-Snapshot fare estimate (từ pricing) + tạo ride request
-
-Publish ride.created
-Design notes
-
-Idempotency key cho create booking để tránh duplicate khi retry
-
-4) Matching Service (AI-enabled)
-Responsibility
-
-Consume ride.created
-
-Redis Geo lọc tài xế gần nhất (hard constraints)
-
-Scoring (soft constraints): rating, acceptance rate, ETA...
-
-Publish ride.assigned
-Fallback
-
-AI/service lỗi → fallback rule-based (nearest-driver)
-
-5) Ride Service (Real-time core)
-Responsibility
-
-Ride lifecycle/state machine
-
-WebSocket nhận GPS từ driver; push updates cho customer/driver
-
-Update Redis Geo hot-store
-
-Publish driver.location.updated
-Design notes
-
-Throttle GPS updates, dedupe theo timestamp để tránh out-of-order
-
-6) ETA Service
-Responsibility
-
-Tính ETA độc lập để không block booking/matching
-
-Consume:
-
-ride.created (ETA initial)
-
-driver.location.updated (ETA refresh)
-
-Cache ETA trong Redis
-
-7) Pricing Service (Surge)
-Responsibility
-
-Fare estimate (base + distance + time)
-
-Surge theo zone/cung-cầu (planned)
-
-Admin có thể chỉnh hệ số surge
-Consistency
-
-Price snapshot gắn booking để tránh “estimate khác actual”
-
-8) Payment Service (Saga mindset)
-Responsibility
-
-Checkout/charge (mock/real provider)
-
-Retry + backoff, idempotency
-
-Publish payment.completed / payment.failed
-Design notes
-
-Eventual consistency: Ride/Wallet cập nhật theo event
-
-9) Wallet Service (optional)
-Responsibility
-
-Consume payment.completed
-
-Update balance + ledger (append-only) (planned/optional)
-
-10) Notification Service
-Responsibility
-
-Consume ride.assigned, payment.failed
-
-Gửi thông báo (in-app/push/email - tuỳ mô phỏng)
-
-Retry + dedupe theo eventId
-
-🧰 Tech Stack
-Backend: Node.js (Express/NestJS), REST + OpenAPI, WebSocket/Socket.IO
-
-Event bus: Kafka
-
-Database: PostgreSQL
-
-Cache/Geo: Redis
-
-Frontend: React (Vite/Next) + TypeScript
-
-Infra: Docker, Docker Compose
-
-Observability (planned/simplified): Prometheus/Grafana, ELK, Jaeger
-
-🚀 Quickstart (Local Dev)
-1) Prerequisites
-Node.js 18+
-
-Docker + Docker Compose
-
-2) Start infrastructure
-docker compose -f infra/docker-compose.yml up -d
-3) Install dependencies
+├── services/
+│   ├── auth-service/
+│   ├── booking-service/
+│   ├── payment-service/
+│   ├── ride-service/
+│   ├── driver-service/
+│   ├── user-service/
+│   ├── matching-service/
+│   ├── notification-service/
+│   ├── pricing-service/
+│   └── review-service/
+├── libs/
+│   ├── common/              # shared utils (logger, errors, config)
+│   └── types/               # shared types (generated from OpenAPI)
+└── scripts/
+    ├── healthcheck.js
+    └── ...
+Giải thích nhanh:
+
+services/* độc lập triển khai, mỗi service có src/, config, dockerfile, test…
+
+libs/* chia sẻ code “an toàn”: types/contracts, logging, error handling, clients (Kafka/Redis/HTTP).
+
+scripts/* tooling: healthcheck, seed, migration helpers…
+
+Frontend (apps)
+apps/
+├── customer-app/            # UI khách hàng (booking, tracking, payment, rating)
+├── driver-app/              # UI tài xế (accept, navigation, realtime)
+└── admin-dashboard/         # UI quản trị
+apps/* nên dùng chung libs/types để đảm bảo type-safe với API contracts.
+
+Contracts / Libs / Infra
+contracts/
+└── openapi/
+    ├── payment-service.yaml
+    └── ...
+
+infra/
+└── docker-compose.dev.yml   # hạ tầng dev: Kafka, Postgres, Redis, ...
+docs/
+└── diagrams/                # mermaid/system design docs
+Quickstart
+Chạy bằng Docker Compose (infra)
+Dự án cung cấp compose cho hạ tầng dev (Kafka/Postgres/Redis…).
+
+# 1) Cài dependencies (monorepo)
 npm install
-4) Run (tuỳ repo set scripts)
-Option A — run all
 
-npm run dev
-Option B — run từng phần
+# 2) Dựng hạ tầng dev (Kafka/Postgres/Redis...)
+npm run dev:infra
 
-# Backend
-cd services/api-gateway
-npm install
-npm run dev
+# (tuỳ chọn) xem logs Kafka
+npm run logs:kafka
 
-# Frontend
-cd apps/customer-app
-npm install
-npm run dev
+# 3) Tắt hạ tầng dev
+npm run down:infra
+Chạy từng service (dev)
+Ví dụ với auth-service (tương tự cho các services khác):
+
+# cài riêng workspace (nếu cần)
+npm -w services/auth-service install
+
+# chạy dev
+npm -w services/auth-service run dev
+Biến môi trường (Environment Variables)
+Mỗi service nên có .env riêng (không commit secrets). Ví dụ:
+
+services/auth-service/.env
+PORT=3001
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/auth_db
+JWT_SECRET=supersecret
+JWT_EXPIRES_IN=3600
+REFRESH_TOKEN_SECRET=refreshsecret
+REFRESH_TOKEN_EXPIRES_IN=604800
+REDIS_URL=redis://localhost:6379
+api-gateway/.env (gợi ý)
+PORT=3000
+AUTH_SERVICE_URL=http://localhost:3001
+BOOKING_SERVICE_URL=http://localhost:3002
+RIDE_SERVICE_URL=http://localhost:3003
+PAYMENT_SERVICE_URL=http://localhost:3004
+
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=120
+JWT_PUBLIC_KEY=...
+Scripts
+Các scripts hữu ích ở root:
+
+npm run dev:infra            # start infra (docker compose)
+npm run down:infra           # stop infra
+npm run logs:kafka           # tail kafka logs
+npm run health               # run healthcheck script
+npm run generate:payment-types  # generate TS types from OpenAPI (contracts)
+Observability
+Thiết kế ưu tiên “observability by default”:
+
+Logging tập trung: trace request qua gateway → services, chuẩn hóa correlation id.
+
+Metrics/Alerting: theo dõi latency, error rate, consumer lag (Kafka), queue depth, DB/Redis saturation.
+
+Audit log: các hành động nhạy cảm (login, payment, role changes).
+
+Security
+Áp dụng nguyên tắc Zero Trust:
+
+AuthN/AuthZ bằng JWT/OAuth2, phân quyền theo role (Customer/Driver/Admin).
+
+Rate limit tại gateway, kết hợp WAF & kiểm soát IP nếu triển khai production-like.
+
+Token rotation/refresh token + blacklist (Redis) cho logout/compromised token.
+
+Service-to-service có thể mở rộng mTLS/service mesh.
+
+Resilience & Failure Handling
+Một số chiến thuật quan trọng:
+
+Retry + exponential backoff (bounded) cho external calls (Payment provider…)
+
+Circuit breaker để tránh “cascading failures”
+
+Idempotency key cho API payment/booking quan trọng
+
+Saga / choreography để xử lý transaction phân tán
+
+Eventual consistency: trạng thái đồng bộ bằng event thay vì cross-service transaction
+
+Graceful degradation: ưu tiên “hệ thống vẫn chạy” ngay cả khi AI matching / payment provider gặp sự cố
+
+Contributing
+Mỗi PR nên kèm mô tả, scope rõ ràng.
+
+Ưu tiên: lint + test + update contracts/diagrams nếu thay đổi API/flow.
+
+Không commit secrets (dùng .env.example).
