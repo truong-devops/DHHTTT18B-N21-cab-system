@@ -107,12 +107,9 @@ This design supports independent scaling, failure isolation, and fan-out updates
 | `user-service` | Customer profile, history, preferences |
 | `driver-service` | Driver profile, availability/online status |
 | `booking-service` | Booking lifecycle, ride request creation |
-| `matching-service` | Dispatch: geo-filter + scoring/AI + assignment |
 | `ride-service` | Ride state machine, WebSocket GPS ingestion, live status updates |
-| `eta-service` | ETA calculation and cache refresh |
 | `pricing-service` | Fare estimation + surge rules (optional) |
 | `payment-service` | Checkout, idempotency, retries, payment events |
-| `wallet-service` | Balance/ledger updates from payment events (optional) |
 | `notification-service` | Push/in-app/email notifications from ride/payment events |
 | `review-service` | Ratings and feedback (optional) |
 
