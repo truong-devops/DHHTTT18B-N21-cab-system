@@ -1,8 +1,27 @@
-# React + Vite
+# Customer App (Expo)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Run
+```bash
+npm install
+npm run start
+```
 
-Currently, two official plugins are available:
+## Metro watch fix (monorepo)
+We set `EXPO_USE_METRO_WORKSPACE_ROOT=0` in scripts + `metro.config.js` to reduce file watchers.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Web preview
+```bash
+npm run web
+```
+
+## Env
+- `EXPO_PUBLIC_API_BASE_URL` (default http://localhost:3000)
+- `EXPO_PUBLIC_MOCK=true` to use mock data
+
+## Common issues
+- EMFILE (too many open files):
+  - `ulimit -n 4096` then rerun `npm run start`
+
+## Notes
+- Navigation: Auth stack + Main tabs
+- Theme: Orange + White
