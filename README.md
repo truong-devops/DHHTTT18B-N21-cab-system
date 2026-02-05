@@ -1,39 +1,39 @@
-# CAB BOOKING SYSTEM  
-**Microservices • Real-time • Event-driven • AI-ready • Zero Trust Architecture**
+# 🚕 CAB BOOKING SYSTEM
+### Microservices • Real-time • Event-driven • AI-ready • Zero Trust Architecture
 
 A modern ride-hailing (cab/taxi) platform designed for **high scalability**, **fault tolerance**, **real-time GPS tracking**, **secure authentication**, and **event-driven service communication**.  
 This repository follows a **cloud-native microservices architecture** (Node.js / Express / NestJS + React), supports **Kafka/RabbitMQ messaging**, and applies **Zero Trust security** end-to-end.
 
 ---
 
-## 1) Executive Summary
+## ✨ Executive Summary
 
 CAB Booking System delivers an end-to-end ride-hailing experience for:
 
 - **Customers**: request rides, view fare estimates, track drivers in real-time, pay, and rate trips  
 - **Drivers**: go online/offline, accept rides, stream GPS updates, complete trips, and view history  
-- **Admins**: monitor operations, manage users/drivers/rides, and analyze signals
+- **Admins**: monitor operations, manage users/drivers/rides, and analyze signals  
 
-The design focuses on:
+The system is designed around:
 
-- **Microservices + Database-per-service** to scale domains independently  
-- **Event-driven messaging** to reduce coupling and allow eventual consistency  
-- **Real-time tracking** via WebSocket/Socket.IO for live GPS + ride status updates  
-- **Zero Trust security** (WAF, TLS, JWT/OAuth2, RBAC/ABAC, mTLS internally)  
-- **Observability by design** (structured logs, metrics, tracing)
+✅ **Microservices + Database-per-service** (independent scaling)  
+✅ **Event-driven messaging** (low coupling + eventual consistency)  
+✅ **Real-time tracking** (WebSocket/Socket.IO for GPS + ride status)  
+✅ **Zero Trust security** (WAF, TLS, JWT/OAuth2, RBAC/ABAC, mTLS internal)  
+✅ **Observability-by-design** (structured logs, metrics, tracing)
 
 ---
 
-## 2) Design Goals & Architecture Principles
+## 🎯 Design Goals & Architecture Principles
 
-### 2.1 Goals
-- **Scalability**: scale horizontally with traffic  
-- **High Availability**: no single point of failure  
-- **Fault Tolerance**: isolation + graceful degradation  
-- **Real-time**: instant updates for location and ride status  
-- **Cloud-native**: containers, orchestration, CI/CD
+### Goals
+- **Scalability**: horizontal scaling under heavy traffic  
+- **High Availability**: minimize single points of failure  
+- **Fault Tolerance**: isolate failures + graceful degradation  
+- **Real-time UX**: instant ride status & location updates  
+- **Cloud-native delivery**: containers, orchestration, CI/CD  
 
-### 2.2 Principles
+### Principles
 - **Database per service**
 - **Stateless services**
 - **Async-first event-driven**
@@ -42,13 +42,13 @@ The design focuses on:
 
 ---
 
-## 3) Technology Stack
+## 🧰 Technology Stack
 
 ### Frontend
-- React / Next.js  
-- TailwindCSS  
-- State: Redux Toolkit / React Query  
-- Real-time: WebSocket / Socket.IO  
+- React / Next.js
+- TailwindCSS
+- State: Redux Toolkit / React Query
+- Real-time: WebSocket / Socket.IO
 - Build: Vite
 
 ### Backend / Microservices
@@ -56,27 +56,25 @@ The design focuses on:
 - REST APIs + OpenAPI/Swagger
 - Validation: Zod / Joi
 - Auth: OAuth2 + JWT, refresh token rotation
-- Synchronous: REST / gRPC (optional)
-- Asynchronous: Kafka / RabbitMQ
+- Sync: REST / gRPC (optional)
+- Async: Kafka / RabbitMQ
 
 ### Data Layer
-- **PostgreSQL** (transactional data)
-- **MongoDB** (flexible documents)
-- **Redis** (cache + Geo index + hot-store)
+- **PostgreSQL**: transactional data
+- **MongoDB**: flexible documents
+- **Redis**: cache + Geo index + hot-store
 
 ### DevOps / Infra
-- Docker  
-- Kubernetes (or Docker Swarm for simpler environments)  
-- Terraform (cloud provisioning)  
+- Docker
+- Kubernetes (or Docker Swarm for simpler environments)
+- Terraform (cloud provisioning)
 - Observability: Prometheus/Grafana, ELK/Loki, Jaeger/OpenTelemetry (recommended)
 
 ---
 
-## 4) Repository Structure (Monorepo)
+## 🗂 Repository Structure (Monorepo)
 
 This repository is organized as a monorepo: frontend apps + backend services + shared contracts/libs/infra.
-
-### 4.1 Folder Tree (Beauty View)
 
 ```text
 DHHTTT18B-N21-cab-system/
@@ -85,7 +83,7 @@ DHHTTT18B-N21-cab-system/
 │  ├─ driver-app/                # Driver UI: online → accept → GPS → complete
 │  └─ admin-dashboard/           # Admin UI: monitor & manage operations
 │
-├─ services/                     # ✅ ONLY 10 SERVICES (as requested)
+├─ services/                     # ✅ ONLY 10 SERVICES
 │  ├─ api-gateway/               # routing, auth middleware, validation, rate limit
 │  ├─ auth-service/              # register/login, JWT issuing, refresh token
 │  ├─ user-service/              # customer profile, preferences, history
@@ -114,7 +112,7 @@ DHHTTT18B-N21-cab-system/
 ├─ scripts/                      # helpers: dev, seed, lint, build, deploy
 ├─ package.json
 └─ README.md
-5) Service Overview (10 Services Only)
+🧩 Service Overview (10 Services Only)
 Service	Responsibility
 api-gateway	Routing, auth middleware, rate limiting, request validation, logging
 auth-service	Register/login, JWT issuing, refresh token management
@@ -126,18 +124,15 @@ pricing-service	Fare estimation + surge rules (optional)
 payment-service	Checkout, idempotency, retries, payment events
 notification-service	Push/in-app/email notifications from ride/payment events
 review-service	Ratings & feedback (optional)
-6) High-Level Architecture
-6.1 Microservices + Data + Event Broker
-
-Client layer (Customer/Driver/Admin apps) talks to API Gateway
+🏗 High-Level Architecture
+Microservices + Data + Event Broker (Concept)
+Client layer (Customer/Driver/Admin apps) → API Gateway
 
 Gateway routes to microservices
 
-Services publish and consume events through Kafka/RabbitMQ
+Services publish/consume events via Kafka/RabbitMQ
 
-Data layer uses PostgreSQL, MongoDB, Redis (Geo + cache)
-
-Conceptual architecture:
+Data uses PostgreSQL, MongoDB, Redis (Geo + cache)
 
 flowchart TB
   subgraph Clients
@@ -198,9 +193,7 @@ flowchart TB
   K --> N
   K --> P
   K --> R
-
-7) Deployment Architecture (Cloud-Native)
-
+☁️ Deployment Architecture (Cloud-Native)
 Designed for:
 
 Docker + Kubernetes (pods per service)
@@ -217,39 +210,33 @@ flowchart TB
   S --> PG[(Managed PostgreSQL)]
   S --> MG[(Managed MongoDB)]
   S --> RD[(Redis Cache/Geo)]
-
-8) Real-time & Event-driven Architecture
-8.1 Real-time channel (WebSocket/Socket.IO)
-
+⚡ Real-time & Event-driven Architecture
+Real-time (WebSocket / Socket.IO)
 Driver streams GPS updates continuously
 
-Passenger receives ride status + driver location near real-time (<1s target)
+Customer receives ride status + driver location near real-time (<1s target)
 
-8.2 Event-driven fanout
+Event-driven fanout
+Ride/payment updates publish events to Kafka/RabbitMQ
 
-Ride updates publish events to Kafka/RabbitMQ
-
-Other services react asynchronously without tight coupling
+Services react asynchronously without tight coupling
 
 flowchart LR
-  DriverApp -->|WebSocket GPS| RideService
+  DriverApp -->|WebSocket GPS| RideService[ride-service]
   RideService -->|Update Geo| RedisGeo[(Redis Geo)]
   RideService -->|Publish driver.location.updated| Kafka[(Kafka/RabbitMQ)]
-  Kafka --> PricingService
-  Kafka --> NotificationService
-  RideService -->|WebSocket push| CustomerApp
-
-9) Zero Trust Security Architecture
-9.1 Core Principles
-
+  Kafka --> PricingService[pricing-service]
+  Kafka --> NotificationService[notification-service]
+  RideService -->|WebSocket push| CustomerApp[customer-app]
+🔐 Zero Trust Security Architecture
+Core Principles
 Never trust, always verify
 
 Every request must be authenticated + authorized
 
 No assumption of trust even inside internal networks
 
-9.2 Client & Edge Security
-
+Client & Edge
 TLS 1.3 mandatory
 
 WAF protections: SQL injection, XSS, L7 DDoS
@@ -258,44 +245,40 @@ Rate limiting by IP/user/device
 
 Device fingerprinting (optional)
 
-9.3 API Gateway Security (Policy Enforcement Point)
-
+API Gateway (Policy Enforcement Point)
 JWT/OAuth2 validation
 
 Scope/role/permission checks
 
-Rate limit & quota
+Rate limit & quota enforcement
 
 Request validation (schema)
 
 Suspicious request blocking
 
-9.4 Service-to-service Security
-
+Service-to-service
 mTLS internal encryption/authentication
 
 Unique service identities
 
-Use service mesh (Istio/Linkerd) for enterprise-grade deployments
+Service mesh (Istio/Linkerd) for enterprise-grade deployments
 
-9.5 Authorization
+Authorization
+RBAC roles: Customer / Driver / Admin
 
-RBAC for core roles: Customer / Driver / Admin
-
-ABAC for dynamic context (time/location/ride state)
+ABAC dynamic context (time/location/ride state)
 
 Example: driver can update GPS only when ride is ACTIVE
 
-9.6 Threat Model (STRIDE) Summary
+Threat Model (STRIDE) Summary
 STRIDE	Threat	Mitigation
 Spoofing	Fake token	JWT + mTLS
 Tampering	Payload modification	TLS + HMAC
 Repudiation	Transaction denial	Audit logs
-Info Disclosure	PII leakage	Encryption
+Information Disclosure	PII leakage	Encryption
 DoS	API flood	WAF + Rate limit
 Privilege Escalation	Unauthorized access	RBAC/ABAC
-10) Scalability & Resilience Patterns
-
+📈 Scalability & Resilience Patterns
 Applied patterns:
 
 Horizontal Pod Autoscaling (HPA)
@@ -308,30 +291,30 @@ Graceful Degradation
 
 Eventual Consistency
 
-Quality Attributes Mapping
+Quality Attributes Mapping:
+
 Attribute	Architectural Choice
 Scalability	Microservices + HPA + Kafka
 Availability	Stateless services + multi-region readiness
 Performance	Redis cache + async processing
 Security	JWT + mTLS + Zero Trust
 Maintainability	Service isolation + API contracts
-11) Event Bus, Topics & Contracts
-11.1 Topics
+🧵 Event Bus, Topics & Contracts
+Topics
 Topic	Producer	Consumers (in this repo)
-ride.created	booking-service	ride-service (dispatch module), pricing-service (ETA module optional)
+ride.created	booking-service	ride-service (dispatch module), pricing-service (ETA optional)
 ride.assigned	ride-service (dispatch module)	notification-service, booking-service
 driver.location.updated	ride-service	pricing-service (ETA), notification-service (optional), monitoring
 payment.completed	payment-service	ride-service, user-service (wallet/history)
 payment.failed	payment-service	notification-service, booking-service
-11.2 Event Envelope (Recommended)
+Event Envelope (Recommended)
 {
   "eventId": "uuid",
   "type": "RideCreated",
   "timestamp": "2025-01-01T10:00:00Z",
   "data": {}
 }
-
-11.3 Sample Event (ride.created)
+Sample Event (ride.created)
 {
   "eventId": "uuid",
   "type": "RideCreated",
@@ -339,12 +322,8 @@ payment.failed	payment-service	notification-service, booking-service
   "pickup": { "lat": 10.7, "lng": 106.6 },
   "timestamp": "2025-01-01T10:00:00Z"
 }
-
-12) Ride & Payment State Machines
-12.1 Ride State Machine
-
-States:
-
+🔄 Ride & Payment State Machines
+Ride State Machine
 CREATED → MATCHING → ASSIGNED → PICKUP → IN_PROGRESS → COMPLETED → PAID
 Cancellation can happen during MATCHING or after ASSIGNED (before completion).
 
@@ -360,14 +339,9 @@ stateDiagram-v2
   COMPLETED --> PAID
   CANCELLED --> [*]
   PAID --> [*]
-
-12.2 Payment State Machine
-
-States:
-
-INIT → PENDING → (SUCCESS)
-
-If failed: FAILED → RETRY → (SUCCESS or FAILED_FINAL)
+Payment State Machine
+INIT → PENDING → SUCCESS
+Failure path: FAILED → RETRY → (SUCCESS or FAILED_FINAL)
 
 stateDiagram-v2
   [*] --> INIT
@@ -379,16 +353,8 @@ stateDiagram-v2
   RETRY --> FAILED_FINAL
   SUCCESS --> [*]
   FAILED_FINAL --> [*]
-
-13) Core Flows (Sequence Diagrams)
-13.1 Login + Refresh Token (JWT + Redis)
-
-Login returns Access Token + Refresh Token
-
-Refresh token stored in Redis
-
-Refresh rotates tokens (best practice)
-
+🧭 Core Flows (Sequence Diagrams)
+Login + Refresh Token (JWT + Redis)
 sequenceDiagram
   participant Client
   participant Gateway
@@ -407,8 +373,7 @@ sequenceDiagram
   Auth->>Redis: check + rotate refresh token
   Auth-->>Gateway: new token pair
   Gateway-->>Client: new tokens
-
-13.2 Booking End-to-End (Request → Assign → Track → Pay)
+Booking End-to-End (Request → Assign → Track → Pay)
 sequenceDiagram
   participant Customer
   participant Gateway
@@ -424,11 +389,13 @@ sequenceDiagram
   Gateway->>Booking: Create booking request
   Booking->>Booking: validate + persist
   Booking->>Kafka: publish ride.created
-  Kafka->>Ride: consume ride.created (dispatch/matching module)
+
+  Kafka->>Ride: consume ride.created (dispatch/matching)
   Ride->>DriverSvc: query nearby available drivers (Redis Geo)
   DriverSvc-->>Ride: candidate drivers
-  Ride->>Driver: notify ride offer (via WS/Push)
+  Ride->>Driver: notify ride offer (WS/Push)
   Driver-->>Ride: accept
+
   Ride->>Kafka: publish ride.assigned
   Kafka->>Noti: notify customer: driver assigned
   Noti-->>Customer: push + WS update
@@ -441,17 +408,7 @@ sequenceDiagram
   Payment->>Payment: call PSP (retry/backoff)
   Payment->>Kafka: payment.completed/payment.failed
   Kafka->>Ride: update ride -> PAID if completed
-
-13.3 Real-time GPS Update (Driver → Passenger)
-
-Driver sends GPS periodically via WebSocket
-
-Ride Service updates Redis Geo index
-
-Ride Service publishes driver.location.updated (optional)
-
-Passenger receives updates near real-time (<1s target)
-
+Real-time GPS Update (Driver → Passenger)
 sequenceDiagram
   participant Driver
   participant Ride
@@ -465,21 +422,7 @@ sequenceDiagram
     Ride->>Kafka: publish driver.location.updated
     Ride-->>Customer: WebSocket broadcast location
   end
-
-13.4 Surge Pricing Real-time (Optional)
-
-Key ideas:
-
-Surge pricing runs near real-time, separated from booking flow
-
-Redis stores supply/demand metrics per zone
-
-AI model optional; fallback rules if AI unavailable
-
-Kafka broadcasts surge updates for cache/dashboard/analytics
-
-Ensure price consistency between estimate and booking
-
+Surge Pricing Real-time (Optional)
 sequenceDiagram
   participant Customer
   participant Pricing
@@ -494,21 +437,7 @@ sequenceDiagram
   AI-->>Pricing: multiplier
   Pricing->>Kafka: publish surge.price.updated (optional)
   Pricing-->>Customer: estimated fare with surge
-
-13.5 Payment Saga (Choreography-Based)
-
-Characteristics:
-
-Event-driven choreography
-
-No distributed transactions (no 2PC)
-
-Each step has compensation action
-
-Ensures no double charge and no lost money
-
-Designed for unreliable PSP behavior (timeouts, retries)
-
+Payment Saga (Choreography-Based)
 sequenceDiagram
   participant Ride
   participant Payment
@@ -519,60 +448,58 @@ sequenceDiagram
   Payment->>PSP: Charge
   alt Success
     PSP-->>Payment: OK
-    Payment->>User: credit wallet/record transaction (optional)
+    Payment->>User: record transaction / update wallet (optional)
     Payment-->>Ride: payment.completed event
   else Failure
     PSP-->>Payment: Failed/Timeout
     Payment-->>Ride: payment.failed event
   end
-
-14) Failure Scenarios & Recovery Strategies
-14.1 Authentication & Security
+🧯 Failure Scenarios & Recovery Strategies
+Authentication & Security
 Failure Scenario	Cause	Handling
-Auth service overload/pod down	crash/traffic	API Gateway returns 503, circuit breaker, short token cache
-JWT expired	token expiry	auto refresh token
+Auth service overload/down	crash/traffic	Gateway returns 503, circuit breaker, short token cache
+JWT expired	token expiry	refresh token flow
 Token compromised	leaked token	revoke via Redis blacklist
 Brute force login	attacks	rate limiting + CAPTCHA
-14.2 Booking & Matching
+Booking & Matching
 Failure Scenario	Cause	Handling
 No driver found	low supply	retry with wider radius, fallback rules
-AI matching down	model/service down	fallback to distance-based matching
+AI matching down	model serving down	fallback to distance-based matching
 Duplicate booking	network retry	idempotency key
 Booking service crash	pod failure	replay events from Kafka
-14.3 Real-time & GPS
+Real-time & GPS
 Failure Scenario	Cause	Handling
 WebSocket disconnect	mobile network	auto reconnect, fallback polling
-GPS delayed/missing	device issues	use last-known-location
+GPS delayed/missing	device issues	last-known-location
 Kafka lag	high throughput	scale consumer group
-14.4 ETA & Pricing
+ETA & Pricing
 Failure Scenario	Cause	Handling
-Traffic provider down	third-party	use historical averages
+Traffic provider down	third-party	historical averages
 ETA overload	peak traffic	cache Redis + rate limit
 Surge model down	model serving	fallback fixed rule
 Price inconsistency	race condition	snapshot fare at booking time
-14.5 Payment
+Payment
 Failure Scenario	Cause	Handling
 Payment timeout	slow PSP	retry + exponential backoff
 PSP outage	third-party down	switch provider / degrade gracefully
 Double charge	retry race	idempotency key
 Pending payment	network split	eventual consistency + reconciliation
-14.6 Data & Storage
+Data & Storage
 Failure Scenario	Cause	Handling
 PostgreSQL fail	node crash	failover + replicas
 Redis eviction	memory pressure	TTL + recompute
 Mongo lag	replication delay	read preference strategy
-14.7 Infrastructure
+Infrastructure
 Failure Scenario	Cause	Handling
 Pod crash	OOM/bug	auto restart
 Node down	cloud issue	reschedule pod
 Region outage	disaster	multi-region failover
-15) Data Design (High-level)
-
+🗃 Data Design (High-level)
 Each service owns its database. Typical entities:
 
 auth-service: users_credentials, refresh_tokens (Redis)
 
-user-service: users, addresses, preferences, ride_history summary
+user-service: users, addresses, preferences, ride_history_summary
 
 driver-service: drivers, vehicles, driver_status, driver_documents
 
@@ -588,10 +515,10 @@ notification-service: notification_templates, notification_logs
 
 review-service: ratings, reviews, feedback_flags
 
-16) API Specification (OpenAPI)
-
+🧾 API Specification (OpenAPI)
 The platform is designed with OpenAPI 3.0 contracts (Swagger/Postman importable).
-Example endpoints commonly included:
+
+Example endpoints:
 
 POST /auth/login
 
@@ -611,24 +538,22 @@ POST /payments/charge
 
 POST /reviews
 
-17) UI/UX Summary (Apps)
-17.1 Design Principles
-
+📱 UI/UX Summary (Apps)
+Design Principles
 Mobile-first (iOS/Android ready)
 
 One-hand usage
 
 Real-time feedback (GPS, ETA, pricing)
 
-Progressive disclosure (hide advanced details until needed)
+Progressive disclosure
 
 Role-based UI: Customer / Driver / Admin
 
-17.2 Customer App Screens (Example)
-
+Customer App Screens
 Splash / onboarding (Book → Track → Pay)
 
-Login/Register (phone/email + OTP, optional social login)
+Login/Register (OTP optional)
 
 Home map + pickup pin + bottom sheet
 
@@ -648,11 +573,10 @@ Ride history (list, filter)
 
 Profile & wallet/settings (saved locations, payment methods)
 
-17.3 Driver App (Example)
-
+Driver App
 Online/offline toggle
 
-Incoming ride request screen (accept/reject)
+Incoming ride request (accept/reject)
 
 Navigation/route view
 
@@ -662,8 +586,7 @@ Trip completion
 
 Earnings & trip history
 
-17.4 Admin Dashboard (Example)
-
+Admin Dashboard
 KPIs overview: active rides, demand/supply, payment success rate
 
 User/driver management
@@ -674,26 +597,20 @@ Pricing and surge configuration (optional)
 
 Logs/audit viewing (optional)
 
-18) Local Development Quickstart
-18.1 Prerequisites
-
+🚀 Local Development Quickstart
+Prerequisites
 Node.js >= 18
 
 Docker + Docker Compose
 
-18.2 Start local infrastructure
+Start local infrastructure
 docker compose -f infra/docker-compose.yml up -d
-
-18.3 Install dependencies
+Install dependencies
 npm install
-
-18.4 Run services/apps
-
+Run services/apps
 Option A (monorepo runner if configured):
 
 npm run dev
-
-
 Option B (run individually):
 
 cd services/api-gateway
