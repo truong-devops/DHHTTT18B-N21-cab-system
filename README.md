@@ -1,3 +1,4 @@
+<details> <summary><b>Show diagram (Mermaid)</b></summary>
 flowchart TB
   subgraph Clients
     C1[Customer App]
@@ -57,3 +58,5 @@ flowchart TB
   K --> N
   K --> P
   K --> R
+
+</details>
