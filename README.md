@@ -10,28 +10,28 @@ This repository follows a **cloud-native microservices architecture** (Node.js /
 
 CAB Booking System delivers an end-to-end ride-hailing experience for:
 
-- **Customers**: request rides, view fare estimates, track drivers in real-time, pay, and rate trips  
-- **Drivers**: go online/offline, accept rides, stream GPS updates, complete trips, and view history  
-- **Admins**: monitor operations, manage users/drivers/rides, and analyze signals  
+- **Customers**: request rides, view fare estimates, track drivers in real-time, pay, and rate trips
+- **Drivers**: go online/offline, accept rides, stream GPS updates, complete trips, and view history
+- **Admins**: monitor operations, manage users/drivers/rides, and analyze signals (architecture scope)
 
 The system is designed around:
 
-✅ **Microservices + Database-per-service** (independent scaling)  
-✅ **Event-driven messaging** (low coupling + eventual consistency)  
-✅ **Real-time tracking** (WebSocket/Socket.IO for GPS + ride status)  
-✅ **Zero Trust security** (WAF, TLS, JWT/OAuth2, RBAC/ABAC, mTLS internal)  
-✅ **Observability-by-design** (structured logs, metrics, tracing)
+- ✅ **Microservices + Database-per-service** (independent scaling)
+- ✅ **Event-driven messaging** (low coupling + eventual consistency)
+- ✅ **Real-time tracking** (WebSocket/Socket.IO for GPS + ride status)
+- ✅ **Zero Trust security** (WAF, TLS, JWT/OAuth2, RBAC/ABAC, mTLS internal)
+- ✅ **Observability-by-design** (structured logs, metrics, tracing)
 
 ---
 
 ## 🎯 Design Goals & Architecture Principles
 
 ### Goals
-- **Scalability**: horizontal scaling under heavy traffic  
-- **High Availability**: minimize single points of failure  
-- **Fault Tolerance**: isolate failures + graceful degradation  
-- **Real-time UX**: instant ride status & location updates  
-- **Cloud-native delivery**: containers, orchestration, CI/CD  
+- **Scalability**: horizontal scaling under heavy traffic
+- **High Availability**: minimize single points of failure
+- **Fault Tolerance**: isolation + graceful degradation
+- **Real-time UX**: instant ride status & location updates
+- **Cloud-native delivery**: containers, orchestration, CI/CD
 
 ### Principles
 - **Database per service**
@@ -76,14 +76,14 @@ The system is designed around:
 
 This repository is organized as a monorepo: frontend apps + backend services + shared contracts/libs/infra.
 
-```mermaid
+```text
 DHHTTT18B-N21-cab-system/
 ├─ apps/
 │  ├─ customer-app/              # Customer UI: book → track → pay → rate
 │  ├─ driver-app/                # Driver UI: online → accept → GPS → complete
 │  └─ admin-dashboard/           # Admin UI: monitor & manage operations
 │
-├─ services/                     
+├─ services/                     # ✅ ONLY 10 SERVICES
 │  ├─ api-gateway/               # routing, auth middleware, validation, rate limit
 │  ├─ auth-service/              # register/login, JWT issuing, refresh token
 │  ├─ user-service/              # customer profile, preferences, history
@@ -112,8 +112,7 @@ DHHTTT18B-N21-cab-system/
 ├─ scripts/                      # helpers: dev, seed, lint, build, deploy
 ├─ package.json
 └─ README.md
-
-🧩 Service Overview 
+🧩 Service Overview (10 Services Only)
 Service	Responsibility
 api-gateway	Routing, auth middleware, rate limiting, request validation, logging
 auth-service	Register/login, JWT issuing, refresh token management
@@ -142,8 +141,8 @@ flowchart TB
     C3[Admin Dashboard]
   end
 
-  C1 -->|HTTPS/WebSocket| G[API Gateway]
-  C2 -->|HTTPS/WebSocket| G
+  C1 -->|HTTPS / WebSocket| G[API Gateway]
+  C2 -->|HTTPS / WebSocket| G
   C3 -->|HTTPS| G
 
   subgraph Services
@@ -194,6 +193,8 @@ flowchart TB
   K --> N
   K --> P
   K --> R
+If Mermaid does not render in your GitHub viewer, replace diagrams with ASCII drawings or use a Markdown Mermaid extension in your IDE.
+
 ☁️ Deployment Architecture (Cloud-Native)
 Designed for:
 
@@ -204,8 +205,7 @@ Auto-scaling (HPA)
 Multi-region readiness
 
 Managed data services (RDS/CloudSQL, Mongo Atlas, Redis ElastiCache)
-` ````
-```mermaid
+
 flowchart TB
   LB[Global/Regional Load Balancer] --> GW[API Gateway Pods]
   GW --> S[Microservices Pods]
@@ -216,7 +216,7 @@ flowchart TB
 Real-time (WebSocket / Socket.IO)
 Driver streams GPS updates continuously
 
-Customer receives ride status + driver location near real-time (<1s target)
+Customer receives ride status + driver location near real-time (target: ~1s updates)
 
 Event-driven fanout
 Ride/payment updates publish events to Kafka/RabbitMQ
