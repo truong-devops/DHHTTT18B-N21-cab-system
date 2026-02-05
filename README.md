@@ -112,7 +112,7 @@ DHHTTT18B-N21-cab-system/
 ├─ scripts/                      # helpers: dev, seed, lint, build, deploy
 ├─ package.json
 └─ README.md
-````
+
 🧩 Service Overview 
 Service	Responsibility
 api-gateway	Routing, auth middleware, rate limiting, request validation, logging
@@ -134,7 +134,7 @@ Gateway routes to microservices
 Services publish/consume events via Kafka/RabbitMQ
 
 Data uses PostgreSQL, MongoDB, Redis (Geo + cache)
-```mermaid
+
 flowchart TB
   subgraph Clients
     C1[Customer App]
@@ -215,7 +215,7 @@ flowchart TB
 ⚡ Real-time & Event-driven Architecture
 Real-time (WebSocket / Socket.IO)
 Driver streams GPS updates continuously
-````
+
 Customer receives ride status + driver location near real-time (<1s target)
 
 Event-driven fanout
