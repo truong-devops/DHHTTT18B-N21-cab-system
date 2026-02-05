@@ -83,7 +83,7 @@ DHHTTT18B-N21-cab-system/
 │  ├─ driver-app/                # Driver UI: online → accept → GPS → complete
 │  └─ admin-dashboard/           # Admin UI: monitor & manage operations
 │
-├─ services/                     # ✅ ONLY 10 SERVICES
+├─ services/                     
 │  ├─ api-gateway/               # routing, auth middleware, validation, rate limit
 │  ├─ auth-service/              # register/login, JWT issuing, refresh token
 │  ├─ user-service/              # customer profile, preferences, history
@@ -112,7 +112,8 @@ DHHTTT18B-N21-cab-system/
 ├─ scripts/                      # helpers: dev, seed, lint, build, deploy
 ├─ package.json
 └─ README.md
-🧩 Service Overview (10 Services Only)
+` ````
+🧩 Service Overview 
 Service	Responsibility
 api-gateway	Routing, auth middleware, rate limiting, request validation, logging
 auth-service	Register/login, JWT issuing, refresh token management
@@ -133,7 +134,7 @@ Gateway routes to microservices
 Services publish/consume events via Kafka/RabbitMQ
 
 Data uses PostgreSQL, MongoDB, Redis (Geo + cache)
-
+```mermaid
 flowchart TB
   subgraph Clients
     C1[Customer App]
@@ -203,7 +204,8 @@ Auto-scaling (HPA)
 Multi-region readiness
 
 Managed data services (RDS/CloudSQL, Mongo Atlas, Redis ElastiCache)
-
+` ````
+```mermaid
 flowchart TB
   LB[Global/Regional Load Balancer] --> GW[API Gateway Pods]
   GW --> S[Microservices Pods]
@@ -213,7 +215,7 @@ flowchart TB
 ⚡ Real-time & Event-driven Architecture
 Real-time (WebSocket / Socket.IO)
 Driver streams GPS updates continuously
-
+` ````
 Customer receives ride status + driver location near real-time (<1s target)
 
 Event-driven fanout
