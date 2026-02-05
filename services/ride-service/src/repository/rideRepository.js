@@ -216,7 +216,12 @@ async function updateRideStatus({
     }
   );
 
-  return mapRide(updatedRide);
+  const mapped = mapRide(updatedRide);
+  if (!mapped) {
+    const fallback = await getRideById(id);
+    return fallback;
+  }
+  return mapped;
 }
 
 async function updateRideFields(id, fields) {
