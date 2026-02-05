@@ -76,7 +76,7 @@ The system is designed around:
 
 This repository is organized as a monorepo: frontend apps + backend services + shared contracts/libs/infra.
 
-```text
+```mermaid
 DHHTTT18B-N21-cab-system/
 ├─ apps/
 │  ├─ customer-app/              # Customer UI: book → track → pay → rate
