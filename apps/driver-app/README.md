@@ -1,44 +1,50 @@
-# Driver App (Expo)
+# Welcome to your Expo app 👋
 
-## Run
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+
+## Get started
+
+1. Install dependencies
+
+   ```bash
+   npm install
+   ```
+
+2. Start the app
+
+   ```bash
+   npx expo start
+   ```
+
+In the output, you'll find options to open the app in a
+
+- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+
+You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+
+## Get a fresh project
+
+When you're ready, run:
+
 ```bash
-npm install
-npm run start
+npm run reset-project
 ```
 
-## Web preview
-```bash
-npm run web
-```
+This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
-## Env
-- `EXPO_PUBLIC_API_BASE_URL` (required, ví dụ http://192.168.x.x:3000)
-- `EXPO_PUBLIC_WS_URL` (optional)
+## Learn more
 
-Nếu thiếu `EXPO_PUBLIC_API_BASE_URL` app sẽ hiển thị màn hình lỗi cấu hình.
+To learn more about developing your project with Expo, look at the following resources:
 
-## Flow
-Login -> Online -> IncomingRide -> Pickup -> InProgress -> Completed -> Earnings/History
+- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
-## Notes
-- Theme: orange-red + white, no gradients
-- Uses polling for realtime; WS can be added via `useRideRealtime`
-- Map is a placeholder view; replace `components/map/MapView.tsx` with real map integration
+## Join the community
 
-## Debug
-- Vào Profile, tap 5 lần vào dòng version để mở Debug screen.
-- Debug hiển thị Base URL + last 10 requests + nút Ping /health.
+Join our community of developers creating universal apps.
 
-## Test flow (BE thật, không mock)
-1) Login tài xế trong app.
-2) Bật ONLINE.
-3) Trên terminal chạy script tạo booking/ride (bạn tự chạy).
-4) App tự poll incoming → hiện thẻ Accept/Reject.
-5) Accept → Arriving → In Progress → Completed trên UI (app sẽ gọi BE thật).
-
-## iOS HTTP (dev)
-Nếu gọi backend qua HTTP (không HTTPS), iOS có thể chặn.  
-Cách làm nhanh (dev only):
-- dùng IP LAN, cùng Wi-Fi
-- backend bind `0.0.0.0`
-- nếu vẫn bị chặn, thêm ATS trong `app.json` hoặc `app.config.js`.
+- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
