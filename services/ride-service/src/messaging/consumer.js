@@ -80,7 +80,8 @@ async function start() {
         consumer: CONSUMER_NAME,
         topic,
         eventType: envelope.type || "unknown",
-        payload: envelope.payload
+        payload: envelope.payload,
+        traceId
       });
 
       if (!inserted) {

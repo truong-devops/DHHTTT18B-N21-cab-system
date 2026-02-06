@@ -327,12 +327,27 @@ router.get(
   }),
   asyncHandler(async (req, res) => {
     const { limit, cursor, sort } = req.pagination;
+    const roles = req.user?.roles || [];
+    const canListAll =
+      roles.includes("admin") ||
+      roles.includes("ops") ||
+      roles.includes("driver");
+    const requestedRiderId = req.query.riderId || null;
+    const riderId = requestedRiderId
+      ? canListAll
+        ? requestedRiderId
+        : req.userId
+      : canListAll
+        ? null
+        : req.userId;
 
     const rows = await listRides({
       limit,
       cursor,
-      status: req.query.status,
-      riderId: req.query.riderId || req.userId,
+      status: req.query.status
+        ? String(req.query.status).toLowerCase()
+        : null,
+      riderId,
       sort: sort === "-createdAt" ? "-created_at" : "created_at"
     });
 
