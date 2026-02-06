@@ -1,76 +1,110 @@
 const request = require("supertest");
 const nock = require("nock");
+const jwt = require("jsonwebtoken");
+
+const TEST_SECRET = "test-secret";
+const authHeader = (payload = { sub: "user-123" }) =>
+  `Bearer ${jwt.sign(payload, TEST_SECRET)}`;
 
 describe("api-gateway proxy", () => {
-  const baseUrl = "http://payment-service.test";
-  let app;
-
-  beforeAll(() => {
-    process.env.PAYMENT_SERVICE_URL = baseUrl;
-    process.env.PROXY_TIMEOUT_MS = "50";
-    process.env.PROXY_RETRY_BACKOFF_MS = "10";
-    process.env.JWT_ACCESS_SECRET = "secret";
-
-    jest.resetModules();
-    app = require("../src/app");
-  });
-
   beforeEach(() => {
-    nock.disableNetConnect();
-    nock.enableNetConnect("127.0.0.1");
+    nock.cleanAll();
+    jest.resetModules();
+    process.env.RIDE_SERVICE_URL = "http://ride-service.test";
+    process.env.JWT_SECRET = TEST_SECRET;
+    process.env.PROXY_TIMEOUT_MS = "20";
+    process.env.PROXY_RETRY_BACKOFF_MS = "5";
   });
 
   afterEach(() => {
     nock.cleanAll();
-    nock.enableNetConnect();
+    delete process.env.RIDE_SERVICE_URL;
+    delete process.env.JWT_SECRET;
+    delete process.env.PROXY_TIMEOUT_MS;
+    delete process.env.PROXY_RETRY_BACKOFF_MS;
   });
 
-  test("forwards auth headers and generates trace id", async () => {
-    const scope = nock(baseUrl)
-      .get("/v1/payments")
-      .matchHeader("authorization", "Bearer token")
-      .matchHeader("x-request-id", "req-1")
-      .matchHeader("x-trace-id", (value) => typeof value === "string" && value.length > 0)
+  it("forwards headers and path", async () => {
+    const app = require("../src/app");
+    const scope = nock("http://ride-service.test")
+      .get("/v1/rides/ride-1")
+      .matchHeader("authorization", /^Bearer\s.+/)
+      .matchHeader("x-user-id", "user-123")
+      .matchHeader("x-user-roles", "rider")
+      .matchHeader("x-trace-id", /.{8,}/)
+      .matchHeader("x-request-id", /.{8,}/)
       .reply(200, { ok: true });
 
     const response = await request(app)
-      .get("/v1/payments")
-      .set("Authorization", "Bearer token")
-      .set("x-request-id", "req-1");
+      .get("/v1/rides/ride-1")
+      .set(
+        "Authorization",
+        authHeader({ sub: "user-123", roles: ["rider"] })
+      );
 
     expect(response.status).toBe(200);
     expect(response.body.ok).toBe(true);
-    expect(response.headers["x-trace-id"]).toBeTruthy();
-    scope.done();
+    expect(scope.isDone()).toBe(true);
   });
 
-  test("retries GET once after timeout", async () => {
-    const path = "/v1/payments/slow";
-    nock(baseUrl)
-      .get(path)
-      .delayConnection(60)
-      .reply(200, { ok: true, attempt: 1 });
+  it("retries GET once on network error", async () => {
+    const app = require("../src/app");
+    const scope = nock("http://ride-service.test")
+      .get("/v1/rides")
+      .replyWithError({ code: "ECONNREFUSED" })
+      .get("/v1/rides")
+      .reply(200, { ok: true });
 
-    nock(baseUrl)
-      .get(path)
-      .reply(200, { ok: true, attempt: 2 });
-
-    const response = await request(app).get(path);
+    const response = await request(app)
+      .get("/v1/rides")
+      .set("Authorization", authHeader());
 
     expect(response.status).toBe(200);
-    expect(response.body.attempt).toBe(2);
-    expect(nock.isDone()).toBe(true);
+    expect(response.body.ok).toBe(true);
+    expect(scope.isDone()).toBe(true);
   });
 
-  test("returns standardized error for unreachable upstream", async () => {
-    nock(baseUrl)
-      .get("/v1/payments/unavailable")
+  it("returns 502 when upstream unreachable for POST", async () => {
+    const app = require("../src/app");
+    nock("http://ride-service.test")
+      .post("/v1/rides")
       .replyWithError({ code: "ECONNREFUSED" });
 
-    const response = await request(app).get("/v1/payments/unavailable");
+    const response = await request(app)
+      .post("/v1/rides")
+      .set("Authorization", authHeader())
+      .send({ foo: "bar" });
 
-    expect(response.status).toBe(503);
-    expect(response.body.error.code).toBe("UPSTREAM_UNAVAILABLE");
+    expect(response.status).toBe(502);
+    expect(response.body.error.code).toBe(
+      "UPSTREAM_UNAVAILABLE"
+    );
     expect(response.body.traceId).toBeTruthy();
+  });
+
+  it("returns 504 when upstream times out", async () => {
+    const app = require("../src/app");
+    nock("http://ride-service.test")
+      .post("/v1/rides")
+      .delayConnection(50)
+      .reply(200, { ok: true });
+
+    const response = await request(app)
+      .post("/v1/rides")
+      .set("Authorization", authHeader())
+      .send({ foo: "bar" });
+
+    expect(response.status).toBe(504);
+    expect(response.body.error.code).toBe(
+      "UPSTREAM_TIMEOUT"
+    );
+  });
+
+  it("returns 401 when authorization header missing", async () => {
+    const app = require("../src/app");
+    const response = await request(app).get("/v1/rides");
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("UNAUTHORIZED");
   });
 });

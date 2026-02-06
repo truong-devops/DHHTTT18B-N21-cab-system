@@ -2,6 +2,7 @@ const config = {
   serviceName: process.env.SERVICE_NAME || "payment-service",
   port: Number(process.env.PORT || 3000),
   db: {
+    connectionString: process.env.DATABASE_URL || "",
     host: process.env.PGHOST || "localhost",
     port: Number(process.env.PGPORT || 5432),
     user: process.env.PGUSER || "postgres",
@@ -43,7 +44,11 @@ const config = {
     expiresInMinutes: Number(process.env.VIETQR_EXPIRES_IN_MINUTES || 15)
   },
   auth: {
-    jwtAccessSecret: process.env.JWT_ACCESS_SECRET || ""
+    jwtAccessSecret:
+      process.env.JWT_ACCESS_SECRET ||
+      process.env.AUTH_JWT_SECRET ||
+      process.env.JWT_SECRET ||
+      ""
   }
 };
 

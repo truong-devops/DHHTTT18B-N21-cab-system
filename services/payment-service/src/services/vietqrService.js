@@ -24,8 +24,8 @@ function ensureVietQrConfig() {
   if (!config.vietqr.accountName) missing.push("VIETQR_ACCOUNT_NAME");
   if (missing.length) {
     throw new ApiError(
-      500,
-      "INTERNAL",
+      400,
+      "VIETQR_CONFIG_MISSING",
       `Missing VietQR config: ${missing.join(", ")}`
     );
   }
@@ -41,8 +41,8 @@ async function generateVietQr({ amount, currency, note, traceId, requestId, auth
   const accountName = normalizeText(config.vietqr.accountName, 50);
   if (accountName.length < 5) {
     throw new ApiError(
-      500,
-      "INTERNAL",
+      400,
+      "VIETQR_CONFIG_INVALID",
       "VIETQR_ACCOUNT_NAME must be at least 5 characters after normalization"
     );
   }

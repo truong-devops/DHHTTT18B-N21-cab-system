@@ -132,7 +132,7 @@ async function updatePaymentStatus(client, paymentId, status, failureReason) {
 }
 
 async function listPayments({ limit, cursor, sort, status, rideId }) {
-  const builder = { where: [], values: [], orderBy: "" };
+  const builder = { where: [], values: [], orderBy: "", limit: 20 };
 
   if (status) {
     builder.values.push(status);
@@ -144,10 +144,18 @@ async function listPayments({ limit, cursor, sort, status, rideId }) {
     builder.where.push(`ride_id = $${builder.values.length}`);
   }
 
-  const { limit: safeLimit } = applyCursorQuery(builder, { limit, cursor, sort });
+  const safeLimit = Number(limit) && Number(limit) > 0 ? Number(limit) : 20;
+  applyCursorQuery(builder, {
+    limit: safeLimit + 1,
+    cursor,
+    sort
+  });
 
   const whereClause = builder.where.length ? `WHERE ${builder.where.join(" AND ")}` : "";
-  const query = `SELECT * FROM payments ${whereClause} ${builder.orderBy} LIMIT $${builder.values.length}`;
+  const orderByClause = builder.orderBy ? `ORDER BY ${builder.orderBy}` : "ORDER BY created_at DESC, id DESC";
+  builder.values.push(builder.limit);
+  const limitIndex = builder.values.length;
+  const query = `SELECT * FROM payments ${whereClause} ${orderByClause} LIMIT $${limitIndex}`;
 
   const result = await pool.query(query, builder.values);
   const rows = result.rows.map(mapPaymentRow);

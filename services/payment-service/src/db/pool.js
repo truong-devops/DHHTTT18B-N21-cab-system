@@ -4,14 +4,18 @@ const { Pool } = require("pg");
 
 const config = require("../config");
 
-const pool = new Pool({
-  host: config.db.host,
-  port: config.db.port,
-  user: config.db.user,
-  password: config.db.password,
-  database: config.db.database,
-  max: config.db.max
-});
+const poolConfig = config.db.connectionString
+  ? { connectionString: config.db.connectionString, max: config.db.max }
+  : {
+      host: config.db.host,
+      port: config.db.port,
+      user: config.db.user,
+      password: config.db.password,
+      database: config.db.database,
+      max: config.db.max
+    };
+
+const pool = new Pool(poolConfig);
 
 function extractUpSql(raw) {
   const lines = raw.split(/\r?\n/);

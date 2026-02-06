@@ -15,34 +15,27 @@
 require("dotenv").config();
 
 const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const jwt = require("jsonwebtoken");
+const { traceMiddleware } = require("./middleware/trace");
+const { requestLogger } = require("./middleware/requestLogger");
+const { errorHandler } = require("./middleware/errorHandler");
+const { ApiError } = require("./utils/errors");
+const userRoutes = require("./routes/users");
+const internalRoutes = require("./routes/internal");
 
 const app = express();
-app.use(helmet());
-app.use(express.json());
-app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
 
-app.get("/health", (req, res) => res.json({ ok: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(traceMiddleware);
+app.use(requestLogger);
 
-function authenticateJWT(req, res, next) {
-  const auth = req.headers.authorization || "";
-  if (!auth.startsWith("Bearer ")) return res.status(401).json({ message: "Missing token" });
-  try {
-    req.user = jwt.verify(auth.slice(7), process.env.JWT_ACCESS_SECRET);
-    next();
-  } catch {
-    res.status(401).json({ message: "Invalid/expired token" });
-  }
-}
+app.get("/healthz", (_req, res) => res.json({ ok: true }));
+app.use(userRoutes);
+app.use(internalRoutes);
 
-app.get("/admin/summary", authenticateJWT, (req, res) => {
-  res.json({
-    viewer: { id: req.user.sub, username: req.user.username, role: req.user.role },
-    kpi: { totalUsers: 1234, totalDrivers: 321, ridesToday: 56, revenueToday: 12500000 },
-    lastUpdated: new Date().toISOString()
-  });
+app.use((_req, _res, next) => {
+  next(new ApiError(404, "NOT_FOUND", "Route not found"));
 });
+
+app.use(errorHandler);
 
 module.exports = app;

@@ -1,52 +1,215 @@
 services:
-  # =========================
-  # Infra: Kafka + Zookeeper
-  # =========================
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
+    networks:
+      - backend
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     depends_on:
       - zookeeper
-    ports:
-      - "9092:9092"
-      - "29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    networks:
+      - backend
 
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    depends_on:
-      - kafka
-    ports:
-      - "8088:8080" # đổi port host để không đụng API Gateway 8080
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-
-  # =========================
-  # Infra: Redis
-  # =========================
   redis:
     image: redis:7-alpine
-    container_name: cab-redis
+    volumes:
+      - cab_redis_data:/data
+    networks:
+      - backend
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile
     ports:
-      - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+      - "3000:3000"
+    environment:
+      SERVICE_NAME: api-gateway
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+      AUTH_SERVICE_URL: http://auth-service:4001
+      BOOKING_SERVICE_URL: http://booking-service:3003
+      DRIVER_SERVICE_URL: http://driver-service:3011
+      NOTIFICATION_SERVICE_URL: http://notification-service:3010
+      PAYMENT_SERVICE_URL: http://payment-service:3007
+      PRICING_SERVICE_URL: http://pricing-service:3006
+      RIDE_SERVICE_URL: http://ride-service:3005
+      REVIEW_SERVICE_URL: http://review-service:3009
+      USER_SERVICE_URL: http://user-service:4004
+    depends_on:
+      - auth-service
+      - booking-service
+      - driver-service
+      - notification-service
+      - payment-service
+      - pricing-service
+      - ride-service
+      - review-service
+      - user-service
+    networks:
+      - backend
+
+  auth-service:
+    build:
+      context: ..
+      dockerfile: services/auth-service/Dockerfile
+    environment:
+      SERVICE_NAME: auth-service
+      PORT: 4001
+      DATABASE_URL: postgres://cab:cabpass@postgres:5432/auth-service_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
+  user-service:
+    build:
+      context: ..
+      dockerfile: services/user-service/Dockerfile
+    environment:
+      SERVICE_NAME: user-service
+      PORT: 4004
+      DATABASE_URL: postgres://cab:cabpass@postgres:5432/user-service_db
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
+  ride-service:
+    build:
+      context: ..
+      dockerfile: services/ride-service/Dockerfile
+    environment:
+      SERVICE_NAME: ride-service
+      PORT: 3005
+      MONGODB_URI: mongodb://mongo:27017/ride_service
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on:
+      - mongo
+      - redis
+      - kafka
+    networks:
+      - backend
+
+  booking-service:
+    build:
+      context: ../services/booking-service
+    environment:
+      SERVICE_NAME: booking-service
+      PORT: 3003
+      KAFKA_BROKERS: kafka:9092
+      PRICING_BASE_URL: http://pricing-service:3006
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+    depends_on:
+      - kafka
+    networks:
+      - backend
+
+  driver-service:
+    build:
+      context: ..
+      dockerfile: services/driver-service/Dockerfile
+    environment:
+      SERVICE_NAME: driver-service
+      PORT: 3011
+      DATABASE_URL: postgres://cab:cabpass@postgres:5432/driver-service_db
+      REDIS_URL: redis://redis:6379
+      AUTH_JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - backend
+
+  notification-service:
+    build:
+      context: ../services/notification-service
+    environment:
+      SERVICE_NAME: notification-service
+      PORT: 3010
+      MONGODB_URI: mongodb://mongo:27017/notification_service
+      USER_SERVICE_BASE_URL: http://user-service:4004
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      AUTH_JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on:
+      - mongo
+      - user-service
+    networks:
+      - backend
+
+  pricing-service:
+    build:
+      context: ..
+      dockerfile: services/pricing-service/Dockerfile
+    environment:
+      SERVICE_NAME: pricing-service
+      PORT: 3006
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+    depends_on:
+      - redis
+    networks:
+      - backend
+
+  payment-service:
+    build:
+      context: ..
+      dockerfile: services/payment-service/Dockerfile
+    environment:
+      SERVICE_NAME: payment-service
+      PORT: 3007
+      DATABASE_URL: postgres://cab:cabpass@postgres:5432/payment-service_db
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      JWT_ACCESS_SECRET: ${JWT_SECRET:-dev-secret}
+
+      VIETQR_BANK_BIN: "970418"
+      VIETQR_ACCOUNT_NUMBER: "123456789"
+      VIETQR_ACCOUNT_NAME: "NGUYEN VAN A"
+      VIETQR_CLIENT_ID: "your-client-id"
+      VIETQR_API_KEY: "your-api-key"
+      VIETQR_EXPIRES_IN_MINUTES: 15
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - backend
+
+  review-service:
+    build:
+      context: ..
+      dockerfile: services/review-service/Dockerfile
+    environment:
+      SERVICE_NAME: review-service
+      PORT: 3009
+      DATABASE_URL: postgres://cab:cabpass@postgres:5432/review-service_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - backend
 
   # =========================
   # Infra: Postgres (demo future)
@@ -57,114 +220,24 @@ services:
       POSTGRES_USER: cab
       POSTGRES_PASSWORD: cabpass
       POSTGRES_DB: cab_booking
-    ports:
-      - "5432:5432"
     volumes:
       - cab_postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - backend
 
-  # =========================
-  # App services for LOGIN DEMO
-  # =========================
-
-  auth-service:
-    build:
-      context: ..
-      dockerfile: services/auth-service/Dockerfile
-    depends_on:
-      - redis
-    environment:
-      PORT: 4001
-      CORS_ORIGIN: "http://localhost:5173"
-      REDIS_URL: "redis://redis:6379"
-      JWT_ACCESS_SECRET: "dev_access_secret"
-      JWT_REFRESH_SECRET: "dev_refresh_secret"
-      ACCESS_TOKEN_TTL_SECONDS: 60
-      REFRESH_TOKEN_TTL_SECONDS: 604800
-      # optional kafka bootstrap for future
-      KAFKA_BROKERS: "kafka:9092"
-    ports:
-      - "4001:4001"
-
-  user-service:
-    build:
-      context: ..
-      dockerfile: services/user-service/Dockerfile
-    environment:
-      PORT: 4002
-      CORS_ORIGIN: "http://localhost:5173"
-      JWT_ACCESS_SECRET: "dev_access_secret"
-      # optional db for future
-      DATABASE_URL: "postgres://cab:cabpass@postgres:5432/cab_booking"
-      KAFKA_BROKERS: "kafka:9092"
-    depends_on:
-      - postgres
-    ports:
-      - "4002:4002"
-
-  payment-service:
-    build:
-      context: ..
-      dockerfile: services/payment-service/Dockerfile
-    depends_on:
-      - postgres
-      - redis
-      - kafka
-    environment:
-      PORT: 3004
-      SERVICE_NAME: payment-service
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: cab
-      PGPASSWORD: cabpass
-      PGDATABASE: payment-service_db
-      PGPOOL_MAX: 10
-      JWT_ACCESS_SECRET: "dev_access_secret"
-      REDIS_URL: "redis://redis:6379"
-      KAFKA_BROKERS: "kafka:9092"
-      KAFKA_CLIENT_ID: "payment-service"
-      KAFKA_CONSUMER_GROUP_ID: "payment-service-group"
-      KAFKA_CONSUME_TOPICS: ""
-      OUTBOX_PUBLISH_INTERVAL_MS: 5000
-      VIETQR_API_URL: "https://api.vietqr.io/v2/generate"
-      VIETQR_BANK_BIN: ""
-      VIETQR_ACCOUNT_NUMBER: ""
-      VIETQR_ACCOUNT_NAME: ""
-      VIETQR_MERCHANT_CITY: "HO CHI MINH"
-      VIETQR_FORMAT: "text"
-      VIETQR_CLIENT_ID: ""
-      VIETQR_API_KEY: ""
-      VIETQR_EXPIRES_IN_MINUTES: 15
-    ports:
-      - "3004:3004"
-
-  api-gateway:
-    build:
-      context: ..
-      dockerfile: services/api-gateway/Dockerfile
-    depends_on:
-      - auth-service
-      - user-service
-    environment:
-      PORT: 3000
-      CORS_ORIGIN: "http://localhost:5173"
-      JWT_ACCESS_SECRET: "dev_access_secret"
-      AUTH_SERVICE_URL: "http://auth-service:4001"
-      USER_SERVICE_URL: "http://user-service:4002"
-    ports:
-      - "3000:3000"
-
-  admin-dashboard:
-    build:
-      context: ..
-      dockerfile: apps/admin-dashboard/Dockerfile
-    depends_on:
-      - api-gateway
-    environment:
-      # Vite đọc biến có prefix VITE_
-      VITE_API_BASE_URL: "http://localhost:3000"
-    ports:
-      - "5173:5173"
+  mongo:
+    image: mongo:7
+    volumes:
+      - cab_mongo_data:/data/db
+    networks:
+      - backend
 
 volumes:
   cab_postgres_data:
+  cab_redis_data:
+  cab_mongo_data:
+
+networks:
+  backend:
+    driver: bridge

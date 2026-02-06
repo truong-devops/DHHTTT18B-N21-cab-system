@@ -3,7 +3,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const crypto = require("crypto");
-
+const bookingsRouter = require("./routes/bookings");
 const app = express();
 app.use(helmet());
 app.use(cors());
@@ -12,6 +12,7 @@ app.use(morgan("dev"));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
+app.use("/v1/bookings", bookingsRouter);
 // DEMO endpoint: publish RideCreated event
 app.post("/demo/ride-created", async (_req, res) => {
   try {
