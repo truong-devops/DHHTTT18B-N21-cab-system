@@ -36,6 +36,23 @@ type WalletSummary = {
   payoutDate: string;
 };
 
+type ActiveRide = {
+  id: string;
+  passenger: string;
+  pickup: string;
+  dropoff: string;
+  remainingTimeMin: number;
+  nextDistanceKm: number;
+  totalDistanceKm: number;
+  paymentMethod: string;
+};
+
+type RideSummary = {
+  totalAmount: number;
+  distanceKm: number;
+  durationMin: number;
+};
+
 const driverProfile: DriverProfile = {
   id: 'drv-101',
   name: 'Nguyễn Hoàng',
@@ -99,6 +116,23 @@ const walletSummary: WalletSummary = {
   payoutDate: 'Thứ Sáu, 07/02',
 };
 
+const activeRide: ActiveRide = {
+  id: 'ride-live-01',
+  passenger: 'Kieu Trang',
+  pickup: 'Cong vien Tao Dan',
+  dropoff: 'Ga Quoc Te T2',
+  remainingTimeMin: 18,
+  nextDistanceKm: 2.4,
+  totalDistanceKm: 15.2,
+  paymentMethod: 'Tien mat',
+};
+
+const rideSummary: RideSummary = {
+  totalAmount: 324000,
+  distanceKm: 15.2,
+  durationMin: 28,
+};
+
 const payouts = [
   { id: 'pay-1', date: '04/02', amount: 1200000, status: 'Đã chuyển' },
   { id: 'pay-2', date: '02/02', amount: 980000, status: 'Đã chuyển' },
@@ -120,6 +154,9 @@ export const mockApi = {
       onlineTime: '5h 42m',
       hotZone: 'Trung tâm Q1 +12%',
       boost: '1.6x đến 09:30',
+      acceptanceRate: 92,
+      cancelRate: 3,
+      nextGoal: 'Thêm 4 chuyến để nhận thưởng 120k',
     });
   },
   async getRideRequests() {
@@ -127,6 +164,12 @@ export const mockApi = {
   },
   async getRideHistory() {
     return mockDelay(rideHistory);
+  },
+  async getActiveRide() {
+    return mockDelay(activeRide);
+  },
+  async getRideSummary() {
+    return mockDelay(rideSummary);
   },
   async getWalletSummary() {
     return mockDelay({ summary: walletSummary, payouts });

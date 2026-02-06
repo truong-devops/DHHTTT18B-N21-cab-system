@@ -5,6 +5,7 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { palette } from '@/lib/theme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -19,7 +20,7 @@ export default function TabLayout() {
         tabBarButton: HapticTab,
         tabBarStyle: {
           backgroundColor: '#ffffff',
-          borderTopColor: 'rgba(229, 57, 53, 0.15)',
+          borderTopColor: palette.border,
           borderTopWidth: 1,
           height: 64,
           paddingBottom: 8,

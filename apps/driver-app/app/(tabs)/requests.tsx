@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { router } from 'expo-router';
 import { mockApi } from '@/lib/mock-api';
 import { palette } from '@/lib/theme';
 
 type Request = Awaited<ReturnType<typeof mockApi.getRideRequests>>[number];
 
 const phases = ['Đang đến điểm đón', 'Đang đón khách', 'Đang di chuyển'];
+const paymentTags = ['Tiền mặt', 'Ví Be', 'Thẻ'];
 
 export default function RequestsScreen() {
   const [requests, setRequests] = useState<Request[]>([]);
@@ -59,7 +61,21 @@ export default function RequestsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Chuyến nhận</Text>
+        <View style={styles.header}>
+          <Text style={styles.title}>Chuyến nhận</Text>
+          <View style={styles.timerPill}>
+            <Text style={styles.timerText}>03:24</Text>
+          </View>
+        </View>
+
+        <View style={styles.mapPreview}>
+          <View style={styles.mapBadge}>
+            <Text style={styles.mapBadgeText}>Bản đồ giả lập</Text>
+          </View>
+          <View style={styles.mapPin} />
+          <Text style={styles.mapText}>Khu vực trung tâm, Q1</Text>
+        </View>
+
         {!activeRequest ? (
           <View style={styles.card}>
             <Text style={styles.emptyText}>Đang tải yêu cầu...</Text>
@@ -72,32 +88,39 @@ export default function RequestsScreen() {
                 <Text style={styles.requestTitle}>{activeRequest.title}</Text>
               </View>
               <View style={styles.pricePill}>
-                <Text style={styles.priceText}>
-                  {activeRequest.price.toLocaleString('vi-VN')} đ
-                </Text>
+                <Text style={styles.priceText}>{activeRequest.price.toLocaleString('vi-VN')} đ</Text>
+                <Text style={styles.priceSub}>ước tính</Text>
               </View>
             </View>
 
-            <View style={styles.requestRow}>
-              <Text style={styles.label}>Khách</Text>
-              <Text style={styles.value}>{activeRequest.passenger}</Text>
+            <View style={styles.chipRow}>
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>{activeRequest.category}</Text>
+              </View>
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>
+                  {activeRequest.distanceKm} km • {activeRequest.durationMin} phút
+                </Text>
+              </View>
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>{paymentTags[activeIndex % paymentTags.length]}</Text>
+              </View>
             </View>
-            <View style={styles.requestRow}>
-              <Text style={styles.label}>Loại chuyến</Text>
-              <Text style={styles.value}>{activeRequest.category}</Text>
+
+            <View style={styles.timeline}>
+              <View style={styles.timelineLine}>
+                <View style={styles.timelineDot} />
+                <View style={styles.timelineBar} />
+                <View style={styles.timelineDotOutline} />
+              </View>
+              <View style={styles.timelineContent}>
+                <Text style={styles.label}>Điểm đón</Text>
+                <Text style={styles.value}>{activeRequest.pickup}</Text>
+                <Text style={styles.label}>Điểm đến</Text>
+                <Text style={styles.value}>{activeRequest.dropoff}</Text>
+              </View>
             </View>
-            <View style={styles.requestRow}>
-              <Text style={styles.label}>Quãng đường</Text>
-              <Text style={styles.value}>{activeRequest.distanceKm} km • {activeRequest.durationMin} phút</Text>
-            </View>
-            <View style={styles.requestRow}>
-              <Text style={styles.label}>Điểm đón</Text>
-              <Text style={styles.value}>{activeRequest.pickup}</Text>
-            </View>
-            <View style={styles.requestRow}>
-              <Text style={styles.label}>Điểm đến</Text>
-              <Text style={styles.value}>{activeRequest.dropoff}</Text>
-            </View>
+
             <View style={styles.noteBox}>
               <Text style={styles.noteLabel}>Ghi chú</Text>
               <Text style={styles.noteText}>{activeRequest.note}</Text>
@@ -108,6 +131,12 @@ export default function RequestsScreen() {
                 <Text style={styles.phaseLabel}>Trạng thái chuyến</Text>
                 <Text style={styles.phaseValue}>{phases[phaseIndex]}</Text>
               </View>
+            )}
+
+            {status === 'accepted' && (
+              <TouchableOpacity style={styles.navLink} onPress={() => router.push('/ride/navigation')}>
+                <Text style={styles.navLinkText}>Mở điều hướng</Text>
+              </TouchableOpacity>
             )}
 
             <View style={styles.actions}>
@@ -134,16 +163,72 @@ const styles = StyleSheet.create({
   },
   container: {
     padding: 20,
+    paddingBottom: 32,
     gap: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
     color: palette.text,
   },
+  timerPill: {
+    backgroundColor: palette.redSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  timerText: {
+    color: palette.redDark,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  mapPreview: {
+    backgroundColor: palette.redSoft,
+    borderRadius: 20,
+    padding: 16,
+    minHeight: 140,
+    justifyContent: 'flex-end',
+    position: 'relative',
+  },
+  mapBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: '#fff',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  mapBadgeText: {
+    fontSize: 11,
+    color: palette.redDark,
+    fontWeight: '600',
+  },
+  mapPin: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: palette.red,
+    alignSelf: 'center',
+    marginBottom: 10,
+    shadowColor: palette.shadow,
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  mapText: {
+    textAlign: 'center',
+    color: palette.muted,
+    fontSize: 12,
+  },
   card: {
     backgroundColor: palette.card,
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 16,
     borderWidth: 1,
     borderColor: palette.border,
@@ -154,7 +239,7 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 12,
     marginBottom: 12,
   },
   eyebrow: {
@@ -171,18 +256,68 @@ const styles = StyleSheet.create({
   },
   pricePill: {
     backgroundColor: palette.redSoft,
-    borderRadius: 999,
+    borderRadius: 16,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: palette.border,
+    paddingVertical: 8,
+    alignItems: 'flex-end',
   },
   priceText: {
     color: palette.redDark,
     fontWeight: '700',
   },
-  requestRow: {
-    marginTop: 10,
+  priceSub: {
+    color: palette.muted,
+    fontSize: 10,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  chip: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  chipText: {
+    color: palette.redDark,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  timeline: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  timelineLine: {
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: palette.red,
+  },
+  timelineBar: {
+    width: 2,
+    height: 28,
+    backgroundColor: palette.border,
+    marginVertical: 4,
+  },
+  timelineDotOutline: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: palette.red,
+    backgroundColor: '#fff',
+  },
+  timelineContent: {
+    flex: 1,
   },
   label: {
     color: palette.muted,
@@ -193,9 +328,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginTop: 4,
+    marginBottom: 10,
   },
   noteBox: {
-    marginTop: 12,
+    marginTop: 8,
     backgroundColor: palette.redSoft,
     borderRadius: 12,
     padding: 12,
@@ -223,6 +359,19 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontWeight: '600',
     marginTop: 4,
+  },
+  navLink: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  navLinkText: {
+    color: palette.redDark,
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',
