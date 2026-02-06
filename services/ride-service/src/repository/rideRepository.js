@@ -63,7 +63,8 @@ async function createRide({
   dropoffLat = null,
   dropoffLng = null,
   status,
-  traceId = null
+  traceId = null,
+  emitOutbox = true
 }) {
   const db = await getDb();
   const now = new Date();
@@ -84,31 +85,36 @@ async function createRide({
     updated_at: now
   };
 
-  const eventId = crypto.randomUUID();
-  const eventPayload = {
-    rideId,
-    pickup: { lat: pickupLat, lng: pickupLng },
-    timestamp: now
-  };
-  const outboxDoc = {
-    _id: crypto.randomUUID(),
-    event_id: eventId,
-    aggregate_type: "ride",
-    aggregate_id: rideId,
-    event_type: "RideCreated",
-    payload: { traceId, payload: eventPayload },
-    status: "pending",
-    occurred_at: now,
-    created_at: now,
-    updated_at: now
-  };
+  let outboxDoc = null;
+  if (emitOutbox) {
+    const eventId = crypto.randomUUID();
+    const eventPayload = {
+      rideId,
+      pickup: { lat: pickupLat, lng: pickupLng },
+      timestamp: now
+    };
+    outboxDoc = {
+      _id: crypto.randomUUID(),
+      event_id: eventId,
+      aggregate_type: "ride",
+      aggregate_id: rideId,
+      event_type: "RideCreated",
+      payload: { traceId, payload: eventPayload },
+      status: "pending",
+      occurred_at: now,
+      created_at: now,
+      updated_at: now
+    };
+  }
 
   await runWithOptionalTransaction(async (session) => {
     const options = session ? { session } : {};
     await db.collection("rides").insertOne(rideDoc, options);
-    await db
-      .collection("outbox_events")
-      .insertOne(outboxDoc, options);
+    if (outboxDoc) {
+      await db
+        .collection("outbox_events")
+        .insertOne(outboxDoc, options);
+    }
     return rideDoc;
   });
 
