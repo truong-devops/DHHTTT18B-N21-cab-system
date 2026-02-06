@@ -1,5 +1,12 @@
 {
   "name": "@libs/types",
   "private": true,
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "scripts": {
+    "generate:review-service": "openapi-typescript ../../contracts/openapi/review-service.yaml -o review-service.ts",
+    "generate:ride-service": "openapi-typescript ../../contracts/openapi/ride-service.yaml -o ride-service.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.6.1"
+  }
 }

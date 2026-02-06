@@ -78,6 +78,14 @@ function normalizeListQuery(query) {
     return {};
   }
   const nextQuery = { ...query };
+  if (typeof nextQuery.limit === "string") {
+    const parsedLimit = Number(nextQuery.limit);
+    if (Number.isFinite(parsedLimit)) {
+      nextQuery.limit = parsedLimit;
+    } else {
+      delete nextQuery.limit;
+    }
+  }
   if (typeof nextQuery.status === "string") {
     nextQuery.status = nextQuery.status.trim().toUpperCase();
   }

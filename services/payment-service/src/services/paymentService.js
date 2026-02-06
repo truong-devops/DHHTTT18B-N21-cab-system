@@ -8,7 +8,7 @@ const {
 } = require("../repositories/paymentsRepo");
 const { saveIdempotencyKey } = require("../repositories/idempotencyRepo");
 const { insertOutboxEvent } = require("../repositories/outboxRepo");
-const { encodeCursor } = require("../../../../libs/http/cursor");
+const { encodeCursor, decodeCursor } = require("../../../../libs/http/cursor");
 const { hashRequest } = require("../utils/idempotency");
 const { ApiError } = require("../utils/errors");
 const { STATUSES, canTransition } = require("../domain/paymentStatus");
@@ -76,9 +76,11 @@ async function fetchPayment(paymentId) {
 }
 
 async function fetchPayments(parsedQuery) {
+  const limit = parsedQuery.limit ? Number(parsedQuery.limit) : 20;
+  const cursor = parsedQuery.cursor ? decodeCursor(parsedQuery.cursor) : null;
   const result = await listPayments({
-    limit: parsedQuery.limit,
-    cursor: parsedQuery.cursor,
+    limit,
+    cursor,
     sort: parsedQuery.sort,
     status: parsedQuery.status,
     rideId: parsedQuery.rideId

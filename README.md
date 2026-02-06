@@ -540,7 +540,6 @@ JWT_SECRET=super_secret_key
 JWT_EXPIRES_IN=15m
 REFRESH_TOKEN_EXPIRES_IN=7d
 Best practices
-
 🔒 Never commit secrets → use .env.example + secrets manager in production
 
 🧱 Database-per-service → avoid cross-service DB coupling
@@ -589,3 +588,6 @@ Payment PSP timeout → retry/backoff; provider down → failover strategy
 
 Kafka lag → scale consumers; tune partitions
 ```
+
+
+\

@@ -5,15 +5,30 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "db:migrate": "dbmate --migrations-dir ./migrations up",
+    "db:rollback": "dbmate --migrations-dir ./migrations down",
+    "db:status": "dbmate --migrations-dir ./migrations status",
+    "test": "jest"
   },
   "dependencies": {
-    "express": "^4.19.2",
+    "@libs/http": "0.1.0",
+    "@libs/validation": "0.1.0",
+    "ajv": "^8.12.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
     "helmet": "^7.1.0",
-    "morgan": "^1.10.0"
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "pino": "^9.4.0",
+    "pg": "^8.11.5"
   },
   "devDependencies": {
-    "nodemon": "^3.0.3"
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.3",
+    "supertest": "^6.3.4",
+    "yaml": "^2.4.2"
   }
 }

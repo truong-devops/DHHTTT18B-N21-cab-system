@@ -1,6 +1,17 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json ./
-RUN npm i --omit=dev
-COPY . .
+
+# Install workspace deps with local libs
+COPY package.json package-lock.json ./
+COPY libs ./libs
+COPY services/review-service/package.json services/review-service/package.json
+RUN npm install --omit=dev \
+  --workspaces \
+  --include-workspace-root \
+  --workspace @libs/http \
+  --workspace @libs/validation \
+  --workspace @services/review-service
+
+COPY services/review-service ./services/review-service
+WORKDIR /app/services/review-service
 CMD ["node", "src/server.js"]
