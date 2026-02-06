@@ -27,7 +27,6 @@ A modern taxi/cab booking platform designed for **high scalability**, **near rea
   - [6) Payment Failure Handling + Retry](#6-payment-failure-handling--retry)
   - [7) Payment Saga (Choreography-based, No 2PC)](#7-payment-saga-choreography-based-no-2pc)
   - [8) Surge Pricing (Near Real-time)](#8-surge-pricing-near-real-time)
-  - [9) ETA Calculation (Independent Service, Event-driven)](#9-eta-calculation-independent-service-event-driven)
 - [📨 Kafka Topics & Event Schema](#-kafka-topics--event-schema)
 - [🧰 Installation & Running Locally](#-installation--running-locally)
 - [⚙️ Configuration](#-configuration)
@@ -78,7 +77,6 @@ flowchart LR
   GW --> RIDE[Ride Service]
   GW --> PAY[Payment Service]
   GW --> PRICE[Pricing Service]
-  GW --> ETA[ETA Service]
   GW --> NOTI[Notification Service]
   GW --> REVIEW[Review Service]
 
@@ -95,8 +93,9 @@ flowchart LR
   AUTH --> PG
   USER --> PG
   DRIVER --> PG
+  DRIVER --> MG
   BOOK --> PG
-  RIDE --> PG
+  RIDE --> MG
   NOTI --> MG
   REVIEW --> MG
   PRICE --> RD
@@ -108,7 +107,6 @@ flowchart LR
 
   BOOK <--> KAFKA
   RIDE <--> KAFKA
-  ETA <--> KAFKA
   PRICE <--> KAFKA
   PAY <--> KAFKA
   NOTI <--> KAFKA
