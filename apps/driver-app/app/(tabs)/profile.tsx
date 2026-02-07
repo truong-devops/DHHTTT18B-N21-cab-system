@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { Card } from '@/components/ui/card';
-import { mockApi } from '@/lib/mock-api';
+import { PrimaryButton } from '@/components/ui/primary-button';
+import { useAuth } from '@/lib/contexts/auth';
+import { useDriver } from '@/lib/contexts/driver';
+import * as paymentApi from '@/lib/services/payment';
 import { palette } from '@/lib/theme';
-
-type Profile = Awaited<ReturnType<typeof mockApi.getDriverProfile>>;
-type WalletData = Awaited<ReturnType<typeof mockApi.getWalletSummary>>;
 
 const menuItems = [
   { id: 'history', label: 'Lịch sử cuốc xe', route: '/(tabs)/history' },
@@ -16,66 +16,127 @@ const menuItems = [
 ];
 
 export default function ProfileScreen() {
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [wallet, setWallet] = useState<WalletData | null>(null);
+  const { isAuthenticated, login, logout } = useAuth();
+  const { driver, refresh } = useDriver();
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [walletTotal, setWalletTotal] = useState<number | null>(null);
 
   useEffect(() => {
-    Promise.all([mockApi.getDriverProfile(), mockApi.getWalletSummary()]).then(([driver, walletData]) => {
-      setProfile(driver);
-      setWallet(walletData);
-    });
-  }, []);
+    if (!isAuthenticated) {
+      setWalletTotal(null);
+      return;
+    }
+
+    paymentApi
+      .listPayments(10)
+      .then((res) => {
+        const total = (res.data || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        setWalletTotal(total);
+      })
+      .catch(() => {
+        setWalletTotal(null);
+      });
+  }, [isAuthenticated]);
 
   const initials = useMemo(() => {
-    if (!profile?.name) return 'TX';
-    const parts = profile.name.split(' ').filter(Boolean);
+    if (!driver?.fullName) return 'TX';
+    const parts = driver.fullName.split(' ').filter(Boolean);
     const first = parts[0]?.[0] ?? '';
     const last = parts[parts.length - 1]?.[0] ?? '';
     return `${first}${last}`.toUpperCase();
-  }, [profile?.name]);
+  }, [driver?.fullName]);
+
+  const handleLogin = async () => {
+    if (!identifier || !password) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập email/sđt và mật khẩu.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await login(identifier, password);
+      await refresh();
+      setPassword('');
+    } catch (err: any) {
+      setError(err?.message ?? 'Đăng nhập thất bại');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Menu tài xế</Text>
 
-        <Card style={styles.profileCard}>
-          <View style={styles.profileHeader}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.name}>{profile?.name ?? '--'}</Text>
-              <Text style={styles.phone}>{profile?.phone ?? '--'}</Text>
-              <Text style={styles.statusText}>{profile?.online ? 'Đang trực tuyến' : 'Ngoại tuyến'}</Text>
-            </View>
-          </View>
-        </Card>
+        {!isAuthenticated ? (
+          <Card style={styles.loginCard}>
+            <Text style={styles.sectionTitle}>Đăng nhập tài xế</Text>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            <TextInput
+              placeholder="Email hoặc SĐT"
+              value={identifier}
+              onChangeText={setIdentifier}
+              autoCapitalize="none"
+              style={styles.input}
+            />
+            <TextInput
+              placeholder="Mật khẩu"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              style={styles.input}
+            />
+            <PrimaryButton title={loading ? 'Đang đăng nhập...' : 'Đăng nhập'} onPress={handleLogin} />
+          </Card>
+        ) : (
+          <>
+            <Card style={styles.profileCard}>
+              <View style={styles.profileHeader}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{initials}</Text>
+                </View>
+                <View style={styles.profileInfo}>
+                  <Text style={styles.name}>{driver?.fullName ?? '--'}</Text>
+                  <Text style={styles.phone}>{driver?.phone ?? '--'}</Text>
+                  <Text style={styles.statusText}>
+                    {driver?.onlineStatus === 'ONLINE' ? 'Đang trực tuyến' : 'Ngoại tuyến'}
+                  </Text>
+                </View>
+              </View>
+            </Card>
 
-        <View style={styles.walletCard}>
-          <Text style={styles.walletLabel}>Số dư ví hiện tại</Text>
-          <Text style={styles.walletValue}>
-            {wallet ? `${wallet.summary.balance.toLocaleString('vi-VN')} đ` : '--'}
-          </Text>
-          <Text style={styles.walletHint}>
-            Hôm nay: {wallet ? `${wallet.summary.today.toLocaleString('vi-VN')} đ` : '--'}
-          </Text>
-        </View>
+            <View style={styles.walletCard}>
+              <Text style={styles.walletLabel}>Số dư ví hiện tại</Text>
+              <Text style={styles.walletValue}>
+                {walletTotal !== null ? `${walletTotal.toLocaleString('vi-VN')} đ` : '--'}
+              </Text>
+              <Text style={styles.walletHint}>Hôm nay: --</Text>
+            </View>
 
-        <Card>
-          <Text style={styles.sectionTitle}>Chức năng</Text>
-          {menuItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.menuItem, item.danger && styles.menuItemDanger]}
-              onPress={() => {
-                if (item.route) router.push(item.route);
-              }}>
-              <Text style={[styles.menuText, item.danger && styles.menuTextDanger]}>{item.label}</Text>
-              <Text style={[styles.menuArrow, item.danger && styles.menuTextDanger]}>{'>'}</Text>
-            </TouchableOpacity>
-          ))}
-        </Card>
+            <Card>
+              <Text style={styles.sectionTitle}>Chức năng</Text>
+              {menuItems.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.menuItem, item.danger && styles.menuItemDanger]}
+                  onPress={() => {
+                    if (item.id === 'logout') {
+                      void logout();
+                      return;
+                    }
+                    if (item.route) router.push(item.route);
+                  }}>
+                  <Text style={[styles.menuText, item.danger && styles.menuTextDanger]}>{item.label}</Text>
+                  <Text style={[styles.menuArrow, item.danger && styles.menuTextDanger]}>{'>'}</Text>
+                </TouchableOpacity>
+              ))}
+            </Card>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -95,6 +156,25 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: palette.text,
+  },
+  loginCard: {
+    gap: 12,
+  },
+  sectionTitle: {
+    fontWeight: '700',
+    color: palette.text,
+    marginBottom: 4,
+  },
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 12,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   profileCard: {
     padding: 16,
@@ -154,11 +234,6 @@ const styles = StyleSheet.create({
     color: '#FFE7DE',
     fontSize: 12,
     marginTop: 8,
-  },
-  sectionTitle: {
-    fontWeight: '700',
-    color: palette.text,
-    marginBottom: 12,
   },
   menuItem: {
     flexDirection: 'row',
