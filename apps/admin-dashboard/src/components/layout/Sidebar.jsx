@@ -14,7 +14,11 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <span>RIDEX ADMIN</span>
+        <div className="brand-mark">RX</div>
+        <div>
+          <div className="brand-title">RIDEX</div>
+          <div className="brand-subtitle">Admin Console</div>
+        </div>
       </div>
       <nav className="sidebar-nav">
         {navItems.map((item) => (
@@ -29,7 +33,10 @@ function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="sidebar-footer">Operational Console</div>
+      <div className="sidebar-footer">
+        <span>Operational Console</span>
+        <span className="badge info">Live</span>
+      </div>
     </aside>
   )
 }

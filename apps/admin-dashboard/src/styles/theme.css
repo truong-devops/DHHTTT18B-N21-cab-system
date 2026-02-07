@@ -1,15 +1,36 @@
 :root {
-  --brand-600: #ff6a00;
-  --brand-700: #e85e00;
-  --brand-50: #fff3e8;
-  --bg: #ffffff;
+  --font-body: 'Manrope', 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Manrope', sans-serif;
+
+  --brand-950: #5b1d00;
+  --brand-900: #7a2a00;
+  --brand-800: #a63a00;
+  --brand-700: #d15600;
+  --brand-600: #f06a0a;
+  --brand-500: #ff7c1f;
+  --brand-300: #ffb882;
+  --brand-200: #ffd7b7;
+  --brand-100: #ffe9d7;
+  --brand-50: #fff4ec;
+
+  --bg: #fff7f1;
   --surface: #ffffff;
-  --surface-2: #f6f7f9;
-  --border: #e6e8ec;
-  --text: #111827;
-  --muted: #6b7280;
-  --danger: #ef4444;
-  --success: #16a34a;
-  --info: #2563eb;
-  --warning: #f59e0b;
+  --surface-2: #fff1e6;
+  --surface-3: #ffe7d2;
+  --border: #f2d7c7;
+  --text: #2b1c15;
+  --muted: #7b5a47;
+
+  --shadow-soft: 0 12px 24px rgba(140, 74, 0, 0.12);
+  --shadow-strong: 0 18px 40px rgba(140, 74, 0, 0.18);
+  --focus: rgba(240, 106, 10, 0.4);
+
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+
+  --danger: #d94848;
+  --success: #1b8a5a;
+  --info: #1f6d7a;
+  --warning: #f1a21b;
 }

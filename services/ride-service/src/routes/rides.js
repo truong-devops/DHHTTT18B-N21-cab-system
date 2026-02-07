@@ -327,12 +327,15 @@ router.get(
   }),
   asyncHandler(async (req, res) => {
     const { limit, cursor, sort } = req.pagination;
+    const roles = req.user?.roles || [];
+    const isAdmin = roles.includes("admin") || roles.includes("ops") || roles.includes("service");
+    const riderId = req.query.riderId || (isAdmin ? null : req.userId);
 
     const rows = await listRides({
       limit,
       cursor,
       status: req.query.status,
-      riderId: req.query.riderId || req.userId,
+      riderId: riderId || null,
       sort: sort === "-createdAt" ? "-created_at" : "created_at"
     });
 

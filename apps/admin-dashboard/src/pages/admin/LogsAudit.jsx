@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import PageHeader from '../../components/common/PageHeader.jsx'
 import LogTable from '../../components/admin/logs/LogTable.jsx'
 import AuditTable from '../../components/admin/logs/AuditTable.jsx'
 import LogDetailModal from '../../components/admin/logs/LogDetailModal.jsx'
@@ -25,7 +26,10 @@ function LogsAudit() {
 
   return (
     <div>
-      <h1 className="page-title">Logs & Audit</h1>
+      <PageHeader
+        title="Logs & Audit"
+        subtitle="Audit trail of platform operations and security events."
+      />
       <div className="tabs">
         <div
           className={`tab ${tab === 'logs' ? 'active' : ''}`}

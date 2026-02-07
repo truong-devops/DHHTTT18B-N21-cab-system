@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import PageHeader from '../../components/common/PageHeader.jsx'
 import SurgeRuleForm from '../../components/admin/pricing/SurgeRuleForm.jsx'
 import SurgeRuleTable from '../../components/admin/pricing/SurgeRuleTable.jsx'
 import PricingSimulator from '../../components/admin/pricing/PricingSimulator.jsx'
@@ -12,8 +13,12 @@ function Pricing() {
 
   useEffect(() => {
     async function load() {
-      const result = await pricingService.listRules()
-      setRules(result.items)
+      try {
+        const result = await pricingService.listRules()
+        setRules(result.items)
+      } catch (error) {
+        toast?.push(error.message || 'Failed to load rules', 'danger')
+      }
     }
 
     load()
@@ -21,8 +26,17 @@ function Pricing() {
 
   const handleToggle = async (rule) => {
     const enabled = rule.status !== 'ACTIVE'
-    await pricingService.toggleRule(rule.id, enabled)
-    toast?.push('Rule updated', 'success')
+    try {
+      const updated = await pricingService.toggleRule(rule.id, enabled)
+      setRules((prev) =>
+        prev.map((item) =>
+          item.id === rule.id ? { ...item, ...(updated || {}) } : item
+        )
+      )
+      toast?.push('Rule updated', 'success')
+    } catch (error) {
+      toast?.push(error.message || 'Failed to update rule', 'danger')
+    }
   }
 
   const handleSimulate = async () => {
@@ -32,7 +46,10 @@ function Pricing() {
 
   return (
     <div>
-      <h1 className="page-title">Pricing</h1>
+      <PageHeader
+        title="Pricing"
+        subtitle="Manage surge strategy and simulate fares before release."
+      />
       <div className="grid grid-2">
         <SurgeRuleForm onSubmit={() => toast?.push('Rule saved', 'success')} />
         <PricingSimulator result={simResult} onSimulate={handleSimulate} />

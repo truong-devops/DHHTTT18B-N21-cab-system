@@ -7,16 +7,22 @@ function getToken() {
 
 export async function apiRequest(path, options = {}) {
   const token = getToken()
+  const { headers: optionHeaders, cache: optionCache, ...rest } = options
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(options.headers || {}),
+    ...(optionHeaders || {}),
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
+    cache: optionCache ?? 'no-store',
+    ...rest,
     headers,
   })
+
+  if (response.status === 304) {
+    return null
+  }
 
   const text = await response.text()
   const payload = text ? JSON.parse(text) : null

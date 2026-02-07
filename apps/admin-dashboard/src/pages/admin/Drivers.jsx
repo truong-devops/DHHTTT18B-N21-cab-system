@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Select from '../../components/common/Select.jsx'
+import PageHeader from '../../components/common/PageHeader.jsx'
 import DriverTable from '../../components/admin/drivers/DriverTable.jsx'
 import DriverDetailDrawer from '../../components/admin/drivers/DriverDetailDrawer.jsx'
 import { driverService } from '../../services/driver.service.js'
@@ -33,18 +34,41 @@ function Drivers() {
   }, [filters.status, filters.onlineStatus, filters.vehicleType])
 
   const handleApprove = async (driver) => {
-    await driverService.approve(driver.id)
-    toast?.push('Driver approved', 'success')
+    try {
+      await driverService.approve(driver.id)
+      setDrivers((prev) =>
+        prev.map((item) =>
+          item.id === driver.id ? { ...item, status: 'APPROVED' } : item
+        )
+      )
+      toast?.push('Driver approved', 'success')
+    } catch (error) {
+      toast?.push(error.message || 'Failed to approve driver', 'danger')
+    }
   }
 
   const handleSuspend = async (driver) => {
-    await driverService.suspend(driver.id)
-    toast?.push('Driver suspended', 'warning')
+    try {
+      await driverService.suspend(driver.id)
+      setDrivers((prev) =>
+        prev.map((item) =>
+          item.id === driver.id
+            ? { ...item, status: 'SUSPENDED', onlineStatus: 'OFFLINE' }
+            : item
+        )
+      )
+      toast?.push('Driver suspended', 'warning')
+    } catch (error) {
+      toast?.push(error.message || 'Failed to suspend driver', 'danger')
+    }
   }
 
   return (
     <div>
-      <h1 className="page-title">Drivers</h1>
+      <PageHeader
+        title="Drivers"
+        subtitle="Verify onboarding, compliance, and live availability."
+      />
       <div className="card">
         <div className="grid grid-3">
           <Select

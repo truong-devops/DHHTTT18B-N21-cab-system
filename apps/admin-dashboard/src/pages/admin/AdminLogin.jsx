@@ -30,17 +30,16 @@ function AdminLogin() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 24,
-      }}
-    >
-      <div className="card" style={{ width: 420 }}>
-        <div className="card-header">
-          <h3 className="card-title">Admin Console</h3>
+    <div className="auth-shell">
+      <div className="card auth-card">
+        <div className="auth-header">
+          <div className="auth-mark">RX</div>
+          <div>
+            <h3 className="card-title">Admin Console</h3>
+            <p className="auth-subtitle">
+              Sign in to manage rides, drivers, and operations.
+            </p>
+          </div>
         </div>
         <div className="tabs">
           <div

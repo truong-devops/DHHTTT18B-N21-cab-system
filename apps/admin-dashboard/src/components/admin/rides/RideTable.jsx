@@ -5,9 +5,21 @@ import Button from '../../common/Button.jsx'
 function RideTable({ rides = [], onSelect }) {
   const columns = [
     { key: 'id', header: 'Ride ID' },
-    { key: 'rider', header: 'Rider' },
-    { key: 'driver', header: 'Driver' },
-    { key: 'fare', header: 'Fare' },
+    {
+      key: 'rider',
+      header: 'Rider',
+      render: (row) => row.rider || row.riderId || '-',
+    },
+    {
+      key: 'driver',
+      header: 'Driver',
+      render: (row) => row.driver || row.driverId || '-',
+    },
+    {
+      key: 'fare',
+      header: 'Fare',
+      render: (row) => (row.fare !== null && row.fare !== undefined ? row.fare : 'N/A'),
+    },
     {
       key: 'status',
       header: 'Status',
