@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Select from '../../components/common/Select.jsx'
+import PageHeader from '../../components/common/PageHeader.jsx'
 import RideTable from '../../components/admin/rides/RideTable.jsx'
 import RideDetail from '../../components/admin/rides/RideDetail.jsx'
 import { rideService } from '../../services/ride.service.js'
@@ -26,7 +27,10 @@ function Rides() {
 
   return (
     <div>
-      <h1 className="page-title">Rides</h1>
+      <PageHeader
+        title="Rides"
+        subtitle="Track ride lifecycle, cancellations, and service anomalies."
+      />
       <div className="card">
         <Select
           label="Status"

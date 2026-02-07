@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import PageHeader from '../../components/common/PageHeader.jsx'
 import LiveCounters from '../../components/admin/monitoring/LiveCounters.jsx'
 import LiveMap from '../../components/admin/monitoring/LiveMap.jsx'
 import { monitoringService } from '../../services/monitoring.service.js'
@@ -25,7 +26,10 @@ function Monitoring() {
 
   return (
     <div>
-      <h1 className="page-title">Monitoring</h1>
+      <PageHeader
+        title="Monitoring"
+        subtitle="Live pulse of dispatch, supply, and rider demand."
+      />
       <LiveCounters counters={counters} />
       <LiveMap markers={markers} />
     </div>

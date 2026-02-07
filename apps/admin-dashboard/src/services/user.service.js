@@ -13,7 +13,17 @@ export const userService = {
       return { items, total: items.length }
     }
 
-    const query = new URLSearchParams(params).toString()
+    const queryParams = {}
+    if (params.status) {
+      queryParams.status = String(params.status).toUpperCase()
+    }
+    if (params.role) {
+      queryParams.role = String(params.role).toLowerCase()
+    }
+    if (params.search) {
+      queryParams.email = String(params.search).trim()
+    }
+    const query = new URLSearchParams(queryParams).toString()
     const payload = await apiRequest(`/v1/users${query ? `?${query}` : ''}`)
     return { items: payload?.data || [], total: payload?.data?.length || 0 }
   },
@@ -23,7 +33,7 @@ export const userService = {
       return { id, status }
     }
 
-    return apiRequest(`/v1/users/${id}/status`, {
+    return apiRequest(`/v1/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     })

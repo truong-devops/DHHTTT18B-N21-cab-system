@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Input from '../../components/common/Input.jsx'
 import Select from '../../components/common/Select.jsx'
+import PageHeader from '../../components/common/PageHeader.jsx'
 import UserTable from '../../components/admin/users/UserTable.jsx'
 import UserDetailDrawer from '../../components/admin/users/UserDetailDrawer.jsx'
 import { userService } from '../../services/user.service.js'
@@ -31,9 +32,28 @@ function Users() {
     load()
   }, [debouncedSearch, filters.status, filters.role])
 
+  const handleToggleStatus = async (user) => {
+    if (!user) return
+    const nextStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
+    try {
+      await userService.updateStatus(user.id, nextStatus)
+      setUsers((prev) =>
+        prev.map((item) =>
+          item.id === user.id ? { ...item, status: nextStatus } : item
+        )
+      )
+      toast?.push('Status updated', 'success')
+    } catch (error) {
+      toast?.push(error.message || 'Failed to update user', 'danger')
+    }
+  }
+
   return (
     <div>
-      <h1 className="page-title">Users</h1>
+      <PageHeader
+        title="Users"
+        subtitle="Search, review, and manage customer and driver accounts."
+      />
       <div className="card">
         <div className="grid grid-3">
           <Input
@@ -75,7 +95,7 @@ function Users() {
       <UserDetailDrawer
         user={selected}
         onClose={() => setSelected(null)}
-        onToggleStatus={() => toast?.push('Status updated', 'success')}
+        onToggleStatus={handleToggleStatus}
       />
     </div>
   )

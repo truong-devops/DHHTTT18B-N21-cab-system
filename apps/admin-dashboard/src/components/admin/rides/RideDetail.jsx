@@ -10,8 +10,8 @@ function RideDetail({ ride, onClose }) {
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="section-title">Summary</div>
         <div>Ride ID: {ride.id}</div>
-        <div>Rider: {ride.rider}</div>
-        <div>Driver: {ride.driver}</div>
+        <div>Rider: {ride.rider || ride.riderId || '-'}</div>
+        <div>Driver: {ride.driver || ride.driverId || '-'}</div>
         <Badge variant={ride.status === 'completed' ? 'success' : 'warning'}>
           {ride.status}
         </Badge>

@@ -1,4 +1,10 @@
+const seedBookings = require("../seed/bookings");
+
 const bookings = new Map(); // bookingId -> booking
+
+seedBookings.forEach((booking) => {
+  bookings.set(booking.bookingId, booking);
+});
 
 function create(booking) {
   bookings.set(booking.bookingId, booking);
@@ -20,4 +26,9 @@ function cancel(bookingId) {
   bookings.set(bookingId, booking);
   return booking;
 }
-module.exports = { create, getById, cancel  };
+
+function list() {
+  return Array.from(bookings.values());
+}
+
+module.exports = { create, getById, cancel, list };
