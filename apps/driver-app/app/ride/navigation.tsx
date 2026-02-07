@@ -1,20 +1,74 @@
-import { useEffect, useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo } from 'react';
+import { Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { Card } from '@/components/ui/card';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenHeader } from '@/components/ui/screen-header';
-import { mockApi } from '@/lib/mock-api';
+import { useRideTracking } from '@/hooks/use-ride-tracking';
+import { useRide } from '@/lib/contexts/ride';
 import { palette } from '@/lib/theme';
 
-type ActiveRide = Awaited<ReturnType<typeof mockApi.getActiveRide>>;
-
 export default function RideNavigationScreen() {
-  const [ride, setRide] = useState<ActiveRide | null>(null);
+  const { activeRide, setActiveRide } = useRide();
+  const rideId = activeRide?.id ?? null;
+  const { ride: trackedRide, error, isOffline, updateStatus, isUpdating } = useRideTracking({
+    rideId,
+    enabled: Boolean(rideId),
+    intervalMs: 2500,
+  });
 
   useEffect(() => {
-    mockApi.getActiveRide().then(setRide);
-  }, []);
+    if (trackedRide) {
+      setActiveRide(trackedRide);
+    }
+  }, [trackedRide, setActiveRide]);
+
+  const ride = trackedRide ?? activeRide;
+  const status = useMemo(() => (ride?.status ?? '').toUpperCase(), [ride?.status]);
+  const canArrive = status === 'ASSIGNED' || status === 'REQUESTED';
+  const canStart = status === 'ARRIVING';
+  const canComplete = status === 'IN_PROGRESS';
+  const primaryLabel = canStart ? 'BẮT ĐẦU' : 'ĐÃ ĐẾN';
+
+  const handlePrimaryAction = async () => {
+    if (!ride) return;
+    if (!canArrive && !canStart) return;
+    const nextStatus = canArrive ? 'ARRIVED' : 'STARTED';
+    try {
+      const res = await updateStatus(nextStatus);
+      if (res) setActiveRide(res);
+    } catch (err: any) {
+      Alert.alert('Không thể cập nhật', err?.message ?? 'Đã có lỗi xảy ra');
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!ride) return;
+    if (!canComplete) {
+      Alert.alert('Chưa thể kết thúc', 'Bạn cần bắt đầu chuyến trước khi kết thúc.');
+      return;
+    }
+    try {
+      const res = await updateStatus('COMPLETED');
+      if (res) setActiveRide(res);
+      router.push('/ride/complete');
+    } catch (err: any) {
+      Alert.alert('Không thể kết thúc', err?.message ?? 'Đã có lỗi xảy ra');
+    }
+  };
+
+  if (!ride) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>Chưa có chuyến đang chạy</Text>
+          <Text style={styles.emptySubtitle}>Vui lòng nhận chuyến trước khi điều hướng.</Text>
+          {error ? <Text style={styles.emptyError}>{error}</Text> : null}
+          <PrimaryButton title="Về trang chính" onPress={() => router.replace('/')} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -25,12 +79,20 @@ export default function RideNavigationScreen() {
           variant="red"
           style={styles.header}>
           <View style={styles.headerMetrics}>
-            <Text style={styles.metricValue}>{ride ? `${ride.remainingTimeMin} phút` : '--'}</Text>
+            <Text style={styles.metricValue}>--</Text>
             <Text style={styles.metricLabel}>Còn lại</Text>
-            <Text style={styles.metricValue}>{ride ? `${ride.nextDistanceKm} km` : '--'}</Text>
+            <Text style={styles.metricValue}>--</Text>
             <Text style={styles.metricLabel}>Đến điểm tiếp theo</Text>
           </View>
         </ScreenHeader>
+
+        {(error || isOffline) && (
+          <Card style={styles.errorCard}>
+            <Text style={styles.errorText}>
+              {isOffline ? 'Mất kết nối, đang thử lại...' : error}
+            </Text>
+          </Card>
+        )}
 
         <View style={styles.map}>
           <View style={styles.mapRoute} />
@@ -42,19 +104,23 @@ export default function RideNavigationScreen() {
         <Card>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Khách</Text>
-            <Text style={styles.value}>{ride?.passenger ?? '--'}</Text>
+            <Text style={styles.value}>{ride.riderId ?? '--'}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Điểm đón</Text>
-            <Text style={styles.value}>{ride?.pickup ?? '--'}</Text>
+            <Text style={styles.value}>
+              {ride.pickupLat?.toFixed(5) ?? '--'},{ride.pickupLng?.toFixed(5) ?? '--'}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Điểm đến</Text>
-            <Text style={styles.value}>{ride?.dropoff ?? '--'}</Text>
+            <Text style={styles.value}>
+              {ride.dropoffLat?.toFixed(5) ?? '--'},{ride.dropoffLng?.toFixed(5) ?? '--'}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Thanh toán</Text>
-            <Text style={styles.value}>{ride?.paymentMethod ?? '--'}</Text>
+            <Text style={styles.value}>--</Text>
           </View>
         </Card>
 
@@ -66,11 +132,18 @@ export default function RideNavigationScreen() {
             <Text style={styles.quickActionText}>Nhắn tin</Text>
           </TouchableOpacity>
           <View style={styles.statusGroup}>
-            <PrimaryButton title="ĐÃ ĐẾN" variant="ghost" style={styles.statusButton} />
             <PrimaryButton
-              title="KẾT THÚC"
+              title={isUpdating ? 'ĐANG XỬ LÝ' : primaryLabel}
+              variant="ghost"
               style={styles.statusButton}
-              onPress={() => router.push('/ride/complete')}
+              onPress={handlePrimaryAction}
+              disabled={isUpdating || !(canArrive || canStart)}
+            />
+            <PrimaryButton
+              title={isUpdating ? 'ĐANG XỬ LÝ' : 'KẾT THÚC'}
+              style={styles.statusButton}
+              onPress={handleComplete}
+              disabled={isUpdating || !canComplete}
             />
           </View>
         </View>
@@ -83,6 +156,33 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: palette.background,
+  },
+  emptyState: {
+    flex: 1,
+    padding: 24,
+    justifyContent: 'center',
+    gap: 12,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  emptySubtitle: {
+    color: palette.muted,
+    lineHeight: 20,
+  },
+  emptyError: {
+    color: palette.redDark,
+    fontSize: 12,
+  },
+  errorCard: {
+    borderColor: palette.red,
+    backgroundColor: '#FFF2ED',
+  },
+  errorText: {
+    color: palette.redDark,
+    fontSize: 12,
   },
   container: {
     flex: 1,

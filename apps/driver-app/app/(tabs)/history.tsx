@@ -1,25 +1,43 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { mockApi } from '@/lib/mock-api';
+import { useAuth } from '@/lib/contexts/auth';
+import * as rideApi from '@/lib/services/ride';
 import { palette } from '@/lib/theme';
 
-type HistoryItem = Awaited<ReturnType<typeof mockApi.getRideHistory>>[number];
-
 export default function HistoryScreen() {
-  const [items, setItems] = useState<HistoryItem[]>([]);
+  const { isAuthenticated } = useAuth();
+  const [items, setItems] = useState<rideApi.Ride[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    mockApi.getRideHistory().then(setItems);
-  }, []);
+    if (!isAuthenticated) {
+      setItems([]);
+      return;
+    }
+
+    let mounted = true;
+    setError(null);
+    rideApi
+      .listHistory(20)
+      .then((res) => {
+        if (mounted) setItems(res.data || []);
+      })
+      .catch((err: any) => {
+        if (mounted) setError(err?.message ?? 'Không thể tải lịch sử');
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthenticated]);
 
   const summary = useMemo(() => {
-    const completed = items.filter((item) => item.status === 'COMPLETED');
-    const cancelled = items.filter((item) => item.status === 'CANCELLED');
-    const totalAmount = completed.reduce((sum, item) => sum + item.amount, 0);
+    const completed = items.filter((item) => item.status?.toUpperCase() === 'COMPLETED');
+    const cancelled = items.filter((item) => item.status?.toUpperCase() === 'CANCELLED');
     return {
       completed: completed.length,
       cancelled: cancelled.length,
-      totalAmount,
+      totalAmount: 0,
     };
   }, [items]);
 
@@ -27,6 +45,12 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Lịch sử chuyến</Text>
+
+        {error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.summaryCard}>
           <View style={styles.summaryItem}>
@@ -39,30 +63,35 @@ export default function HistoryScreen() {
           </View>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Doanh thu</Text>
-            <Text style={styles.summaryValue}>
-              {summary.totalAmount.toLocaleString('vi-VN')} đ
-            </Text>
+            <Text style={styles.summaryValue}>{summary.totalAmount.toLocaleString('vi-VN')} đ</Text>
           </View>
         </View>
 
-        {items.map((ride) => (
-          <View key={ride.id} style={styles.card}>
-            <View style={styles.row}>
-              <Text style={styles.route}>{ride.route}</Text>
-              <Text style={styles.amount}>
-                {ride.amount === 0 ? '0 đ' : `${ride.amount.toLocaleString('vi-VN')} đ`}
-              </Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.time}>{ride.time}</Text>
-              <View style={[styles.statusPill, ride.status === 'COMPLETED' ? styles.statusOk : styles.statusCancel]}>
-                <Text style={[styles.statusText, ride.status === 'COMPLETED' ? styles.statusOkText : styles.statusCancelText]}>
-                  {ride.status === 'COMPLETED' ? 'Hoàn tất' : 'Đã hủy'}
-                </Text>
+        {items.map((ride) => {
+          const status = ride.status?.toUpperCase() ?? '--';
+          const statusLabel = status === 'COMPLETED' ? 'Hoàn tất' : status === 'CANCELLED' ? 'Đã hủy' : status;
+          const createdAt = ride.createdAt ? new Date(ride.createdAt).toLocaleString('vi-VN') : '--';
+          const route = `${ride.pickupLat?.toFixed(3) ?? '--'},${ride.pickupLng?.toFixed(3) ?? '--'} → ${
+            ride.dropoffLat?.toFixed(3) ?? '--'
+          },${ride.dropoffLng?.toFixed(3) ?? '--'}`;
+
+          return (
+            <View key={ride.id} style={styles.card}>
+              <View style={styles.row}>
+                <Text style={styles.route}>{route}</Text>
+                <Text style={styles.amount}>--</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.time}>{createdAt}</Text>
+                <View style={[styles.statusPill, status === 'COMPLETED' ? styles.statusOk : styles.statusCancel]}>
+                  <Text style={[styles.statusText, status === 'COMPLETED' ? styles.statusOkText : styles.statusCancelText]}>
+                    {statusLabel}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -83,6 +112,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: palette.text,
     marginBottom: 4,
+  },
+  errorCard: {
+    backgroundColor: '#FFF1F1',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 12,
   },
   summaryCard: {
     flexDirection: 'row',
@@ -116,10 +156,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
   route: {
     color: palette.text,
     fontWeight: '600',
+    flex: 1,
   },
   amount: {
     color: palette.redDark,

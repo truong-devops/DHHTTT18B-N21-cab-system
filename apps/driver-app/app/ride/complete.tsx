@@ -1,20 +1,48 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Card } from '@/components/ui/card';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenHeader } from '@/components/ui/screen-header';
-import { mockApi } from '@/lib/mock-api';
+import { useRideTracking } from '@/hooks/use-ride-tracking';
+import { useRide } from '@/lib/contexts/ride';
 import { palette } from '@/lib/theme';
 
-type RideSummary = Awaited<ReturnType<typeof mockApi.getRideSummary>>;
-
 export default function RideCompleteScreen() {
-  const [summary, setSummary] = useState<RideSummary | null>(null);
+  const { activeRide, setActiveRide } = useRide();
+  const rideId = activeRide?.id ?? null;
+  const { ride: trackedRide } = useRideTracking({ rideId, enabled: Boolean(rideId), intervalMs: 4000 });
+  const ride = trackedRide ?? activeRide;
 
   useEffect(() => {
-    mockApi.getRideSummary().then(setSummary);
-  }, []);
+    if (trackedRide) {
+      setActiveRide(trackedRide);
+    }
+  }, [trackedRide, setActiveRide]);
+
+  if (!ride) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.container}>
+          <ScreenHeader title="Hoàn thành cuốc xe" subtitle="Không tìm thấy chuyến" variant="light" />
+          <View style={styles.content}>
+            <Card style={styles.summaryCard}>
+              <Text style={styles.totalLabel}>Chuyến đã kết thúc</Text>
+              <Text style={styles.totalValue}>--</Text>
+              <Text style={styles.metricLabel}>Không có dữ liệu chuyến.</Text>
+            </Card>
+            <PrimaryButton
+              title="Về màn hình chính"
+              onPress={() => {
+                setActiveRide(null);
+                router.replace('/');
+              }}
+            />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -25,21 +53,28 @@ export default function RideCompleteScreen() {
           <Card style={styles.summaryCard}>
             <Text style={styles.totalLabel}>Tổng tiền</Text>
             <Text style={styles.totalValue}>
-              {summary ? `${summary.totalAmount.toLocaleString('vi-VN')} đ` : '--'}
+              --
             </Text>
             <View style={styles.metricsRow}>
               <View style={styles.metricItem}>
                 <Text style={styles.metricLabel}>Quãng đường</Text>
-                <Text style={styles.metricValue}>{summary ? `${summary.distanceKm} km` : '--'}</Text>
+                <Text style={styles.metricValue}>--</Text>
               </View>
               <View style={styles.metricItem}>
                 <Text style={styles.metricLabel}>Thời gian</Text>
-                <Text style={styles.metricValue}>{summary ? `${summary.durationMin} phút` : '--'}</Text>
+                <Text style={styles.metricValue}>--</Text>
               </View>
             </View>
+            <Text style={styles.metricLabel}>Mã chuyến: {ride.externalRideId ?? ride.id}</Text>
           </Card>
 
-          <PrimaryButton title="HOÀN THÀNH" onPress={() => router.replace('/')} />
+          <PrimaryButton
+            title="HOÀN THÀNH"
+            onPress={() => {
+              setActiveRide(null);
+              router.replace('/');
+            }}
+          />
         </View>
       </View>
     </SafeAreaView>

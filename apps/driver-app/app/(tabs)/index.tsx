@@ -1,52 +1,133 @@
 import { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { mockApi } from '@/lib/mock-api';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { router } from 'expo-router';
+import { useAuth } from '@/lib/contexts/auth';
+import { useDriver } from '@/lib/contexts/driver';
+import { useDriverOnline } from '@/hooks/use-driver-online';
+import * as paymentApi from '@/lib/services/payment';
+import * as rideApi from '@/lib/services/ride';
 import { palette } from '@/lib/theme';
 
-type DashboardData = Awaited<ReturnType<typeof mockApi.getDashboard>>;
-type DriverProfile = Awaited<ReturnType<typeof mockApi.getDriverProfile>>;
+type DashboardData = {
+  earningsToday?: number;
+  tripsToday?: number;
+  onlineTime?: string;
+  rating?: string;
+  nextGoal?: string;
+  acceptanceRate?: number;
+  cancelRate?: number;
+  hotZone?: string;
+  boost?: string;
+};
 
 export default function DashboardScreen() {
+  const { isAuthenticated } = useAuth();
+  const { driver, error: driverError } = useDriver();
+  const {
+    isOnline,
+    state: onlineState,
+    error: onlineError,
+    sending: onlineSending,
+    startOnline,
+    stopOnline,
+  } = useDriverOnline();
   const [data, setData] = useState<DashboardData | null>(null);
-  const [profile, setProfile] = useState<DriverProfile | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([mockApi.getDashboard(), mockApi.getDriverProfile()]).then(([dashboard, driver]) => {
-      setData(dashboard);
-      setProfile(driver);
-    });
-  }, []);
+    if (!isAuthenticated) {
+      setData(null);
+      return;
+    }
+
+    let mounted = true;
+    setLoading(true);
+    setError(null);
+    Promise.all([paymentApi.listPayments(20), rideApi.listHistory(20)])
+      .then(([payments, rides]) => {
+        if (!mounted) return;
+        const totalAmount = (payments.data || []).reduce((sum, item) => {
+          const amount = Number(item.amount || 0);
+          return Number.isFinite(amount) ? sum + amount : sum;
+        }, 0);
+        const trips = (rides.data || []).length;
+        setData({
+          earningsToday: totalAmount,
+          tripsToday: trips,
+        });
+      })
+      .catch((err: any) => {
+        if (!mounted) return;
+        setError(err?.message ?? 'Không thể tải dữ liệu');
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthenticated]);
 
   const initials = useMemo(() => {
-    if (!profile?.name) return 'TX';
-    const parts = profile.name.split(' ').filter(Boolean);
+    if (!driver?.fullName) return 'TX';
+    const parts = driver.fullName.split(' ').filter(Boolean);
     const first = parts[0]?.[0] ?? '';
     const last = parts[parts.length - 1]?.[0] ?? '';
     return `${first}${last}`.toUpperCase();
-  }, [profile?.name]);
+  }, [driver?.fullName]);
 
-  const onlineLabel = profile?.online ? 'ĐANG BẬT' : 'NGOẠI TUYẾN';
+  const onlineLabel =
+    onlineState === 'sending' ? 'ĐANG CẬP NHẬT' : isOnline ? 'ĐANG BẬT' : 'NGOẠI TUYẾN';
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+        {driverError ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{driverError}</Text>
           </View>
+        ) : null}
+        {onlineError ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{onlineError}</Text>
+          </View>
+        ) : null}
+        {error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.avatar}
+            activeOpacity={0.9}
+            onLongPress={() => router.push('/debug')}
+            delayLongPress={600}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </TouchableOpacity>
           <View style={styles.headerInfo}>
             <Text style={styles.greeting}>Chào mừng trở lại</Text>
-            <Text style={styles.name}>{profile?.name ?? '--'}</Text>
+            <Text style={styles.name}>{driver?.fullName ?? '--'}</Text>
             <View style={styles.headerMeta}>
               <View style={styles.ratingBadge}>
-                <Text style={styles.ratingValue}>{profile?.rating ?? '--'}</Text>
+                <Text style={styles.ratingValue}>{data?.rating ?? '--'}</Text>
                 <Text style={styles.ratingLabel}>đánh giá</Text>
               </View>
-              <Text style={styles.vehicle}>{profile?.vehicle ?? '--'}</Text>
+              <Text style={styles.vehicle}>{driver?.vehicle?.plateNumber ?? '--'}</Text>
             </View>
           </View>
-          <View style={[styles.statusPill, profile?.online ? styles.statusOnline : styles.statusOffline]}>
-            <Text style={[styles.statusText, profile?.online ? styles.statusOnlineText : styles.statusOfflineText]}>
+          <View
+            style={[
+              styles.statusPill,
+              onlineState === 'sending'
+                ? styles.statusPending
+                : isOnline
+                  ? styles.statusOnline
+                  : styles.statusOffline,
+            ]}>
+            <Text style={[styles.statusText, isOnline ? styles.statusOnlineText : styles.statusOfflineText]}>
               {onlineLabel}
             </Text>
           </View>
@@ -61,7 +142,7 @@ export default function DashboardScreen() {
             </View>
           </View>
           <Text style={styles.heroValue}>
-            {data ? `${data.earningsToday.toLocaleString('vi-VN')} đ` : '--'}
+            {data?.earningsToday !== undefined ? `${data.earningsToday.toLocaleString('vi-VN')} đ` : '--'}
           </Text>
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
@@ -134,8 +215,27 @@ export default function DashboardScreen() {
             <TouchableOpacity style={styles.ghostButton}>
               <Text style={styles.ghostText}>Báo cáo nhanh</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryButton}>
-              <Text style={styles.primaryText}>Bật nhận chuyến</Text>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              disabled={onlineSending}
+              onPress={async () => {
+                if (!isAuthenticated) {
+                  Alert.alert('Cần đăng nhập', 'Vui lòng đăng nhập để nhận chuyến.');
+                  return;
+                }
+                try {
+                  if (isOnline) {
+                    await stopOnline();
+                  } else {
+                    await startOnline();
+                  }
+                } catch (err: any) {
+                  Alert.alert('Không thể cập nhật trạng thái', err?.message ?? 'Đã có lỗi xảy ra');
+                }
+              }}>
+              <Text style={styles.primaryText}>
+                {onlineSending ? 'Đang cập nhật...' : isOnline ? 'Tắt nhận chuyến' : 'Bật nhận chuyến'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -153,6 +253,17 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 32,
     gap: 16,
+  },
+  errorCard: {
+    backgroundColor: '#FFF1F1',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 12,
   },
   header: {
     flexDirection: 'row',
@@ -225,6 +336,9 @@ const styles = StyleSheet.create({
   },
   statusOffline: {
     backgroundColor: '#F5F5F5',
+  },
+  statusPending: {
+    backgroundColor: '#FEF3C7',
   },
   statusText: {
     fontSize: 11,

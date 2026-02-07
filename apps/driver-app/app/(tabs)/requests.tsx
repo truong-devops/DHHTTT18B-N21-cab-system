@@ -1,61 +1,93 @@
-import { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
-import { mockApi } from '@/lib/mock-api';
+import { useIncomingRide } from '@/hooks/use-incoming-ride';
+import { useDriver } from '@/lib/contexts/driver';
+import { useRide } from '@/lib/contexts/ride';
+import * as rideApi from '@/src/services/rideApi';
 import { palette } from '@/lib/theme';
 
-type Request = Awaited<ReturnType<typeof mockApi.getRideRequests>>[number];
-
-const phases = ['Đang đến điểm đón', 'Đang đón khách', 'Đang di chuyển'];
-const paymentTags = ['Tiền mặt', 'Ví Be', 'Thẻ'];
+const paymentTags = ['Tiền mặt', 'Ví', 'Thẻ'];
 
 export default function RequestsScreen() {
-  const [requests, setRequests] = useState<Request[]>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [status, setStatus] = useState<'pending' | 'accepted' | 'completed' | 'declined'>('pending');
-  const [phaseIndex, setPhaseIndex] = useState(0);
+  const [ignoredRideId, setIgnoredRideId] = useState<string | null>(null);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const lastActionRef = useRef<string | null>(null);
+  const { driver } = useDriver();
+  const { setActiveRide } = useRide();
+  const isOnline = driver?.onlineStatus === 'ONLINE' || driver?.onlineStatus === 'BUSY';
+  const { incomingRide, isSearching, error } = useIncomingRide({
+    enabled: isOnline,
+    intervalMs: 2500,
+    limit: 1,
+  });
+
+  const activeRequest =
+    incomingRide && incomingRide.id !== ignoredRideId ? incomingRide : null;
 
   useEffect(() => {
-    mockApi.getRideRequests().then(setRequests);
-  }, []);
+    if (incomingRide && incomingRide.id !== ignoredRideId) {
+      setIgnoredRideId(null);
+    }
+  }, [incomingRide, ignoredRideId]);
 
-  const activeRequest = requests[activeIndex];
+  const requestTitle = useMemo(() => {
+    if (!activeRequest) return '--';
+    return `Chuyến #${activeRequest.id.slice(0, 6)}`;
+  }, [activeRequest]);
 
-  const ctaLabel = useMemo(() => {
-    if (status === 'pending') return 'Nhận chuyến';
-    if (status === 'accepted' && phaseIndex < phases.length - 1) return 'Cập nhật trạng thái';
-    if (status === 'accepted') return 'Hoàn tất chuyến';
-    if (status === 'completed') return 'Chuyến đã hoàn tất';
-    return 'Yêu cầu tiếp theo';
-  }, [status, phaseIndex]);
-
-  const handleAccept = () => {
-    setStatus('accepted');
-    setPhaseIndex(0);
+  const handleAccept = async () => {
+    if (!activeRequest) return;
+    if (!driver?.id) {
+      Alert.alert('Thiếu hồ sơ', 'Không tìm thấy driverId. Hãy đăng nhập lại.');
+      return;
+    }
+    const actionKey = `accept:${activeRequest.id}`;
+    if (lastActionRef.current === actionKey) return;
+    lastActionRef.current = actionKey;
+    setIsAccepting(true);
+    try {
+      const res = await rideApi.acceptRide(activeRequest.id, driver.id);
+      setActiveRide(res.data);
+      router.push('/ride/navigation');
+    } catch (err: any) {
+      if (err?.status === 409 || err?.code === 'INVALID_STATE_TRANSITION') {
+        Alert.alert('Chuyến đã thay đổi', 'Chuyến này đã được nhận hoặc đã hết hiệu lực.');
+        setIgnoredRideId(activeRequest.id);
+        return;
+      }
+      Alert.alert('Không thể nhận chuyến', err?.message ?? 'Đã có lỗi xảy ra');
+    } finally {
+      setIsAccepting(false);
+      if (lastActionRef.current === actionKey) {
+        lastActionRef.current = null;
+      }
+    }
   };
 
-  const handleAdvance = () => {
-    if (status === 'pending') {
-      handleAccept();
-      return;
+  const handleDecline = async () => {
+    if (!activeRequest) return;
+    const actionKey = `reject:${activeRequest.id}`;
+    if (lastActionRef.current === actionKey) return;
+    lastActionRef.current = actionKey;
+    setIsRejecting(true);
+    try {
+      await rideApi.rejectRide(activeRequest.id, 'DRIVER_REJECTED');
+      setIgnoredRideId(activeRequest.id);
+    } catch (err: any) {
+      if (err?.status === 409 || err?.code === 'INVALID_STATE_TRANSITION') {
+        Alert.alert('Chuyến đã thay đổi', 'Chuyến này đã được nhận hoặc đã hết hiệu lực.');
+        setIgnoredRideId(activeRequest.id);
+        return;
+      }
+      Alert.alert('Không thể từ chối', err?.message ?? 'Đã có lỗi xảy ra');
+    } finally {
+      setIsRejecting(false);
+      if (lastActionRef.current === actionKey) {
+        lastActionRef.current = null;
+      }
     }
-    if (status === 'accepted' && phaseIndex < phases.length - 1) {
-      setPhaseIndex((prev) => prev + 1);
-      return;
-    }
-    if (status === 'accepted') {
-      setStatus('completed');
-      return;
-    }
-    if (status === 'completed' || status === 'declined') {
-      setStatus('pending');
-      setPhaseIndex(0);
-      setActiveIndex((prev) => (prev + 1) % Math.max(requests.length, 1));
-    }
-  };
-
-  const handleDecline = () => {
-    setStatus('declined');
   };
 
   return (
@@ -78,32 +110,35 @@ export default function RequestsScreen() {
 
         {!activeRequest ? (
           <View style={styles.card}>
-            <Text style={styles.emptyText}>Đang tải yêu cầu...</Text>
+            <Text style={styles.emptyText}>
+              {isSearching ? 'Đang tải yêu cầu...' : isOnline ? 'Chưa có yêu cầu mới' : 'Tài xế đang OFFLINE'}
+            </Text>
+            {error ? <Text style={styles.emptySub}>{error}</Text> : null}
           </View>
         ) : (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View>
                 <Text style={styles.eyebrow}>Yêu cầu mới</Text>
-                <Text style={styles.requestTitle}>{activeRequest.title}</Text>
+                <Text style={styles.requestTitle}>{requestTitle}</Text>
               </View>
               <View style={styles.pricePill}>
-                <Text style={styles.priceText}>{activeRequest.price.toLocaleString('vi-VN')} đ</Text>
-                <Text style={styles.priceSub}>ước tính</Text>
+                <Text style={styles.priceText}>--</Text>
+                <Text style={styles.priceSub}>đang cập nhật</Text>
               </View>
             </View>
 
             <View style={styles.chipRow}>
               <View style={styles.chip}>
-                <Text style={styles.chipText}>{activeRequest.category}</Text>
+                <Text style={styles.chipText}>Tiêu chuẩn</Text>
               </View>
               <View style={styles.chip}>
                 <Text style={styles.chipText}>
-                  {activeRequest.distanceKm} km • {activeRequest.durationMin} phút
+                  {activeRequest.pickupLat?.toFixed(3) ?? '--'},{activeRequest.pickupLng?.toFixed(3) ?? '--'}
                 </Text>
               </View>
               <View style={styles.chip}>
-                <Text style={styles.chipText}>{paymentTags[activeIndex % paymentTags.length]}</Text>
+                <Text style={styles.chipText}>{paymentTags[0]}</Text>
               </View>
             </View>
 
@@ -115,38 +150,35 @@ export default function RequestsScreen() {
               </View>
               <View style={styles.timelineContent}>
                 <Text style={styles.label}>Điểm đón</Text>
-                <Text style={styles.value}>{activeRequest.pickup}</Text>
+                <Text style={styles.value}>
+                  {activeRequest.pickupLat?.toFixed(5) ?? '--'},{activeRequest.pickupLng?.toFixed(5) ?? '--'}
+                </Text>
                 <Text style={styles.label}>Điểm đến</Text>
-                <Text style={styles.value}>{activeRequest.dropoff}</Text>
+                <Text style={styles.value}>
+                  {activeRequest.dropoffLat?.toFixed(5) ?? '--'},{activeRequest.dropoffLng?.toFixed(5) ?? '--'}
+                </Text>
               </View>
             </View>
 
             <View style={styles.noteBox}>
               <Text style={styles.noteLabel}>Ghi chú</Text>
-              <Text style={styles.noteText}>{activeRequest.note}</Text>
+              <Text style={styles.noteText}>Chưa có</Text>
             </View>
 
-            {status === 'accepted' && (
-              <View style={styles.phaseBox}>
-                <Text style={styles.phaseLabel}>Trạng thái chuyến</Text>
-                <Text style={styles.phaseValue}>{phases[phaseIndex]}</Text>
-              </View>
-            )}
-
-            {status === 'accepted' && (
-              <TouchableOpacity style={styles.navLink} onPress={() => router.push('/ride/navigation')}>
-                <Text style={styles.navLinkText}>Mở điều hướng</Text>
-              </TouchableOpacity>
-            )}
-
             <View style={styles.actions}>
-              {status === 'pending' && (
-                <TouchableOpacity style={styles.secondary} onPress={handleDecline}>
-                  <Text style={styles.secondaryText}>Từ chối</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={styles.primary} onPress={handleAdvance}>
-                <Text style={styles.primaryText}>{ctaLabel}</Text>
+              <TouchableOpacity
+                style={[styles.secondary, (isAccepting || isRejecting) && styles.disabledButton]}
+                onPress={handleDecline}
+                disabled={isAccepting || isRejecting}>
+                <Text style={styles.secondaryText}>Từ chối</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primary, (isAccepting || isRejecting) && styles.disabledButton]}
+                onPress={handleAccept}
+                disabled={isAccepting || isRejecting}>
+                <Text style={styles.primaryText}>
+                  {isAccepting ? 'Đang nhận...' : 'Nhận chuyến'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -200,26 +232,23 @@ const styles = StyleSheet.create({
     top: 12,
     left: 12,
     backgroundColor: '#fff',
+    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: palette.border,
   },
   mapBadgeText: {
-    fontSize: 11,
-    color: palette.redDark,
+    fontSize: 10,
     fontWeight: '600',
+    color: palette.redDark,
   },
   mapPin: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: palette.red,
     alignSelf: 'center',
-    marginBottom: 10,
-    shadowColor: palette.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
   },
   mapText: {
     textAlign: 'center',
@@ -235,6 +264,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: palette.muted,
+    textAlign: 'center',
+  },
+  emptySub: {
+    color: palette.muted,
+    textAlign: 'center',
+    marginTop: 6,
+    fontSize: 12,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -259,11 +295,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    alignItems: 'flex-end',
+    alignItems: 'center',
   },
   priceText: {
     color: palette.redDark,
     fontWeight: '700',
+    fontSize: 14,
   },
   priceSub: {
     color: palette.muted,
@@ -273,28 +310,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   chip: {
-    backgroundColor: '#fff',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: palette.border,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   chipText: {
-    color: palette.redDark,
-    fontSize: 11,
-    fontWeight: '600',
+    color: palette.text,
+    fontSize: 12,
   },
   timeline: {
     flexDirection: 'row',
     gap: 12,
+    marginBottom: 12,
   },
   timelineLine: {
+    width: 12,
     alignItems: 'center',
-    marginTop: 4,
   },
   timelineDot: {
     width: 10,
@@ -304,7 +340,7 @@ const styles = StyleSheet.create({
   },
   timelineBar: {
     width: 2,
-    height: 28,
+    flex: 1,
     backgroundColor: palette.border,
     marginVertical: 4,
   },
@@ -318,72 +354,43 @@ const styles = StyleSheet.create({
   },
   timelineContent: {
     flex: 1,
+    gap: 6,
   },
   label: {
-    color: palette.muted,
     fontSize: 12,
+    color: palette.muted,
   },
   value: {
     color: palette.text,
-    fontSize: 14,
     fontWeight: '600',
-    marginTop: 4,
-    marginBottom: 10,
   },
   noteBox: {
-    marginTop: 8,
     backgroundColor: palette.redSoft,
     borderRadius: 12,
     padding: 12,
+    marginBottom: 12,
   },
   noteLabel: {
-    color: palette.muted,
     fontSize: 12,
-    marginBottom: 4,
+    color: palette.muted,
   },
   noteText: {
     color: palette.text,
-  },
-  phaseBox: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  phaseLabel: {
-    color: palette.muted,
-    fontSize: 12,
-  },
-  phaseValue: {
-    color: palette.text,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  navLink: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  navLinkText: {
-    color: palette.redDark,
-    fontWeight: '600',
+    marginTop: 6,
   },
   actions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 16,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   primary: {
     flex: 1,
     backgroundColor: palette.red,
-    paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
+    paddingVertical: 12,
   },
   primaryText: {
     color: '#fff',
@@ -391,15 +398,15 @@ const styles = StyleSheet.create({
   },
   secondary: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingVertical: 12,
     borderRadius: 12,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: palette.border,
+    alignItems: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#fff',
   },
   secondaryText: {
     color: palette.redDark,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

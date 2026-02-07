@@ -1,30 +1,79 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { mockApi } from '@/lib/mock-api';
+import { useAuth } from '@/lib/contexts/auth';
+import * as paymentApi from '@/lib/services/payment';
 import { palette } from '@/lib/theme';
 
-type WalletData = Awaited<ReturnType<typeof mockApi.getWalletSummary>>;
-
 export default function WalletScreen() {
-  const [data, setData] = useState<WalletData | null>(null);
+  const { isAuthenticated } = useAuth();
+  const [payments, setPayments] = useState<paymentApi.Payment[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    mockApi.getWalletSummary().then(setData);
-  }, []);
+    if (!isAuthenticated) {
+      setPayments([]);
+      return;
+    }
+
+    let mounted = true;
+    setError(null);
+    paymentApi
+      .listPayments(20)
+      .then((res) => {
+        if (mounted) setPayments(res.data || []);
+      })
+      .catch((err: any) => {
+        if (mounted) setError(err?.message ?? 'Không thể tải thu nhập');
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthenticated]);
+
+  const summary = useMemo(() => {
+    const total = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const pending = payments
+      .filter((item) => item.status?.toUpperCase() !== 'PAID')
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const today = payments
+      .filter((item) => {
+        if (!item.createdAt) return false;
+        const created = new Date(item.createdAt).toDateString();
+        return created === new Date().toDateString();
+      })
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    return { total, pending, today };
+  }, [payments]);
 
   const breakdown = useMemo(
     () => [
-      { label: 'Thưởng', value: 120000 },
-      { label: 'Khuyến mãi', value: 64000 },
-      { label: 'Phí nền tảng', value: -54000 },
+      {
+        label: 'Đã thanh toán',
+        value: payments
+          .filter((item) => item.status?.toUpperCase() === 'PAID')
+          .reduce((sum, item) => sum + Number(item.amount || 0), 0),
+      },
+      {
+        label: 'Chờ xử lý',
+        value: payments
+          .filter((item) => item.status?.toUpperCase() !== 'PAID')
+          .reduce((sum, item) => sum + Number(item.amount || 0), 0),
+      },
     ],
-    [],
+    [payments],
   );
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Ví & Thu nhập</Text>
+
+        {error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.balanceCard}>
           <View style={styles.balanceHeader}>
@@ -33,26 +82,18 @@ export default function WalletScreen() {
               <Text style={styles.balancePillText}>Ví tài xế</Text>
             </View>
           </View>
-          <Text style={styles.balanceValue}>
-            {data ? `${data.summary.balance.toLocaleString('vi-VN')} đ` : '--'}
-          </Text>
+          <Text style={styles.balanceValue}>{summary.total.toLocaleString('vi-VN')} đ</Text>
           <View style={styles.balanceRow}>
             <View>
               <Text style={styles.smallLabel}>Chờ đối soát</Text>
-              <Text style={styles.smallValue}>
-                {data ? `${data.summary.pending.toLocaleString('vi-VN')} đ` : '--'}
-              </Text>
+              <Text style={styles.smallValue}>{summary.pending.toLocaleString('vi-VN')} đ</Text>
             </View>
             <View>
               <Text style={styles.smallLabel}>Hôm nay</Text>
-              <Text style={styles.smallValue}>
-                {data ? `${data.summary.today.toLocaleString('vi-VN')} đ` : '--'}
-              </Text>
+              <Text style={styles.smallValue}>{summary.today.toLocaleString('vi-VN')} đ</Text>
             </View>
           </View>
-          <Text style={styles.payoutText}>
-            Kỳ chuyển tiền tiếp theo: {data?.summary.payoutDate ?? '--'}
-          </Text>
+          <Text style={styles.payoutText}>Kỳ chuyển tiền tiếp theo: --</Text>
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.lightButton}>
               <Text style={styles.lightButtonText}>Rút tiền</Text>
@@ -68,24 +109,28 @@ export default function WalletScreen() {
           {breakdown.map((item) => (
             <View key={item.label} style={styles.breakRow}>
               <Text style={styles.breakLabel}>{item.label}</Text>
-              <Text style={[styles.breakValue, item.value < 0 && styles.breakNegative]}>
-                {item.value < 0 ? '-' : ''}{Math.abs(item.value).toLocaleString('vi-VN')} đ
-              </Text>
+              <Text style={styles.breakValue}>{item.value.toLocaleString('vi-VN')} đ</Text>
             </View>
           ))}
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Lịch sử chuyển tiền</Text>
-          {data?.payouts.map((item) => (
-            <View key={item.id} style={styles.payoutRow}>
-              <View>
-                <Text style={styles.payoutDate}>{item.date}</Text>
-                <Text style={styles.payoutStatus}>{item.status}</Text>
+          <Text style={styles.sectionTitle}>Lịch sử giao dịch</Text>
+          {payments.length === 0 ? (
+            <Text style={styles.emptyText}>Chưa có giao dịch</Text>
+          ) : (
+            payments.map((item) => (
+              <View key={item.id} style={styles.payoutRow}>
+                <View>
+                  <Text style={styles.payoutDate}>
+                    {item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '--'}
+                  </Text>
+                  <Text style={styles.payoutStatus}>{item.status}</Text>
+                </View>
+                <Text style={styles.payoutAmount}>{Number(item.amount || 0).toLocaleString('vi-VN')} đ</Text>
               </View>
-              <Text style={styles.payoutAmount}>{item.amount.toLocaleString('vi-VN')} đ</Text>
-            </View>
-          ))}
+            ))
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -106,6 +151,17 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: palette.text,
+  },
+  errorCard: {
+    backgroundColor: '#FFF1F1',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 12,
   },
   balanceCard: {
     backgroundColor: palette.red,
@@ -198,15 +254,13 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontWeight: '600',
   },
-  breakNegative: {
-    color: palette.redDark,
-  },
   payoutRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.border,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
   },
   payoutDate: {
     color: palette.text,
@@ -215,10 +269,12 @@ const styles = StyleSheet.create({
   payoutStatus: {
     color: palette.muted,
     fontSize: 12,
-    marginTop: 4,
   },
   payoutAmount: {
     color: palette.redDark,
     fontWeight: '700',
+  },
+  emptyText: {
+    color: palette.muted,
   },
 });
