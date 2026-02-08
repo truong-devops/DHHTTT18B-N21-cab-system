@@ -1,15 +1,20 @@
-import { useEffect, useMemo } from 'react';
-import { Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Modal, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { router } from 'expo-router';
 import { Card } from '@/components/ui/card';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { useRideTracking } from '@/hooks/use-ride-tracking';
 import { useRide } from '@/lib/contexts/ride';
+import { useDriver } from '@/lib/contexts/driver';
 import { palette } from '@/lib/theme';
 
 export default function RideNavigationScreen() {
+  const mapRef = useRef<MapView | null>(null);
   const { activeRide, setActiveRide } = useRide();
+  const { driver } = useDriver();
   const rideId = activeRide?.id ?? null;
   const { ride: trackedRide, error, isOffline, updateStatus, isUpdating } = useRideTracking({
     rideId,
@@ -29,6 +34,74 @@ export default function RideNavigationScreen() {
   const canStart = status === 'ARRIVING';
   const canComplete = status === 'IN_PROGRESS';
   const primaryLabel = canStart ? 'BẮT ĐẦU' : 'ĐÃ ĐẾN';
+
+  const pickupPoint = useMemo(() => {
+    if (typeof ride?.pickupLat !== 'number' || typeof ride?.pickupLng !== 'number') return null;
+    return { latitude: ride.pickupLat, longitude: ride.pickupLng };
+  }, [ride?.pickupLat, ride?.pickupLng]);
+
+  const dropoffPoint = useMemo(() => {
+    if (typeof ride?.dropoffLat !== 'number' || typeof ride?.dropoffLng !== 'number') return null;
+    return { latitude: ride.dropoffLat, longitude: ride.dropoffLng };
+  }, [ride?.dropoffLat, ride?.dropoffLng]);
+
+  const driverPoint = useMemo(() => {
+    const lat = driver?.location?.lat;
+    const lng = driver?.location?.lng;
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    return { latitude: lat, longitude: lng };
+  }, [driver?.location?.lat, driver?.location?.lng]);
+
+  const isOnTrip = status === 'IN_PROGRESS' || status === 'STARTED';
+  const isCompleted = status === 'COMPLETED';
+
+  const centerPoint = useMemo(() => {
+    if (isCompleted) return pickupPoint ?? driverPoint;
+    if (isOnTrip && pickupPoint && dropoffPoint) {
+      return {
+        latitude: (pickupPoint.latitude + dropoffPoint.latitude) / 2,
+        longitude: (pickupPoint.longitude + dropoffPoint.longitude) / 2,
+      };
+    }
+    return driverPoint ?? pickupPoint ?? dropoffPoint ?? null;
+  }, [driverPoint, dropoffPoint, isCompleted, isOnTrip, pickupPoint]);
+
+  const routePoints = useMemo(() => {
+    if (isCompleted) return [];
+    if (isOnTrip) {
+      if (pickupPoint && dropoffPoint) return [pickupPoint, dropoffPoint];
+      return pickupPoint && dropoffPoint ? [pickupPoint, dropoffPoint] : [];
+    }
+    if (driverPoint && pickupPoint) return [driverPoint, pickupPoint];
+    if (pickupPoint) return [pickupPoint];
+    return [];
+  }, [isCompleted, isOnTrip, driverPoint, pickupPoint, dropoffPoint]);
+
+  const [zoomDelta, setZoomDelta] = useState({
+    latitudeDelta: 0.02,
+    longitudeDelta: 0.02,
+  });
+  const [isMapOpen, setIsMapOpen] = useState(false);
+
+  useEffect(() => {
+    if (!mapRef.current || !centerPoint) return;
+    mapRef.current.animateToRegion(
+      {
+        ...centerPoint,
+        latitudeDelta: zoomDelta.latitudeDelta,
+        longitudeDelta: zoomDelta.longitudeDelta,
+      },
+      350,
+    );
+  }, [centerPoint, zoomDelta]);
+
+  const handleZoom = (factor: number) => {
+    setZoomDelta((prev) => {
+      const nextLat = Math.min(0.2, Math.max(0.001, prev.latitudeDelta * factor));
+      const nextLng = Math.min(0.2, Math.max(0.001, prev.longitudeDelta * factor));
+      return { latitudeDelta: nextLat, longitudeDelta: nextLng };
+    });
+  };
 
   const handlePrimaryAction = async () => {
     if (!ride) return;
@@ -95,10 +168,49 @@ export default function RideNavigationScreen() {
         )}
 
         <View style={styles.map}>
-          <View style={styles.mapRoute} />
-          <View style={styles.mapDotStart} />
-          <View style={styles.mapDotEnd} />
-          <Text style={styles.mapText}>Bản đồ giả lập tuyến đường</Text>
+          <MapView
+            ref={(ref: any) => {
+              mapRef.current = ref;
+            }}
+            style={StyleSheet.absoluteFillObject}
+            initialRegion={{
+              latitude: ride?.pickupLat ?? 10.76,
+              longitude: ride?.pickupLng ?? 106.66,
+              latitudeDelta: zoomDelta.latitudeDelta,
+              longitudeDelta: zoomDelta.longitudeDelta,
+            }}
+            provider={PROVIDER_GOOGLE}>
+            {driverPoint && !isOnTrip ? (
+              <Marker coordinate={driverPoint} title="Tài xế" pinColor={palette.redDark} />
+            ) : null}
+            {pickupPoint ? (
+              <Marker coordinate={pickupPoint} title="Điểm đón" pinColor={palette.red} />
+            ) : null}
+            {dropoffPoint ? (
+              <Marker coordinate={dropoffPoint} title="Điểm đến" pinColor={palette.redDark} />
+            ) : null}
+            {routePoints.length >= 2 ? (
+              <Polyline
+                coordinates={routePoints}
+                strokeColor={palette.red}
+                strokeWidth={4}
+              />
+            ) : null}
+          </MapView>
+          <View style={styles.mapBadge}>
+            <Text style={styles.mapBadgeText}>Bản đồ</Text>
+          </View>
+          <View style={styles.zoomControls}>
+            <TouchableOpacity style={styles.zoomButton} onPress={() => handleZoom(0.7)}>
+              <Text style={styles.zoomText}>＋</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.zoomButton} onPress={() => handleZoom(1.3)}>
+              <Text style={styles.zoomText}>－</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.mapAction} onPress={() => setIsMapOpen(true)}>
+            <MaterialIcons name="fullscreen" size={18} color={palette.redDark} />
+          </TouchableOpacity>
         </View>
 
         <Card>
@@ -147,8 +259,79 @@ export default function RideNavigationScreen() {
             />
           </View>
         </View>
+        <FullscreenMap
+          visible={isMapOpen}
+          onClose={() => setIsMapOpen(false)}
+          ride={ride}
+          driverPoint={driverPoint}
+          pickupPoint={pickupPoint}
+          dropoffPoint={dropoffPoint}
+          routePoints={routePoints}
+          zoomDelta={zoomDelta}
+        />
       </View>
     </SafeAreaView>
+  );
+}
+
+function FullscreenMap({
+  visible,
+  onClose,
+  ride,
+  driverPoint,
+  pickupPoint,
+  dropoffPoint,
+  routePoints,
+  zoomDelta,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  ride: any;
+  driverPoint: { latitude: number; longitude: number } | null;
+  pickupPoint: { latitude: number; longitude: number } | null;
+  dropoffPoint: { latitude: number; longitude: number } | null;
+  routePoints: { latitude: number; longitude: number }[];
+  zoomDelta: { latitudeDelta: number; longitudeDelta: number };
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={styles.modalSafe}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Bản đồ</Text>
+          <TouchableOpacity onPress={onClose} style={styles.modalClose}>
+            <Text style={styles.modalCloseText}>Đóng</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.modalMap}>
+          <MapView
+            style={StyleSheet.absoluteFillObject}
+            initialRegion={{
+              latitude: ride?.pickupLat ?? 10.76,
+              longitude: ride?.pickupLng ?? 106.66,
+              latitudeDelta: zoomDelta.latitudeDelta,
+              longitudeDelta: zoomDelta.longitudeDelta,
+            }}
+            provider={PROVIDER_GOOGLE}>
+            {driverPoint ? (
+              <Marker coordinate={driverPoint} title="Tài xế" pinColor={palette.redDark} />
+            ) : null}
+            {pickupPoint ? (
+              <Marker coordinate={pickupPoint} title="Điểm đón" pinColor={palette.red} />
+            ) : null}
+            {dropoffPoint ? (
+              <Marker coordinate={dropoffPoint} title="Điểm đến" pinColor={palette.redDark} />
+            ) : null}
+            {routePoints.length >= 2 ? (
+              <Polyline
+                coordinates={routePoints}
+                strokeColor={palette.red}
+                strokeWidth={4}
+              />
+            ) : null}
+          </MapView>
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
 }
 
@@ -215,37 +398,88 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  mapRoute: {
+  mapBadge: {
     position: 'absolute',
-    width: '70%',
-    height: 2,
-    backgroundColor: palette.redDark,
-    top: '45%',
-    opacity: 0.4,
-  },
-  mapDotStart: {
-    position: 'absolute',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: palette.red,
-    left: '18%',
-    top: '40%',
-  },
-  mapDotEnd: {
-    position: 'absolute',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: palette.red,
+    top: 12,
+    left: 12,
     backgroundColor: '#fff',
-    right: '18%',
-    top: '40%',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: palette.border,
   },
-  mapText: {
-    color: palette.muted,
+  mapBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: palette.redDark,
+  },
+  zoomControls: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    gap: 8,
+  },
+  zoomButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  zoomText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: palette.redDark,
+  },
+  mapAction: {
+    position: 'absolute',
+    left: 12,
+    bottom: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSafe: {
+    flex: 1,
+    backgroundColor: palette.background,
+  },
+  modalHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  modalClose: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  modalCloseText: {
     fontSize: 12,
+    fontWeight: '600',
+    color: palette.redDark,
+  },
+  modalMap: {
+    flex: 1,
+    backgroundColor: palette.surface,
   },
   infoRow: {
     marginBottom: 10,
