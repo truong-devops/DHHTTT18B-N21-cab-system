@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
-import { useIncomingRide } from '@/hooks/use-incoming-ride';
+import { useRequests } from '@/hooks/use-requests';
 import { useDriver } from '@/lib/contexts/driver';
 import { useRide } from '@/lib/contexts/ride';
 import * as rideApi from '@/src/services/rideApi';
@@ -16,9 +16,7 @@ export default function RequestsScreen() {
   const lastActionRef = useRef<string | null>(null);
   const { driver } = useDriver();
   const { setActiveRide } = useRide();
-  const isOnline = driver?.onlineStatus === 'ONLINE' || driver?.onlineStatus === 'BUSY';
-  const { incomingRide, isSearching, error } = useIncomingRide({
-    enabled: isOnline,
+  const { incomingRide, isSearching, error, isOnline } = useRequests({
     intervalMs: 2500,
     limit: 1,
   });

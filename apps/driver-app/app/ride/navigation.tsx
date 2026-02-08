@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import { Card } from '@/components/ui/card';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenHeader } from '@/components/ui/screen-header';
-import { useRideTracking } from '@/hooks/use-ride-tracking';
+import { useRide as useRideState } from '@/hooks/use-ride';
 import { useRoutePolyline } from '@/hooks/use-route-polyline';
 import { useRide } from '@/lib/contexts/ride';
 import { useDriver } from '@/lib/contexts/driver';
@@ -17,7 +17,7 @@ export default function RideNavigationScreen() {
   const { activeRide, setActiveRide } = useRide();
   const { driver } = useDriver();
   const rideId = activeRide?.id ?? null;
-  const { ride: trackedRide, error, isOffline, updateStatus, isUpdating } = useRideTracking({
+  const { ride: trackedRide, error, isOffline, updateStatus, isUpdating } = useRideState({
     rideId,
     enabled: Boolean(rideId),
     intervalMs: 2500,
@@ -64,7 +64,7 @@ export default function RideNavigationScreen() {
 
   const routeOrigin = useMemo(() => {
     if (isCompleted) return null;
-    if (isOnTrip) return pickupPoint;
+    if (isOnTrip) return driverPoint ?? pickupPoint;
     if (driverPoint && pickupPoint) return driverPoint;
     return null;
   }, [driverPoint, isCompleted, isOnTrip, pickupPoint]);
@@ -207,7 +207,7 @@ export default function RideNavigationScreen() {
         {routeError && (
           <Card style={styles.routeErrorCard}>
             <Text style={styles.routeErrorText}>
-              Không lấy được đường đi thật, đang dùng đường thẳng tạm thời.
+              Đang load dữ liệu....
             </Text>
           </Card>
         )}

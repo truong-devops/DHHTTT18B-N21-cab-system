@@ -1,4 +1,5 @@
 import { apiRequest } from '../api';
+import { endpoints } from '../endpoints';
 
 export type Payment = {
   id: string;
@@ -19,7 +20,7 @@ export type PaymentListResponse = {
 export async function listPayments(limit = 5) {
   return apiRequest<PaymentListResponse>({
     method: 'GET',
-    path: '/v1/payments',
+    path: endpoints.payment.list,
     params: { limit },
   });
 }
