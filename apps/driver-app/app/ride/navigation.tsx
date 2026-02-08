@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { useRideTracking } from '@/hooks/use-ride-tracking';
+import { useRoutePolyline } from '@/hooks/use-route-polyline';
 import { useRide } from '@/lib/contexts/ride';
 import { useDriver } from '@/lib/contexts/driver';
 import { palette } from '@/lib/theme';
@@ -55,6 +56,36 @@ export default function RideNavigationScreen() {
   const isOnTrip = status === 'IN_PROGRESS' || status === 'STARTED';
   const isCompleted = status === 'COMPLETED';
 
+  const routeProfile = useMemo(() => {
+    const raw = String(ride?.vehicleType ?? '').toUpperCase();
+    if (raw.includes('BIKE') || raw.includes('MOTOR')) return 'motorbike';
+    return 'car';
+  }, [ride?.vehicleType]);
+
+  const routeOrigin = useMemo(() => {
+    if (isCompleted) return null;
+    if (isOnTrip) return pickupPoint;
+    if (driverPoint && pickupPoint) return driverPoint;
+    return null;
+  }, [driverPoint, isCompleted, isOnTrip, pickupPoint]);
+
+  const routeDestination = useMemo(() => {
+    if (isCompleted) return null;
+    if (isOnTrip) return dropoffPoint;
+    if (driverPoint && pickupPoint) return pickupPoint;
+    return null;
+  }, [driverPoint, dropoffPoint, isCompleted, isOnTrip, pickupPoint]);
+
+  const {
+    coords: routeCoords,
+    isLoading: isRouteLoading,
+    error: routeError,
+  } = useRoutePolyline({
+    origin: routeOrigin,
+    destination: routeDestination,
+    profile: routeProfile,
+  });
+
   const centerPoint = useMemo(() => {
     if (isCompleted) return pickupPoint ?? driverPoint;
     if (isOnTrip && pickupPoint && dropoffPoint) {
@@ -68,14 +99,12 @@ export default function RideNavigationScreen() {
 
   const routePoints = useMemo(() => {
     if (isCompleted) return [];
-    if (isOnTrip) {
-      if (pickupPoint && dropoffPoint) return [pickupPoint, dropoffPoint];
-      return pickupPoint && dropoffPoint ? [pickupPoint, dropoffPoint] : [];
-    }
-    if (driverPoint && pickupPoint) return [driverPoint, pickupPoint];
-    if (pickupPoint) return [pickupPoint];
+    if (routeOrigin && routeDestination) return [routeOrigin, routeDestination];
+    if (routeDestination) return [routeDestination];
     return [];
-  }, [isCompleted, isOnTrip, driverPoint, pickupPoint, dropoffPoint]);
+  }, [isCompleted, routeOrigin, routeDestination]);
+
+  const polylineCoords = routeCoords.length >= 2 ? routeCoords : routePoints;
 
   const [zoomDelta, setZoomDelta] = useState({
     latitudeDelta: 0.02,
@@ -94,6 +123,15 @@ export default function RideNavigationScreen() {
       350,
     );
   }, [centerPoint, zoomDelta]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (polylineCoords.length < 2) return;
+    mapRef.current.fitToCoordinates(polylineCoords, {
+      edgePadding: { top: 80, bottom: 120, left: 60, right: 60 },
+      animated: true,
+    });
+  }, [polylineCoords]);
 
   const handleZoom = (factor: number) => {
     setZoomDelta((prev) => {
@@ -166,6 +204,16 @@ export default function RideNavigationScreen() {
             </Text>
           </Card>
         )}
+        {routeError && (
+          <Card style={styles.routeErrorCard}>
+            <Text style={styles.routeErrorText}>
+              Không lấy được đường đi thật, đang dùng đường thẳng tạm thời.
+            </Text>
+          </Card>
+        )}
+        {isRouteLoading && (
+          <Text style={styles.routeLoadingText}>Đang lấy đường đi thật...</Text>
+        )}
 
         <View style={styles.map}>
           <MapView
@@ -189,9 +237,9 @@ export default function RideNavigationScreen() {
             {dropoffPoint ? (
               <Marker coordinate={dropoffPoint} title="Điểm đến" pinColor={palette.redDark} />
             ) : null}
-            {routePoints.length >= 2 ? (
+            {polylineCoords.length >= 2 ? (
               <Polyline
-                coordinates={routePoints}
+                coordinates={polylineCoords}
                 strokeColor={palette.red}
                 strokeWidth={4}
               />
@@ -267,6 +315,7 @@ export default function RideNavigationScreen() {
           pickupPoint={pickupPoint}
           dropoffPoint={dropoffPoint}
           routePoints={routePoints}
+          routeCoords={polylineCoords}
           zoomDelta={zoomDelta}
         />
       </View>
@@ -282,6 +331,7 @@ function FullscreenMap({
   pickupPoint,
   dropoffPoint,
   routePoints,
+  routeCoords,
   zoomDelta,
 }: {
   visible: boolean;
@@ -291,8 +341,10 @@ function FullscreenMap({
   pickupPoint: { latitude: number; longitude: number } | null;
   dropoffPoint: { latitude: number; longitude: number } | null;
   routePoints: { latitude: number; longitude: number }[];
+  routeCoords: { latitude: number; longitude: number }[];
   zoomDelta: { latitudeDelta: number; longitudeDelta: number };
 }) {
+  const polylineCoords = routeCoords.length >= 2 ? routeCoords : routePoints;
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.modalSafe}>
@@ -321,9 +373,9 @@ function FullscreenMap({
             {dropoffPoint ? (
               <Marker coordinate={dropoffPoint} title="Điểm đến" pinColor={palette.redDark} />
             ) : null}
-            {routePoints.length >= 2 ? (
+            {polylineCoords.length >= 2 ? (
               <Polyline
-                coordinates={routePoints}
+                coordinates={polylineCoords}
                 strokeColor={palette.red}
                 strokeWidth={4}
               />
@@ -365,6 +417,18 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: palette.redDark,
+    fontSize: 12,
+  },
+  routeErrorCard: {
+    borderColor: palette.red,
+    backgroundColor: '#FFF2ED',
+  },
+  routeErrorText: {
+    color: palette.redDark,
+    fontSize: 12,
+  },
+  routeLoadingText: {
+    color: palette.muted,
     fontSize: 12,
   },
   container: {

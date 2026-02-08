@@ -19,7 +19,7 @@ type LocationSnapshot = {
   recordedAt?: string | null;
 };
 
-const DEFAULT_INTERVAL_MS = 2500;
+const DEFAULT_INTERVAL_MS = 5000;
 const MAX_RECONNECT_DELAY = 10000;
 
 function mapLocation(
