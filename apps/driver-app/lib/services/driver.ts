@@ -1,4 +1,5 @@
 import { apiRequest } from '../api';
+import { endpoints } from '../endpoints';
 
 export type DriverProfileResponse = {
   data: {
@@ -38,14 +39,14 @@ export type DriverProfileResponse = {
 export async function getMe() {
   return apiRequest<DriverProfileResponse>({
     method: 'GET',
-    path: '/v1/driver/me',
+    path: endpoints.driver.me,
   });
 }
 
 export async function setOnline(lat?: number, lng?: number) {
   return apiRequest({
     method: 'POST',
-    path: '/v1/driver/me/online',
+    path: endpoints.driver.online,
     body: lat && lng ? { initialLocation: { lat, lng } } : {},
   });
 }
@@ -53,7 +54,7 @@ export async function setOnline(lat?: number, lng?: number) {
 export async function setOffline() {
   return apiRequest({
     method: 'POST',
-    path: '/v1/driver/me/offline',
+    path: endpoints.driver.offline,
   });
 }
 
@@ -69,7 +70,7 @@ export type DriverLocationPayload = {
 export async function sendLocation(payload: DriverLocationPayload) {
   return apiRequest({
     method: 'POST',
-    path: '/v1/driver/me/location',
+    path: endpoints.driver.location,
     body: payload,
   });
 }
@@ -77,6 +78,6 @@ export async function sendLocation(payload: DriverLocationPayload) {
 export async function heartbeat() {
   return apiRequest({
     method: 'POST',
-    path: '/v1/driver/me/heartbeat',
+    path: endpoints.driver.heartbeat,
   });
 }

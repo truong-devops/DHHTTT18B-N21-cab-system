@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { Card } from '@/components/ui/card';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { useAuth } from '@/lib/contexts/auth';
-import { useDriver } from '@/lib/contexts/driver';
-import * as paymentApi from '@/lib/services/payment';
+import { useProfile } from '@/hooks/use-profile';
 import { palette } from '@/lib/theme';
 
 const menuItems = [
@@ -16,30 +14,13 @@ const menuItems = [
 ];
 
 export default function ProfileScreen() {
-  const { isAuthenticated, login, logout } = useAuth();
-  const { driver, refresh } = useDriver();
+  const { auth, driver: driverState, walletTotal, earnings } = useProfile();
+  const { isAuthenticated, login, logout } = auth;
+  const { driver, refresh } = driverState;
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [walletTotal, setWalletTotal] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setWalletTotal(null);
-      return;
-    }
-
-    paymentApi
-      .listPayments(10)
-      .then((res) => {
-        const total = (res.data || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-        setWalletTotal(total);
-      })
-      .catch(() => {
-        setWalletTotal(null);
-      });
-  }, [isAuthenticated]);
 
   const initials = useMemo(() => {
     if (!driver?.fullName) return 'TX';
@@ -112,9 +93,11 @@ export default function ProfileScreen() {
             <View style={styles.walletCard}>
               <Text style={styles.walletLabel}>Số dư ví hiện tại</Text>
               <Text style={styles.walletValue}>
-                {walletTotal !== null ? `${walletTotal.toLocaleString('vi-VN')} đ` : '--'}
+                {Number.isFinite(walletTotal) ? `${walletTotal.toLocaleString('vi-VN')} đ` : '--'}
               </Text>
-              <Text style={styles.walletHint}>Hôm nay: --</Text>
+              <Text style={styles.walletHint}>
+                Hôm nay: {earnings.summary.today ? `${earnings.summary.today.toLocaleString('vi-VN')} đ` : '--'}
+              </Text>
             </View>
 
             <Card>

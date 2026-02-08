@@ -1,50 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '@/lib/contexts/auth';
-import * as paymentApi from '@/lib/services/payment';
+import { useEarnings } from '@/hooks/use-earnings';
 import { palette } from '@/lib/theme';
 
 export default function WalletScreen() {
-  const { isAuthenticated } = useAuth();
-  const [payments, setPayments] = useState<paymentApi.Payment[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setPayments([]);
-      return;
-    }
-
-    let mounted = true;
-    setError(null);
-    paymentApi
-      .listPayments(20)
-      .then((res) => {
-        if (mounted) setPayments(res.data || []);
-      })
-      .catch((err: any) => {
-        if (mounted) setError(err?.message ?? 'Không thể tải thu nhập');
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [isAuthenticated]);
-
-  const summary = useMemo(() => {
-    const total = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const pending = payments
-      .filter((item) => item.status?.toUpperCase() !== 'PAID')
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const today = payments
-      .filter((item) => {
-        if (!item.createdAt) return false;
-        const created = new Date(item.createdAt).toDateString();
-        return created === new Date().toDateString();
-      })
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    return { total, pending, today };
-  }, [payments]);
+  const { payments, summary, loading, error } = useEarnings({ limit: 20 });
 
   const breakdown = useMemo(
     () => [
@@ -73,6 +33,9 @@ export default function WalletScreen() {
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
+        ) : null}
+        {loading && payments.length === 0 ? (
+          <Text style={styles.emptyText}>Đang tải thu nhập...</Text>
         ) : null}
 
         <View style={styles.balanceCard}>

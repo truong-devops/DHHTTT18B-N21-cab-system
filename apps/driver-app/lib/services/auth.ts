@@ -1,13 +1,14 @@
 import { apiRequest } from '../api';
+import { endpoints } from '../endpoints';
 
 export type AuthResponse = {
   data: {
     id: string;
-    email: string;
+    email?: string | null;
     username?: string | null;
-    role: string;
-    status: string;
-    createdAt: string;
+    role?: string | null;
+    status?: string | null;
+    createdAt?: string | null;
   };
   tokens: {
     accessToken: string;
@@ -16,10 +17,18 @@ export type AuthResponse = {
   };
 };
 
+export type VerifyResponse = {
+  data: {
+    userId: string;
+    role?: string | null;
+    roles?: string[] | null;
+  };
+};
+
 export async function login(identifier: string, password: string) {
   return apiRequest<AuthResponse>({
     method: 'POST',
-    path: '/v1/auth/login',
+    path: endpoints.auth.login,
     body: { identifier, password },
     auth: false,
   });
@@ -28,7 +37,7 @@ export async function login(identifier: string, password: string) {
 export async function refresh(refreshToken: string) {
   return apiRequest<AuthResponse>({
     method: 'POST',
-    path: '/v1/auth/refresh',
+    path: endpoints.auth.refresh,
     body: { refreshToken },
     auth: false,
     retryAuth: false,
@@ -36,16 +45,16 @@ export async function refresh(refreshToken: string) {
 }
 
 export async function getMe() {
-  return apiRequest<{ data: AuthResponse['data'] }>({
+  return apiRequest<VerifyResponse>({
     method: 'GET',
-    path: '/v1/auth/me',
+    path: endpoints.auth.verify,
   });
 }
 
 export async function logout(refreshToken: string) {
   return apiRequest<{ ok: boolean }>({
     method: 'POST',
-    path: '/v1/auth/logout',
+    path: endpoints.auth.logout,
     body: { refreshToken },
     auth: false,
     retryAuth: false,

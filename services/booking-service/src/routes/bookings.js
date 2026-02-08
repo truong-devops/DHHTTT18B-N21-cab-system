@@ -62,7 +62,10 @@ router.post("/", async (req, res) => {
       type: "RideCreated",
       payload: {
         rideId,
+        bookingId,
         pickup: { lat: pickup.lat, lng: pickup.lng },
+        dropoff: { lat: dropoff.lat, lng: dropoff.lng },
+        vehicleType,
         timestamp: new Date().toISOString()
       }
     });

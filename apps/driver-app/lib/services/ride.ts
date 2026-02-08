@@ -1,4 +1,5 @@
 import { apiRequest } from '../api';
+import { endpoints } from '../endpoints';
 
 export type Ride = {
   id: string;
@@ -24,7 +25,7 @@ export type RideListResponse = {
 export async function listRequested(limit = 5) {
   return apiRequest<RideListResponse>({
     method: 'GET',
-    path: '/v1/rides',
+    path: endpoints.ride.list,
     params: { status: 'requested', limit },
   });
 }
@@ -32,7 +33,7 @@ export async function listRequested(limit = 5) {
 export async function listHistory(limit = 20) {
   return apiRequest<RideListResponse>({
     method: 'GET',
-    path: '/v1/rides',
+    path: endpoints.ride.list,
     params: { limit },
   });
 }
@@ -40,14 +41,14 @@ export async function listHistory(limit = 20) {
 export async function getRide(id: string) {
   return apiRequest<{ data: Ride }>({
     method: 'GET',
-    path: `/v1/rides/${id}`,
+    path: endpoints.ride.detail(id),
   });
 }
 
 export async function assignRide(id: string, driverId: string) {
   return apiRequest<{ data: Ride }>({
     method: 'PATCH',
-    path: `/v1/rides/${id}`,
+    path: endpoints.ride.update(id),
     body: { driverId, status: 'ASSIGNED' },
   });
 }
@@ -55,7 +56,7 @@ export async function assignRide(id: string, driverId: string) {
 export async function updateStatus(id: string, status: string) {
   return apiRequest<{ data: Ride }>({
     method: 'PATCH',
-    path: `/v1/rides/${id}`,
+    path: endpoints.ride.update(id),
     body: { status },
   });
 }
@@ -63,7 +64,7 @@ export async function updateStatus(id: string, status: string) {
 export async function rejectRide(id: string, reason?: string) {
   return apiRequest<{ data: Ride }>({
     method: 'DELETE',
-    path: `/v1/rides/${id}`,
+    path: endpoints.ride.cancel(id),
     body: reason ? { reason } : undefined,
   });
 }

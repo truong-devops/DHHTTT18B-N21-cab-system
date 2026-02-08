@@ -1,45 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useAuth } from '@/lib/contexts/auth';
-import * as rideApi from '@/lib/services/ride';
+import { useTrips } from '@/hooks/use-trips';
 import { palette } from '@/lib/theme';
 
 export default function HistoryScreen() {
-  const { isAuthenticated } = useAuth();
-  const [items, setItems] = useState<rideApi.Ride[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setItems([]);
-      return;
-    }
-
-    let mounted = true;
-    setError(null);
-    rideApi
-      .listHistory(20)
-      .then((res) => {
-        if (mounted) setItems(res.data || []);
-      })
-      .catch((err: any) => {
-        if (mounted) setError(err?.message ?? 'Không thể tải lịch sử');
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [isAuthenticated]);
-
-  const summary = useMemo(() => {
-    const completed = items.filter((item) => item.status?.toUpperCase() === 'COMPLETED');
-    const cancelled = items.filter((item) => item.status?.toUpperCase() === 'CANCELLED');
-    return {
-      completed: completed.length,
-      cancelled: cancelled.length,
-      totalAmount: 0,
-    };
-  }, [items]);
+  const { items, summary, paymentsByRide, loading, error } = useTrips({ limit: 20 });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -67,6 +31,10 @@ export default function HistoryScreen() {
           </View>
         </View>
 
+        {loading && items.length === 0 ? (
+          <Text style={styles.emptyText}>Đang tải lịch sử...</Text>
+        ) : null}
+
         {items.map((ride) => {
           const status = ride.status?.toUpperCase() ?? '--';
           const statusLabel = status === 'COMPLETED' ? 'Hoàn tất' : status === 'CANCELLED' ? 'Đã hủy' : status;
@@ -74,12 +42,17 @@ export default function HistoryScreen() {
           const route = `${ride.pickupLat?.toFixed(3) ?? '--'},${ride.pickupLng?.toFixed(3) ?? '--'} → ${
             ride.dropoffLat?.toFixed(3) ?? '--'
           },${ride.dropoffLng?.toFixed(3) ?? '--'}`;
+          const amountValue = paymentsByRide[ride.id];
+          const amountLabel =
+            typeof amountValue === 'number' && Number.isFinite(amountValue)
+              ? `${amountValue.toLocaleString('vi-VN')} đ`
+              : '--';
 
           return (
             <View key={ride.id} style={styles.card}>
               <View style={styles.row}>
                 <Text style={styles.route}>{route}</Text>
-                <Text style={styles.amount}>--</Text>
+                <Text style={styles.amount}>{amountLabel}</Text>
               </View>
               <View style={styles.row}>
                 <Text style={styles.time}>{createdAt}</Text>

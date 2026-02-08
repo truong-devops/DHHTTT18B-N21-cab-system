@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/lib/contexts/auth';
 import { useDriver } from '@/lib/contexts/driver';
 import { useDriverOnline } from '@/hooks/use-driver-online';
-import * as paymentApi from '@/lib/services/payment';
-import * as rideApi from '@/lib/services/ride';
+import { useEarnings } from '@/hooks/use-earnings';
+import { useTrips } from '@/hooks/use-trips';
 import { palette } from '@/lib/theme';
 
 type DashboardData = {
@@ -31,44 +31,39 @@ export default function DashboardScreen() {
     startOnline,
     stopOnline,
   } = useDriverOnline();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const earnings = useEarnings({ limit: 50 });
+  const trips = useTrips({ limit: 50 });
+  const error = earnings.error || trips.error;
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setData(null);
-      return;
-    }
+  const tripsToday = useMemo(() => {
+    if (!trips.items.length) return undefined;
+    const today = new Date().toDateString();
+    return trips.items.filter((item) => {
+      if (!item.createdAt) return false;
+      return new Date(item.createdAt).toDateString() === today;
+    }).length;
+  }, [trips.items]);
 
-    let mounted = true;
-    setLoading(true);
-    setError(null);
-    Promise.all([paymentApi.listPayments(20), rideApi.listHistory(20)])
-      .then(([payments, rides]) => {
-        if (!mounted) return;
-        const totalAmount = (payments.data || []).reduce((sum, item) => {
-          const amount = Number(item.amount || 0);
-          return Number.isFinite(amount) ? sum + amount : sum;
-        }, 0);
-        const trips = (rides.data || []).length;
-        setData({
-          earningsToday: totalAmount,
-          tripsToday: trips,
-        });
-      })
-      .catch((err: any) => {
-        if (!mounted) return;
-        setError(err?.message ?? 'Không thể tải dữ liệu');
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
+  const acceptanceStats = useMemo(() => {
+    const completed = trips.summary.completed;
+    const cancelled = trips.summary.cancelled;
+    const total = completed + cancelled;
+    if (!total) return { acceptanceRate: undefined, cancelRate: undefined };
+    return {
+      acceptanceRate: Math.round((completed / total) * 100),
+      cancelRate: Math.round((cancelled / total) * 100),
     };
-  }, [isAuthenticated]);
+  }, [trips.summary.cancelled, trips.summary.completed]);
+
+  const data: DashboardData = useMemo(
+    () => ({
+      earningsToday: earnings.summary.today,
+      tripsToday,
+      acceptanceRate: acceptanceStats.acceptanceRate,
+      cancelRate: acceptanceStats.cancelRate,
+    }),
+    [acceptanceStats.acceptanceRate, acceptanceStats.cancelRate, earnings.summary.today, tripsToday],
+  );
 
   const initials = useMemo(() => {
     if (!driver?.fullName) return 'TX';

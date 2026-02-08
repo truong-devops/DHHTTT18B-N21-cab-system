@@ -5,11 +5,12 @@ import { setOnAuthFailure } from '@/lib/api';
 
 export type AuthUser = {
   id: string;
-  email: string;
+  email?: string | null;
   username?: string | null;
-  role: string;
-  status: string;
-  createdAt: string;
+  role?: string | null;
+  roles?: string[] | null;
+  status?: string | null;
+  createdAt?: string | null;
 };
 
 type AuthContextValue = {
@@ -74,7 +75,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (storedAccess) {
           try {
             const me = await authApi.getMe();
-            if (mounted) setUser(me.data);
+            if (mounted) {
+              setUser({
+                id: me.data.userId,
+                role: me.data.role ?? null,
+                roles: me.data.roles ?? null,
+              });
+            }
           } catch {
             await clearTokens();
             if (mounted) {
