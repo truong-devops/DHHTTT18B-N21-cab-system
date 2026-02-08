@@ -89,11 +89,11 @@ export default function DashboardScreen() {
             <Text style={styles.errorText}>{driverError}</Text>
           </View>
         ) : null}
-        {onlineError ? (
+        {/* {onlineError ? (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{onlineError}</Text>
           </View>
-        ) : null}
+        ) : null} */}
         {error ? (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{error}</Text>
