@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useIncomingRide } from '@/hooks/use-incoming-ride';
 import { useDriver } from '@/lib/contexts/driver';
+import { useRide } from '@/lib/contexts/ride';
 
 type Options = {
   intervalMs?: number;
@@ -9,9 +10,14 @@ type Options = {
 
 export function useRequests({ intervalMs = 2500, limit = 1 }: Options = {}) {
   const { driver } = useDriver();
+  const { activeRide } = useRide();
   const isOnline = driver?.onlineStatus === 'ONLINE' || driver?.onlineStatus === 'BUSY';
+  const activeStatus = (activeRide?.status ?? '').toUpperCase();
+  const hasActiveRide =
+    Boolean(activeRide?.id) &&
+    !['COMPLETED', 'CANCELED', 'CANCELLED'].includes(activeStatus);
   const incoming = useIncomingRide({
-    enabled: isOnline,
+    enabled: isOnline && !hasActiveRide,
     intervalMs,
     limit,
   });

@@ -30,11 +30,32 @@ export async function listRequested(limit = 5) {
   });
 }
 
-export async function listHistory(limit = 20) {
+export async function listAssignments() {
+  return apiRequest<RideListResponse>({
+    method: 'GET',
+    path: endpoints.ride.assignments,
+  });
+}
+
+type RideListParams = {
+  limit?: number;
+  cursor?: string;
+  status?: string;
+  driverId?: string | null;
+  riderId?: string | null;
+};
+
+export async function listHistory({ limit = 20, cursor, status, driverId, riderId }: RideListParams = {}) {
   return apiRequest<RideListResponse>({
     method: 'GET',
     path: endpoints.ride.list,
-    params: { limit },
+    params: {
+      limit,
+      cursor,
+      status: status ? status.toLowerCase() : undefined,
+      driverId: driverId ?? undefined,
+      riderId: riderId ?? undefined,
+    },
   });
 }
 

@@ -66,6 +66,7 @@ export default function RequestsScreen() {
     intervalMs: 2500,
     limit: 1,
   });
+  const showError = false;
 
   const activeRequest =
     incomingRide && incomingRide.id !== ignoredRideId ? incomingRide : null;
@@ -263,7 +264,7 @@ export default function RequestsScreen() {
             <Text style={styles.emptyText}>
               {isSearching ? 'Đang tải yêu cầu...' : isOnline ? 'Chưa có yêu cầu mới' : 'Tài xế đang OFFLINE'}
             </Text>
-            {error ? <Text style={styles.emptySub}>{error}</Text> : null}
+            {showError && error ? <Text style={styles.emptySub}>{error}</Text> : null}
           </View>
         ) : (
           <View style={styles.card}>
