@@ -1,0 +1,277 @@
+openapi: 3.1.0
+info:
+  title: Booking Service API
+  version: 1.0.0
+  description: |
+    Booking service for creating/canceling bookings and publishing ride.created events.
+    Note: error payloads are not fully standardized in this service.
+servers:
+  - url: http://localhost:3003
+    description: Direct booking-service
+  - url: http://localhost:3000
+    description: API Gateway (prefix /v1/bookings)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LatLng:
+      type: object
+      properties:
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+        address: { type: string }
+      required: [lat, lng]
+    PriceBreakdown:
+      type: object
+      properties:
+        base: { type: number }
+        perKm: { type: number }
+        perMin: { type: number }
+        discount: { type: number }
+        surge: { type: number }
+    PriceSnapshot:
+      type: object
+      properties:
+        quoteId: { type: string }
+        estimatedFare: { type: number }
+        currency: { type: string }
+        distanceKm: { type: number }
+        durationMin: { type: number }
+        breakdown: { $ref: '#/components/schemas/PriceBreakdown' }
+        expiresAt: { type: string, format: date-time }
+    Booking:
+      type: object
+      properties:
+        bookingId: { type: string }
+        rideId: { type: string }
+        pickup: { $ref: '#/components/schemas/LatLng' }
+        dropoff: { $ref: '#/components/schemas/LatLng' }
+        vehicleType: { type: string, enum: [BIKE, CAR, SUV] }
+        priceSnapshot: { $ref: '#/components/schemas/PriceSnapshot' }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+    PublishedEvent:
+      type: object
+      properties:
+        topic: { type: string }
+        eventId: { type: string }
+    ErrorResponse:
+      description: Non-standard error payloads in booking-service.
+      type: object
+      properties:
+        error:
+          oneOf:
+            - type: string
+            - type: object
+              properties:
+                message: { type: string }
+                details: {}
+  responses:
+    Error400:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            validation:
+              value: { error: "Invalid payload", details: { fieldErrors: { pickup: ["Required"] } } }
+    Error401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unauthorized:
+              value: { error: { message: "Unauthorized" } }
+    Error403:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Error404:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            notFound:
+              value: { error: "Booking not found" }
+    Error409:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Error422:
+      description: Unprocessable Entity
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Error429:
+      description: Too Many Requests
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Error500:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            internal:
+              value: { error: "Internal error" }
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Liveness check.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+              examples: { ok: { value: { ok: true } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/bookings:
+    post:
+      summary: Create booking
+      description: Create a booking and publish ride.created event.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pickup: { $ref: '#/components/schemas/LatLng' }
+                dropoff: { $ref: '#/components/schemas/LatLng' }
+                vehicleType: { type: string, enum: [BIKE, CAR, SUV], default: CAR }
+              required: [pickup, dropoff]
+            examples:
+              create:
+                value:
+                  pickup: { lat: 10.76, lng: 106.66 }
+                  dropoff: { lat: 10.78, lng: 106.68 }
+                  vehicleType: CAR
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  booking: { $ref: '#/components/schemas/Booking' }
+                  publishedEvent: { $ref: '#/components/schemas/PublishedEvent' }
+              examples:
+                success:
+                  value:
+                    booking:
+                      bookingId: "bk_1770324251624"
+                      rideId: "ride_1770324251624"
+                      pickup: { lat: 10.76, lng: 106.66 }
+                      dropoff: { lat: 10.78, lng: 106.68 }
+                      vehicleType: CAR
+                      priceSnapshot:
+                        quoteId: "uuid"
+                        estimatedFare: 31325
+                        currency: "VND"
+                        distanceKm: 3.117
+                        durationMin: 7.48
+                        breakdown: { base: 12000, perKm: 15585, perMin: 3740, discount: 0, surge: 0 }
+                        expiresAt: "2026-02-05T20:49:11.621Z"
+                      status: CREATED
+                      createdAt: "2026-02-05T20:44:11.624Z"
+                    publishedEvent: { topic: "ride.created", eventId: "uuid" }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  booking: { $ref: '#/components/schemas/Booking' }
+                  publishedEvent: { $ref: '#/components/schemas/PublishedEvent' }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/bookings/{id}/cancel:
+    post:
+      summary: Cancel booking
+      description: Cancel a booking and publish ride.cancelled event.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  booking: { $ref: '#/components/schemas/Booking' }
+                  publishedEvent: { $ref: '#/components/schemas/PublishedEvent' }
+              examples:
+                success:
+                  value:
+                    booking:
+                      bookingId: "bk_1770310462875"
+                      rideId: "ride_1770310462875"
+                      status: CANCELED
+                    publishedEvent: { topic: "ride.cancelled", eventId: "uuid" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /demo/ride-created:
+    post:
+      summary: Demo publish ride.created
+      description: Demo endpoint to publish ride.created event. (Not through gateway)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  published: { type: boolean }
+                  topic: { type: string }
+                  event: { type: object }
+              examples:
+                success:
+                  value: { published: true, topic: "ride.created", event: { eventId: "uuid" } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }

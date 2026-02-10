@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cab Booking OpenAPI</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --ink-900: #0f172a;
+        --ink-700: #334155;
+        --ink-500: #64748b;
+        --surface: #ffffff;
+        --surface-muted: #f8fafc;
+        --stroke: #e2e8f0;
+        --accent: #ff4d2d;
+        --accent-weak: #ffe7e1;
+        --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      }
+      body {
+        margin: 0;
+        font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+        color: var(--ink-900);
+        background:
+          radial-gradient(circle at 10% 10%, rgba(255, 122, 26, 0.08), transparent 40%),
+          radial-gradient(circle at 90% 0%, rgba(255, 77, 45, 0.12), transparent 45%),
+          #f6f7fb;
+      }
+      #fileNotice {
+        display: none;
+        padding: 12px 16px;
+        background: #fff7ed;
+        color: #7c2d12;
+        border-bottom: 1px solid #fed7aa;
+        font-size: 13px;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+      .sidebar {
+        background: var(--surface);
+        border-right: 1px solid var(--stroke);
+        padding: 24px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        box-sizing: border-box;
+      }
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .brand h1 {
+        font-family: "Space Grotesk", system-ui, sans-serif;
+        font-size: 20px;
+        margin: 0;
+      }
+      .brand p {
+        margin: 0;
+        color: var(--ink-500);
+        font-size: 13px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--stroke);
+        border-radius: 16px;
+        padding: 14px;
+        box-shadow: var(--shadow);
+      }
+      .picker label {
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .picker select {
+        width: 100%;
+        margin-top: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--stroke);
+        font-size: 14px;
+        background: var(--surface-muted);
+      }
+      .actions {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .actions button, .actions a {
+        appearance: none;
+        border: 1px solid var(--stroke);
+        background: var(--surface);
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 13px;
+        color: var(--ink-700);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+      .actions button.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: transparent;
+      }
+      .meta {
+        display: grid;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--ink-700);
+      }
+      .meta h2 {
+        margin: 0;
+        font-size: 15px;
+        font-family: "Space Grotesk", system-ui, sans-serif;
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: var(--accent-weak);
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .list {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--ink-500);
+        line-height: 1.4;
+      }
+      .list li {
+        margin-bottom: 6px;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--ink-500);
+      }
+      .main {
+        padding: 24px 20px;
+      }
+      .redoc-shell {
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid var(--stroke);
+        background: var(--surface);
+        min-height: calc(100vh - 48px);
+      }
+      #redoc-container {
+        min-height: calc(100vh - 48px);
+      }
+      .footer {
+        font-size: 12px;
+        color: var(--ink-500);
+        margin-top: auto;
+      }
+      @media (max-width: 1024px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          position: relative;
+          height: auto;
+        }
+      }
+    </style>
+    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+  </head>
+  <body>
+    <div id="fileNotice">
+      You are opening this file with file://. Start a local server for Redoc to load specs.
+    </div>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <h1>Cab Booking OpenAPI</h1>
+          <p>Readable specs generated from repo code. Use the panel below to explore.</p>
+        </div>
+
+        <div class="card picker">
+          <label for="specSelect">Spec file</label>
+          <select id="specSelect"></select>
+          <div class="actions">
+            <button class="primary" id="openSwagger">Open in Swagger Editor</button>
+            <a id="openInventory" href="api-inventory.md" target="_blank" rel="noreferrer">Open API Inventory</a>
+            <a id="openRaw" href="#" target="_blank" rel="noreferrer">Open raw spec</a>
+          </div>
+          <div class="note">Tip: serve this folder over HTTP (not file://).</div>
+        </div>
+
+        <div class="card meta" id="specMeta"></div>
+        <div class="card meta" id="specDetails"></div>
+
+        <div class="footer">
+          Generated from code. Run the sync checker to detect drift:
+          <br />
+          <code>node scripts/openapi-sync.js</code>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="redoc-shell">
+          <div id="redoc-container"></div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const specs = [
+        {
+          file: "api-gateway.openapi.yaml",
+          title: "API Gateway",
+          summary: "Single entry point that proxies /v1/* traffic to services.",
+          highlights: [
+            "Health endpoints for liveness checks.",
+            "Route mapping: /v1/{domain} -> downstream service.",
+            "Use for testing full request flow through gateway."
+          ]
+        },
+        {
+          file: "auth-service.openapi.yaml",
+          title: "Auth Service",
+          summary: "Login, register, refresh, and session lifecycle.",
+          highlights: [
+            "Issue access + refresh tokens.",
+            "Refresh flow for expired access tokens.",
+            "Role-based identities (user, driver, admin)."
+          ]
+        },
+        {
+          file: "booking-service.openapi.yaml",
+          title: "Booking Service",
+          summary: "Create and cancel bookings; emits ride.created events.",
+          highlights: [
+            "Create booking with pickup/dropoff + vehicle type.",
+            "Returns price snapshot and rideId.",
+            "Cancel booking with reason."
+          ]
+        },
+        {
+          file: "driver-service.openapi.yaml",
+          title: "Driver Service",
+          summary: "Driver profile, vehicle, online/offline, and location.",
+          highlights: [
+            "Toggle online/offline state.",
+            "Update driver location.",
+            "Admin approval and vehicle update."
+          ]
+        },
+        {
+          file: "notification-service.openapi.yaml",
+          title: "Notification Service",
+          summary: "Create, retry, cancel notifications + user preferences.",
+          highlights: [
+            "Send in-app notifications (single or batch).",
+            "Retry or cancel pending notifications.",
+            "Manage per-user channel preferences."
+          ]
+        },
+        {
+          file: "payment-service.openapi.yaml",
+          title: "Payment Service",
+          summary: "Create payments, update status, list and fetch details.",
+          highlights: [
+            "Support CASH and VIETQR flows.",
+            "Update payment status transitions.",
+            "List recent payments."
+          ]
+        },
+        {
+          file: "pricing-service.openapi.yaml",
+          title: "Pricing Service",
+          summary: "Quote estimation and fare finalization.",
+          highlights: [
+            "Create quote for pickup/dropoff + vehicle.",
+            "Fetch quote details by id.",
+            "Finalize fare for completed trip."
+          ]
+        },
+        {
+          file: "review-service.openapi.yaml",
+          title: "Review Service",
+          summary: "Create and manage ride reviews.",
+          highlights: [
+            "Submit review for a ride.",
+            "Fetch reviews list.",
+            "Update or delete review."
+          ]
+        },
+        {
+          file: "ride-service.openapi.yaml",
+          title: "Ride Service",
+          summary: "Ride lifecycle, assignments, and status transitions.",
+          highlights: [
+            "Incoming assignments for drivers.",
+            "Accept/reject + status updates.",
+            "Ride history list."
+          ]
+        },
+        {
+          file: "user-service.openapi.yaml",
+          title: "User Service",
+          summary: "User CRUD + internal lookups.",
+          highlights: [
+            "List and update users.",
+            "Internal lookups by id or email.",
+            "Health endpoint."
+          ]
+        }
+      ];
+
+      const params = new URLSearchParams(window.location.search);
+      const current = params.get("spec") || specs[0].file;
+      const select = document.getElementById("specSelect");
+      const container = document.getElementById("redoc-container");
+      const fileNotice = document.getElementById("fileNotice");
+      const metaNode = document.getElementById("specMeta");
+      const detailsNode = document.getElementById("specDetails");
+      const rawLink = document.getElementById("openRaw");
+
+      if (window.location.protocol === "file:") {
+        fileNotice.style.display = "block";
+      }
+
+      specs.forEach((spec) => {
+        const opt = document.createElement("option");
+        opt.value = spec.file;
+        opt.textContent = spec.title;
+        select.appendChild(opt);
+      });
+      select.value = current;
+
+      function baseUrl() {
+        const path = window.location.pathname.replace(/index\.html$/, "");
+        return window.location.origin + path;
+      }
+
+      function renderMeta(spec) {
+        metaNode.innerHTML = `
+          <span class="tag">ACTIVE SPEC</span>
+          <h2>${spec.title}</h2>
+          <div>${spec.summary}</div>
+        `;
+        detailsNode.innerHTML = `
+          <h2>API details</h2>
+          <ul class="list">
+            ${spec.highlights.map((item) => `<li>${item}</li>`).join("")}
+          </ul>
+          <div class="note">Open the spec for exact request/response schemas.</div>
+        `;
+      }
+
+      function load(specFile) {
+        Redoc.init(specFile, {}, container);
+        const spec = specs.find((item) => item.file === specFile) || specs[0];
+        renderMeta(spec);
+        rawLink.href = specFile;
+      }
+
+      select.addEventListener("change", () => {
+        const next = select.value;
+        const search = new URLSearchParams(window.location.search);
+        search.set("spec", next);
+        window.location.search = search.toString();
+      });
+
+      document.getElementById("openSwagger").addEventListener("click", () => {
+        const specUrl = baseUrl() + select.value;
+        const editorUrl = "https://editor.swagger.io/?url=" + encodeURIComponent(specUrl);
+        window.open(editorUrl, "_blank");
+      });
+
+      load(current);
+    </script>
+  </body>
+</html>
