@@ -33,14 +33,15 @@ export function useTrips({ limit = 20 }: Options = {}) {
     setLoading(true);
     setError(null);
 
-    Promise.all([rideApi.listHistory(limit), paymentApi.listPayments(limit)])
+    const driverId = driver?.id || null;
+
+    Promise.all([
+      rideApi.listHistory({ limit, driverId }),
+      paymentApi.listPayments(limit),
+    ])
       .then(([ridesRes, paymentsRes]) => {
         if (!mounted) return;
-        const driverId = driver?.id;
-        const rides = (ridesRes.data || []).filter((ride) =>
-          driverId ? ride.driverId === driverId : true,
-        );
-        setItems(rides);
+        setItems(ridesRes.data || []);
 
         const paymentMap: Record<string, number> = {};
         (paymentsRes.data || []).forEach((payment) => {

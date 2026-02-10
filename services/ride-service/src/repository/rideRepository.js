@@ -390,10 +390,11 @@ async function claimRideForDriver({ driverId, traceId = null } = {}) {
         updateOptions
       );
 
-    const rideDoc = rideResult?.value || null;
-    if (!rideDoc) {
+    if (!rideResult || !rideResult.value) {
       return null;
     }
+
+    const rideDoc = rideResult.value;
 
     const insertOptions = session ? { session } : {};
     await db.collection("ride_status_history").insertOne(
