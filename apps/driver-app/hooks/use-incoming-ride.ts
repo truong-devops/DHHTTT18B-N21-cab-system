@@ -68,14 +68,14 @@ export function useIncomingRide({
     if (!enabled) return;
     setError(null);
     try {
-      const res = await rideApi.listRequested(limit);
+      const res = await rideApi.listAssignments();
       const nextRide = (res.data || [])[0] ?? null;
       setIncomingRide(nextRide);
       setLastUpdateAt(Date.now());
     } catch (err: any) {
       setError(err?.message ?? 'Không thể tải chuyến mới');
     }
-  }, [enabled, limit]);
+  }, [enabled]);
 
   const startPolling = useCallback(() => {
     if (pollingRef.current) return;
