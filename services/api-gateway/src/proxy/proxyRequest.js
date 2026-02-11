@@ -1,4 +1,5 @@
 const fetch = require("node-fetch");
+const { propagation, context } = require("@opentelemetry/api");
 const { SERVICE_URLS } = require("../config/services");
 const { sendError } = require("../utils/http");
 
@@ -39,6 +40,11 @@ function buildUpstreamHeaders(req) {
 
   if (req.header("content-type")) {
     headers["content-type"] = req.header("content-type");
+  }
+  try {
+    propagation.inject(context.active(), headers);
+  } catch (err) {
+    // Best-effort: do not block proxying if OTel is not available.
   }
   return headers;
 }
