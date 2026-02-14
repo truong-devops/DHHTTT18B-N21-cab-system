@@ -1,33 +1,34 @@
 import Badge from '../../common/Badge.jsx'
 import Button from '../../common/Button.jsx'
 import Table from '../../common/Table.jsx'
-
-function SurgeRuleTable({ rules = [], onToggle }) {
-  const columns = [
-    { key: 'name', header: 'Rule' },
-    { key: 'zone', header: 'Zone' },
-    { key: 'multiplier', header: 'Multiplier' },
+import { labelFrom, surgeStatusLabels } from '../../../utils/labels.js'
+
+function SurgeRuleTable({ rules = [], onToggle }) {
+  const columns = [
+    { key: 'name', header: 'Quy tắc' },
+    { key: 'zone', header: 'Khu vực' },
+    { key: 'multiplier', header: 'Hệ số' },
     {
       key: 'status',
-      header: 'Status',
+      header: 'Trạng thái',
       render: (row) => (
         <Badge variant={row.status === 'ACTIVE' ? 'success' : 'warning'}>
-          {row.status}
+          {labelFrom(surgeStatusLabels, row.status)}
         </Badge>
       ),
     },
     {
       key: 'action',
-      header: 'Action',
+      header: 'Thao tác',
       render: (row) => (
         <Button variant="outline" onClick={() => onToggle?.(row)}>
-          Toggle
+          Bật/Tắt
         </Button>
       ),
     },
   ]
-
-  return <Table columns={columns} data={rules} total={rules.length} />
-}
-
-export default SurgeRuleTable
+
+  return <Table columns={columns} data={rules} total={rules.length} />
+}
+
+export default SurgeRuleTable

@@ -61,12 +61,10 @@ A modern taxi/cab booking platform designed for **high scalability**, **near rea
 ```mermaid
 flowchart LR
   subgraph Clients
-    C1[Customer App]
     C2[Driver App]
     C3[Admin Web]
   end
 
-  C1 --> GW[API Gateway]
   C2 --> GW
   C3 --> GW
 
@@ -80,8 +78,7 @@ flowchart LR
   GW --> NOTI[Notification Service]
   GW --> REVIEW[Review Service]
 
-  RT[Realtime Gateway] <--> C1
-  RT <--> C2
+  RT[Realtime Gateway] <--> C2
   RT <--> RIDE
 
   subgraph Data Stores
@@ -167,7 +164,7 @@ This architecture is intentionally split into clear layers to keep the platform 
 
 | Folder | What it Contains | Typical Examples |
 |-------|-------------------|------------------|
-| `apps/` | Frontend clients | `customer-app/`, `driver-app/`, `admin-web/` |
+| `apps/` | Frontend clients | `driver-app/`, `admin-web/` |
 | `services/` | Backend microservices | `auth-service/`, `booking-service/`, `payment-service/`, `gateway/` |
 | `contracts/` | API + event contracts | OpenAPI specs, Kafka/RabbitMQ schemas |
 | `libs/` | Shared libraries | logging, validation, HTTP clients, auth helpers |
@@ -180,7 +177,6 @@ This README follows the repository layout below.
 ```text
 .
 ├── apps/                                # Frontend clients
-│   ├── customer-app/                    # Customer UI (book ride, track, pay, rate)
 │   ├── driver-app/                      # Driver UI (online/offline, accept rides, GPS)
 │   └── admin-dashboard/                 # Admin/ops UI (monitoring, management, pricing)
 │
