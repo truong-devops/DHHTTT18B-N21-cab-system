@@ -7,7 +7,18 @@ let client;
 
 function getClient() {
   if (!client) {
-    client = createHttpClient({ baseUrl: config.payos.apiBaseUrl, timeoutMs: 8000 });
+    client = createHttpClient({
+      baseUrl: config.payos.apiBaseUrl,
+      timeoutMs: config.gateway.timeoutMs,
+      retry: {
+        max: config.gateway.retryMax,
+        backoffMs: config.gateway.retryBaseMs,
+        backoffMultiplier: config.gateway.retryMultiplier,
+        maxBackoffMs: config.gateway.retryMaxMs,
+        jitter: config.gateway.retryJitter,
+        methods: ["POST"]
+      }
+    });
   }
   return client;
 }

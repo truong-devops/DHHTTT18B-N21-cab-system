@@ -25,6 +25,14 @@ const config = {
   outbox: {
     publishIntervalMs: Number(process.env.OUTBOX_PUBLISH_INTERVAL_MS || 5000)
   },
+  gateway: {
+    retryMax: Number(process.env.PAYMENT_GATEWAY_RETRY_MAX || 2),
+    retryBaseMs: Number(process.env.PAYMENT_GATEWAY_RETRY_BASE_MS || 200),
+    retryMaxMs: Number(process.env.PAYMENT_GATEWAY_RETRY_MAX_MS || 2000),
+    retryMultiplier: Number(process.env.PAYMENT_GATEWAY_RETRY_MULTIPLIER || 2),
+    retryJitter: Number(process.env.PAYMENT_GATEWAY_RETRY_JITTER || 0.2),
+    timeoutMs: Number(process.env.PAYMENT_GATEWAY_TIMEOUT_MS || 8000)
+  },
   redis: {
     url: process.env.REDIS_URL || "redis://localhost:6379"
   },
