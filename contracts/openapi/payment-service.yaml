@@ -211,6 +211,8 @@ components:
           format: date-time
         vietqr:
           $ref: "#/components/schemas/VietQrData"
+        payos:
+          $ref: "#/components/schemas/PayosData"
     VietQrData:
       type: object
       properties:
@@ -223,6 +225,17 @@ components:
         expiresAt:
           type: string
           format: date-time
+    PayosData:
+      type: object
+      properties:
+        orderCode:
+          type: string
+        paymentLinkId:
+          type: string
+        checkoutUrl:
+          type: string
+        qrCode:
+          type: string
     PaymentCreateRequest:
       type: object
       required:

@@ -1,0 +1,36 @@
+:root {
+  --font-body: 'Manrope', 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Manrope', sans-serif;
+
+  --brand-950: #4a1400;
+  --brand-900: #6a1c00;
+  --brand-800: #8f2600;
+  --brand-700: #d04a23;
+  --brand-600: #f25c2a;
+  --brand-500: #ff8a65;
+  --brand-300: #ffc1ad;
+  --brand-200: #ffd9cc;
+  --brand-100: #ffece4;
+  --brand-50: #fff6f2;
+
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #fff7f2;
+  --surface-3: #fff0e9;
+  --border: #f2d2c6;
+  --text: #2a1b14;
+  --muted: #7a5846;
+
+  --shadow-soft: 0 12px 24px rgba(140, 60, 0, 0.12);
+  --shadow-strong: 0 18px 40px rgba(140, 60, 0, 0.18);
+  --focus: rgba(242, 92, 42, 0.35);
+
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+
+  --danger: #d94848;
+  --success: #1b8a5a;
+  --info: #1f6d7a;
+  --warning: #f1a21b;
+}

@@ -209,6 +209,14 @@ function validateCreatePaymentCustom(body) {
   if (body && body.method === "VIETQR" && body.currency !== "VND") {
     errors.push({ path: "body.currency", message: "must be VND when method is VIETQR" });
   }
+  if (body && body.method === "PAYOS") {
+    if (body.currency !== "VND") {
+      errors.push({ path: "body.currency", message: "must be VND when method is PAYOS" });
+    }
+    if (Number.isFinite(numeric) && !Number.isInteger(numeric)) {
+      errors.push({ path: "body.amount", message: "must be an integer when method is PAYOS" });
+    }
+  }
   return errors;
 }
 

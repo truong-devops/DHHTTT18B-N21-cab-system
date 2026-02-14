@@ -43,6 +43,15 @@ const config = {
     apiKey: process.env.VIETQR_API_KEY || "",
     expiresInMinutes: Number(process.env.VIETQR_EXPIRES_IN_MINUTES || 15)
   },
+  payos: {
+    apiBaseUrl: process.env.PAYOS_API_URL || "https://api-merchant.payos.vn",
+    clientId: process.env.PAYOS_CLIENT_ID || "",
+    apiKey: process.env.PAYOS_API_KEY || "",
+    checksumKey: process.env.PAYOS_CHECKSUM_KEY || "",
+    partnerCode: process.env.PAYOS_PARTNER_CODE || "",
+    returnUrl: process.env.PAYOS_RETURN_URL || "",
+    cancelUrl: process.env.PAYOS_CANCEL_URL || ""
+  },
   auth: {
     jwtAccessSecret:
       process.env.JWT_ACCESS_SECRET ||

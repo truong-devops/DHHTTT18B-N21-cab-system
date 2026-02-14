@@ -181,6 +181,8 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      COUPON_DISCOUNTS_JSON: '{"WELCOME10":10000,"VIP20":20000,"OFF50":50000}'
+      RATES_JSON: '{"STANDARD":{"surgeMultiplier":1.1},"PREMIUM":{"surgeMultiplier":1.3}}'
     depends_on:
       - redis
     networks:
@@ -206,6 +208,13 @@ services:
       VIETQR_CLIENT_ID: "your-client-id"
       VIETQR_API_KEY: "your-api-key"
       VIETQR_EXPIRES_IN_MINUTES: 15
+      PAYOS_API_URL: ${PAYOS_API_URL:-https://api-merchant.payos.vn}
+      PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID:-}
+      PAYOS_API_KEY: ${PAYOS_API_KEY:-}
+      PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY:-}
+      PAYOS_PARTNER_CODE: ${PAYOS_PARTNER_CODE:-}
+      PAYOS_RETURN_URL: ${PAYOS_RETURN_URL:-}
+      PAYOS_CANCEL_URL: ${PAYOS_CANCEL_URL:-}
     depends_on:
       - postgres
       - redis
@@ -250,6 +259,7 @@ services:
     image: mongo:7
     volumes:
       - cab_mongo_data:/data/db
+      - ./mongo/init:/docker-entrypoint-initdb.d
     networks:
       - backend
 

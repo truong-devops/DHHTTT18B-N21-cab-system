@@ -12,6 +12,11 @@ const {
 } = require("../domain/pricingEngine");
 const { getRateCard, getCouponDiscount } = require("../repository/rateRepository");
 const { saveQuote, getQuote } = require("../repository/quoteRepository");
+const {
+  listRules,
+  createRule,
+  toggleRule
+} = require("../repository/surgeRuleRepository");
 const { requireAuthOrInternal } = require("../middleware/auth");
 
 const router = express.Router();
@@ -65,6 +70,58 @@ function ensurePickupDiffers(pickup, dropoff, errors) {
 }
 
 router.use(requireAuthOrInternal);
+
+router.get(
+  "/surge-rules",
+  asyncHandler(async (req, res) => {
+    return sendSuccess(res, req, { items: listRules() });
+  })
+);
+
+router.post(
+  "/surge-rules",
+  validateRequest({
+    bodySchema: {
+      required: ["name", "multiplier"],
+      properties: {
+        name: { type: "string" },
+        multiplier: { type: "number" },
+        status: { type: "string" },
+        zone: { type: "string" }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const rule = createRule({
+      name: req.body.name,
+      multiplier: req.body.multiplier,
+      status: req.body.status,
+      zone: req.body.zone
+    });
+    return sendSuccess(res, req, rule, 201);
+  })
+);
+
+router.patch(
+  "/surge-rules/:id",
+  validateRequest({
+    paramsSchema: {
+      required: ["id"],
+      properties: { id: { type: "string" } }
+    },
+    bodySchema: {
+      required: ["enabled"],
+      properties: { enabled: { type: "boolean" } }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const rule = toggleRule(req.params.id, Boolean(req.body.enabled));
+    if (!rule) {
+      throw new ApiError(404, "NOT_FOUND", "Rule not found");
+    }
+    return sendSuccess(res, req, rule);
+  })
+);
 
 router.post(
   "/quotes",
@@ -156,6 +213,51 @@ router.post(
       },
       201
     );
+  })
+);
+
+router.post(
+  "/simulate",
+  asyncHandler(async (req, res) => {
+    const payload = req.body || {};
+    const serviceType = payload.serviceType || "STANDARD";
+    const rateCard = await getRateCard(serviceType);
+    if (!rateCard) {
+      throw new ApiError(400, "VALIDATION_ERROR", "Unsupported service type");
+    }
+
+    const basePickup = { lat: 10.776, lng: 106.701 };
+    const baseDropoff = { lat: 10.783, lng: 106.694 };
+
+    const pickup = payload.pickup || basePickup;
+    const dropoff = payload.dropoff || baseDropoff;
+
+    const distanceKm = Number.isFinite(payload.distanceKm)
+      ? payload.distanceKm
+      : round(haversineKm(pickup, dropoff), 3);
+    const durationMin = Number.isFinite(payload.durationMin)
+      ? payload.durationMin
+      : round(estimateDurationMin(distanceKm, rateCard.averageSpeedKmh), 2);
+
+    const discount = getCouponDiscount(payload.couponCode);
+    const surgeMultiplier = Number.isFinite(payload.surgeMultiplier)
+      ? payload.surgeMultiplier
+      : rateCard.surgeMultiplier;
+    const { estimatedFare, breakdown } = calculateFare({
+      distanceKm,
+      durationMin,
+      rateCard: { ...rateCard, surgeMultiplier },
+      discount
+    });
+
+    return sendSuccess(res, req, {
+      multiplier: surgeMultiplier || 1,
+      estimatedFare,
+      currency: rateCard.currency || "VND",
+      distanceKm,
+      durationMin,
+      breakdown
+    });
   })
 );
 

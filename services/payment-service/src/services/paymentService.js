@@ -14,14 +14,25 @@ const { ApiError } = require("../utils/errors");
 const { STATUSES, canTransition } = require("../domain/paymentStatus");
 const { buildPaymentCompleted, buildPaymentFailed } = require("../messaging/events");
 const { generateVietQr } = require("./vietqrService");
+const { createPayosPaymentLink } = require("./payosService");
 const { withTrace } = require("../utils/logger");
 
 async function createPayment({ payload, idempotency, traceId, requestId, method, path, authorization }) {
   const requestHash = idempotency
     ? (idempotency.requestHash || hashRequest(method, path, payload))
     : null;
+  const paymentMethod = payload.method || "";
+  const payosData =
+    paymentMethod === "PAYOS"
+      ? await createPayosPaymentLink({
+          amount: payload.amount,
+          currency: payload.currency,
+          note: payload.note,
+          rideId: payload.rideId
+        })
+      : null;
   const vietqrData =
-    payload.method === "VIETQR"
+    paymentMethod === "VIETQR"
       ? await generateVietQr({
           amount: payload.amount,
           currency: payload.currency,
@@ -35,11 +46,15 @@ async function createPayment({ payload, idempotency, traceId, requestId, method,
   return withTransaction(async (client) => {
     const payment = await insertPayment(client, {
       ...payload,
-      status: STATUSES.INITIATED,
+      status: payosData ? STATUSES.PROCESSING : STATUSES.INITIATED,
       vietqrPayload: vietqrData ? vietqrData.qrCode : null,
       vietqrReference: vietqrData ? vietqrData.reference : null,
       vietqrExpiresAt: vietqrData ? vietqrData.expiresAt : null,
-      vietqrQrUrl: vietqrData ? vietqrData.qrDataUrl : null
+      vietqrQrUrl: vietqrData ? vietqrData.qrDataUrl : null,
+      payosOrderCode: payosData ? payosData.orderCode : null,
+      payosPaymentLinkId: payosData ? payosData.paymentLinkId : null,
+      payosCheckoutUrl: payosData ? payosData.checkoutUrl : null,
+      payosQrCode: payosData ? payosData.qrCode : null
     });
     await insertStatusHistory(client, {
       paymentId: payment.id,
