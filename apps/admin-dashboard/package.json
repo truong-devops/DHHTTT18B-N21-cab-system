@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "mock:realtime": "node scripts/mock-realtime-server.js",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\""
   },
   "dependencies": {
@@ -27,6 +28,7 @@
     "eslint-plugin-react-refresh": "^0.4.14",
     "globals": "^15.11.0",
     "prettier": "^3.3.3",
-    "vite": "^5.4.10"
+    "vite": "^5.4.10",
+    "ws": "^8.19.0"
   }
 }
