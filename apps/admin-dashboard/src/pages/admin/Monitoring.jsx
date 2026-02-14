@@ -18,11 +18,18 @@ function Monitoring() {
     setMarkers(nextMarkers)
   }, [])
 
-  useEffect(() => {
-    load()
-  }, [load])
-
-  usePolling(load, 4000)
+  useEffect(() => {
+    load()
+  }, [load])
+
+  useEffect(() => {
+    const unsubscribe = monitoringService.subscribeMapStream((nextMarkers) => {
+      setMarkers(nextMarkers)
+    })
+    return unsubscribe
+  }, [])
+
+  usePolling(load, 2000)
 
   return (
     <div>
