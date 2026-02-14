@@ -49,6 +49,14 @@ export const markerTypeLabels = {
   ride: 'Chuyến đi',
 }
 
+export const paymentStatusLabels = {
+  INITIATED: 'Khởi tạo',
+  PROCESSING: 'Đang xử lý',
+  PAID: 'Đã thanh toán',
+  FAILED: 'Thất bại',
+  REFUNDED: 'Hoàn tiền',
+}
+
 export function labelFrom(map, value, fallback = '-') {
   if (value === null || value === undefined || value === '') return fallback
   return map[value] || value
