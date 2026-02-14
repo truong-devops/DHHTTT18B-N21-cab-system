@@ -1,6 +1,8 @@
 import { apiRequest, isMock } from './api.service.js'
 import { mockSurgeRules } from './mock.data.js'
 
+const unwrap = (payload) => payload?.data ?? payload
+
 export const pricingService = {
   async listRules() {
     if (isMock) {
@@ -8,7 +10,13 @@ export const pricingService = {
     }
 
     const payload = await apiRequest('/v1/pricing/surge-rules')
-    return { items: payload?.data || [] }
+    const data = unwrap(payload)
+    const items = Array.isArray(data?.items)
+      ? data.items
+      : Array.isArray(data)
+        ? data
+        : []
+    return { items }
   },
 
   async createRule(rule) {
@@ -16,10 +24,11 @@ export const pricingService = {
       return { ...rule, id: `s-${Date.now()}` }
     }
 
-    return apiRequest('/v1/pricing/surge-rules', {
+    const payload = await apiRequest('/v1/pricing/surge-rules', {
       method: 'POST',
       body: JSON.stringify(rule),
     })
+    return unwrap(payload)
   },
 
   async toggleRule(id, enabled) {
@@ -27,10 +36,11 @@ export const pricingService = {
       return { id, status: enabled ? 'ACTIVE' : 'INACTIVE' }
     }
 
-    return apiRequest(`/v1/pricing/surge-rules/${id}`, {
+    const payload = await apiRequest(`/v1/pricing/surge-rules/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
     })
+    return unwrap(payload)
   },
 
   async simulate(payload) {
@@ -38,9 +48,10 @@ export const pricingService = {
       return { multiplier: 1.3, estimatedFare: 98000 }
     }
 
-    return apiRequest('/v1/pricing/simulate', {
+    const response = await apiRequest('/v1/pricing/simulate', {
       method: 'POST',
       body: JSON.stringify(payload),
     })
+    return unwrap(response)
   },
 }

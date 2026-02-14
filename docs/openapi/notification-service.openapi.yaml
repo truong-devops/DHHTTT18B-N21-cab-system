@@ -1,0 +1,602 @@
+openapi: 3.1.0
+info:
+  title: Notification Service API
+  version: 1.0.0
+  description: |
+    Notification service for in-app and multi-channel notifications.
+servers:
+  - url: http://localhost:3010
+    description: Direct notification-service
+  - url: http://localhost:3000
+    description: API Gateway (prefix /v1/notifications or /v1/notifications/users)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Notification:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        channels:
+          type: array
+          items: { type: string }
+        recipient:
+          type: object
+          properties:
+            email: { type: [string, 'null'] }
+            phone: { type: [string, 'null'] }
+            pushTokens:
+              type: array
+              items: { type: string }
+        templateKey: { type: [string, 'null'] }
+        title: { type: [string, 'null'] }
+        body: { type: [string, 'null'] }
+        data: { type: [object, 'null'] }
+        status: { type: string }
+        perChannelStatus:
+          type: object
+          additionalProperties: true
+        sourceService: { type: [string, 'null'] }
+        sourceAction: { type: [string, 'null'] }
+        sourceRef: { type: [object, 'null'] }
+        dedupeKey: { type: [string, 'null'] }
+        scheduledAt: { type: [string, 'null'], format: date-time }
+        requestMeta: { type: [object, 'null'] }
+        createdBy: { type: [string, 'null'] }
+        createdAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: [string, 'null'], format: date-time }
+      required: [id, userId, channels, status]
+    NotificationPreferences:
+      type: object
+      properties:
+        userId: { type: string }
+        channels:
+          type: object
+          additionalProperties: { type: boolean }
+        updatedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: [string, 'null'], format: date-time }
+    NotificationCreateRequest:
+      type: object
+      properties:
+        sourceService: { type: string }
+        sourceAction: { type: string }
+        userId: { type: string }
+        channels:
+          type: array
+          items: { type: string }
+        recipient: { type: object }
+        sourceRef: { type: object }
+        templateKey: { type: string }
+        dedupeKey: { type: string }
+        title: { type: string }
+        body: { type: string }
+        data: { type: object }
+        scheduledAt: { type: string, format: date-time }
+      required: [sourceService, sourceAction, userId, channels]
+    NotificationBatchRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/NotificationCreateRequest' }
+      required: [items]
+    NotificationCreateResponse:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string }
+        perChannelStatus:
+          type: object
+          additionalProperties: true
+        requestId: { type: [string, 'null'] }
+        created: { type: boolean }
+    NotificationListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Notification' }
+            total: { type: number }
+            page: { type: number }
+            limit: { type: number }
+        requestId: { type: [string, 'null'] }
+    NotificationResponse:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/Notification' }
+        requestId: { type: [string, 'null'] }
+    PreferencesResponse:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/NotificationPreferences' }
+        requestId: { type: [string, 'null'] }
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              oneOf:
+                - type: array
+                  items: {}
+                - type: object
+          required: [code, message]
+        traceId: { type: [string, 'null'] }
+        requestId: { type: [string, 'null'] }
+        correlationId: { type: [string, 'null'] }
+      required: [error]
+  responses:
+    Error400:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            validation:
+              value:
+                error: { code: VALIDATION_ERROR, message: "templateKey or title/body is required", details: [] }
+    Error401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unauthorized:
+              value:
+                error: { code: UNAUTHORIZED, message: "Missing authorization token", details: [] }
+    Error403:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            forbidden:
+              value:
+                error: { code: FORBIDDEN, message: "Forbidden", details: [] }
+    Error404:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            notFound:
+              value:
+                error: { code: NOT_FOUND, message: "Notification not found", details: [] }
+    Error409:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            conflict:
+              value:
+                error: { code: CONFLICT, message: "Conflict", details: [] }
+    Error422:
+      description: Unprocessable Entity
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unprocessable:
+              value:
+                error: { code: VALIDATION_ERROR, message: "Invalid payload", details: [] }
+    Error429:
+      description: Too Many Requests
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            rateLimit:
+              value:
+                error: { code: RATE_LIMITED, message: "Too many requests", details: [] }
+    Error500:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            internal:
+              value:
+                error: { code: INTERNAL, message: "Unexpected error", details: [] }
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+              examples: { ok: { value: { ok: true } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  dispatcher:
+                    type: object
+                    properties:
+                      running: { type: boolean }
+                      lastTickAt: { type: [string, 'null'] }
+                      lastError: { type: boolean }
+              examples:
+                ready:
+                  value:
+                    ok: true
+                    dispatcher: { running: true, lastTickAt: "2026-02-05T16:46:29.855Z", lastError: false }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/notifications:
+    post:
+      summary: Create notification
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationCreateRequest' }
+            examples:
+              create:
+                value:
+                  userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
+                  channels: ["IN_APP"]
+                  sourceService: "booking-service"
+                  sourceAction: "BOOKING_CREATED"
+                  title: "Test notification"
+                  sourceRef: {}
+                  dedupeKey: "test-1770310464"
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationCreateResponse' }
+              examples:
+                created:
+                  value:
+                    id: "6984cb40477b432033c4c005"
+                    status: "PENDING"
+                    perChannelStatus:
+                      IN_APP:
+                        status: "PENDING"
+                        attempts: 0
+                    requestId: "492e429e-da89-49f4-8f9c-4ae1b31752e5"
+                    created: true
+        '200':
+          description: Existing (dedupe)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationCreateResponse' }
+              examples:
+                existing:
+                  value:
+                    id: "6984cb40477b432033c4c005"
+                    status: "PENDING"
+                    perChannelStatus: { IN_APP: { status: "PENDING", attempts: 0 } }
+                    requestId: "492e429e-da89-49f4-8f9c-4ae1b31752e5"
+                    created: false
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/notifications/batch:
+    post:
+      summary: Create notifications in batch
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationBatchRequest' }
+            examples:
+              batch:
+                value:
+                  items:
+                    - userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
+                      channels: ["IN_APP"]
+                      sourceService: "booking-service"
+                      sourceAction: "BOOKING_CREATED"
+                      title: "Batch 1"
+                    - userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
+                      channels: ["IN_APP"]
+                      sourceService: "booking-service"
+                      sourceAction: "BOOKING_CREATED"
+                      title: "Batch 2"
+      responses:
+        '207':
+          description: Multi-Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index: { type: number }
+                        id: { type: string }
+                        created: { type: boolean }
+                        error:
+                          type: object
+                          properties:
+                            code: { type: string }
+                            message: { type: string }
+                  requestId: { type: [string, 'null'] }
+              examples:
+                success:
+                  value:
+                    results:
+                      - index: 0
+                        id: "6984cb41477b432033c4c006"
+                        created: true
+                      - index: 1
+                        id: "6984cb41477b432033c4c007"
+                        created: true
+                    requestId: "0aa59173-f7f8-4176-926e-25ce9fcd4774"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/notifications/{id}:
+    get:
+      summary: Get notification
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "6984cb40477b432033c4c005"
+                      userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
+                      channels: ["IN_APP"]
+                      title: "Test notification"
+                      status: "PENDING"
+                    requestId: "b96c0457-18d7-4da7-b408-2347486fcd7a"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/notifications/{id}/retry:
+    post:
+      summary: Retry notification
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "6984cb40477b432033c4c005"
+                      status: "PENDING"
+                    requestId: "a89d10f7-648e-4a51-af8b-79c2c0c38270"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/notifications/{id}/cancel:
+    patch:
+      summary: Cancel notification
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "6984cb40477b432033c4c005"
+                      status: "CANCELED"
+                    requestId: "c982335c-e880-4f02-9bc2-c507998b9f52"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/users/{userId}/notifications:
+    get:
+      summary: List notifications by user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: channel
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - name: page
+          in: query
+          schema: { type: number }
+        - name: limit
+          in: query
+          schema: { type: number }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationListResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      items:
+                        - id: "6984cb40477b432033c4c005"
+                          userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
+                          channels: ["IN_APP"]
+                          status: "CANCELED"
+                      total: 1
+                      page: 1
+                      limit: 20
+                    requestId: "1954a8fe-fa89-4718-ab71-26491f36b94b"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/users/{userId}/preferences:
+    get:
+      summary: Get user notification preferences
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PreferencesResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
+                      channels: { IN_APP: true, EMAIL: false, SMS: false, PUSH: false }
+                    requestId: "f3ecf8fb-2980-4f9e-933f-ce869922b1ba"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+    put:
+      summary: Update user notification preferences
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channels:
+                  type: object
+                  additionalProperties: { type: boolean }
+            examples:
+              update:
+                value:
+                  channels: { IN_APP: true, EMAIL: false, SMS: false, PUSH: false }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PreferencesResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
+                      channels: { IN_APP: true, EMAIL: false, SMS: false, PUSH: false }
+                    requestId: "f3ecf8fb-2980-4f9e-933f-ce869922b1ba"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }

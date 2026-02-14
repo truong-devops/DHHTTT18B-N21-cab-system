@@ -6,6 +6,7 @@ const config = require("./config");
 const { traceMiddleware } = require("./middleware/trace");
 const { errorHandler, notFoundHandler } = require("./middleware/errors");
 const paymentsRouter = require("./routes/payments");
+const webhooksRouter = require("./routes/webhooks");
 const { logger } = require("./utils/logger");
 
 const app = express();
@@ -36,6 +37,7 @@ app.get("/health", (_req, res) => res.json({ ok: true, service: config.serviceNa
 app.get("/healthz", (_req, res) => res.json({ ok: true, service: config.serviceName }));
 app.get("/readyz", (_req, res) => res.json({ ok: true, service: config.serviceName }));
 
+app.use("/webhooks", webhooksRouter);
 app.use("/v1/payments", paymentsRouter);
 
 app.use(notFoundHandler);

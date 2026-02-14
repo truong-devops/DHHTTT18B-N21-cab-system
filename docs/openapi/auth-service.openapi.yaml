@@ -1,0 +1,411 @@
+openapi: 3.1.0
+info:
+  title: Auth Service API
+  version: 1.0.0
+  description: |
+    Auth service for user registration, login, token refresh, logout, and token verification.
+    Base path on service: /auth. Gateway path: /v1/auth/* (mapped to /auth/*).
+servers:
+  - url: http://localhost:4001
+    description: Direct auth-service
+  - url: http://localhost:3000/v1/auth
+    description: API Gateway (mapped to auth-service /auth)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AuthUser:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: [string, 'null'] }
+        username: { type: [string, 'null'] }
+        role: { type: string }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, role, status, createdAt]
+    AuthTokens:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: string, description: "Duration string, e.g. 15m" }
+      required: [accessToken, refreshToken, expiresIn]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              type: array
+              items: {}
+          required: [code, message]
+      required: [error]
+  responses:
+    Error400:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            validation:
+              value:
+                error: { code: VALIDATION_ERROR, message: "password must be at least 6 characters", details: [] }
+    Error401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unauthorized:
+              value:
+                error: { code: UNAUTHORIZED, message: "Invalid credentials", details: [] }
+    Error403:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            forbidden:
+              value:
+                error: { code: FORBIDDEN, message: "User is not active", details: [] }
+    Error404:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            notFound:
+              value:
+                error: { code: NOT_FOUND, message: "Route not found", details: [] }
+    Error409:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            conflict:
+              value:
+                error: { code: CONFLICT, message: "User already exists", details: [] }
+    Error422:
+      description: Unprocessable Entity
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unprocessable:
+              value:
+                error: { code: VALIDATION_ERROR, message: "Validation failed", details: [] }
+    Error429:
+      description: Too Many Requests
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            throttled:
+              value:
+                error: { code: RATE_LIMITED, message: "Too many requests", details: [] }
+    Error500:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            internal:
+              value:
+                error: { code: INTERNAL, message: "Internal server error", details: [] }
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Liveness check.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+              examples:
+                ok:
+                  value: { ok: true }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /healthz:
+    get:
+      summary: Health check
+      description: Liveness check.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+              examples: { ok: { value: { ok: true } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /readyz:
+    get:
+      summary: Readiness check
+      description: Readiness probe.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+              examples: { ok: { value: { ok: true } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /auth/register:
+    post:
+      summary: Register user
+      description: Create a new user (email or username required). Returns user data and tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string }
+                username: { type: string }
+                password: { type: string, minLength: 6 }
+                role: { type: string }
+              required: [password]
+            examples:
+              email:
+                value: { email: "user@test.com", password: "secret123", role: "driver" }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AuthUser' }
+                  tokens: { $ref: '#/components/schemas/AuthTokens' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "uuid"
+                      email: "user@test.com"
+                      username: null
+                      role: "driver"
+                      status: "active"
+                      createdAt: "2026-02-05T16:59:38.132Z"
+                    tokens:
+                      accessToken: "<jwt>"
+                      refreshToken: "<refresh>"
+                      expiresIn: "15m"
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AuthUser' }
+                  tokens: { $ref: '#/components/schemas/AuthTokens' }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /auth/login:
+    post:
+      summary: Login
+      description: Authenticate with identifier (email or username) and password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                identifier: { type: string }
+                password: { type: string }
+              required: [identifier, password]
+            examples:
+              login:
+                value: { identifier: "user@test.com", password: "secret123" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AuthUser' }
+                  tokens: { $ref: '#/components/schemas/AuthTokens' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "uuid"
+                      email: "user@test.com"
+                      username: null
+                      role: "driver"
+                      status: "active"
+                      createdAt: "2026-02-05T16:59:38.132Z"
+                    tokens:
+                      accessToken: "<jwt>"
+                      refreshToken: "<refresh>"
+                      expiresIn: "15m"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /auth/refresh:
+    post:
+      summary: Refresh token
+      description: Exchange a refresh token for a new access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken: { type: string }
+              required: [refreshToken]
+            examples:
+              refresh:
+                value: { refreshToken: "<refresh>" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AuthUser' }
+                  tokens: { $ref: '#/components/schemas/AuthTokens' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "uuid"
+                      email: "user@test.com"
+                      username: null
+                      role: "driver"
+                      status: "active"
+                      createdAt: "2026-02-05T16:59:38.132Z"
+                    tokens:
+                      accessToken: "<jwt>"
+                      refreshToken: "<refresh>"
+                      expiresIn: "15m"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /auth/logout:
+    post:
+      summary: Logout
+      description: Invalidate refresh token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken: { type: string }
+              required: [refreshToken]
+            examples:
+              logout:
+                value: { refreshToken: "<refresh>" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+              examples:
+                success:
+                  value: { ok: true }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /auth/verify:
+    get:
+      summary: Verify access token
+      description: Verify JWT and return basic identity.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      userId: { type: string }
+                      role: { type: [string, 'null'] }
+                      roles:
+                        type: array
+                        items: { type: string }
+              examples:
+                success:
+                  value: { data: { userId: "uuid", role: "driver", roles: ["driver"] } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
