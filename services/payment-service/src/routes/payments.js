@@ -6,7 +6,8 @@ const {
   createPaymentController,
   getPaymentController,
   updatePaymentStatusController,
-  getVietQrController
+  getVietQrController,
+  confirmPaymentDevController
 } = require("../controllers/paymentsController");
 const {
   validateCreatePayment,
@@ -49,6 +50,13 @@ router.get(
   "/:id/vietqr-codes",
   validatePaymentParams,
   asyncHandler(getVietQrController)
+);
+
+router.post(
+  "/:id/confirm-dev",
+  requireRole("admin"),
+  validatePaymentParams,
+  asyncHandler(confirmPaymentDevController)
 );
 
 module.exports = router;

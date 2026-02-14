@@ -235,6 +235,20 @@ services:
     networks:
       - backend
 
+  pgadmin:
+    image: dpage/pgadmin4:8
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    volumes:
+      - cab_pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
   mongo:
     image: mongo:7
     volumes:
@@ -245,6 +259,7 @@ services:
 
 volumes:
   cab_postgres_data:
+  cab_pgadmin_data:
   cab_redis_data:
   cab_mongo_data:
 

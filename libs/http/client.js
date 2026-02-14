@@ -3,6 +3,10 @@ const axios = require("axios");
 const DEFAULT_TIMEOUT_MS = 3000;
 const DEFAULT_RETRY_MAX = 1;
 const DEFAULT_RETRY_BACKOFF_MS = 100;
+const DEFAULT_RETRY_BACKOFF_MULTIPLIER = 2;
+const DEFAULT_RETRY_MAX_BACKOFF_MS = 2000;
+const DEFAULT_RETRY_JITTER = 0.2;
+const DEFAULT_RETRY_METHODS = ["GET"];
 const DEFAULT_FAILURE_THRESHOLD = 5;
 const DEFAULT_RESET_TIMEOUT_MS = 10000;
 
@@ -97,7 +101,17 @@ function createHttpClient(options = {}) {
 
   const retry = {
     max: Number(options.retry?.max ?? DEFAULT_RETRY_MAX),
-    backoffMs: Number(options.retry?.backoffMs ?? DEFAULT_RETRY_BACKOFF_MS)
+    backoffMs: Number(options.retry?.backoffMs ?? DEFAULT_RETRY_BACKOFF_MS),
+    backoffMultiplier: Number(
+      options.retry?.backoffMultiplier ?? DEFAULT_RETRY_BACKOFF_MULTIPLIER
+    ),
+    maxBackoffMs: Number(
+      options.retry?.maxBackoffMs ?? DEFAULT_RETRY_MAX_BACKOFF_MS
+    ),
+    jitter: Number(options.retry?.jitter ?? DEFAULT_RETRY_JITTER),
+    methods: Array.isArray(options.retry?.methods)
+      ? options.retry.methods
+      : DEFAULT_RETRY_METHODS
   };
 
   const breaker = {
@@ -160,6 +174,29 @@ function createHttpClient(options = {}) {
     await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  function normalizeRetryMethods() {
+    const methods = Array.isArray(retry.methods)
+      ? retry.methods
+      : DEFAULT_RETRY_METHODS;
+    return new Set(
+      methods.map((method) => String(method).toUpperCase())
+    );
+  }
+
+  const retryMethods = normalizeRetryMethods();
+
+  function shouldRetryMethod(method) {
+    return retryMethods.has(String(method).toUpperCase());
+  }
+
+  function computeBackoff(attempt) {
+    const base = retry.backoffMs * Math.pow(retry.backoffMultiplier, attempt - 1);
+    const capped = Math.min(base, retry.maxBackoffMs);
+    const jitter = Math.max(0, Math.min(retry.jitter, 0.9));
+    const factor = 1 + (Math.random() * 2 - 1) * jitter;
+    return Math.round(capped * factor);
+  }
+
   async function request(params = {}) {
     const method = String(params.method || "GET").toUpperCase();
     const path = params.path || "";
@@ -167,7 +204,7 @@ function createHttpClient(options = {}) {
     const responseType = params.responseType || "json";
 
     let attempt = 0;
-    const maxRetries = method === "GET" ? retry.max : 0;
+    const maxRetries = shouldRetryMethod(method) ? retry.max : 0;
 
     while (true) {
       canAttempt();
@@ -185,7 +222,7 @@ function createHttpClient(options = {}) {
         });
         if (isRetryableStatus(response.status) && attempt < maxRetries) {
           attempt += 1;
-          await sleep(retry.backoffMs);
+          await sleep(computeBackoff(attempt));
           continue;
         }
         recordSuccess();
@@ -198,7 +235,7 @@ function createHttpClient(options = {}) {
         recordFailure();
         if (attempt < maxRetries && isRetryableError(err)) {
           attempt += 1;
-          await sleep(retry.backoffMs);
+          await sleep(computeBackoff(attempt));
           continue;
         }
         throw err;

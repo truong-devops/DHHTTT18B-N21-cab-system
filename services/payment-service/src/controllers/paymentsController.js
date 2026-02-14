@@ -8,6 +8,17 @@ const {
 const { withIdempotency, pickIdempotencyHeaders } = require("../services/idempotencyService");
 const { hashRequest } = require("../utils/idempotency");
 const { ApiError } = require("../utils/errors");
+const { STATUSES } = require("../domain/paymentStatus");
+
+function isDevConfirmEnabled() {
+  if (process.env.PAYMENT_DEV_CONFIRM === "true") {
+    return true;
+  }
+  if (process.env.PAYMENT_DEV_CONFIRM === "false") {
+    return false;
+  }
+  return process.env.NODE_ENV !== "production";
+}
 
 async function listPaymentsController(req, res) {
   const result = await fetchPayments(req.validatedQuery);
@@ -88,10 +99,46 @@ async function getVietQrController(req, res) {
   res.json({ data: vietqr });
 }
 
+async function confirmPaymentDevController(req, res) {
+  if (!isDevConfirmEnabled()) {
+    throw new ApiError(403, "FORBIDDEN", "Dev confirmation is disabled");
+  }
+
+  const paymentId = req.validatedParams ? req.validatedParams.id : req.params.id;
+  const payment = await fetchPayment(paymentId);
+  const traceId = req.traceId || "dev-confirm";
+  const requestId = req.requestId || null;
+
+  if ([STATUSES.PAID, STATUSES.FAILED, STATUSES.REFUNDED].includes(payment.status)) {
+    return res.json({ data: payment, handled: false, reason: "terminal_state" });
+  }
+
+  if (payment.status === STATUSES.INITIATED) {
+    await changePaymentStatus({
+      paymentId: payment.id,
+      statusUpdate: { status: STATUSES.PROCESSING },
+      traceId,
+      requestId,
+      actor: "dev-webhook"
+    });
+  }
+
+  const updated = await changePaymentStatus({
+    paymentId: payment.id,
+    statusUpdate: { status: STATUSES.PAID },
+    traceId,
+    requestId,
+    actor: "dev-webhook"
+  });
+
+  res.json({ data: updated, handled: true });
+}
+
 module.exports = {
   listPaymentsController,
   createPaymentController,
   getPaymentController,
   updatePaymentStatusController,
-  getVietQrController
+  getVietQrController,
+  confirmPaymentDevController
 };
