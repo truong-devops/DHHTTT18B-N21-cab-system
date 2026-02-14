@@ -29,7 +29,7 @@ export async function apiRequest(path, options = {}) {
 
   if (!response.ok) {
     const message =
-      payload?.error?.message || payload?.message || 'Request failed'
+      payload?.error?.message || payload?.message || 'Yêu cầu thất bại'
     const error = new Error(message)
     error.status = response.status
     error.payload = payload

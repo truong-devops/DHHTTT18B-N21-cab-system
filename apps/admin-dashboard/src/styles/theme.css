@@ -2,28 +2,28 @@
   --font-body: 'Manrope', 'Segoe UI', sans-serif;
   --font-display: 'Space Grotesk', 'Manrope', sans-serif;
 
-  --brand-950: #5b1d00;
-  --brand-900: #7a2a00;
-  --brand-800: #a63a00;
-  --brand-700: #d15600;
-  --brand-600: #f06a0a;
-  --brand-500: #ff7c1f;
-  --brand-300: #ffb882;
-  --brand-200: #ffd7b7;
-  --brand-100: #ffe9d7;
-  --brand-50: #fff4ec;
+  --brand-950: #4a1400;
+  --brand-900: #6a1c00;
+  --brand-800: #8f2600;
+  --brand-700: #d04a23;
+  --brand-600: #f25c2a;
+  --brand-500: #ff8a65;
+  --brand-300: #ffc1ad;
+  --brand-200: #ffd9cc;
+  --brand-100: #ffece4;
+  --brand-50: #fff6f2;
 
-  --bg: #fff7f1;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #fff1e6;
-  --surface-3: #ffe7d2;
-  --border: #f2d7c7;
-  --text: #2b1c15;
-  --muted: #7b5a47;
+  --surface-2: #fff7f2;
+  --surface-3: #fff0e9;
+  --border: #f2d2c6;
+  --text: #2a1b14;
+  --muted: #7a5846;
 
-  --shadow-soft: 0 12px 24px rgba(140, 74, 0, 0.12);
-  --shadow-strong: 0 18px 40px rgba(140, 74, 0, 0.18);
-  --focus: rgba(240, 106, 10, 0.4);
+  --shadow-soft: 0 12px 24px rgba(140, 60, 0, 0.12);
+  --shadow-strong: 0 18px 40px rgba(140, 60, 0, 0.18);
+  --focus: rgba(242, 92, 42, 0.35);
 
   --radius-lg: 18px;
   --radius-md: 12px;

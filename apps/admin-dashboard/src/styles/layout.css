@@ -6,7 +6,7 @@
 
 .sidebar {
   width: 260px;
-  background: linear-gradient(180deg, var(--surface-2) 0%, #ffffff 100%);
+  background: var(--surface);
   border-right: 1px solid var(--border);
   padding: 28px 18px;
   display: flex;
@@ -28,7 +28,7 @@
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--brand-500), var(--brand-800));
+  background: var(--brand-600);
   display: grid;
   place-items: center;
   color: #ffffff;
@@ -89,7 +89,7 @@
 }
 
 .sidebar-link.active {
-  background: linear-gradient(135deg, var(--brand-600), var(--brand-700));
+  background: var(--brand-600);
   color: #ffffff;
   border-color: transparent;
   box-shadow: var(--shadow-soft);
