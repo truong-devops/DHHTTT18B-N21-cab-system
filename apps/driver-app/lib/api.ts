@@ -116,6 +116,8 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
   const start = Date.now();
   const requestHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache',
+    Pragma: 'no-cache',
     ...headers,
   };
 
@@ -132,6 +134,7 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
       method,
       headers: requestHeaders,
       body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store',
     },
     timeoutMs,
   );
