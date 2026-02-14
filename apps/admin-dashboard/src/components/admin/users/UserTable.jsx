@@ -1,32 +1,37 @@
 import Badge from '../../common/Badge.jsx'
 import Table from '../../common/Table.jsx'
+import { labelFrom, roleLabels, userStatusLabels } from '../../../utils/labels.js'
 
 function UserTable({ users = [], onSelect }) {
   const columns = [
     { key: 'email', header: 'Email' },
-    { key: 'fullName', header: 'Name' },
-    { key: 'role', header: 'Role' },
+    { key: 'fullName', header: 'Tên' },
+    {
+      key: 'role',
+      header: 'Vai trò',
+      render: (row) => labelFrom(roleLabels, row.role),
+    },
     {
       key: 'status',
-      header: 'Status',
+      header: 'Trạng thái',
       render: (row) => (
         <Badge variant={row.status === 'ACTIVE' ? 'success' : 'danger'}>
-          {row.status}
+          {labelFrom(userStatusLabels, row.status)}
         </Badge>
       ),
     },
     {
       key: 'action',
-      header: 'Action',
+      header: 'Thao tác',
       render: (row) => (
         <button className="btn btn-ghost" onClick={() => onSelect?.(row)}>
-          View
+          Xem
         </button>
       ),
     },
   ]
-
-  return <Table columns={columns} data={users} total={users.length} />
-}
-
-export default UserTable
+
+  return <Table columns={columns} data={users} total={users.length} />
+}
+
+export default UserTable

@@ -1,0 +1,1065 @@
+openapi: 3.1.0
+info:
+  title: Driver Service API
+  version: 1.0.0
+  description: |
+    Driver service for driver profile, vehicle, online/offline, and location updates.
+servers:
+  - url: http://localhost:3011
+    description: Direct driver-service
+  - url: http://localhost:3000
+    description: API Gateway (prefix /v1/driver, /v1/admin, /v1/internal)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Driver:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        status: { type: string }
+        onlineStatus: { type: string }
+        fullName: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        createdAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: [string, 'null'], format: date-time }
+      required: [id, userId, status, onlineStatus]
+    Vehicle:
+      type: object
+      properties:
+        id: { type: string }
+        driverId: { type: string }
+        vehicleType: { type: [string, 'null'] }
+        plateNumber: { type: [string, 'null'] }
+        brand: { type: [string, 'null'] }
+        model: { type: [string, 'null'] }
+        color: { type: [string, 'null'] }
+        isActive: { type: [boolean, 'null'] }
+        createdAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: [string, 'null'], format: date-time }
+    Location:
+      type: object
+      properties:
+        driverId: { type: [string, 'null'] }
+        lat: { type: number }
+        lng: { type: number }
+        heading: { type: [number, 'null'] }
+        speed: { type: [number, 'null'] }
+        accuracyM: { type: [number, 'null'] }
+        recordedAt: { type: [string, 'null'], format: date-time }
+      required: [lat, lng]
+    LatLng:
+      type: object
+      properties:
+        lat: { type: number }
+        lng: { type: number }
+      required: [lat, lng]
+    DriverMeData:
+      type: object
+      properties:
+        driver: { $ref: '#/components/schemas/Driver' }
+        vehicle: { $ref: '#/components/schemas/Vehicle' }
+        location: { $ref: '#/components/schemas/Location' }
+    DriverMeResponse:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/DriverMeData' }
+        requestId: { type: [string, 'null'] }
+    DriverOnlyResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            driver: { $ref: '#/components/schemas/Driver' }
+        requestId: { type: [string, 'null'] }
+    VehicleResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            vehicle: { $ref: '#/components/schemas/Vehicle' }
+        requestId: { type: [string, 'null'] }
+    LocationUpdateResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        requestId: { type: [string, 'null'] }
+    HeartbeatResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            ok: { type: boolean }
+        requestId: { type: [string, 'null'] }
+    AdminCreateDriverResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            driver: { $ref: '#/components/schemas/Driver' }
+            created: { type: boolean }
+        requestId: { type: [string, 'null'] }
+    AdminDriverListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Driver' }
+            page: { type: number }
+            limit: { type: number }
+        requestId: { type: [string, 'null'] }
+    InternalAvailableEntry:
+      type: object
+      properties:
+        driverId: { type: string }
+        distanceMeters: { type: [number, 'null'] }
+        location:
+          type: object
+          properties:
+            lat: { type: number }
+            lng: { type: number }
+            recordedAt: { type: [string, 'null'], format: date-time }
+        vehicle:
+          type: object
+          properties:
+            type: { type: [string, 'null'] }
+            plate: { type: [string, 'null'] }
+    InternalAvailableResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/InternalAvailableEntry' }
+        requestId: { type: [string, 'null'] }
+    InternalDriverResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            driver: { $ref: '#/components/schemas/Driver' }
+            vehicle: { $ref: '#/components/schemas/Vehicle' }
+        requestId: { type: [string, 'null'] }
+    InternalLocationResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            location: { $ref: '#/components/schemas/Location' }
+        requestId: { type: [string, 'null'] }
+    InternalMarkBusyResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            driver: { $ref: '#/components/schemas/Driver' }
+            rideId: { type: string }
+        requestId: { type: [string, 'null'] }
+    InternalMarkAvailableResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            driver: { $ref: '#/components/schemas/Driver' }
+        requestId: { type: [string, 'null'] }
+    BulkSnapshotEntry:
+      type: object
+      properties:
+        driverId: { type: string }
+        driver: { $ref: '#/components/schemas/Driver' }
+        vehicle: { $ref: '#/components/schemas/Vehicle' }
+        location: { $ref: '#/components/schemas/Location' }
+    BulkSnapshotResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/BulkSnapshotEntry' }
+        requestId: { type: [string, 'null'] }
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              oneOf:
+                - type: array
+                  items: {}
+                - type: object
+          required: [code, message]
+        traceId: { type: [string, 'null'] }
+        requestId: { type: [string, 'null'] }
+        correlationId: { type: [string, 'null'] }
+      required: [error]
+  responses:
+    Error400:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            validation:
+              value:
+                error: { code: VALIDATION_ERROR, message: "Validation failed", details: [{ path: "body.lat", message: "must be a number" }] }
+    Error401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unauthorized:
+              value:
+                error: { code: UNAUTHORIZED, message: "Missing authorization token", details: [] }
+    Error403:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            forbidden:
+              value:
+                error: { code: FORBIDDEN, message: "Insufficient role", details: [] }
+    Error404:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            notFound:
+              value:
+                error: { code: NOT_FOUND, message: "Driver not found", details: [] }
+    Error409:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            conflict:
+              value:
+                error: { code: CONFLICT, message: "Driver already online", details: [] }
+    Error422:
+      description: Unprocessable Entity
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unprocessable:
+              value:
+                error: { code: VALIDATION_ERROR, message: "Invalid payload", details: [] }
+    Error429:
+      description: Too Many Requests
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            rateLimit:
+              value:
+                error: { code: RATE_LIMITED, message: "Too many requests", details: [] }
+    Error500:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            internal:
+              value:
+                error: { code: INTERNAL, message: "Unexpected error", details: [] }
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+              examples: { ok: { value: { ok: true } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+              examples: { ok: { value: { ok: true } } }
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  error: { type: [string, 'null'] }
+              examples:
+                unavailable:
+                  value: { ok: false, error: "redis ping failed" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/driver/me:
+    get:
+      summary: Get driver profile
+      description: Return driver profile with active vehicle and last location.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriverMeResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "APPROVED"
+                        onlineStatus: "ONLINE"
+                        fullName: "Driver One"
+                        phone: "0900000000"
+                        createdAt: "2026-02-01T16:27:33.529Z"
+                        updatedAt: "2026-02-05T16:47:16.954Z"
+                      vehicle:
+                        id: "25cedaa6-db0c-489a-9092-a0514bba26a3"
+                        driverId: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        vehicleType: "CAR"
+                        plateNumber: "51A-12345"
+                        brand: "Toyota"
+                        model: "Vios"
+                        color: "White"
+                        isActive: true
+                      location:
+                        lat: 10.76
+                        lng: 106.66
+                        recordedAt: "2026-02-05T16:47:18.013Z"
+                    requestId: "e36e6c10-a3f1-4107-ac16-ae145b3a22b6"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+    put:
+      summary: Update driver profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName: { type: string }
+                phone: { type: string }
+            examples:
+              update:
+                value: { fullName: "Driver Test", phone: "0900000001" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriverMeResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "APPROVED"
+                        onlineStatus: "OFFLINE"
+                        fullName: "Driver Test"
+                        phone: "0900000001"
+                      vehicle: null
+                      location: null
+                    requestId: "2d2f05c0-2b84-4f79-8bf2-6b20f04590b3"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/driver/me/vehicle:
+    put:
+      summary: Update or create active vehicle
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vehicleType, plateNumber]
+              properties:
+                vehicleType: { type: string }
+                plateNumber: { type: string }
+                brand: { type: string }
+                model: { type: string }
+                color: { type: string }
+                isActive: { type: boolean }
+            examples:
+              update:
+                value:
+                  vehicleType: "CAR"
+                  plateNumber: "51A-12345"
+                  brand: "Toyota"
+                  model: "Vios"
+                  color: "White"
+                  isActive: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      vehicle:
+                        id: "25cedaa6-db0c-489a-9092-a0514bba26a3"
+                        driverId: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        vehicleType: "CAR"
+                        plateNumber: "51A-12345"
+                        brand: "Toyota"
+                        model: "Vios"
+                        color: "White"
+                        isActive: true
+                    requestId: "5291e2ad-1ca9-41fd-b1cd-271ecba8091f"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/driver/me/online:
+    post:
+      summary: Set driver online
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId: { type: string }
+                initialLocation: { $ref: '#/components/schemas/LatLng' }
+            examples:
+              online:
+                value: { initialLocation: { lat: 10.76, lng: 106.66 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriverOnlyResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "APPROVED"
+                        onlineStatus: "ONLINE"
+                    requestId: "3498ddde-a09e-4c9d-8119-66cf647fb21c"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/driver/me/offline:
+    post:
+      summary: Set driver offline
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriverOnlyResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "APPROVED"
+                        onlineStatus: "OFFLINE"
+                    requestId: "3f65e114-4a49-4e80-96e0-31e7b100f30d"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/driver/me/location:
+    post:
+      summary: Update driver location
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat: { type: number }
+                lng: { type: number }
+                heading: { type: number }
+                speed: { type: number }
+                accuracy: { type: number }
+                recordedAt: { type: string, format: date-time }
+            examples:
+              update:
+                value:
+                  lat: 10.76
+                  lng: 106.66
+                  heading: 90
+                  speed: 1.2
+                  accuracy: 12.3
+                  recordedAt: "2026-02-05T16:47:18.013Z"
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocationUpdateResponse' }
+              examples:
+                success:
+                  value: { ok: true, requestId: "09043d47-98bb-4e56-885a-8617cc175693" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/driver/me/heartbeat:
+    post:
+      summary: Heartbeat
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HeartbeatResponse' }
+              examples:
+                success:
+                  value: { data: { ok: true }, requestId: "bdf42557-a605-474b-a438-8ea7be7815f9" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/admin/drivers:
+    post:
+      summary: Create driver (admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string }
+                fullName: { type: string }
+                phone: { type: string }
+            examples:
+              create:
+                value: { userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4", fullName: "Driver One", phone: "0900000000" }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminCreateDriverResponse' }
+              examples:
+                created:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "PENDING"
+                        onlineStatus: "OFFLINE"
+                        fullName: "Driver One"
+                        phone: "0900000000"
+                      created: true
+                    requestId: "2821d281-b6e7-4b82-ad2e-4e97a43b8a8f"
+        '200':
+          description: Existing driver
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminCreateDriverResponse' }
+              examples:
+                existing:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "APPROVED"
+                        onlineStatus: "OFFLINE"
+                        fullName: "Driver One"
+                        phone: "0900000000"
+                      created: false
+                    requestId: "b3b28f51-8a74-4046-8443-2184303f4d31"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+    get:
+      summary: List drivers (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: online
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: number }
+        - name: limit
+          in: query
+          schema: { type: number }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminDriverListResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      items:
+                        - id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                          userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                          status: "APPROVED"
+                          onlineStatus: "OFFLINE"
+                          fullName: "Driver One"
+                          phone: "0900000000"
+                      page: 1
+                      limit: 20
+                    requestId: "004cc3eb-8474-4bd4-86c7-0bb10b35c4ce"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/admin/drivers/{driverId}/approve:
+    patch:
+      summary: Approve driver
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: driverId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriverOnlyResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "APPROVED"
+                        onlineStatus: "OFFLINE"
+                    requestId: "9b807429-d256-4159-ac31-2be16fbb948c"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/admin/drivers/{driverId}/suspend:
+    patch:
+      summary: Suspend driver
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: driverId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriverOnlyResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "SUSPENDED"
+                        onlineStatus: "OFFLINE"
+                    requestId: "b075d229-2aca-420e-ad91-66a28aa905ee"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/internal/drivers/available:
+    get:
+      summary: List available drivers (internal)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema: { type: number }
+        - name: lng
+          in: query
+          required: true
+          schema: { type: number }
+        - name: radiusMeters
+          in: query
+          schema: { type: number }
+        - name: limit
+          in: query
+          schema: { type: number }
+        - name: vehicleType
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InternalAvailableResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      - driverId: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        distanceMeters: 0
+                        location: { lat: 10.76, lng: 106.66, recordedAt: "2026-02-05T16:47:18.013Z" }
+                        vehicle: { type: "CAR", plate: "51A-12345" }
+                    requestId: "a5137fe2-f71f-487d-bf0c-9f4571e2d4e3"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/internal/drivers/{driverId}:
+    get:
+      summary: Get driver (internal)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: driverId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InternalDriverResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "APPROVED"
+                        onlineStatus: "ONLINE"
+                        fullName: "Driver One"
+                        phone: "0900000000"
+                      vehicle:
+                        id: "25cedaa6-db0c-489a-9092-a0514bba26a3"
+                        driverId: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        vehicleType: "CAR"
+                        plateNumber: "51A-12345"
+                    requestId: "87367a27-cdcb-4462-b1f6-0b6a944244f0"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/internal/drivers/{driverId}/location:
+    get:
+      summary: Get driver location (internal)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: driverId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InternalLocationResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      location:
+                        lat: 10.76
+                        lng: 106.66
+                        recordedAt: "2026-02-05T16:47:18.013Z"
+                    requestId: "67068545-ce10-4c28-ab57-d88e3ac9f2fc"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/internal/drivers/{driverId}/mark-busy:
+    post:
+      summary: Mark driver busy (internal)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: driverId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rideId]
+              properties:
+                rideId: { type: string }
+            examples:
+              busy:
+                value: { rideId: "ride_test_1" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InternalMarkBusyResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "APPROVED"
+                        onlineStatus: "BUSY"
+                      rideId: "ride_test_1"
+                    requestId: "7517bc35-f1a6-4a7d-a047-d78ca1e65460"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/internal/drivers/{driverId}/mark-available:
+    post:
+      summary: Mark driver available (internal)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: driverId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rideId: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InternalMarkAvailableResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      driver:
+                        id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                        status: "APPROVED"
+                        onlineStatus: "ONLINE"
+                    requestId: "be8e77ca-578a-4649-a668-23b94d236ea7"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/internal/drivers/bulk:
+    post:
+      summary: Bulk snapshot (internal)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                driverIds:
+                  type: array
+                  items: { type: string }
+                fields:
+                  type: array
+                  items: { type: string }
+            examples:
+              snapshot:
+                value:
+                  driverIds: ["32385757-64ae-482d-8d24-ed99a2364f9c"]
+                  fields: ["driver", "location"]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkSnapshotResponse' }
+              examples:
+                success:
+                  value:
+                    data:
+                      - driverId: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                        driver:
+                          id: "32385757-64ae-482d-8d24-ed99a2364f9c"
+                          userId: "dcdebf96-ae9f-49a6-8553-d5c1f87c2aa4"
+                          status: "APPROVED"
+                          onlineStatus: "ONLINE"
+                        location:
+                          lat: 10.76
+                          lng: 106.66
+                          recordedAt: "2026-02-05T16:47:18.013Z"
+                    requestId: "6e522b78-3250-4918-a998-c862fc56ebbf"
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }

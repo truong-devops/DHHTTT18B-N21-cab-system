@@ -1,12 +1,27 @@
 const { URL } = require("url");
 const { createHttpClient } = require("../../../../libs/http/client");
 const { ApiError } = require("../utils/errors");
+const config = require("../config");
 
 const clientCache = new Map();
 
 function getClient(baseUrl) {
   if (!clientCache.has(baseUrl)) {
-    clientCache.set(baseUrl, createHttpClient({ baseUrl, timeoutMs: 8000 }));
+    clientCache.set(
+      baseUrl,
+      createHttpClient({
+        baseUrl,
+        timeoutMs: config.gateway.timeoutMs,
+        retry: {
+          max: config.gateway.retryMax,
+          backoffMs: config.gateway.retryBaseMs,
+          backoffMultiplier: config.gateway.retryMultiplier,
+          maxBackoffMs: config.gateway.retryMaxMs,
+          jitter: config.gateway.retryJitter,
+          methods: ["POST"]
+        }
+      })
+    );
   }
   return clientCache.get(baseUrl);
 }

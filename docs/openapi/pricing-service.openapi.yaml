@@ -1,0 +1,388 @@
+openapi: 3.1.0
+info:
+  title: Pricing Service API
+  version: 1.0.0
+  description: |
+    Pricing service for quotes and fare finalization.
+    Auth: JWT bearer OR internal key (x-internal-key).
+servers:
+  - url: http://localhost:3006
+    description: Direct pricing-service
+  - url: http://localhost:3000
+    description: API Gateway (prefix /v1/pricing)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    internalKey:
+      type: apiKey
+      in: header
+      name: x-internal-key
+  schemas:
+    LatLng:
+      type: object
+      properties:
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+      required: [lat, lng]
+    FareBreakdown:
+      type: object
+      properties:
+        base: { type: number }
+        perKm: { type: number }
+        perMin: { type: number }
+        discount: { type: number }
+        surge: { type: number }
+    QuoteResponse:
+      type: object
+      properties:
+        quoteId: { type: string }
+        estimatedFare: { type: number }
+        currency: { type: string }
+        distanceKm: { type: number }
+        durationMin: { type: number }
+        breakdown: { $ref: '#/components/schemas/FareBreakdown' }
+        expiresAt: { type: string, format: date-time }
+    FinalizeResponse:
+      type: object
+      properties:
+        quoteId: { type: string }
+        finalFare: { type: number }
+        currency: { type: string }
+        distanceKm: { type: number }
+        durationMin: { type: number }
+        breakdown: { $ref: '#/components/schemas/FareBreakdown' }
+    SuccessEnvelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        data: {}
+        meta:
+          type: object
+          properties:
+            requestId: { type: [string, 'null'] }
+            traceId: { type: [string, 'null'] }
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object }
+            traceId: { type: [string, 'null'] }
+          required: [code, message]
+      required: [error]
+  responses:
+    Error400:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            validation:
+              value:
+                success: false
+                error: { code: VALIDATION_ERROR, message: "Validation failed", details: { "body.pickup.lat": "must be between -90 and 90" } }
+    Error401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unauthorized:
+              value:
+                success: false
+                error: { code: UNAUTHORIZED, message: "Missing authorization token", details: {} }
+    Error403:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            forbidden:
+              value:
+                success: false
+                error: { code: FORBIDDEN, message: "Forbidden", details: {} }
+    Error404:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            notFound:
+              value:
+                success: false
+                error: { code: NOT_FOUND, message: "Not found", details: {} }
+    Error409:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            conflict:
+              value:
+                success: false
+                error: { code: CONFLICT, message: "Conflict", details: {} }
+    Error410:
+      description: Gone (quote expired)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            expired:
+              value:
+                success: false
+                error: { code: QUOTE_EXPIRED, message: "Quote expired", details: {} }
+    Error422:
+      description: Unprocessable Entity
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unprocessable:
+              value:
+                success: false
+                error: { code: VALIDATION_ERROR, message: "Invalid payload", details: {} }
+    Error429:
+      description: Too Many Requests
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            rateLimit:
+              value:
+                success: false
+                error: { code: RATE_LIMITED, message: "Too many requests", details: {} }
+    Error500:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            internal:
+              value:
+                success: false
+                error: { code: INTERNAL, message: "Unexpected error", details: {} }
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Liveness check.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+              examples: { ok: { value: { ok: true } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '410': { $ref: '#/components/responses/Error410' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /ready:
+    get:
+      summary: Readiness check
+      description: Checks dependencies (Redis).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+              examples: { ok: { value: { ok: true } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '410': { $ref: '#/components/responses/Error410' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/pricing/quotes:
+    post:
+      summary: Create quote
+      description: Creates a fare quote for pickup/dropoff.
+      security:
+        - bearerAuth: []
+        - internalKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pickup, dropoff, serviceType]
+              properties:
+                pickup: { $ref: '#/components/schemas/LatLng' }
+                dropoff: { $ref: '#/components/schemas/LatLng' }
+                serviceType: { type: string, enum: [STANDARD, PREMIUM] }
+                couponCode: { type: string }
+            examples:
+              create:
+                value:
+                  pickup: { lat: 10.76, lng: 106.66 }
+                  dropoff: { lat: 10.78, lng: 106.68 }
+                  serviceType: STANDARD
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/QuoteResponse' }
+              examples:
+                success:
+                  value:
+                    success: true
+                    data:
+                      quoteId: "e80db0e0-53ab-4adb-8810-dc1e51cd05c7"
+                      estimatedFare: 31325
+                      currency: VND
+                      distanceKm: 3.117
+                      durationMin: 7.48
+                      breakdown: { base: 12000, perKm: 15585, perMin: 3740, discount: 0, surge: 0 }
+                      expiresAt: "2026-02-05T16:59:22.761Z"
+                    meta: { requestId: "uuid", traceId: "uuid" }
+        '200':
+          description: OK (non-standard)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/QuoteResponse' }
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '410': { $ref: '#/components/responses/Error410' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/pricing/quotes/{quoteId}:
+    get:
+      summary: Get quote
+      description: Fetch a quote by id.
+      security:
+        - bearerAuth: []
+        - internalKey: []
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/QuoteResponse' }
+              examples:
+                success:
+                  value:
+                    success: true
+                    data:
+                      quoteId: "e80db0e0-53ab-4adb-8810-dc1e51cd05c7"
+                      estimatedFare: 31325
+                      currency: VND
+                      distanceKm: 3.117
+                      durationMin: 7.48
+                      breakdown: { base: 12000, perKm: 15585, perMin: 3740, discount: 0, surge: 0 }
+                      expiresAt: "2026-02-05T16:59:22.761Z"
+                    meta: { requestId: "uuid", traceId: "uuid" }
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '410': { $ref: '#/components/responses/Error410' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/pricing/finalize:
+    post:
+      summary: Finalize quote
+      description: Finalize a quote based on actual distance/duration.
+      security:
+        - bearerAuth: []
+        - internalKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quoteId]
+              properties:
+                quoteId: { type: string }
+                actualDistanceKm: { type: number }
+                actualDurationMin: { type: number }
+            examples:
+              finalize:
+                value:
+                  quoteId: "e80db0e0-53ab-4adb-8810-dc1e51cd05c7"
+                  actualDistanceKm: 3.5
+                  actualDurationMin: 9
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/FinalizeResponse' }
+              examples:
+                success:
+                  value:
+                    success: true
+                    data:
+                      quoteId: "e80db0e0-53ab-4adb-8810-dc1e51cd05c7"
+                      finalFare: 34000
+                      currency: VND
+                      distanceKm: 3.5
+                      durationMin: 9
+                      breakdown: { base: 12000, perKm: 17500, perMin: 4500, discount: 0, surge: 0 }
+                    meta: { requestId: "uuid", traceId: "uuid" }
+        '201':
+          description: Created (not used)
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '410': { $ref: '#/components/responses/Error410' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }

@@ -14,7 +14,7 @@ Nguồn: đọc cấu trúc repo + README + routes của các service trong thư
 ## 2) Cấu trúc thư mục chính
 ```
 .
-├── apps/        # Frontend apps (admin-dashboard, customer-app, driver-app)
+├── apps/        # Frontend apps (admin-dashboard, driver-app)
 ├── services/    # Các microservice backend theo domain
 ├── contracts/   # OpenAPI + schema Kafka + state machine
 ├── libs/        # Thư viện dùng chung (http, kafka, validation, ...)

@@ -25,6 +25,14 @@ const config = {
   outbox: {
     publishIntervalMs: Number(process.env.OUTBOX_PUBLISH_INTERVAL_MS || 5000)
   },
+  gateway: {
+    retryMax: Number(process.env.PAYMENT_GATEWAY_RETRY_MAX || 2),
+    retryBaseMs: Number(process.env.PAYMENT_GATEWAY_RETRY_BASE_MS || 200),
+    retryMaxMs: Number(process.env.PAYMENT_GATEWAY_RETRY_MAX_MS || 2000),
+    retryMultiplier: Number(process.env.PAYMENT_GATEWAY_RETRY_MULTIPLIER || 2),
+    retryJitter: Number(process.env.PAYMENT_GATEWAY_RETRY_JITTER || 0.2),
+    timeoutMs: Number(process.env.PAYMENT_GATEWAY_TIMEOUT_MS || 8000)
+  },
   redis: {
     url: process.env.REDIS_URL || "redis://localhost:6379"
   },
@@ -42,6 +50,15 @@ const config = {
     clientId: process.env.VIETQR_CLIENT_ID || "",
     apiKey: process.env.VIETQR_API_KEY || "",
     expiresInMinutes: Number(process.env.VIETQR_EXPIRES_IN_MINUTES || 15)
+  },
+  payos: {
+    apiBaseUrl: process.env.PAYOS_API_URL || "https://api-merchant.payos.vn",
+    clientId: process.env.PAYOS_CLIENT_ID || "",
+    apiKey: process.env.PAYOS_API_KEY || "",
+    checksumKey: process.env.PAYOS_CHECKSUM_KEY || "",
+    partnerCode: process.env.PAYOS_PARTNER_CODE || "",
+    returnUrl: process.env.PAYOS_RETURN_URL || "",
+    cancelUrl: process.env.PAYOS_CANCEL_URL || ""
   },
   auth: {
     jwtAccessSecret:

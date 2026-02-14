@@ -15,13 +15,27 @@ export const driverService = {
       return { items, total: items.length }
     }
 
-    const query = new URLSearchParams(params).toString()
+    const queryParams = {}
+    if (params.status) {
+      queryParams.status = String(params.status).toUpperCase()
+    }
+    if (params.onlineStatus) {
+      queryParams.online = String(params.onlineStatus).toUpperCase()
+    }
+    const query = new URLSearchParams(queryParams).toString()
     const payload = await apiRequest(
       `/v1/admin/drivers${query ? `?${query}` : ''}`
     )
+    const items = payload?.data?.items || payload?.data || []
+    const filtered =
+      params.vehicleType && items.length
+        ? items.filter(
+            (driver) => driver.vehicleType === params.vehicleType
+          )
+        : items
     return {
-      items: payload?.data?.items || payload?.data || [],
-      total: payload?.data?.items?.length || 0,
+      items: filtered,
+      total: filtered.length,
     }
   },
 

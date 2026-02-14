@@ -1,3 +1,5 @@
+require("dotenv").config();
+require("./observability");
 const app = require("./app");
 const config = require("./config");
 

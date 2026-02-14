@@ -47,6 +47,15 @@ function mapPaymentRow(row) {
     };
   }
 
+  if (row.payos_order_code != null) {
+    payment.payos = {
+      orderCode: row.payos_order_code,
+      paymentLinkId: row.payos_payment_link_id,
+      checkoutUrl: row.payos_checkout_url,
+      qrCode: row.payos_qr_code
+    };
+  }
+
   return payment;
 }
 
@@ -65,9 +74,13 @@ async function insertPayment(client, payment) {
       vietqr_payload,
       vietqr_reference,
       vietqr_expires_at,
-      vietqr_qr_url
+      vietqr_qr_url,
+      payos_order_code,
+      payos_payment_link_id,
+      payos_checkout_url,
+      payos_qr_code
     )
-     VALUES ($1, $2, $3, $4, $5, $6, now(), $7, $8, $9, $10, $11)
+     VALUES ($1, $2, $3, $4, $5, $6, now(), $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING *`,
     [
       payment.rideId,
@@ -80,7 +93,11 @@ async function insertPayment(client, payment) {
       payment.vietqrPayload || null,
       payment.vietqrReference || null,
       payment.vietqrExpiresAt || null,
-      payment.vietqrQrUrl || null
+      payment.vietqrQrUrl || null,
+      payment.payosOrderCode || null,
+      payment.payosPaymentLinkId || null,
+      payment.payosCheckoutUrl || null,
+      payment.payosQrCode || null
     ]
   );
   return mapPaymentRow(result.rows[0]);
@@ -113,6 +130,14 @@ async function insertStatusHistory(client, data) {
 
 async function getPaymentById(id) {
   const result = await pool.query("SELECT * FROM payments WHERE id = $1", [id]);
+  return mapPaymentRow(result.rows[0]);
+}
+
+async function getPaymentByPayosOrderCode(orderCode) {
+  const result = await pool.query(
+    "SELECT * FROM payments WHERE payos_order_code = $1",
+    [orderCode]
+  );
   return mapPaymentRow(result.rows[0]);
 }
 
@@ -174,6 +199,7 @@ module.exports = {
   insertPayment,
   insertStatusHistory,
   getPaymentById,
+  getPaymentByPayosOrderCode,
   updatePaymentStatus,
   listPayments,
   mapPaymentRow

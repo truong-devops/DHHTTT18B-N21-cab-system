@@ -39,6 +39,8 @@ services:
       - "3000:3000"
     environment:
       SERVICE_NAME: api-gateway
+      OTEL_SERVICE_NAME: api-gateway
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
       AUTH_SERVICE_URL: http://auth-service:4001
       BOOKING_SERVICE_URL: http://booking-service:3003
@@ -68,6 +70,8 @@ services:
       dockerfile: services/auth-service/Dockerfile
     environment:
       SERVICE_NAME: auth-service
+      OTEL_SERVICE_NAME: auth-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       PORT: 4001
       DATABASE_URL: postgres://cab:cabpass@postgres:5432/auth-service_db
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
@@ -82,6 +86,8 @@ services:
       dockerfile: services/user-service/Dockerfile
     environment:
       SERVICE_NAME: user-service
+      OTEL_SERVICE_NAME: user-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       PORT: 4004
       DATABASE_URL: postgres://cab:cabpass@postgres:5432/user-service_db
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
@@ -97,6 +103,8 @@ services:
       dockerfile: services/ride-service/Dockerfile
     environment:
       SERVICE_NAME: ride-service
+      OTEL_SERVICE_NAME: ride-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       PORT: 3005
       MONGODB_URI: mongodb://mongo:27017/ride_service
       REDIS_URL: redis://redis:6379
@@ -114,6 +122,8 @@ services:
       context: ../services/booking-service
     environment:
       SERVICE_NAME: booking-service
+      OTEL_SERVICE_NAME: booking-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       PORT: 3003
       KAFKA_BROKERS: kafka:9092
       PRICING_BASE_URL: http://pricing-service:3006
@@ -129,6 +139,8 @@ services:
       dockerfile: services/driver-service/Dockerfile
     environment:
       SERVICE_NAME: driver-service
+      OTEL_SERVICE_NAME: driver-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       PORT: 3011
       DATABASE_URL: postgres://cab:cabpass@postgres:5432/driver-service_db
       REDIS_URL: redis://redis:6379
@@ -144,6 +156,8 @@ services:
       context: ../services/notification-service
     environment:
       SERVICE_NAME: notification-service
+      OTEL_SERVICE_NAME: notification-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       PORT: 3010
       MONGODB_URI: mongodb://mongo:27017/notification_service
       USER_SERVICE_BASE_URL: http://user-service:4004
@@ -161,10 +175,14 @@ services:
       dockerfile: services/pricing-service/Dockerfile
     environment:
       SERVICE_NAME: pricing-service
+      OTEL_SERVICE_NAME: pricing-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       PORT: 3006
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      COUPON_DISCOUNTS_JSON: '{"WELCOME10":10000,"VIP20":20000,"OFF50":50000}'
+      RATES_JSON: '{"STANDARD":{"surgeMultiplier":1.1},"PREMIUM":{"surgeMultiplier":1.3}}'
     depends_on:
       - redis
     networks:
@@ -176,6 +194,8 @@ services:
       dockerfile: services/payment-service/Dockerfile
     environment:
       SERVICE_NAME: payment-service
+      OTEL_SERVICE_NAME: payment-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       PORT: 3007
       DATABASE_URL: postgres://cab:cabpass@postgres:5432/payment-service_db
       REDIS_URL: redis://redis:6379
@@ -188,6 +208,13 @@ services:
       VIETQR_CLIENT_ID: "your-client-id"
       VIETQR_API_KEY: "your-api-key"
       VIETQR_EXPIRES_IN_MINUTES: 15
+      PAYOS_API_URL: ${PAYOS_API_URL:-https://api-merchant.payos.vn}
+      PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID:-}
+      PAYOS_API_KEY: ${PAYOS_API_KEY:-}
+      PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY:-}
+      PAYOS_PARTNER_CODE: ${PAYOS_PARTNER_CODE:-}
+      PAYOS_RETURN_URL: ${PAYOS_RETURN_URL:-}
+      PAYOS_CANCEL_URL: ${PAYOS_CANCEL_URL:-}
     depends_on:
       - postgres
       - redis
@@ -201,6 +228,8 @@ services:
       dockerfile: services/review-service/Dockerfile
     environment:
       SERVICE_NAME: review-service
+      OTEL_SERVICE_NAME: review-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       PORT: 3009
       DATABASE_URL: postgres://cab:cabpass@postgres:5432/review-service_db
       REDIS_URL: redis://redis:6379
@@ -226,15 +255,31 @@ services:
     networks:
       - backend
 
+  pgadmin:
+    image: dpage/pgadmin4:8
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    volumes:
+      - cab_pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
   mongo:
     image: mongo:7
     volumes:
       - cab_mongo_data:/data/db
+      - ./mongo/init:/docker-entrypoint-initdb.d
     networks:
       - backend
 
 volumes:
   cab_postgres_data:
+  cab_pgadmin_data:
   cab_redis_data:
   cab_mongo_data:
 
