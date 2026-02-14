@@ -9,6 +9,17 @@ const topics = require("../messaging/topics");
 
 const router = express.Router();
 
+router.get("/", (_req, res) => {
+  const items = bookingRepo.list();
+  return res.json({ data: items });
+});
+
+router.get("/:id", (req, res) => {
+  const booking = bookingRepo.getById(req.params.id);
+  if (!booking) return res.status(404).json({ error: "Booking not found" });
+  return res.json({ data: booking });
+});
+
 function buildEnvelope({ eventId, type, traceId, payload }) {
   return {
     eventId,

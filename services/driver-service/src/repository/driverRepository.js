@@ -105,9 +105,19 @@ async function listDrivers({ status, onlineStatus, limit = 20, offset = 0 }) {
 
   const result = await pool.query(
     `
-      SELECT * FROM drivers
+      SELECT d.*,
+             v.vehicle_type,
+             v.plate_number,
+             l.lat AS location_lat,
+             l.lng AS location_lng,
+             l.recorded_at AS location_recorded_at
+      FROM drivers d
+      LEFT JOIN driver_vehicles v
+        ON v.driver_id = d.id AND v.is_active = true
+      LEFT JOIN driver_last_locations l
+        ON l.driver_id = d.id
       ${whereClause}
-      ORDER BY created_at DESC
+      ORDER BY d.created_at DESC
       LIMIT $${idx++} OFFSET $${idx++}
     `,
     values

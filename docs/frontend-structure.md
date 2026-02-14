@@ -1,7 +1,6 @@
 # Frontend React structure proposal (monorepo)
 
-This repo already has `apps/` in workspaces and three frontends:
-- `apps/customer-app`
+This repo already has `apps/` in workspaces and two frontends:
 - `apps/driver-app`
 - `apps/admin-dashboard`
 
@@ -15,7 +14,7 @@ to extend later.
 
 ```
 apps/
-  customer-app/
+  driver-app/
     src/
       app/
         App.jsx
@@ -45,12 +44,9 @@ apps/
         types/
         api/
       assets/
-  driver-app/
-    src/
-      (same structure as customer-app)
   admin-dashboard/
     src/
-      (same structure as customer-app)
+      (same structure as driver-app)
 
 libs/
   ui/

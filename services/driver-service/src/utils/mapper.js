@@ -7,6 +7,16 @@ function mapDriver(row) {
     onlineStatus: row.online_status,
     fullName: row.full_name,
     phone: row.phone,
+    vehicleType: row.vehicle_type || null,
+    plateNumber: row.plate_number || null,
+    location:
+      row.location_lat !== null && row.location_lat !== undefined
+        ? {
+            lat: row.location_lat,
+            lng: row.location_lng,
+            recordedAt: row.location_recorded_at
+          }
+        : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
