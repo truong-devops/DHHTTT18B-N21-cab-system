@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 
 import PageHeader from '../../components/common/PageHeader.jsx'
 import Button from '../../components/common/Button.jsx'
 import Input from '../../components/common/Input.jsx'
 import Select from '../../components/common/Select.jsx'
+import Table from '../../components/common/Table.jsx'
+import Badge from '../../components/common/Badge.jsx'
 
 import { paymentService } from '../../services/payment.service.js'
 import { useToast } from '../../hooks/useToast.js'
 import { useAuth } from '../../hooks/useAuth.js'
+import { labelFrom, paymentStatusLabels } from '../../utils/labels.js'
 
 const DEFAULT_FORM = {
   rideId: 'ride_demo_001',
@@ -51,10 +54,14 @@ function Payments() {
   )
   const [loading, setLoading] = useState(false)
   const [loadingQr, setLoadingQr] = useState(false)
+  const [loadingList, setLoadingList] = useState(false)
   const [payment, setPayment] = useState(null)
+  const [payments, setPayments] = useState([])
   const [vietqr, setVietqr] = useState(null)
   const [qrFallback, setQrFallback] = useState('')
   const [error, setError] = useState('')
+  const [listError, setListError] = useState('')
+  const [statusDrafts, setStatusDrafts] = useState({})
   const [autoConfirm, setAutoConfirm] = useState(false)
   const [autoConfirmDelay, setAutoConfirmDelay] = useState(8)
   const autoConfirmTimerRef = useRef(null)
@@ -76,6 +83,37 @@ function Payments() {
       setForm((prev) => ({ ...prev, userId: tokenSubject }))
     }
   }, [tokenSubject, form.userId])
+
+  const loadPayments = useCallback(async () => {
+    if (!authToken.trim()) {
+      setPayments([])
+      setListError('Chưa có token để tải danh sách thanh toán.')
+      return
+    }
+    setLoadingList(true)
+    setListError('')
+    try {
+      const result = await paymentService.list({ limit: 50 }, authToken.trim())
+      setPayments(result.items || [])
+      setStatusDrafts((prev) => {
+        const next = { ...prev }
+        ;(result.items || []).forEach((item) => {
+          if (!next[item.id]) {
+            next[item.id] = { status: item.status, failureReason: '' }
+          }
+        })
+        return next
+      })
+    } catch (err) {
+      setListError(err?.message || 'Không thể tải danh sách thanh toán')
+    } finally {
+      setLoadingList(false)
+    }
+  }, [authToken])
+
+  useEffect(() => {
+    loadPayments()
+  }, [loadPayments])
 
   useEffect(() => {
     if (autoConfirmTimerRef.current) {
@@ -212,6 +250,7 @@ function Payments() {
       )
       setPayment(result.data)
       setVietqr(result.data?.vietqr || null)
+      loadPayments()
       toast?.push('Đã tạo thanh toán', 'success')
     } catch (err) {
       const message = err?.message || 'Không thể tạo thanh toán'
@@ -265,10 +304,77 @@ function Payments() {
       if (updated) {
         setPayment(updated)
       }
+      loadPayments()
       toast?.push('Đã xác nhận thanh toán (dev)', 'success')
     } catch (err) {
       const message = err?.message || 'Không thể xác nhận thanh toán'
       setError(message)
+      toast?.push(message, 'danger')
+    }
+  }
+
+  const statusOptions = useMemo(
+    () => ['INITIATED', 'PROCESSING', 'PAID', 'FAILED', 'REFUNDED'],
+    []
+  )
+
+  const statusVariant = (status) => {
+    switch (status) {
+      case 'PAID':
+        return 'success'
+      case 'FAILED':
+        return 'danger'
+      case 'PROCESSING':
+        return 'warning'
+      case 'REFUNDED':
+        return 'info'
+      default:
+        return 'info'
+    }
+  }
+
+  const handleDraftChange = (id, field, value) => {
+    setStatusDrafts((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], [field]: value },
+    }))
+  }
+
+  const handleUpdateStatus = async (row) => {
+    if (!authToken.trim()) {
+      const message = 'Chưa có token để cập nhật thanh toán.'
+      setListError(message)
+      toast?.push(message, 'danger')
+      return
+    }
+    const draft = statusDrafts[row.id] || {}
+    const nextStatus = draft.status || row.status
+    const failureReason = (draft.failureReason || '').trim()
+
+    if (nextStatus === 'FAILED' && !failureReason) {
+      const message = 'Cần nhập lý do khi chuyển sang FAILED.'
+      setListError(message)
+      toast?.push(message, 'danger')
+      return
+    }
+
+    try {
+      const updated = await paymentService.updateStatus(
+        row.id,
+        nextStatus,
+        failureReason || null,
+        authToken.trim()
+      )
+      if (updated) {
+        setPayments((prev) =>
+          prev.map((item) => (item.id === row.id ? updated : item))
+        )
+        setPayment((prev) => (prev?.id === row.id ? updated : prev))
+      }
+      toast?.push('Đã cập nhật trạng thái', 'success')
+    } catch (err) {
+      const message = err?.message || 'Không thể cập nhật trạng thái'
+      setListError(message)
       toast?.push(message, 'danger')
     }
   }
@@ -491,6 +597,97 @@ function Payments() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">Danh sách thanh toán</h3>
+          <Button variant="outline" onClick={loadPayments} disabled={loadingList}>
+            {loadingList ? 'Đang tải...' : 'Làm mới'}
+          </Button>
+        </div>
+        {listError && <div className="input-helper">{listError}</div>}
+        <Table
+          columns={[
+            {
+              key: 'id',
+              header: 'Mã',
+              render: (row) => row.id?.slice(0, 8) || '-',
+            },
+            { key: 'rideId', header: 'Ride' },
+            { key: 'userId', header: 'User' },
+            {
+              key: 'amount',
+              header: 'Số tiền',
+              render: (row) =>
+                row.amount ? `${row.amount} ${row.currency}` : '-',
+            },
+            {
+              key: 'method',
+              header: 'Phương thức',
+              render: (row) => row.method || '-',
+            },
+            {
+              key: 'status',
+              header: 'Trạng thái',
+              render: (row) => (
+                <Badge variant={statusVariant(row.status)}>
+                  {labelFrom(paymentStatusLabels, row.status)}
+                </Badge>
+              ),
+            },
+            {
+              key: 'actions',
+              header: 'Cập nhật',
+              render: (row) => {
+                const draft = statusDrafts[row.id] || {}
+                const nextStatus = draft.status || row.status
+                return (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <select
+                      className="select"
+                      value={nextStatus}
+                      onChange={(event) =>
+                        handleDraftChange(row.id, 'status', event.target.value)
+                      }
+                    >
+                      {statusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {labelFrom(paymentStatusLabels, status)}
+                        </option>
+                      ))}
+                    </select>
+                    {nextStatus === 'FAILED' && (
+                      <input
+                        className="input"
+                        placeholder="Lý do"
+                        value={draft.failureReason || ''}
+                        onChange={(event) =>
+                          handleDraftChange(
+                            row.id,
+                            'failureReason',
+                            event.target.value
+                          )
+                        }
+                        style={{ width: 160 }}
+                      />
+                    )}
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      onClick={() => handleUpdateStatus(row)}
+                    >
+                      Lưu
+                    </Button>
+                  </div>
+                )
+              },
+            },
+          ]}
+          data={payments}
+          total={payments.length}
+          emptyText={loadingList ? 'Đang tải...' : 'Chưa có thanh toán'}
+        />
       </div>
     </div>
   )

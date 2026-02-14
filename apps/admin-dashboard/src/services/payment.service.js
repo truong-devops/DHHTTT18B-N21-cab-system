@@ -6,13 +6,19 @@ function buildIdemKey() {
 }
 
 export const paymentService = {
-  async list(params = {}) {
+  async list(params = {}, authToken) {
     if (isMock) {
       return { items: [], total: 0 }
     }
 
     const query = new URLSearchParams(params).toString()
-    const payload = await apiRequest(`/v1/payments${query ? `?${query}` : ''}`)
+    const headers = {}
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`
+    }
+    const payload = await apiRequest(`/v1/payments${query ? `?${query}` : ''}`, {
+      headers,
+    })
     const items = payload?.data || []
     return { items, total: items.length, nextCursor: payload?.nextCursor || null }
   },
@@ -52,6 +58,23 @@ export const paymentService = {
     const result = await apiRequest(`/v1/payments/${paymentId}/confirm-dev`, {
       method: 'POST',
       headers,
+    })
+    return result?.data || null
+  },
+
+  async updateStatus(paymentId, status, failureReason, authToken) {
+    const headers = {}
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`
+    }
+    const payload = { status }
+    if (failureReason) {
+      payload.failureReason = failureReason
+    }
+    const result = await apiRequest(`/v1/payments/${paymentId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload),
     })
     return result?.data || null
   },
