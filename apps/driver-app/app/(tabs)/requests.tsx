@@ -38,8 +38,18 @@ export default function RequestsScreen() {
 
   const handleAccept = async () => {
     if (!activeRequest) return;
-    if (!driver?.id) {
+    const principalDriverId = driver?.userId || driver?.id;
+    if (!principalDriverId) {
       Alert.alert('Thiếu hồ sơ', 'Không tìm thấy driverId. Hãy đăng nhập lại.');
+      return;
+    }
+    const currentStatus = String(activeRequest.status || '').toUpperCase();
+    const alreadyOwned =
+      activeRequest.driverId === principalDriverId &&
+      ['ASSIGNED', 'ARRIVING', 'IN_PROGRESS'].includes(currentStatus);
+    if (alreadyOwned) {
+      setActiveRide(activeRequest);
+      router.push('/ride/navigation');
       return;
     }
     const actionKey = `accept:${activeRequest.id}`;
@@ -47,11 +57,21 @@ export default function RequestsScreen() {
     lastActionRef.current = actionKey;
     setIsAccepting(true);
     try {
-      const res = await rideApi.acceptRide(activeRequest.id, driver.id);
+      const res = await rideApi.acceptRide(activeRequest.id, principalDriverId);
       setActiveRide(res.data);
       router.push('/ride/navigation');
     } catch (err: any) {
       if (err?.status === 409 || err?.code === 'INVALID_STATE_TRANSITION') {
+        const stillOwned =
+          activeRequest.driverId === principalDriverId &&
+          ['ASSIGNED', 'ARRIVING', 'IN_PROGRESS'].includes(
+            String(activeRequest.status || '').toUpperCase(),
+          );
+        if (stillOwned) {
+          setActiveRide(activeRequest);
+          router.push('/ride/navigation');
+          return;
+        }
         Alert.alert('Chuyến đã thay đổi', 'Chuyến này đã được nhận hoặc đã hết hiệu lực.');
         setIgnoredRideId(activeRequest.id);
         return;

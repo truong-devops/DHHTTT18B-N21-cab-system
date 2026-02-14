@@ -78,6 +78,11 @@ function normalizeListQuery(query) {
     return {};
   }
   const nextQuery = { ...query };
+  // Some clients append cache-busting query params (e.g. "_=timestamp").
+  // Ignore them so list validation stays strict for business params.
+  delete nextQuery._;
+  delete nextQuery.cacheBust;
+  delete nextQuery.cb;
   if (typeof nextQuery.limit === "string") {
     const parsedLimit = Number(nextQuery.limit);
     if (Number.isFinite(parsedLimit)) {

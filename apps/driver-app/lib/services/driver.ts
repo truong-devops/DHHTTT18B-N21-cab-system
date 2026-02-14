@@ -44,10 +44,12 @@ export async function getMe() {
 }
 
 export async function setOnline(lat?: number, lng?: number) {
+  const hasInitialLocation =
+    Number.isFinite(lat as number) && Number.isFinite(lng as number);
   return apiRequest({
     method: 'POST',
     path: endpoints.driver.online,
-    body: lat && lng ? { initialLocation: { lat, lng } } : {},
+    body: hasInitialLocation ? { initialLocation: { lat, lng } } : {},
   });
 }
 
@@ -68,10 +70,20 @@ export type DriverLocationPayload = {
 };
 
 export async function sendLocation(payload: DriverLocationPayload) {
+  // Backend validates optional numeric fields as number-only, so skip null/NaN.
+  const body: Record<string, unknown> = {
+    lat: payload.lat,
+    lng: payload.lng,
+  };
+  if (Number.isFinite(payload.heading as number)) body.heading = payload.heading;
+  if (Number.isFinite(payload.speed as number)) body.speed = payload.speed;
+  if (Number.isFinite(payload.accuracy as number)) body.accuracy = payload.accuracy;
+  if (payload.recordedAt) body.recordedAt = payload.recordedAt;
+
   return apiRequest({
     method: 'POST',
     path: endpoints.driver.location,
-    body: payload,
+    body,
   });
 }
 
