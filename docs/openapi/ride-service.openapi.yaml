@@ -1,0 +1,478 @@
+openapi: 3.1.0
+info:
+  title: Ride Service API
+  version: 1.0.0
+  description: |
+    Ride service for ride lifecycle. All endpoints require JWT bearer auth.
+servers:
+  - url: http://localhost:3005
+    description: Direct ride-service
+  - url: http://localhost:3000
+    description: API Gateway (prefix /v1/rides)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Ride:
+      type: object
+      properties:
+        id: { type: string }
+        externalRideId: { type: string }
+        bookingId: { type: [string, 'null'] }
+        riderId: { type: [string, 'null'] }
+        driverId: { type: [string, 'null'] }
+        pickupLat: { type: number }
+        pickupLng: { type: number }
+        dropoffLat: { type: [number, 'null'] }
+        dropoffLng: { type: [number, 'null'] }
+        status: { type: string }
+        statusUpdatedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, pickupLat, pickupLng, status]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              oneOf:
+                - type: array
+                  items: {}
+                - type: object
+          required: [code, message]
+        traceId: { type: [string, 'null'] }
+      required: [error]
+  responses:
+    Error400:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            validation:
+              value: { error: { code: VALIDATION_ERROR, message: "Validation failed", details: ["headers.Idempotency-Key: is required"] } }
+    Error401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unauthorized:
+              value: { error: { code: UNAUTHORIZED, message: "Missing authorization token", details: [] } }
+    Error403:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            forbidden:
+              value: { error: { code: FORBIDDEN, message: "Forbidden", details: [] } }
+    Error404:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            notFound:
+              value: { error: { code: NOT_FOUND, message: "Ride not found", details: [] } }
+    Error409:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            conflict:
+              value: { error: { code: INVALID_STATE_TRANSITION, message: "Invalid transition from requested to completed", details: [] } }
+    Error422:
+      description: Unprocessable Entity
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unprocessable:
+              value: { error: { code: VALIDATION_ERROR, message: "Invalid payload", details: [] } }
+    Error429:
+      description: Too Many Requests
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            rateLimit:
+              value: { error: { code: RATE_LIMITED, message: "Too many requests", details: [] } }
+    Error500:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            internal:
+              value: { error: { code: INTERNAL, message: "Unexpected error", details: [] } }
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+              examples: { ok: { value: { ok: true } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /healthz:
+    get:
+      summary: Health check (alias)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+              examples: { ok: { value: { ok: true } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+              examples: { ok: { value: { ok: true } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/rides:
+    post:
+      summary: Create ride
+      description: Create a ride (Idempotency-Key header required).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pickupLat, pickupLng]
+              properties:
+                pickupLat: { type: number }
+                pickupLng: { type: number }
+                dropoffLat: { type: number }
+                dropoffLng: { type: number }
+                bookingId: { type: string }
+                driverId: { type: string }
+                status: { type: string }
+            examples:
+              create:
+                value: { pickupLat: 10.76, pickupLng: 106.66 }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Ride' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "a01695df-2278-42a5-8d6a-d410cea73a82"
+                      externalRideId: "357ade53-f6aa-4bf8-9de3-3003e5312504"
+                      bookingId: null
+                      riderId: "user_id"
+                      driverId: null
+                      pickupLat: 10.76
+                      pickupLng: 106.66
+                      dropoffLat: null
+                      dropoffLng: null
+                      status: requested
+                      statusUpdatedAt: "2026-02-05T20:09:00.170Z"
+                      createdAt: "2026-02-05T20:09:00.170Z"
+                      updatedAt: "2026-02-05T20:09:00.170Z"
+        '200':
+          description: OK (idempotent replay)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Ride' }
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+    get:
+      summary: List rides
+      description: List rides with filters and pagination.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: riderId
+          in: query
+          schema: { type: string }
+        - name: driverId
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [createdAt, -createdAt], default: -createdAt }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Ride' }
+                  nextCursor: { type: [string, 'null'] }
+              examples:
+                success:
+                  value:
+                    data:
+                      - id: "f12854d8-9954-4dc0-b1ce-7731dd0614eb"
+                        externalRideId: "c95d0859-2f62-46cf-8477-e3e9f1bd8c6f"
+                        pickupLat: 10.76
+                        pickupLng: 106.66
+                        status: completed
+                        createdAt: "2026-02-05T16:54:23.042Z"
+                        updatedAt: "2026-02-05T16:54:23.183Z"
+                    nextCursor: null
+        '201':
+          description: Created (not used)
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/rides/assignments:
+    get:
+      summary: Get driver assignments
+      description: Returns active/claimed ride for the current driver.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Ride' }
+              examples:
+                success:
+                  value:
+                    data:
+                      - id: "6a3e97fb-0e43-429c-ad02-5ef692f9ed3f"
+                        externalRideId: "ride_1770663776850"
+                        bookingId: "bk_1770663776850"
+                        driverId: "driver_id"
+                        pickupLat: 10.76
+                        pickupLng: 106.66
+                        dropoffLat: 10.89
+                        dropoffLng: 10.99
+                        status: assigned
+                        createdAt: "2026-02-09T19:02:59.609Z"
+                        updatedAt: "2026-02-09T19:03:01.135Z"
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/rides/{id}:
+    get:
+      summary: Get ride by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Ride' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "f12854d8-9954-4dc0-b1ce-7731dd0614eb"
+                      externalRideId: "c95d0859-2f62-46cf-8477-e3e9f1bd8c6f"
+                      pickupLat: 10.76
+                      pickupLng: 106.66
+                      status: requested
+                      createdAt: "2026-02-05T16:54:23.042Z"
+                      updatedAt: "2026-02-05T16:54:23.042Z"
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+    patch:
+      summary: Update ride fields or status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                driverId: { type: string }
+                pickupLat: { type: number }
+                pickupLng: { type: number }
+                dropoffLat: { type: number }
+                dropoffLng: { type: number }
+                status: { type: string }
+                statusReason: { type: string }
+            examples:
+              assign:
+                value: { driverId: "driver_id", status: "assigned" }
+              arriving:
+                value: { status: "arriving" }
+              inProgress:
+                value: { status: "in_progress" }
+              completed:
+                value: { status: "completed" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Ride' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "f12854d8-9954-4dc0-b1ce-7731dd0614eb"
+                      status: "completed"
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+    delete:
+      summary: Cancel ride
+      description: Marks ride as cancelled.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Ride' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "f12854d8-9954-4dc0-b1ce-7731dd0614eb"
+                      status: "cancelled"
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
