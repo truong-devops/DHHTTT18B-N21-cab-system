@@ -1,4 +1,0 @@
-services:
-  payment-service:
-    ports:
-      - "3007:3007"

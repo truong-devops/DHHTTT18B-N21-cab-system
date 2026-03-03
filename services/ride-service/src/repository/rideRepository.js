@@ -63,7 +63,8 @@ async function createRide({
   dropoffLat = null,
   dropoffLng = null,
   status,
-  traceId = null
+  traceId = null,
+  emitOutbox = true
 }) {
   const db = await getDb();
   const now = new Date();
@@ -84,31 +85,36 @@ async function createRide({
     updated_at: now
   };
 
-  const eventId = crypto.randomUUID();
-  const eventPayload = {
-    rideId,
-    pickup: { lat: pickupLat, lng: pickupLng },
-    timestamp: now
-  };
-  const outboxDoc = {
-    _id: crypto.randomUUID(),
-    event_id: eventId,
-    aggregate_type: "ride",
-    aggregate_id: rideId,
-    event_type: "RideCreated",
-    payload: { traceId, payload: eventPayload },
-    status: "pending",
-    occurred_at: now,
-    created_at: now,
-    updated_at: now
-  };
+  let outboxDoc = null;
+  if (emitOutbox) {
+    const eventId = crypto.randomUUID();
+    const eventPayload = {
+      rideId,
+      pickup: { lat: pickupLat, lng: pickupLng },
+      timestamp: now
+    };
+    outboxDoc = {
+      _id: crypto.randomUUID(),
+      event_id: eventId,
+      aggregate_type: "ride",
+      aggregate_id: rideId,
+      event_type: "RideCreated",
+      payload: { traceId, payload: eventPayload },
+      status: "pending",
+      occurred_at: now,
+      created_at: now,
+      updated_at: now
+    };
+  }
 
   await runWithOptionalTransaction(async (session) => {
     const options = session ? { session } : {};
     await db.collection("rides").insertOne(rideDoc, options);
-    await db
-      .collection("outbox_events")
-      .insertOne(outboxDoc, options);
+    if (outboxDoc) {
+      await db
+        .collection("outbox_events")
+        .insertOne(outboxDoc, options);
+    }
     return rideDoc;
   });
 
@@ -126,6 +132,21 @@ async function getRideByExternalId(externalRideId) {
   const doc = await db
     .collection("rides")
     .findOne({ external_ride_id: externalRideId });
+  return mapRide(doc);
+}
+
+async function getActiveRideForDriver(driverId) {
+  if (!driverId) {
+    return null;
+  }
+  const db = await getDb();
+  const doc = await db.collection("rides").findOne(
+    {
+      driver_id: driverId,
+      status: { $in: ["assigned", "arriving", "in_progress"] }
+    },
+    { sort: { status_updated_at: -1, created_at: -1 } }
+  );
   return mapRide(doc);
 }
 
@@ -216,7 +237,12 @@ async function updateRideStatus({
     }
   );
 
-  return mapRide(updatedRide);
+  const mapped = mapRide(updatedRide);
+  if (!mapped) {
+    const fallback = await getRideById(id);
+    return fallback;
+  }
+  return mapped;
 }
 
 async function updateRideFields(id, fields) {
@@ -290,6 +316,7 @@ async function listRides({
   cursor = null,
   status = null,
   riderId = null,
+  driverId = null,
   sort = "-created_at"
 } = {}) {
   const db = await getDb();
@@ -302,6 +329,9 @@ async function listRides({
   }
   if (riderId) {
     filter.rider_id = riderId;
+  }
+  if (driverId) {
+    filter.driver_id = driverId;
   }
 
   const cursorFilter = buildCursorFilter({
@@ -328,12 +358,98 @@ async function listRides({
   return docs.map(mapRide);
 }
 
+async function claimRideForDriver({ driverId, traceId = null } = {}) {
+  if (!driverId) {
+    return null;
+  }
+
+  const db = await getDb();
+  const now = new Date();
+
+  return runWithOptionalTransaction(async (session) => {
+    const updateOptions = {
+      sort: { created_at: 1, _id: 1 },
+      returnDocument: "after"
+    };
+    if (session) {
+      updateOptions.session = session;
+    }
+
+    const rideResult = await db
+      .collection("rides")
+      .findOneAndUpdate(
+        { status: "requested", driver_id: null },
+        {
+          $set: {
+            driver_id: driverId,
+            status: "assigned",
+            status_updated_at: now,
+            updated_at: now
+          }
+        },
+        updateOptions
+      );
+
+    if (!rideResult || !rideResult.value) {
+      return null;
+    }
+
+    const rideDoc = rideResult.value;
+
+    const insertOptions = session ? { session } : {};
+    await db.collection("ride_status_history").insertOne(
+      {
+        _id: crypto.randomUUID(),
+        ride_id: rideDoc._id,
+        from_status: "requested",
+        to_status: "assigned",
+        reason: "driver_claimed",
+        actor_id: driverId,
+        trace_id: traceId,
+        occurred_at: now,
+        created_at: now,
+        updated_at: now
+      },
+      insertOptions
+    );
+
+    const eventId = crypto.randomUUID();
+    const outboxDoc = {
+      _id: crypto.randomUUID(),
+      event_id: eventId,
+      aggregate_type: "ride",
+      aggregate_id: rideDoc._id,
+      event_type: "RideAssigned",
+      payload: {
+        traceId,
+        payload: {
+          rideId: rideDoc._id,
+          driverId,
+          assignedAt: now
+        }
+      },
+      status: "pending",
+      occurred_at: now,
+      created_at: now,
+      updated_at: now
+    };
+
+    await db
+      .collection("outbox_events")
+      .insertOne(outboxDoc, insertOptions);
+
+    return mapRide(rideDoc);
+  });
+}
+
 module.exports = {
   createRide,
   getRideById,
   getRideByExternalId,
+  getActiveRideForDriver,
   updateRideStatus,
   updateRideFields,
   addStatusHistory,
-  listRides
+  listRides,
+  claimRideForDriver
 };

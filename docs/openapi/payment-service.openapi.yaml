@@ -1,0 +1,455 @@
+openapi: 3.1.0
+info:
+  title: Payment Service API
+  version: 1.0.0
+  description: |
+    Payment service for creating and managing payments.
+    All endpoints require JWT bearer auth; status updates require admin role.
+servers:
+  - url: http://localhost:3007
+    description: Direct payment-service
+  - url: http://localhost:3000
+    description: API Gateway (prefix /v1/payments)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    VietQr:
+      type: object
+      properties:
+        payload: { type: string }
+        qrUrl: { type: [string, 'null'] }
+        reference: { type: string }
+        expiresAt: { type: string, format: date-time }
+    Payment:
+      type: object
+      properties:
+        id: { type: string }
+        rideId: { type: string }
+        amount: { type: string, description: "Decimal string" }
+        currency: { type: string }
+        status: { type: string, enum: [INITIATED, PROCESSING, PAID, FAILED, CANCELED] }
+        statusUpdatedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        userId: { type: [string, 'null'] }
+        method: { type: [string, 'null'], enum: [CASH, VIETQR, WALLET, null] }
+        vietqr: { $ref: '#/components/schemas/VietQr' }
+      required: [id, rideId, amount, currency, status]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              oneOf:
+                - type: array
+                  items: {}
+                - type: object
+          required: [code, message]
+        traceId: { type: [string, 'null'] }
+      required: [error]
+  responses:
+    Error400:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            validation:
+              value: { error: { code: VALIDATION_ERROR, message: "Validation failed", details: ["body.amount: must be greater than zero"] } }
+    Error401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unauthorized:
+              value: { error: { code: UNAUTHORIZED, message: "Missing authorization token", details: [] } }
+    Error403:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            forbidden:
+              value: { error: { code: FORBIDDEN, message: "Forbidden", details: [] } }
+    Error404:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            notFound:
+              value: { error: { code: NOT_FOUND, message: "Payment not found", details: [] } }
+    Error409:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            conflict:
+              value: { error: { code: INVALID_STATE_TRANSITION, message: "Cannot transition from INITIATED to PAID", details: [] } }
+    Error422:
+      description: Unprocessable Entity
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            unprocessable:
+              value: { error: { code: VALIDATION_ERROR, message: "Invalid payload", details: [] } }
+    Error429:
+      description: Too Many Requests
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            rateLimit:
+              value: { error: { code: RATE_LIMITED, message: "Too many requests", details: [] } }
+    Error500:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            internal:
+              value: { error: { code: INTERNAL, message: "Internal error", details: [] } }
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Liveness check.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, service: { type: string } } }
+              examples: { ok: { value: { ok: true, service: "payment-service" } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /healthz:
+    get:
+      summary: Health check (alias)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, service: { type: string } } }
+              examples: { ok: { value: { ok: true, service: "payment-service" } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, service: { type: string } } }
+              examples: { ok: { value: { ok: true, service: "payment-service" } } }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/payments:
+    get:
+      summary: List payments
+      description: List payments with pagination and filters.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [createdAt, -createdAt], default: -createdAt }
+        - name: status
+          in: query
+          schema: { type: string, enum: [INITIATED, PROCESSING, PAID, FAILED, CANCELED] }
+        - name: rideId
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Payment' }
+                  nextCursor: { type: [string, 'null'] }
+              examples:
+                success:
+                  value:
+                    data:
+                      - id: "1926b56e-adda-4c61-9323-39ae665b2997"
+                        rideId: "ride_test_1"
+                        amount: "100000.00"
+                        currency: VND
+                        status: INITIATED
+                        statusUpdatedAt: "2026-02-05T16:47:51.205Z"
+                        createdAt: "2026-02-05T16:47:51.205Z"
+                        updatedAt: "2026-02-05T16:47:51.205Z"
+                        userId: "uuid"
+                        method: CASH
+                    nextCursor: null
+        '201':
+          description: Created (not used)
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+    post:
+      summary: Create payment
+      description: Create a payment (Idempotency-Key header required).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rideId, amount, currency]
+              properties:
+                rideId: { type: string }
+                amount: { type: string, description: "Decimal string" }
+                currency: { type: string, minLength: 3, maxLength: 3 }
+                method: { type: string, enum: [CASH, VIETQR, WALLET] }
+                userId: { type: string }
+                note: { type: string }
+            examples:
+              cash:
+                value: { rideId: "ride_test_1", amount: "100000.00", currency: "VND", method: "CASH" }
+              vietqr:
+                value: { rideId: "ride_test_2", amount: "150000.00", currency: "VND", method: "VIETQR" }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Payment' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "1926b56e-adda-4c61-9323-39ae665b2997"
+                      rideId: "ride_test_1"
+                      amount: "100000.00"
+                      currency: "VND"
+                      status: INITIATED
+                      statusUpdatedAt: "2026-02-05T16:47:51.205Z"
+                      createdAt: "2026-02-05T16:47:51.205Z"
+                      updatedAt: "2026-02-05T16:47:51.205Z"
+                      userId: "uuid"
+                      method: CASH
+        '200':
+          description: OK (idempotent replay)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Payment' }
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/payments/{id}:
+    get:
+      summary: Get payment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Payment' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "1926b56e-adda-4c61-9323-39ae665b2997"
+                      rideId: "ride_test_1"
+                      amount: "100000.00"
+                      currency: VND
+                      status: INITIATED
+                      statusUpdatedAt: "2026-02-05T16:47:51.205Z"
+                      createdAt: "2026-02-05T16:47:51.205Z"
+                      updatedAt: "2026-02-05T16:47:51.205Z"
+                      userId: "uuid"
+                      method: CASH
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+    patch:
+      summary: Update payment status
+      description: Admin-only. Updates payment status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [INITIATED, PROCESSING, PAID, FAILED, CANCELED] }
+                failureReason: { type: string }
+            examples:
+              paid:
+                value: { status: PAID }
+              failed:
+                value: { status: FAILED, failureReason: "BANK_DECLINED" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Payment' }
+              examples:
+                success:
+                  value:
+                    data:
+                      id: "1926b56e-adda-4c61-9323-39ae665b2997"
+                      status: PAID
+                      statusUpdatedAt: "2026-02-05T16:47:51.871Z"
+        '201':
+          description: Created (not used)
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+  /v1/payments/{id}/vietqr-codes:
+    get:
+      summary: Get VietQR codes
+      description: Returns VietQR payload for a payment.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      paymentId: { type: string }
+                      rideId: { type: string }
+                      amount: { type: string }
+                      currency: { type: string }
+                      vietqr: { $ref: '#/components/schemas/VietQr' }
+              examples:
+                success:
+                  value:
+                    data:
+                      paymentId: "d8b60eae-5f48-4f4c-a556-1a0617c4e8bb"
+                      rideId: "ride_test_2"
+                      amount: "150000.00"
+                      currency: "VND"
+                      vietqr:
+                        payload: "000201010212..."
+                        qrUrl: null
+                        reference: "77f992cc-77c2-4008-a755-83141597510f"
+                        expiresAt: "2026-02-05T17:02:51.306Z"
+        '204':
+          description: No Content (not used)
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }

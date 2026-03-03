@@ -4,9 +4,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Env
-.env
-.env.*
+#Do dự án đang phát triển và tiện trao đổi trong nhóm nên tạm thời vẫn push file .env lên Github
+#.env
 
 # OS
 .DS_Store

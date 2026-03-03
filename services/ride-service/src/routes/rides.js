@@ -3,7 +3,9 @@ const crypto = require("crypto");
 const {
   createRide,
   getRideById,
+  getActiveRideForDriver,
   listRides,
+  claimRideForDriver,
   updateRideFields,
   updateRideStatus,
   addStatusHistory
@@ -251,6 +253,32 @@ router.post(
 );
 
 router.get(
+  "/assignments",
+  asyncHandler(async (req, res) => {
+    const driverId = req.userId;
+    if (!driverId) {
+      throw new ApiError(401, "UNAUTHORIZED", "Missing driver identity");
+    }
+
+    const active = await getActiveRideForDriver(driverId);
+    if (active) {
+      return res.json({ data: [toRideResponse(active)] });
+    }
+
+    const claimed = await claimRideForDriver({
+      driverId,
+      traceId: req.traceId
+    });
+
+    if (!claimed) {
+      return res.json({ data: [] });
+    }
+
+    return res.json({ data: [toRideResponse(claimed)] });
+  })
+);
+
+router.get(
   "/:id",
   validateRequest({
     paramsSchema: {
@@ -277,6 +305,7 @@ router.get(
       properties: {
         status: { type: "string" },
         riderId: { type: "string" },
+        driverId: { type: "string" },
         limit: { type: "string" },
         cursor: { type: "string" },
         sort: { type: "string" }
@@ -328,14 +357,33 @@ router.get(
   asyncHandler(async (req, res) => {
     const { limit, cursor, sort } = req.pagination;
     const roles = req.user?.roles || [];
-    const isAdmin = roles.includes("admin") || roles.includes("ops") || roles.includes("service");
-    const riderId = req.query.riderId || (isAdmin ? null : req.userId);
+    const canListAll =
+      roles.includes("admin") ||
+      roles.includes("ops") ||
+      roles.includes("driver");
+    const requestedRiderId = req.query.riderId || null;
+    const requestedDriverId = req.query.driverId || null;
+    const riderId = requestedRiderId
+      ? canListAll
+        ? requestedRiderId
+        : req.userId
+      : canListAll
+        ? null
+        : req.userId;
+    const driverId = requestedDriverId
+      ? canListAll
+        ? requestedDriverId
+        : req.userId
+      : null;
 
     const rows = await listRides({
       limit,
       cursor,
-      status: req.query.status,
-      riderId: riderId || null,
+      status: req.query.status
+        ? String(req.query.status).toLowerCase()
+        : null,
+      riderId,
+      driverId,
       sort: sort === "-createdAt" ? "-created_at" : "created_at"
     });
 
