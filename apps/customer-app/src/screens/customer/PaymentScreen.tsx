@@ -25,7 +25,7 @@ const PaymentScreen = () => {
       await completeRidePayment(method)
       navigation.replace('Rating')
     } catch (err: any) {
-      push(err?.message || 'Payment failed', 'danger')
+      push(err?.message || 'Thanh toán thất bại', 'danger')
     } finally {
       setLoading(false)
     }
@@ -33,20 +33,24 @@ const PaymentScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Payment</Text>
+      <Text style={styles.title}>Thanh toán</Text>
       <Card>
-        <Text style={styles.label}>Fare Summary</Text>
+        <Text style={styles.label}>Tổng cước phí</Text>
         <Text style={styles.amount}>{formatVnd(activeRide?.option.price || 0)}</Text>
       </Card>
       <Card>
-        <Text style={styles.label}>Payment Method</Text>
+        <Text style={styles.label}>Phương thức thanh toán</Text>
         {paymentMethods.map((item) => (
           <View key={item}>
-            {item === method ? <PrimaryButton title={`${item} selected`} onPress={() => setMethod(item)} /> : <OutlineButton title={item} onPress={() => setMethod(item)} />}
+            {item === method ? (
+              <PrimaryButton title={`${item} đã chọn`} onPress={() => setMethod(item)} />
+            ) : (
+              <OutlineButton title={item} onPress={() => setMethod(item)} />
+            )}
           </View>
         ))}
       </Card>
-      <PrimaryButton title={loading ? 'Processing...' : 'Pay'} onPress={handlePay} disabled={loading} />
+      <PrimaryButton title={loading ? 'Đang xử lý...' : 'Thanh toán'} onPress={handlePay} disabled={loading} />
       {/* TODO: Add VietQR/card redirect flow once Payment Service integration is enabled */}
     </View>
   )

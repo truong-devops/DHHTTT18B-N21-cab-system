@@ -8,7 +8,7 @@ import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { MainStackParamList } from '../../navigation/MainStack'
 
-const pickup = 'Current Location'
+const pickup = 'Vị trí hiện tại'
 
 const DestinationScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
@@ -27,8 +27,8 @@ const DestinationScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Choose Destination</Text>
-      <InputField value={query} onChangeText={setQuery} placeholder="Search destination" />
+      <Text style={styles.title}>Chọn điểm đến</Text>
+      <InputField value={query} onChangeText={setQuery} placeholder="Tìm điểm đến" />
       <FlatList
         data={filtered}
         keyExtractor={(item) => item}

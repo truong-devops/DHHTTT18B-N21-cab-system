@@ -1,1 +1,1 @@
-﻿export const formatVnd = (value: number) => `${value.toLocaleString('vi-VN')} VND`
+export const formatVnd = (value: number) => `${value.toLocaleString('vi-VN')} ₫`

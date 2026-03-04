@@ -27,7 +27,7 @@ const SearchingDriverScreen = () => {
         return () => clearTimeout(navTimer)
       })
       .catch((err: any) => {
-        push(err?.message || 'No driver found', 'danger')
+        push(err?.message || 'Không tìm thấy tài xế', 'danger')
         navigation.goBack()
       })
 
@@ -36,10 +36,10 @@ const SearchingDriverScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Searching Driver</Text>
-      <Text style={styles.subtitle}>Matching in realtime... {seconds}s</Text>
+      <Text style={styles.title}>Đang tìm tài xế</Text>
+      <Text style={styles.subtitle}>Đang ghép chuyến theo thời gian thực... {seconds}s</Text>
       <ActivityIndicator size="large" color={colors.brand600} />
-      <OutlineButton title="Cancel" onPress={() => navigation.goBack()} />
+      <OutlineButton title="Hủy" onPress={() => navigation.goBack()} />
       {/* TODO: Subscribe to matching events through WebSocket or SSE instead of timer */}
     </View>
   )

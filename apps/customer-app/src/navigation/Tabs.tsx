@@ -22,9 +22,21 @@ const Tabs = () => {
         tabBarStyle: { borderTopColor: colors.border }
       }}
     >
-      <Tab.Screen name="Home" component={HomeMapScreen} />
-      <Tab.Screen name="History" component={HistoryScreen} />
-      <Tab.Screen name="Profile" component={ProfileWalletScreen} />
+      <Tab.Screen
+        name="Home"
+        component={HomeMapScreen}
+        options={{ title: 'Trang chủ', tabBarLabel: 'Trang chủ' }}
+      />
+      <Tab.Screen
+        name="History"
+        component={HistoryScreen}
+        options={{ title: 'Lịch sử', tabBarLabel: 'Lịch sử' }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileWalletScreen}
+        options={{ title: 'Tài khoản', tabBarLabel: 'Tài khoản' }}
+      />
     </Tab.Navigator>
   )
 }

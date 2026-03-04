@@ -11,17 +11,17 @@ const ProfileWalletScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Profile & Wallet</Text>
+      <Text style={styles.title}>Tài khoản & Ví tiền</Text>
       <Card>
-        <Text style={styles.name}>{user?.name || 'Guest User'}</Text>
-        <Text style={styles.meta}>Phone: {user?.phone || '-'}</Text>
+        <Text style={styles.name}>{user?.name || 'Khách vãng lai'}</Text>
+        <Text style={styles.meta}>Số điện thoại: {user?.phone || '-'}</Text>
       </Card>
       <Card>
-        <Text style={styles.meta}>Wallet Balance</Text>
+        <Text style={styles.meta}>Số dư ví</Text>
         <Text style={styles.balance}>{formatVnd(walletBalance)}</Text>
-        <Text style={styles.meta}>Saved locations: Home, Work</Text>
+        <Text style={styles.meta}>Địa điểm đã lưu: Nhà, Công ty</Text>
       </Card>
-      <OutlineButton title="Logout" onPress={logout} />
+      <OutlineButton title="Đăng xuất" onPress={logout} />
       {/* TODO: Load wallet transactions + saved locations from User/Payment services */}
     </View>
   )

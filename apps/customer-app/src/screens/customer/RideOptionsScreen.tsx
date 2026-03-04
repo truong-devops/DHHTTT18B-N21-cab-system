@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
 import type { MainStackParamList } from '../../navigation/MainStack'
-import { customerMockApi } from '../../services/mockApi'
+import { customerApi } from '../../services/customerApi'
 import type { RideOption } from '../../mock/data'
 import { RideOptionCard } from '../../components/customer/RideOptionCard'
 import { PrimaryButton } from '../../components/common/PrimaryButton'
@@ -21,16 +21,16 @@ const RideOptionsScreen = () => {
   const { push } = useToast()
 
   useEffect(() => {
-    customerMockApi
+    customerApi
       .getRideOptions(route.params.pickup, route.params.destination)
       .then((result) => setOptions(result))
-      .catch((err) => push(err?.message || 'Cannot load ride options', 'danger'))
+      .catch((err) => push(err?.message || 'Không tải được lựa chọn xe', 'danger'))
       .finally(() => setLoading(false))
   }, [route.params.destination, route.params.pickup, push])
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Ride Options & Pricing</Text>
+      <Text style={styles.title}>Chọn xe & giá cước</Text>
       {loading ? <ActivityIndicator color={colors.brand600} /> : null}
       {options.map((option) => (
         <RideOptionCard
@@ -41,10 +41,10 @@ const RideOptionsScreen = () => {
         />
       ))}
       <PrimaryButton
-        title="Find Driver"
+        title="Tìm tài xế"
         onPress={() => {
           if (!selectedOption) {
-            push('Please select one option', 'danger')
+            push('Vui lòng chọn một loại xe', 'danger')
             return
           }
           navigation.navigate('SearchingDriver', route.params)

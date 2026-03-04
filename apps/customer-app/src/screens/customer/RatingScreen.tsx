@@ -14,20 +14,24 @@ const RatingScreen = () => {
   const { push } = useToast()
   const [stars, setStars] = useState(5)
   const [comment, setComment] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async () => {
     try {
+      setLoading(true)
       await submitRating(stars, comment)
-      push('Thanks for your feedback', 'success')
+      push('Cảm ơn bạn đã đánh giá', 'success')
       navigation.popToTop()
     } catch (err: any) {
-      push(err?.message || 'Submit rating failed', 'danger')
+      push(err?.message || 'Gửi đánh giá thất bại', 'danger')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Rating & Feedback</Text>
+      <Text style={styles.title}>Đánh giá chuyến đi</Text>
       <View style={styles.starsRow}>
         {[1, 2, 3, 4, 5].map((value) => (
           <Pressable key={value} onPress={() => setStars(value)}>
@@ -38,11 +42,11 @@ const RatingScreen = () => {
       <TextInput
         value={comment}
         onChangeText={setComment}
-        placeholder="Share your feedback"
+        placeholder="Chia sẻ cảm nhận của bạn"
         style={styles.comment}
         multiline
       />
-      <PrimaryButton title="Submit" onPress={handleSubmit} />
+      <PrimaryButton title={loading ? 'Đang gửi...' : 'Gửi đánh giá'} onPress={handleSubmit} disabled={loading} />
       {/* TODO: Extend payload with tip amount once wallet/tip service is available */}
     </View>
   )

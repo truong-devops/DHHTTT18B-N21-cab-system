@@ -28,3 +28,5 @@ coverage
 # Logs
 logs
 *.log
+!apps/admin-dashboard/src/components/admin/logs/
+!apps/admin-dashboard/src/components/admin/logs/*.jsx

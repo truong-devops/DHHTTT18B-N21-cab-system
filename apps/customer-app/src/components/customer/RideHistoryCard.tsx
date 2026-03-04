@@ -5,6 +5,8 @@ import { colors, spacing, typography } from '../../theme/tokens'
 import { formatVnd } from '../../utils/format'
 
 export const RideHistoryCard: React.FC<{ item: RideHistoryItem }> = ({ item }) => {
+  const statusLabel = item.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'
+
   return (
     <View style={styles.card}>
       <View style={styles.row}>
@@ -16,7 +18,7 @@ export const RideHistoryCard: React.FC<{ item: RideHistoryItem }> = ({ item }) =
         {' -> '}
         {item.destination}
       </Text>
-      <Text style={[styles.status, item.status === 'completed' ? styles.done : styles.cancel]}>{item.status}</Text>
+      <Text style={[styles.status, item.status === 'completed' ? styles.done : styles.cancel]}>{statusLabel}</Text>
     </View>
   )
 }

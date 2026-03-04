@@ -11,6 +11,7 @@
     "down:infra": "docker compose -f infra/docker-compose.dev.yml down -v",
     "logs:kafka": "docker compose -f infra/docker-compose.dev.yml logs -f kafka",
     "health": "node scripts/healthcheck.js",
+    "seed:all": "node scripts/seed-all.js",
     "generate:payment-types": "openapi-typescript contracts/openapi/payment-service.yaml -o libs/types/src/payment-service.ts"
   },
   "overrides": {

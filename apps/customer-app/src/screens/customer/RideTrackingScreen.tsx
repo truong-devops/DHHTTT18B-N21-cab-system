@@ -1,17 +1,26 @@
-﻿import React, { useEffect } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { MainStackParamList } from '../../navigation/MainStack'
-import { MapPlaceholder } from '../../components/map/MapPlaceholder'
+import { CustomerLiveMap } from '../../components/map/CustomerLiveMap'
 import { DriverInfoCard } from '../../components/customer/DriverInfoCard'
 import { PrimaryButton } from '../../components/common/PrimaryButton'
 import { colors, spacing, typography } from '../../theme/tokens'
+import { destinationPoints } from '../../mock/data'
 import { useCustomerStore } from '../../store/customerStore'
+import { customerApi } from '../../services/customerApi'
 
 const RideTrackingScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
   const { activeRide, decreaseEta } = useCustomerStore()
+
+  const destinationCoordinate = useMemo(() => {
+    if (!activeRide) return null
+    const found = destinationPoints.find((point) => point.label === activeRide.destination)
+    if (!found) return null
+    return { latitude: found.lat, longitude: found.lng }
+  }, [activeRide])
 
   useEffect(() => {
     if (!activeRide) return
@@ -24,7 +33,7 @@ const RideTrackingScreen = () => {
   if (!activeRide?.driver) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>Ride state missing</Text>
+        <Text style={styles.emptyText}>Không tìm thấy trạng thái chuyến đi</Text>
       </View>
     )
   }
@@ -32,11 +41,17 @@ const RideTrackingScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.mapArea}>
-        <MapPlaceholder label="C7 Ride Tracking map (driver + route)" />
+        <CustomerLiveMap
+          label="Theo dõi hành trình trực tiếp"
+          destination={destinationCoordinate}
+          showRoute={Boolean(destinationCoordinate)}
+          onLocationChange={(coords) => {
+            customerApi.setLivePickupLocation(coords.latitude, coords.longitude)
+          }}
+        />
       </View>
       <DriverInfoCard driver={activeRide.driver} etaMinutes={activeRide.etaMinutes} />
-      <PrimaryButton title="Complete Ride" onPress={() => navigation.replace('Payment')} />
-      {/* TODO: Replace simulated ETA countdown with realtime ETA stream from ETA Service */}
+      <PrimaryButton title="Hoàn tất chuyến đi" onPress={() => navigation.replace('Payment')} />
     </View>
   )
 }
@@ -49,4 +64,3 @@ const styles = StyleSheet.create({
 })
 
 export default RideTrackingScreen
-

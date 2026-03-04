@@ -15,7 +15,7 @@ const HistoryScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Ride History</Text>
+      <Text style={styles.title}>Lịch sử chuyến đi</Text>
       <FlatList
         data={history}
         keyExtractor={(item) => item.id}
