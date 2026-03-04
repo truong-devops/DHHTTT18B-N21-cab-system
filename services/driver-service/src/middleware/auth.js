@@ -1,6 +1,5 @@
 const jwt = require("jsonwebtoken");
 const { ApiError } = require("../utils/errors");
-const logger = require("../utils/logger");
 
 function resolveJwtConfig() {
   const publicKey = process.env.AUTH_PUBLIC_KEY;
@@ -32,14 +31,6 @@ function normalizeRoles(payload) {
     return [String(payload.role).toLowerCase()].filter(Boolean);
   }
   return [];
-}
-
-function parseRolesHeader(value) {
-  if (!value) return [];
-  return String(value)
-    .split(",")
-    .map((role) => role.trim().toLowerCase())
-    .filter(Boolean);
 }
 
 function normalizeRoleList(list) {
@@ -76,23 +67,17 @@ function requireAuth(req, _res, next) {
       );
     }
 
-    let roles = normalizeRoles(payload);
-    if (!roles.length) {
-      const headerRoles = parseRolesHeader(
-        req.header("x-user-roles")
-      );
-      if (headerRoles.length) {
-        roles = headerRoles;
-      }
-    }
-    const headerRole = req.header("x-user-role");
+    const roles = normalizeRoles(payload);
+    const roleFromPayload = payload.role
+      ? String(payload.role).toLowerCase()
+      : null;
+
     req.user = {
       id,
       roles,
       role:
-        payload.role ||
-        (roles.length ? roles[0] : null) ||
-        (headerRole ? String(headerRole).toLowerCase() : null),
+        roleFromPayload ||
+        (roles.length ? roles[0] : null),
       scopes: Array.isArray(payload.scopes) ? payload.scopes : []
     };
     req.userId = id;
@@ -116,19 +101,10 @@ function requireRole(...roles) {
         ? req.user.roles
         : req.user.role || null
     );
-    const headerRoles = normalizeRoleList(
-      req.header("x-user-roles") || req.header("x-user-role")
-    );
-    const hasRole = [...rolesToCheck, ...headerRoles].some(
+    const hasRole = rolesToCheck.some(
       (role) => allowed.includes(role)
     );
     if (!hasRole) {
-      logger.withTrace(req).warn({
-        msg: "role check failed",
-        allowed,
-        rolesToCheck,
-        headerRoles
-      });
       return next(
         new ApiError(403, "FORBIDDEN", "Insufficient role")
       );

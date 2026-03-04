@@ -1,10 +1,12 @@
-﻿export type RideOption = {
+export type RideOption = {
   id: string
   name: string
   etaMinutes: number
   price: number
   capacity: number
   surgeLabel?: string
+  quoteId?: string
+  serviceType?: 'STANDARD' | 'PREMIUM'
 }
 
 export type DriverInfo = {
@@ -24,20 +26,42 @@ export type RideHistoryItem = {
   status: 'completed' | 'cancelled'
 }
 
+export type LocationPoint = {
+  label: string
+  lat: number
+  lng: number
+}
+
 export const nearbyDrivers = 12
 
-export const destinations = [
-  'IUH Campus 12 Nguyen Van Bao',
-  'Tan Son Nhat Airport',
-  'Ben Thanh Market',
-  'Landmark 81',
-  'Saigon Centre'
+export const pickupPoint: LocationPoint = {
+  label: 'Vị trí hiện tại',
+  lat: 10.776889,
+  lng: 106.700806
+}
+
+export const destinationPoints: LocationPoint[] = [
+  { label: 'IUH Cơ sở 12 Nguyễn Văn Bảo', lat: 10.822558, lng: 106.686917 },
+  { label: 'Sân bay Tân Sơn Nhất', lat: 10.818855, lng: 106.65199 },
+  { label: 'Chợ Bến Thành', lat: 10.772477, lng: 106.698025 },
+  { label: 'Landmark 81', lat: 10.794142, lng: 106.721979 },
+  { label: 'Saigon Centre', lat: 10.773468, lng: 106.700978 }
 ]
 
+export const destinations = destinationPoints.map((item) => item.label)
+
 export const rideOptions: RideOption[] = [
-  { id: 'bike', name: 'Bike', etaMinutes: 4, price: 32000, capacity: 1 },
-  { id: 'car4', name: 'Car 4 Seat', etaMinutes: 6, price: 74000, capacity: 4, surgeLabel: 'x1.2 surge' },
-  { id: 'car7', name: 'Car 7 Seat', etaMinutes: 7, price: 98000, capacity: 7 }
+  { id: 'bike', name: 'Xe máy', etaMinutes: 4, price: 32000, capacity: 1, serviceType: 'STANDARD' },
+  {
+    id: 'car4',
+    name: 'Xe 4 chỗ',
+    etaMinutes: 6,
+    price: 74000,
+    capacity: 4,
+    surgeLabel: 'Tăng giá x1.2',
+    serviceType: 'STANDARD'
+  },
+  { id: 'car7', name: 'Xe 7 chỗ', etaMinutes: 7, price: 98000, capacity: 7, serviceType: 'PREMIUM' }
 ]
 
 export const mockDriver: DriverInfo = {
@@ -48,4 +72,4 @@ export const mockDriver: DriverInfo = {
   plate: '51K-999.88'
 }
 
-export const paymentMethods = ['Cash', 'Card', 'Wallet']
+export const paymentMethods = ['Tiền mặt', 'Ví', 'VietQR']

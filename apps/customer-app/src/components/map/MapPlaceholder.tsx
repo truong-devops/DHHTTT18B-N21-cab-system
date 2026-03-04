@@ -2,7 +2,7 @@
 import { StyleSheet, Text, View } from 'react-native'
 import { colors, spacing, typography } from '../../theme/tokens'
 
-export const MapPlaceholder: React.FC<{ label?: string }> = ({ label = 'Map Placeholder' }) => {
+export const MapPlaceholder: React.FC<{ label?: string }> = ({ label = 'Khu vực bản đồ' }) => {
   return (
     <View style={styles.map}>
       <Text style={styles.text}>{label}</Text>

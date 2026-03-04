@@ -11,10 +11,10 @@ type Props = {
 export const DriverInfoCard: React.FC<Props> = ({ driver, etaMinutes }) => {
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Driver Found</Text>
+      <Text style={styles.title}>Đã tìm thấy tài xế</Text>
       <Text style={styles.line}>{driver.name} | {driver.vehicle}</Text>
-      <Text style={styles.line}>Plate {driver.plate} | Rating {driver.rating}</Text>
-      <Text style={styles.eta}>ETA live: {etaMinutes} min</Text>
+      <Text style={styles.line}>Biển số {driver.plate} | Đánh giá {driver.rating}</Text>
+      <Text style={styles.eta}>Thời gian đến dự kiến: {etaMinutes} phút</Text>
       {/* TODO: Integrate call/chat actions with Communication Service */}
     </View>
   )

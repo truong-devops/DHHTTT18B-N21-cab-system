@@ -17,7 +17,7 @@ export const RideOptionCard: React.FC<Props> = ({ option, selected, onPress }) =
         <Text style={styles.name}>{option.name}</Text>
         <Text style={styles.price}>{formatVnd(option.price)}</Text>
       </View>
-      <Text style={styles.meta}>ETA {option.etaMinutes} min | {option.capacity} seats</Text>
+      <Text style={styles.meta}>Đến nơi dự kiến {option.etaMinutes} phút | {option.capacity} chỗ</Text>
       {option.surgeLabel ? <Text style={styles.surge}>{option.surgeLabel}</Text> : null}
     </Pressable>
   )

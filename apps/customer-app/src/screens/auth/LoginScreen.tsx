@@ -6,7 +6,7 @@ import { colors, spacing, typography } from '../../theme/tokens'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { AuthStackParamList } from '../../navigation/AuthStack'
-import { customerMockApi } from '../../services/mockApi'
+import { customerApi } from '../../services/customerApi'
 import { useToast } from '../../hooks/useToast'
 
 const LoginScreen = () => {
@@ -16,18 +16,19 @@ const LoginScreen = () => {
   const { push } = useToast()
 
   const handleContinue = async () => {
-    if (!identifier.trim()) {
-      push('Please enter phone or email', 'danger')
+    const normalizedIdentifier = identifier.trim()
+    if (!normalizedIdentifier) {
+      push('Vui lòng nhập số điện thoại hoặc email', 'danger')
       return
     }
 
     try {
       setLoading(true)
-      const result = await customerMockApi.requestOtp(identifier)
-      if (!result.ok) throw new Error('Cannot request OTP')
-      navigation.navigate('Otp', { identifier })
+      const result = await customerApi.requestOtp(normalizedIdentifier)
+      if (!result.ok) throw new Error('Không thể gửi OTP')
+      navigation.navigate('Otp', { identifier: normalizedIdentifier })
     } catch (err: any) {
-      push(err?.message || 'Request OTP failed', 'danger')
+      push(err?.message || 'Gửi OTP thất bại', 'danger')
     } finally {
       setLoading(false)
     }
@@ -35,15 +36,15 @@ const LoginScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Customer Login</Text>
-      <Text style={styles.subtitle}>Use your phone or email to continue</Text>
+      <Text style={styles.title}>Đăng nhập khách hàng</Text>
+      <Text style={styles.subtitle}>Nhập số điện thoại hoặc email để tiếp tục (OTP/Mật khẩu ở bước sau)</Text>
       <InputField
-        label="Phone or Email"
+        label="Số điện thoại hoặc Email"
         value={identifier}
         onChangeText={setIdentifier}
-        placeholder="090xxxxxxx or user@email.com"
+        placeholder="090xxxxxxx hoặc user@email.com"
       />
-      <PrimaryButton title={loading ? 'Sending OTP...' : 'Continue'} onPress={handleContinue} disabled={loading} />
+      <PrimaryButton title={loading ? 'Đang gửi OTP...' : 'Tiếp tục'} onPress={handleContinue} disabled={loading} />
       {/* TODO: Add social login buttons when Auth Service supports OAuth providers */}
     </View>
   )

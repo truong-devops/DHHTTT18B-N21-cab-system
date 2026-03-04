@@ -1,28 +1,43 @@
-﻿import React from 'react'
+import React, { useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { MainStackParamList } from '../../navigation/MainStack'
-import { MapPlaceholder } from '../../components/map/MapPlaceholder'
+import { CustomerLiveMap } from '../../components/map/CustomerLiveMap'
 import { Card } from '../../components/common/Card'
 import { PrimaryButton } from '../../components/common/PrimaryButton'
 import { colors, spacing, typography } from '../../theme/tokens'
-import { nearbyDrivers } from '../../mock/data'
+import { destinationPoints, nearbyDrivers } from '../../mock/data'
+import { useCustomerStore } from '../../store/customerStore'
+import { customerApi } from '../../services/customerApi'
 
 const HomeMapScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
+  const { destination } = useCustomerStore()
+
+  const destinationCoordinate = useMemo(() => {
+    const found = destinationPoints.find((point) => point.label === destination)
+    if (!found) return null
+    return { latitude: found.lat, longitude: found.lng }
+  }, [destination])
 
   return (
     <View style={styles.container}>
       <View style={styles.mapWrap}>
-        <MapPlaceholder label="C3 Home Map & Pickup - live map will be integrated later" />
+        <CustomerLiveMap
+          label="Bản đồ điểm đón trực tiếp"
+          destination={destinationCoordinate}
+          showRoute={Boolean(destinationCoordinate)}
+          onLocationChange={(coords) => {
+            customerApi.setLivePickupLocation(coords.latitude, coords.longitude)
+          }}
+        />
       </View>
       <Card>
-        <Text style={styles.title}>Pickup: Current Location</Text>
-        <Text style={styles.meta}>{nearbyDrivers} drivers nearby</Text>
-        <PrimaryButton title="Set Destination" onPress={() => navigation.navigate('Destination')} />
+        <Text style={styles.title}>Điểm đón: Vị trí hiện tại</Text>
+        <Text style={styles.meta}>Có {nearbyDrivers} tài xế ở gần bạn</Text>
+        <PrimaryButton title="Chọn điểm đến" onPress={() => navigation.navigate('Destination')} />
       </Card>
-      {/* TODO: Integrate WebSocket nearby-driver updates from Ride Service */}
     </View>
   )
 }

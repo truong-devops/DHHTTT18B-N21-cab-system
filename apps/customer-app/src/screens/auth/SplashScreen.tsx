@@ -17,8 +17,8 @@ const SplashScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>CAB CUSTOMER</Text>
-      <Text style={styles.subtitle}>Book | Track | Pay</Text>
+      <Text style={styles.logo}>CAB KHÁCH HÀNG</Text>
+      <Text style={styles.subtitle}>Đặt xe | Theo dõi | Thanh toán</Text>
     </View>
   )
 }

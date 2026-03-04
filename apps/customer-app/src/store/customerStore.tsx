@@ -1,6 +1,9 @@
-﻿import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { DriverInfo, RideHistoryItem, RideOption } from '../mock/data'
-import { customerMockApi } from '../services/mockApi'
+import { setOnAuthFailure } from '../lib/api'
+import { clearTokens, getRefreshToken, hydrateTokens, setTokens } from '../lib/token-store'
+import * as authApi from '../services/authApi'
+import { customerApi } from '../services/customerApi'
 
 type User = {
   id: string
@@ -15,6 +18,7 @@ type ActiveRide = {
   option: RideOption
   driver: DriverInfo | null
   etaMinutes: number
+  driverId?: string
 }
 
 type CustomerContextValue = {
@@ -28,7 +32,7 @@ type CustomerContextValue = {
   walletBalance: number
   setDestination: (destination: string) => void
   login: (identifier: string, otp: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   loadHistory: () => Promise<void>
   chooseOption: (option: RideOption) => void
   startRide: (pickup: string, destination: string) => Promise<void>
@@ -40,7 +44,7 @@ type CustomerContextValue = {
 const CustomerContext = createContext<CustomerContextValue | undefined>(undefined)
 
 export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [bootstrapped] = useState(true)
+  const [bootstrapped, setBootstrapped] = useState(false)
   const [authenticated, setAuthenticated] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [destination, setDestination] = useState('')
@@ -49,25 +53,101 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [history, setHistory] = useState<RideHistoryItem[]>([])
   const [walletBalance] = useState(450000)
 
-  const login = useCallback(async (identifier: string, otp: string) => {
-    if (!identifier.trim() || !otp.trim()) {
-      throw new Error('Missing login data')
-    }
-    const result = await customerMockApi.verifyOtp()
-    setAuthenticated(true)
-    setUser(result.user)
-  }, [])
-
-  const logout = useCallback(() => {
+  const resetState = useCallback(() => {
     setAuthenticated(false)
     setUser(null)
     setDestination('')
     setSelectedOption(null)
     setActiveRide(null)
+    setHistory([])
   }, [])
 
+  const logout = useCallback(async () => {
+    const refreshToken = getRefreshToken()
+    if (refreshToken) {
+      try {
+        await authApi.logout(refreshToken)
+      } catch {
+        // ignore logout failures during client cleanup
+      }
+    }
+
+    await clearTokens()
+    resetState()
+  }, [resetState])
+
+  const syncUserFromVerify = useCallback((identifier: string, result: authApi.VerifyResponse) => {
+    setAuthenticated(true)
+    setUser({
+      id: result.data.userId,
+      name: identifier,
+      phone: identifier.includes('@') ? 'Không có' : identifier
+    })
+  }, [])
+
+  const login = useCallback(
+    async (identifier: string, otp: string) => {
+      const normalizedIdentifier = typeof identifier === 'string' ? identifier.trim() : ''
+      const normalizedCredential = typeof otp === 'string' ? otp.trim() : ''
+      if (!normalizedIdentifier) {
+        throw new Error('Thiếu số điện thoại/email.')
+      }
+      if (!normalizedCredential) {
+        throw new Error('Thiếu OTP/mật khẩu.')
+      }
+
+      const result = await customerApi.verifyOtp(normalizedIdentifier, normalizedCredential)
+      await setTokens(result.accessToken, result.refreshToken)
+
+      try {
+        const verified = await authApi.verify()
+        syncUserFromVerify(result.user.name, verified)
+      } catch {
+        setAuthenticated(true)
+        setUser(result.user)
+      }
+    },
+    [syncUserFromVerify]
+  )
+
+  useEffect(() => {
+    setOnAuthFailure(() => {
+      void logout()
+    })
+    return () => setOnAuthFailure(null)
+  }, [logout])
+
+  useEffect(() => {
+    let mounted = true
+
+    hydrateTokens()
+      .then(async ({ accessToken }) => {
+        if (!mounted || !accessToken) return
+
+        try {
+          const verified = await authApi.verify()
+          if (!mounted) return
+          syncUserFromVerify('Khách hàng', verified)
+        } catch {
+          await clearTokens()
+          if (mounted) {
+            resetState()
+          }
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setBootstrapped(true)
+        }
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [resetState, syncUserFromVerify])
+
   const loadHistory = useCallback(async () => {
-    const items = await customerMockApi.getHistory()
+    const items = await customerApi.getHistory()
     setHistory(items)
   }, [])
 
@@ -77,15 +157,24 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const startRide = useCallback(
     async (pickup: string, destinationValue: string) => {
-      if (!selectedOption) throw new Error('No ride option selected')
-      const driver = await customerMockApi.findDriver(selectedOption.id)
+      if (!selectedOption) {
+        throw new Error('Chưa chọn loại xe')
+      }
+
+      const result = await customerApi.startRide({
+        pickupLabel: pickup,
+        destinationLabel: destinationValue,
+        option: selectedOption
+      })
+
       setActiveRide({
-        id: `ride-${Date.now()}`,
+        id: result.ride.id,
         pickup,
         destination: destinationValue,
         option: selectedOption,
-        driver,
-        etaMinutes: selectedOption.etaMinutes
+        driver: result.driver,
+        etaMinutes: selectedOption.etaMinutes,
+        driverId: result.ride.driverId || result.ride.id
       })
     },
     [selectedOption]
@@ -97,16 +186,17 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const completeRidePayment = useCallback(
     async (method: string) => {
-      if (!activeRide) throw new Error('No active ride')
-      await customerMockApi.createPayment(activeRide.id, method)
+      if (!activeRide) throw new Error('Không có chuyến đi đang hoạt động')
+      await customerApi.createPayment(activeRide.id, method, activeRide.option.price)
     },
     [activeRide]
   )
 
   const submitRating = useCallback(
     async (stars: number, comment: string) => {
-      if (!activeRide) throw new Error('No active ride')
-      await customerMockApi.submitRating(activeRide.id, stars, comment)
+      if (!activeRide) throw new Error('Không có chuyến đi đang hoạt động')
+
+      await customerApi.submitRating(activeRide.id, activeRide.driverId, stars, comment)
 
       setHistory((prev) => [
         {
@@ -117,8 +207,9 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           amount: activeRide.option.price,
           status: 'completed'
         },
-        ...prev
+        ...prev.filter((item) => item.id !== activeRide.id)
       ])
+
       setSelectedOption(null)
       setActiveRide(null)
       setDestination('')
