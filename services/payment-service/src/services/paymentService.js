@@ -15,20 +15,83 @@ const { STATUSES, canTransition } = require("../domain/paymentStatus");
 const { buildPaymentCompleted, buildPaymentFailed } = require("../messaging/events");
 const { generateVietQr } = require("./vietqrService");
 const { createPayosPaymentLink } = require("./payosService");
+const { generateVietQrCode } = require("../integrations/vietqrClient");
+const config = require("../config");
 const { withTrace } = require("../utils/logger");
+
+async function resolvePayosQrCode({
+  payosData,
+  traceId,
+  requestId,
+  authorization
+}) {
+  if (!payosData || !payosData.qrCode) {
+    return payosData;
+  }
+  if (config.payos.qrSource !== "VIETQR") {
+    return payosData;
+  }
+
+  const bankBin = payosData.bankBin;
+  const accountNumber = payosData.accountNumber;
+  const accountName = payosData.accountName;
+  const addInfo = payosData.description || String(payosData.orderCode || "");
+  const amount = Number(payosData.amount);
+  if (!bankBin || !accountNumber || !accountName || !addInfo || !Number.isFinite(amount)) {
+    return payosData;
+  }
+
+  try {
+    const vietqr = await generateVietQrCode({
+      apiUrl: config.vietqr.apiUrl,
+      bankBin,
+      accountNumber,
+      accountName,
+      amount,
+      addInfo,
+      format: config.vietqr.format,
+      headers: {
+        authorization,
+        traceId,
+        requestId,
+        clientId: config.vietqr.clientId,
+        apiKey: config.vietqr.apiKey
+      }
+    });
+    return {
+      ...payosData,
+      qrCode: vietqr.qrDataUrl || vietqr.qrCode || payosData.qrCode
+    };
+  } catch (err) {
+    withTrace(traceId, requestId).warn(
+      { err, orderCode: payosData.orderCode },
+      "Fallback to PayOS QR due to VietQR generation error"
+    );
+    return payosData;
+  }
+}
 
 async function createPayment({ payload, idempotency, traceId, requestId, method, path, authorization }) {
   const requestHash = idempotency
     ? (idempotency.requestHash || hashRequest(method, path, payload))
     : null;
   const paymentMethod = payload.method || "";
-  const payosData =
+  const rawPayosData =
     paymentMethod === "PAYOS"
       ? await createPayosPaymentLink({
           amount: payload.amount,
           currency: payload.currency,
           note: payload.note,
           rideId: payload.rideId
+        })
+      : null;
+  const payosData =
+    paymentMethod === "PAYOS"
+      ? await resolvePayosQrCode({
+          payosData: rawPayosData,
+          traceId,
+          requestId,
+          authorization
         })
       : null;
   const vietqrData =

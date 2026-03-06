@@ -21,7 +21,8 @@ const PUBLIC_PATHS = new Set(
   parseList(process.env.AUTH_PUBLIC_PATHS, [
     "/health",
     "/healthz",
-    "/readyz"
+    "/readyz",
+    "/webhooks/payos"
   ])
 );
 

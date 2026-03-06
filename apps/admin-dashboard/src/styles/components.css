@@ -431,3 +431,297 @@
   word-break: break-all;
   color: var(--text);
 }
+
+.payment-sheet {
+  border: 1px solid #e8ebf2;
+  border-radius: 22px;
+  padding: 20px;
+  background: #ffffff;
+  box-shadow: 0 20px 42px rgba(15, 23, 42, 0.07);
+}
+
+.payment-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.payment-sheet-brand-main {
+  display: flex;
+  align-items: center;
+}
+
+.payment-sheet-brand-partners {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pay-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 12px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pay-brand-payos {
+  border-color: #d5dffa;
+  background: #f4f7ff;
+  color: #314992;
+}
+
+.pay-brand-payos-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(150deg, #5f6aff 0%, #3544ca 100%);
+}
+
+.pay-brand-vietqr {
+  border: none;
+  background: transparent;
+  padding: 0;
+  gap: 8px;
+}
+
+.pay-brand-vietqr-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 9px 9px 3px 9px;
+  transform: rotate(-20deg);
+  background: linear-gradient(145deg, #ff4d62 0%, #dd2c4c 100%);
+}
+
+.pay-brand-vietqr-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.pay-brand-vietqr-text .is-red {
+  color: #eb3e50;
+}
+
+.pay-brand-vietqr-text .is-blue {
+  color: #2f4f97;
+}
+
+.payment-sheet-title {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #717a8f;
+  text-align: center;
+}
+
+.payment-sheet-caption {
+  margin-top: 8px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 31px;
+  line-height: 1.25;
+  color: #121a2b;
+}
+
+.payment-sheet-amount {
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  color: #1f2937;
+  text-align: center;
+}
+
+.payment-sheet-hint {
+  margin-top: 4px;
+  color: #6f788e;
+  font-size: 12px;
+  text-align: center;
+}
+
+.payment-sheet-qr {
+  margin-top: 12px;
+  display: grid;
+  place-items: center;
+}
+
+.payment-sheet-qr-frame {
+  position: relative;
+  width: min(300px, 100%);
+  aspect-ratio: 1 / 1;
+  border: 1px solid #e6ebf7;
+  border-radius: 20px;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  padding: 26px;
+}
+
+.payment-sheet-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #6965ff;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.payment-sheet-corner.corner-tl {
+  top: 12px;
+  left: 12px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.payment-sheet-corner.corner-tr {
+  top: 12px;
+  right: 12px;
+  border-left: none;
+  border-bottom: none;
+}
+
+.payment-sheet-corner.corner-bl {
+  bottom: 12px;
+  left: 12px;
+  border-right: none;
+  border-top: none;
+}
+
+.payment-sheet-corner.corner-br {
+  bottom: 12px;
+  right: 12px;
+  border-left: none;
+  border-top: none;
+}
+
+.payment-sheet-qr-image {
+  width: min(238px, 92%);
+  height: auto;
+}
+
+.payment-sheet-qr-empty {
+  color: #737c90;
+  font-size: 12px;
+  text-align: center;
+  max-width: 240px;
+}
+
+.payment-sheet-meta {
+  margin-top: 16px;
+  border-top: 1px solid #edf1f8;
+  padding-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.payment-sheet-meta > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  border: 1px solid #eef1f8;
+  border-radius: 12px;
+  background: #f9fbff;
+  padding: 8px 10px;
+}
+
+.payment-sheet-meta span {
+  color: #707b92;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+}
+
+.payment-sheet-meta strong {
+  color: #111827;
+  text-align: right;
+  word-break: break-word;
+  max-width: 60%;
+}
+
+.payment-debug {
+  margin-top: 12px;
+  border: 1px dashed #d8deee;
+  border-radius: 10px;
+  background: #f9fbff;
+  padding: 8px 10px;
+}
+
+.payment-debug summary {
+  cursor: pointer;
+  list-style: none;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  color: #707b92;
+  font-weight: 600;
+}
+
+.payment-debug summary::-webkit-details-marker {
+  display: none;
+}
+
+.payment-debug .code-chip {
+  margin-top: 8px;
+  background: #ffffff;
+}
+
+@media (max-width: 680px) {
+  .payment-sheet {
+    padding: 14px;
+  }
+
+  .payment-sheet-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .payment-sheet-brand-partners {
+    justify-content: flex-start;
+  }
+
+  .pay-brand-vietqr-text {
+    font-size: 22px;
+  }
+
+  .payment-sheet-caption {
+    font-size: 25px;
+  }
+
+  .payment-sheet-amount {
+    font-size: 29px;
+  }
+
+  .payment-sheet-meta > div {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .payment-sheet-meta strong {
+    max-width: 100%;
+    text-align: left;
+  }
+}

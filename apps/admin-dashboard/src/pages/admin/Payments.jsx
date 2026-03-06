@@ -18,7 +18,7 @@ const DEFAULT_FORM = {
   userId: '',
   amount: '120000',
   currency: 'VND',
-  method: 'VIETQR',
+  method: 'PAYOS',
   note: 'Thanh toán thử',
 }
 
@@ -42,6 +42,41 @@ function decodeJwtPayload(token) {
   } catch (error) {
     return null
   }
+}
+
+function formatMoney(amount, currency = 'VND') {
+  const numeric = Number(amount)
+  if (!Number.isFinite(numeric)) return '-'
+  try {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: currency === 'VND' ? 0 : 2,
+    }).format(numeric)
+  } catch (error) {
+    return `${numeric} ${currency}`
+  }
+}
+
+function PayosLogo() {
+  return (
+    <span className="pay-brand pay-brand-payos" aria-label="PayOS">
+      <span className="pay-brand-payos-mark">P</span>
+      <span>PayOS</span>
+    </span>
+  )
+}
+
+function VietQrLogo() {
+  return (
+    <span className="pay-brand pay-brand-vietqr" aria-label="VietQR">
+      <span className="pay-brand-vietqr-mark" />
+      <span className="pay-brand-vietqr-text">
+        <span className="is-red">VIET</span>
+        <span className="is-blue">QR</span>
+      </span>
+    </span>
+  )
 }
 
 function Payments() {
@@ -155,7 +190,7 @@ function Payments() {
     }
   }, [autoConfirm, autoConfirmDelay, authToken, payment, toast])
 
-  const qrImage = useMemo(() => {
+  const nativeQrImage = useMemo(() => {
     if (vietqr?.qrUrl && String(vietqr.qrUrl).startsWith('data:image')) {
       return vietqr.qrUrl
     }
@@ -165,24 +200,27 @@ function Payments() {
     ) {
       return payment.payos.qrCode
     }
-    return qrFallback
+    return ''
   }, [payment, vietqr])
+  const qrImage = nativeQrImage || qrFallback
 
   const qrPayload = useMemo(() => {
     if (vietqr?.payload) return vietqr.payload
-    if (payment?.payos?.qrCode && !qrImage) return payment.payos.qrCode
+    if (payment?.payos?.qrCode && !nativeQrImage) return payment.payos.qrCode
+    if (payment?.payos?.checkoutUrl) return payment.payos.checkoutUrl
     return ''
-  }, [payment, qrImage, vietqr])
+  }, [nativeQrImage, payment, vietqr])
 
   useEffect(() => {
     let mounted = true
 
     async function generateQr() {
-      if (!qrPayload || qrImage) {
+      if (!qrPayload || nativeQrImage) {
         if (mounted) setQrFallback('')
         return
       }
       try {
+        if (mounted) setQrFallback('')
         const dataUrl = await QRCode.toDataURL(qrPayload, {
           width: 220,
           margin: 1,
@@ -195,10 +233,10 @@ function Payments() {
 
     generateQr()
 
-    return () => {
+  return () => {
       mounted = false
     }
-  }, [qrPayload, qrImage])
+  }, [nativeQrImage, qrPayload])
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -232,6 +270,14 @@ function Payments() {
       amount: String(form.amount).trim(),
       currency: form.currency.trim().toUpperCase(),
       method: form.method,
+    }
+
+    if (payload.method === 'PAYOS' && !/^\d+$/.test(payload.amount)) {
+      const message = 'PayOS requires integer amount in VND.'
+      setError(message)
+      toast?.push(message, 'danger')
+      setLoading(false)
+      return
     }
 
     if (form.userId.trim()) {
@@ -317,6 +363,16 @@ function Payments() {
     () => ['INITIATED', 'PROCESSING', 'PAID', 'FAILED', 'REFUNDED'],
     []
   )
+  const isVietQrPayment = payment?.method === 'VIETQR'
+  const isPayosPayment = payment?.method === 'PAYOS'
+  const paymentAmountLabel = useMemo(
+    () => formatMoney(payment?.amount, payment?.currency || 'VND'),
+    [payment]
+  )
+  const statusText = payment?.status || 'INITIATED'
+  const sheetHint = isPayosPayment
+    ? 'Dung app ngan hang ho tro VietQR hoac app PayOS de quet.'
+    : 'Quet ma de thanh toan nhanh.'
 
   const statusVariant = (status) => {
     switch (status) {
@@ -543,9 +599,9 @@ function Payments() {
                 type="button"
                 variant="outline"
                 onClick={handleFetchQr}
-                disabled={!payment?.id || loadingQr}
+                disabled={!payment?.id || !isVietQrPayment || loadingQr}
               >
-                {loadingQr ? 'Đang tải...' : 'Lấy VietQR'}
+                {loadingQr ? 'Đang tải...' : isVietQrPayment ? 'Lấy VietQR' : 'QR PayOS tự sinh'}
               </Button>
               <Button
                 type="button"
@@ -557,43 +613,88 @@ function Payments() {
               </Button>
             </div>
           </div>
-          <div className="qr-preview">
-            {qrImage ? (
-              <img src={qrImage} alt="VietQR" className="qr-image" />
-            ) : (
-              <div className="text-muted">
-                Chưa có QR. Tạo thanh toán VietQR để hiển thị mã QR.
+          <div className="payment-sheet">
+            <div className="payment-sheet-head">
+              <div className="payment-sheet-brand-main">
+                <VietQrLogo />
               </div>
-            )}
-          </div>
-          <div className="qr-meta">
-            <div>
-              <span>Mã thanh toán:</span>{' '}
-              <strong>{payment?.id || '-'}</strong>
+              <div className="payment-sheet-brand-partners">
+                <PayosLogo />
+                <Badge variant={statusVariant(statusText)}>
+                  {labelFrom(paymentStatusLabels, statusText)}
+                </Badge>
+              </div>
             </div>
-            <div>
-              <span>Trạng thái:</span>{' '}
-              <strong>{payment?.status || '-'}</strong>
+
+            <div className="payment-sheet-qr">
+              <div className="payment-sheet-qr-frame">
+                <span className="payment-sheet-corner corner-tl" />
+                <span className="payment-sheet-corner corner-tr" />
+                <span className="payment-sheet-corner corner-bl" />
+                <span className="payment-sheet-corner corner-br" />
+                {qrImage ? (
+                  <img
+                    src={qrImage}
+                    alt="Payment QR"
+                    className="payment-sheet-qr-image"
+                  />
+                ) : (
+                  <div className="payment-sheet-qr-empty">
+                    QR will appear right after payment is created.
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <span>Số tiền:</span>{' '}
-              <strong>
-                {payment?.amount ? `${payment.amount} ${payment.currency}` : '-'}
-              </strong>
-            </div>
-            <div>
-              <span>Tham chiếu VietQR:</span>{' '}
-              <strong>{vietqr?.reference || '-'}</strong>
-            </div>
-            <div>
-              <span>Hết hạn:</span>{' '}
-              <strong>{vietqr?.expiresAt || '-'}</strong>
+
+            <div className="payment-sheet-title">Scan To Pay</div>
+            <div className="payment-sheet-caption">Quet ma thanh toan nhanh</div>
+            <div className="payment-sheet-amount">{paymentAmountLabel}</div>
+            <div className="payment-sheet-hint">{sheetHint}</div>
+
+            <div className="payment-sheet-meta">
+              <div>
+                <span>Payment ID</span>
+                <strong>{payment?.id || '-'}</strong>
+              </div>
+              <div>
+                <span>Ride ID</span>
+                <strong>{payment?.rideId || '-'}</strong>
+              </div>
+              <div>
+                <span>PayOS orderCode</span>
+                <strong>{payment?.payos?.orderCode || '-'}</strong>
+              </div>
+              <div>
+                <span>PayOS paymentLinkId</span>
+                <strong>{payment?.payos?.paymentLinkId || '-'}</strong>
+              </div>
+              <div>
+                <span>VietQR reference</span>
+                <strong>{vietqr?.reference || '-'}</strong>
+              </div>
+              <div>
+                <span>Expires</span>
+                <strong>{vietqr?.expiresAt || '-'}</strong>
+              </div>
             </div>
           </div>
           {qrPayload && (
-            <div style={{ marginTop: 12 }}>
-              <div className="input-label">Payload</div>
+            <details className="payment-debug">
+              <summary>Raw payload</summary>
               <div className="code-chip">{qrPayload}</div>
+            </details>
+          )}
+          {isPayosPayment && payment?.payos?.checkoutUrl && (
+            <div style={{ marginTop: 12 }}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() =>
+                  window.open(payment.payos.checkoutUrl, '_blank', 'noopener,noreferrer')
+                }
+              >
+                Open PayOS Checkout
+              </Button>
             </div>
           )}
         </div>

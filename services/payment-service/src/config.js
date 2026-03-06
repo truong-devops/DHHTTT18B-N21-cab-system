@@ -1,3 +1,17 @@
+function parseBoolean(value, defaultValue = false) {
+  if (value == null || value === "") {
+    return defaultValue;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes") {
+    return true;
+  }
+  if (normalized === "false" || normalized === "0" || normalized === "no") {
+    return false;
+  }
+  return defaultValue;
+}
+
 const config = {
   serviceName: process.env.SERVICE_NAME || "payment-service",
   port: Number(process.env.PORT || 3000),
@@ -58,7 +72,11 @@ const config = {
     checksumKey: process.env.PAYOS_CHECKSUM_KEY || "",
     partnerCode: process.env.PAYOS_PARTNER_CODE || "",
     returnUrl: process.env.PAYOS_RETURN_URL || "",
-    cancelUrl: process.env.PAYOS_CANCEL_URL || ""
+    cancelUrl: process.env.PAYOS_CANCEL_URL || "",
+    qrSource: (process.env.PAYOS_QR_SOURCE || "PAYOS").trim().toUpperCase(),
+    autoSyncEnabled: parseBoolean(process.env.PAYOS_AUTO_SYNC_ENABLED, false),
+    autoSyncIntervalMs: Number(process.env.PAYOS_AUTO_SYNC_INTERVAL_MS || 15000),
+    autoSyncBatchSize: Number(process.env.PAYOS_AUTO_SYNC_BATCH_SIZE || 20)
   },
   auth: {
     jwtAccessSecret:
