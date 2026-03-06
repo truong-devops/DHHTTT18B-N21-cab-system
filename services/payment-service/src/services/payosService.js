@@ -73,7 +73,12 @@ async function createPayosPaymentLink({ amount, currency, note, rideId }) {
     orderCode: data.orderCode || orderCode,
     paymentLinkId: data.paymentLinkId,
     checkoutUrl: data.checkoutUrl,
-    qrCode: data.qrCode
+    qrCode: data.qrCode,
+    bankBin: data.bin || "",
+    accountNumber: data.accountNumber || "",
+    accountName: data.accountName || "",
+    amount: data.amount != null ? data.amount : numericAmount,
+    description: data.description || description
   };
 }
 

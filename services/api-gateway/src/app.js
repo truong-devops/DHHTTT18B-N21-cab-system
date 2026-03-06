@@ -25,6 +25,11 @@ app.get("/readyz", (_req, res) => res.json({ ok: true }));
 app.use(authMiddleware);
 app.use(rateLimiter);
 
+app.all("/webhooks/payos", (req, res) => {
+  req.params = { ...(req.params || {}), domain: "payments" };
+  return proxyRequest(req, res);
+});
+
 app.all("/v1/:domain", proxyRequest);
 app.all("/v1/:domain/*", proxyRequest);
 

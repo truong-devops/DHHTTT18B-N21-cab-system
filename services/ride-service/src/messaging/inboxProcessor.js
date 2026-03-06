@@ -6,10 +6,16 @@ const {
   markFailed
 } = require("../repository/inboxEventsRepository");
 const {
+  getRideById,
   getRideByExternalId,
   createRide,
-  addStatusHistory
+  addStatusHistory,
+  updateRideStatus
 } = require("../repository/rideRepository");
+const {
+  normalizeStatus,
+  isValidTransition
+} = require("../domain/rideStateMachine");
 
 const DEFAULT_INTERVAL_MS = 3000;
 const DEFAULT_BATCH_SIZE = 50;
@@ -54,10 +60,99 @@ async function handleRideCreated(row) {
   return { rideId: ride.id };
 }
 
+async function resolveRideByPaymentRideId(rideId) {
+  if (!rideId) {
+    return null;
+  }
+  const byId = await getRideById(rideId);
+  if (byId) {
+    return byId;
+  }
+  return getRideByExternalId(rideId);
+}
+
+async function applyPaymentStatusToRide({
+  row,
+  payload,
+  targetStatus,
+  reason
+}) {
+  const ride = await resolveRideByPaymentRideId(payload.rideId);
+  if (!ride) {
+    return { skipped: true, reason: "ride_not_found", rideId: payload.rideId };
+  }
+
+  const fromStatus = normalizeStatus(ride.status);
+  const toStatus = normalizeStatus(targetStatus);
+  if (fromStatus === toStatus) {
+    return {
+      skipped: true,
+      reason: "already_in_target_state",
+      rideId: ride.id,
+      status: ride.status
+    };
+  }
+
+  if (!isValidTransition(fromStatus, toStatus)) {
+    return {
+      skipped: true,
+      reason: "invalid_state_transition",
+      rideId: ride.id,
+      fromStatus,
+      toStatus
+    };
+  }
+
+  const updated = await updateRideStatus({
+    id: ride.id,
+    status: String(targetStatus).toLowerCase(),
+    fromStatus,
+    reason: reason || null,
+    actorId: payload.paymentId || "payment-service",
+    traceId: row.trace_id || null
+  });
+
+  return {
+    rideId: updated.id,
+    fromStatus: ride.status,
+    toStatus: updated.status
+  };
+}
+
+async function handlePaymentCompleted(row) {
+  const payload = row.payload || {};
+  if (!payload.paymentId || !payload.rideId) {
+    throw new Error("payment.completed missing paymentId or rideId");
+  }
+  return applyPaymentStatusToRide({
+    row,
+    payload,
+    targetStatus: "completed",
+    reason: "payment_completed"
+  });
+}
+
+async function handlePaymentFailed(row) {
+  const payload = row.payload || {};
+  if (!payload.paymentId || !payload.rideId) {
+    throw new Error("payment.failed missing paymentId or rideId");
+  }
+  return applyPaymentStatusToRide({
+    row,
+    payload,
+    targetStatus: "cancelled",
+    reason: payload.failureReason || "payment_failed"
+  });
+}
+
 async function processRow(row) {
   switch (row.topic) {
     case topics.RideCreated:
       return handleRideCreated(row);
+    case topics.PaymentCompleted:
+      return handlePaymentCompleted(row);
+    case topics.PaymentFailed:
+      return handlePaymentFailed(row);
     default:
       return { skipped: true };
   }

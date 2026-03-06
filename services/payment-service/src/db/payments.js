@@ -195,6 +195,21 @@ async function listPayments({ limit, cursor, sort, status, rideId }) {
   return { items, nextCursor };
 }
 
+async function listPendingPayosPayments(limit = 20) {
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 20;
+  const result = await pool.query(
+    `SELECT *
+       FROM payments
+      WHERE method = 'PAYOS'
+        AND status IN ('INITIATED', 'PROCESSING')
+        AND (payos_order_code IS NOT NULL OR payos_payment_link_id IS NOT NULL)
+      ORDER BY created_at DESC, id DESC
+      LIMIT $1`,
+    [safeLimit]
+  );
+  return result.rows.map(mapPaymentRow);
+}
+
 module.exports = {
   insertPayment,
   insertStatusHistory,
@@ -202,5 +217,6 @@ module.exports = {
   getPaymentByPayosOrderCode,
   updatePaymentStatus,
   listPayments,
+  listPendingPayosPayments,
   mapPaymentRow
 };

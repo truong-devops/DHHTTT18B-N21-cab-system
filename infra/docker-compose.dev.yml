@@ -192,6 +192,8 @@ services:
     build:
       context: ..
       dockerfile: services/payment-service/Dockerfile
+    ports:
+      - "3007:3007"
     environment:
       SERVICE_NAME: payment-service
       OTEL_SERVICE_NAME: payment-service
@@ -202,19 +204,26 @@ services:
       KAFKA_BROKERS: kafka:9092
       JWT_ACCESS_SECRET: ${JWT_SECRET:-dev-secret}
 
-      VIETQR_BANK_BIN: "970418"
-      VIETQR_ACCOUNT_NUMBER: "123456789"
-      VIETQR_ACCOUNT_NAME: "NGUYEN VAN A"
-      VIETQR_CLIENT_ID: "your-client-id"
-      VIETQR_API_KEY: "your-api-key"
-      VIETQR_EXPIRES_IN_MINUTES: 15
+      VIETQR_API_URL: ${VIETQR_API_URL:-https://api.vietqr.io/v2/generate}
+      VIETQR_BANK_BIN: ${VIETQR_BANK_BIN:-970418}
+      VIETQR_ACCOUNT_NUMBER: ${VIETQR_ACCOUNT_NUMBER:-123456789}
+      VIETQR_ACCOUNT_NAME: "${VIETQR_ACCOUNT_NAME:-NGUYEN VAN A}"
+      VIETQR_MERCHANT_CITY: "${VIETQR_MERCHANT_CITY:-HO CHI MINH}"
+      VIETQR_FORMAT: ${VIETQR_FORMAT:-text}
+      VIETQR_CLIENT_ID: ${VIETQR_CLIENT_ID:-}
+      VIETQR_API_KEY: ${VIETQR_API_KEY:-}
+      VIETQR_EXPIRES_IN_MINUTES: ${VIETQR_EXPIRES_IN_MINUTES:-15}
       PAYOS_API_URL: ${PAYOS_API_URL:-https://api-merchant.payos.vn}
       PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID:-}
       PAYOS_API_KEY: ${PAYOS_API_KEY:-}
       PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY:-}
       PAYOS_PARTNER_CODE: ${PAYOS_PARTNER_CODE:-}
-      PAYOS_RETURN_URL: ${PAYOS_RETURN_URL:-}
-      PAYOS_CANCEL_URL: ${PAYOS_CANCEL_URL:-}
+      PAYOS_RETURN_URL: ${PAYOS_RETURN_URL:-http://localhost:5173/admin/payments?payos=success}
+      PAYOS_CANCEL_URL: ${PAYOS_CANCEL_URL:-http://localhost:5173/admin/payments?payos=cancel}
+      PAYOS_QR_SOURCE: ${PAYOS_QR_SOURCE:-PAYOS}
+      PAYOS_AUTO_SYNC_ENABLED: ${PAYOS_AUTO_SYNC_ENABLED:-false}
+      PAYOS_AUTO_SYNC_INTERVAL_MS: ${PAYOS_AUTO_SYNC_INTERVAL_MS:-15000}
+      PAYOS_AUTO_SYNC_BATCH_SIZE: ${PAYOS_AUTO_SYNC_BATCH_SIZE:-20}
     depends_on:
       - postgres
       - redis

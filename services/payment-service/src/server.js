@@ -7,6 +7,7 @@ const { initDb } = require("./db/pool");
 const { startOutboxPublisher } = require("./messaging/outboxPublisher");
 const { startConsumer } = require("./messaging/consumer");
 const { disconnectKafka } = require("./messaging/kafka");
+const { startPayosAutoSync } = require("./services/payosAutoSyncService");
 const { logger } = require("./utils/logger");
 
 async function start() {
@@ -18,6 +19,7 @@ async function start() {
 
   const stopOutbox = startOutboxPublisher();
   const stopConsumer = await startConsumer();
+  const stopPayosAutoSync = startPayosAutoSync();
 
   const shutdown = async () => {
     logger.info("Service shutting down");
@@ -27,6 +29,9 @@ async function start() {
     }
     if (stopConsumer) {
       await stopConsumer();
+    }
+    if (stopPayosAutoSync) {
+      stopPayosAutoSync();
     }
     await disconnectKafka();
     process.exit(0);
