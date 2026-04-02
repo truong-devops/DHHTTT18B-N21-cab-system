@@ -1,19 +1,20 @@
-﻿import React from 'react'
-import { Pressable, StyleSheet, Text } from 'react-native'
+import React from 'react'
+import { Pressable, StyleSheet, Text, ViewStyle, TextStyle } from 'react-native'
 import { colors, radius, spacing, typography } from '../../theme/tokens'
 
 type Props = {
   title: string
   onPress?: () => void
+  disabled?: boolean
+  style?: ViewStyle
+  textStyle?: TextStyle
 }
 
-export const OutlineButton: React.FC<Props> = ({ title, onPress }) => {
-  return (
-    <Pressable onPress={onPress} style={styles.btn}>
-      <Text style={styles.text}>{title}</Text>
-    </Pressable>
-  )
-}
+export const OutlineButton: React.FC<Props> = ({ title, onPress, disabled, style, textStyle }) => (
+  <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled ? styles.disabled : null, style]}>
+    <Text style={[styles.text, disabled ? styles.textDisabled : null, textStyle]}>{title}</Text>
+  </Pressable>
+)
 
 const styles = StyleSheet.create({
   btn: {
@@ -25,8 +26,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.lg
   },
-  text: {
-    ...typography.body,
-    color: colors.text
-  }
+  disabled: { opacity: 0.6 },
+  text: { ...typography.body, color: colors.text },
+  textDisabled: { color: colors.muted }
 })

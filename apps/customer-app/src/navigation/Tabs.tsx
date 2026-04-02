@@ -3,11 +3,15 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import HomeMapScreen from '../screens/customer/HomeMapScreen'
 import HistoryScreen from '../screens/customer/HistoryScreen'
 import ProfileWalletScreen from '../screens/customer/ProfileWalletScreen'
+import WalletScreen from '../screens/customer/WalletScreen'
+import PromoScreen from '../screens/customer/PromoScreen'
 import { colors } from '../theme/tokens'
 
 export type TabParamList = {
   Home: undefined
   History: undefined
+  Wallet: undefined
+  Promo: undefined
   Profile: undefined
 }
 
@@ -32,6 +36,8 @@ const Tabs = () => {
         component={HistoryScreen}
         options={{ title: 'Lịch sử', tabBarLabel: 'Lịch sử' }}
       />
+      <Tab.Screen name="Wallet" component={WalletScreen} options={{ title: 'Ví', tabBarLabel: 'Ví' }} />
+      <Tab.Screen name="Promo" component={PromoScreen} options={{ title: 'Ưu đãi', tabBarLabel: 'Ưu đãi' }} />
       <Tab.Screen
         name="Profile"
         component={ProfileWalletScreen}

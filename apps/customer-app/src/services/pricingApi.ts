@@ -1,5 +1,7 @@
 import { apiRequest } from '../lib/api'
 import { endpoints } from '../lib/endpoints'
+import { mockConfig } from '../mocks/config'
+import { mockCreateQuote } from '../mocks/handlers/pricing'
 
 export type LatLng = {
   lat: number
@@ -34,6 +36,7 @@ type PricingEnvelope<T> = {
 }
 
 export async function createQuote(pickup: LatLng, dropoff: LatLng, serviceType: ServiceType) {
+  if (mockConfig.useMockApi) return mockCreateQuote(pickup, dropoff, serviceType)
   return apiRequest<PricingEnvelope<QuoteData>>({
     method: 'POST',
     path: endpoints.pricing.quotes,

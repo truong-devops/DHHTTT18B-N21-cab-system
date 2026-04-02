@@ -1,10 +1,14 @@
-﻿export const colors = {
+export const colors = {
   brand600: '#FF3B1D',
   brand700: '#E03218',
   brand800: '#B92512',
+  brand100: '#FFE6E1',
+  brand50: '#FFF4F1',
+  white: '#FFFFFF',
   bg: '#FFFFFF',
   surface: '#FFFFFF',
   surface2: '#F4F5F7',
+  card: '#FFFFFF',
   border: '#D0D5DD',
   text: '#111827',
   muted: '#4B5563',
@@ -33,6 +37,8 @@ export const radius = {
 export const typography = {
   title: { fontSize: 20, lineHeight: 24, fontWeight: '600' as const },
   h2: { fontSize: 16, lineHeight: 20, fontWeight: '600' as const },
+  h3: { fontSize: 15, lineHeight: 20, fontWeight: '600' as const },
   body: { fontSize: 14, lineHeight: 20, fontWeight: '400' as const },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '400' as const }
 }
+
