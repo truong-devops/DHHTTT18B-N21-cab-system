@@ -1,44 +1,39 @@
-﻿import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { AuthStackParamList } from '../../navigation/AuthStack'
 import { colors, spacing, typography } from '../../theme/tokens'
+import { Carousel } from '../../components/common/Carousel'
+import { PrimaryButton } from '../../components/common/PrimaryButton'
 
 const SplashScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>()
+  const [index, setIndex] = useState(0)
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      navigation.replace('Login')
-    }, 1100)
+    const timer = setTimeout(() => navigation.replace('Login'), 3600)
     return () => clearTimeout(timer)
   }, [navigation])
+
+  const slides = [
+    { title: 'Book', subtitle: 'Đặt chuyến nhanh, tối ưu hành trình' },
+    { title: 'Track', subtitle: 'Theo dõi tài xế theo thời gian thực' },
+    { title: 'Pay', subtitle: 'Thanh toán an toàn, nhiều phương thức' }
+  ]
 
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>CAB KHÁCH HÀNG</Text>
-      <Text style={styles.subtitle}>Đặt xe | Theo dõi | Thanh toán</Text>
+      <Carousel slides={slides} activeIndex={index} onIndexChange={setIndex} />
+      <PrimaryButton title="Get Started" onPress={() => navigation.replace('Login')} />
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg
-  },
-  logo: {
-    ...typography.title,
-    color: colors.brand700
-  },
-  subtitle: {
-    ...typography.body,
-    color: colors.muted,
-    marginTop: spacing.sm
-  }
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, gap: spacing.xl },
+  logo: { ...typography.title, color: colors.brand700 }
 })
 
 export default SplashScreen

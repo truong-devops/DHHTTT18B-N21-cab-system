@@ -1,5 +1,7 @@
 import { apiRequest } from '../lib/api'
 import { endpoints } from '../lib/endpoints'
+import { mockConfig } from '../mocks/config'
+import { mockHealth, mockLogin, mockLogout, mockRegister, mockVerify } from '../mocks/handlers/auth'
 
 export type AuthUser = {
   id: string
@@ -39,6 +41,7 @@ function parseRegisterPayload(identifier: string, password: string) {
 }
 
 export async function login(identifier: string, password: string) {
+  if (mockConfig.useMockApi) return mockLogin(identifier, password)
   return apiRequest<AuthResponse>({
     method: 'POST',
     path: endpoints.auth.login,
@@ -48,6 +51,7 @@ export async function login(identifier: string, password: string) {
 }
 
 export async function register(identifier: string, password: string) {
+  if (mockConfig.useMockApi) return mockRegister(identifier, password)
   return apiRequest<AuthResponse>({
     method: 'POST',
     path: endpoints.auth.register,
@@ -57,6 +61,7 @@ export async function register(identifier: string, password: string) {
 }
 
 export async function verify() {
+  if (mockConfig.useMockApi) return mockVerify()
   return apiRequest<VerifyResponse>({
     method: 'GET',
     path: endpoints.auth.verify
@@ -64,6 +69,7 @@ export async function verify() {
 }
 
 export async function logout(refreshToken: string) {
+  if (mockConfig.useMockApi) return mockLogout()
   return apiRequest<{ ok: boolean }>({
     method: 'POST',
     path: endpoints.auth.logout,
@@ -74,6 +80,7 @@ export async function logout(refreshToken: string) {
 }
 
 export async function healthCheck() {
+  if (mockConfig.useMockApi) return mockHealth()
   return apiRequest<{ ok: boolean }>({
     method: 'GET',
     path: endpoints.health,

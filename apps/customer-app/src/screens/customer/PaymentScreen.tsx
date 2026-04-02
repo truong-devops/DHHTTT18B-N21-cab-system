@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -8,21 +8,26 @@ import { PrimaryButton } from '../../components/common/PrimaryButton'
 import { OutlineButton } from '../../components/common/OutlineButton'
 import { colors, spacing, typography } from '../../theme/tokens'
 import { useCustomerStore } from '../../store/customerStore'
-import { paymentMethods } from '../../mock/data'
 import { formatVnd } from '../../utils/format'
 import { useToast } from '../../hooks/useToast'
+
+const methods = [
+  { label: 'Tiền mặt', code: 'CASH' },
+  { label: 'Thẻ/Wallet', code: 'WALLET' },
+  { label: 'VietQR', code: 'VIETQR' }
+]
 
 const PaymentScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
   const { activeRide, completeRidePayment } = useCustomerStore()
-  const [method, setMethod] = useState(paymentMethods[0])
+  const [method, setMethod] = useState(methods[0])
   const [loading, setLoading] = useState(false)
   const { push } = useToast()
 
   const handlePay = async () => {
     try {
       setLoading(true)
-      await completeRidePayment(method)
+      await completeRidePayment(method.label)
       navigation.replace('Rating')
     } catch (err: any) {
       push(err?.message || 'Thanh toán thất bại', 'danger')
@@ -40,17 +45,19 @@ const PaymentScreen = () => {
       </Card>
       <Card>
         <Text style={styles.label}>Phương thức thanh toán</Text>
-        {paymentMethods.map((item) => (
-          <View key={item}>
-            {item === method ? (
-              <PrimaryButton title={`${item} đã chọn`} onPress={() => setMethod(item)} />
-            ) : (
-              <OutlineButton title={item} onPress={() => setMethod(item)} />
-            )}
-          </View>
-        ))}
+        {methods.map((item) =>
+          item.label === method.label ? (
+            <PrimaryButton key={item.code} title={`${item.label} (đã chọn)`} onPress={() => setMethod(item)} />
+          ) : (
+            <OutlineButton key={item.code} title={item.label} onPress={() => setMethod(item)} />
+          )
+        )}
       </Card>
       <PrimaryButton title={loading ? 'Đang xử lý...' : 'Thanh toán'} onPress={handlePay} disabled={loading} />
+      <OutlineButton
+        title="Hiển thị mã QR (mock)"
+        onPress={() => push('Hiển thị mã QR VietQR sẽ được thêm khi backend sẵn sàng', 'info')}
+      />
       {/* TODO: Add VietQR/card redirect flow once Payment Service integration is enabled */}
     </View>
   )

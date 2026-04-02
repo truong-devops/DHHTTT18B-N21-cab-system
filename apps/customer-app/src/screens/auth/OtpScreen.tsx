@@ -2,6 +2,7 @@
 import { StyleSheet, Text, View } from 'react-native'
 import { InputField } from '../../components/common/InputField'
 import { PrimaryButton } from '../../components/common/PrimaryButton'
+import { OTPInput } from '../../components/common/OTPInput'
 import { colors, spacing, typography } from '../../theme/tokens'
 import { useCustomerStore } from '../../store/customerStore'
 import { useNavigation, useRoute } from '@react-navigation/native'
@@ -53,7 +54,8 @@ const OtpScreen = () => {
         onChangeText={setIdentifier}
         placeholder="090xxxxxxx hoặc user@email.com"
       />
-      <InputField label="OTP / Mật khẩu" value={otp} onChangeText={setOtp} placeholder="123456" />
+      <Text style={styles.otpLabel}>Nhập OTP / mật khẩu</Text>
+      <OTPInput value={otp} onChange={setOtp} />
       <PrimaryButton title={loading ? 'Đang xác thực...' : 'Xác nhận'} onPress={handleVerify} disabled={loading} />
       <PrimaryButton title="Quay lại đăng nhập" onPress={() => navigation.replace('Login')} disabled={loading} />
     </View>
@@ -63,7 +65,8 @@ const OtpScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.xl, gap: spacing.lg },
   title: { ...typography.title, color: colors.text },
-  subtitle: { ...typography.body, color: colors.muted }
+  subtitle: { ...typography.body, color: colors.muted },
+  otpLabel: { ...typography.caption, color: colors.muted }
 })
 
 export default OtpScreen

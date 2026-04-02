@@ -1,5 +1,5 @@
-﻿import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
 import type { MainStackParamList } from '../../navigation/MainStack'
@@ -7,10 +7,12 @@ import { customerApi } from '../../services/customerApi'
 import type { RideOption } from '../../mock/data'
 import { RideOptionCard } from '../../components/customer/RideOptionCard'
 import { PrimaryButton } from '../../components/common/PrimaryButton'
+import { OutlineButton } from '../../components/common/OutlineButton'
 import { colors, spacing, typography } from '../../theme/tokens'
 import { useCustomerStore } from '../../store/customerStore'
 import { useToast } from '../../hooks/useToast'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { PriceBreakdownModal } from '../../components/customer/PriceBreakdownModal'
 
 const RideOptionsScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, 'RideOptions'>>()
@@ -18,6 +20,7 @@ const RideOptionsScreen = () => {
   const { chooseOption, selectedOption } = useCustomerStore()
   const [options, setOptions] = useState<RideOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [showBreakdown, setShowBreakdown] = useState(false)
   const { push } = useToast()
 
   useEffect(() => {
@@ -33,12 +36,16 @@ const RideOptionsScreen = () => {
       <Text style={styles.title}>Chọn xe & giá cước</Text>
       {loading ? <ActivityIndicator color={colors.brand600} /> : null}
       {options.map((option) => (
-        <RideOptionCard
-          key={option.id}
-          option={option}
-          selected={selectedOption?.id === option.id}
-          onPress={() => chooseOption(option)}
-        />
+        <Pressable key={option.id} onPress={() => chooseOption(option)}>
+          <RideOptionCard
+            option={{
+              ...option,
+              surgeLabel: option.surgeLabel || (option.serviceType === 'STANDARD' ? undefined : 'Cao cấp')
+            }}
+            selected={selectedOption?.id === option.id}
+            onPress={() => chooseOption(option)}
+          />
+        </Pressable>
       ))}
       <PrimaryButton
         title="Tìm tài xế"
@@ -50,7 +57,9 @@ const RideOptionsScreen = () => {
           navigation.navigate('SearchingDriver', route.params)
         }}
       />
-      {/* TODO: Use quote id snapshot from Pricing Service to keep booking price consistent */}
+      <OutlineButton title="Chi tiết giá" onPress={() => setShowBreakdown(true)} disabled={!selectedOption} />
+      <PriceBreakdownModal option={selectedOption} visible={showBreakdown} onClose={() => setShowBreakdown(false)} />
+      {/* TODO: Use quote id snapshot from Pricing Service to giữ giá cố định khi đặt */}
     </View>
   )
 }

@@ -1,12 +1,13 @@
-﻿import React, { useMemo, useState } from 'react'
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
-import { InputField } from '../../components/common/InputField'
+import React, { useMemo, useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { SearchInput } from '../../components/common/SearchInput'
 import { colors, spacing, typography } from '../../theme/tokens'
-import { destinations } from '../../mock/data'
+import { destinations, destinationPoints } from '../../mock/data'
 import { useCustomerStore } from '../../store/customerStore'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { MainStackParamList } from '../../navigation/MainStack'
+import { PlaceList } from '../../components/customer/PlaceList'
 
 const pickup = 'Vị trí hiện tại'
 
@@ -15,10 +16,19 @@ const DestinationScreen = () => {
   const { setDestination } = useCustomerStore()
   const [query, setQuery] = useState('')
 
-  const filtered = useMemo(
-    () => destinations.filter((item) => item.toLowerCase().includes(query.toLowerCase())),
-    [query]
+  const filtered = useMemo(() => {
+    const keyword = query.toLowerCase()
+    return destinationPoints
+      .filter((item) => item.label.toLowerCase().includes(keyword))
+      .map((item) => ({ label: item.label, subtitle: 'Gợi ý', icon: '📍' }))
+  }, [query])
+
+  const recent = useMemo(
+    () => destinations.slice(0, 3).map((label) => ({ label, subtitle: 'Gần đây', icon: '🕓' })),
+    []
   )
+
+  const combined = [...filtered, ...recent.filter((r) => !filtered.find((f) => f.label === r.label))]
 
   const handleSelect = (value: string) => {
     setDestination(value)
@@ -28,30 +38,16 @@ const DestinationScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Chọn điểm đến</Text>
-      <InputField value={query} onChangeText={setQuery} placeholder="Tìm điểm đến" />
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => handleSelect(item)} style={styles.item}>
-            <Text style={styles.text}>{item}</Text>
-          </Pressable>
-        )}
-      />
-      {/* TODO: Replace static suggestions with Places API + recent destinations endpoint */}
+      <SearchInput value={query} onChangeText={setQuery} placeholder="Tìm điểm đến" />
+      <PlaceList data={combined} onSelect={handleSelect} />
+      {/* TODO: Replace with Places API + recent destinations endpoint */}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.xl, gap: spacing.md },
-  title: { ...typography.title, color: colors.text },
-  item: {
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border
-  },
-  text: { ...typography.body, color: colors.text }
+  title: { ...typography.title, color: colors.text }
 })
 
 export default DestinationScreen
