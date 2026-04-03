@@ -204,6 +204,8 @@ services:
       DATABASE_URL: postgres://cab:cabpass@postgres:5432/payment-service_db
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:9092
+      KAFKA_CONSUME_TOPICS: ride.created,ride.assigned,ride.cancelled
+      KAFKA_CONSUMER_GROUP_ID: payment-service-group
       JWT_ACCESS_SECRET: ${JWT_SECRET:-dev-secret}
 
       VIETQR_API_URL: ${VIETQR_API_URL:-https://api.vietqr.io/v2/generate}
