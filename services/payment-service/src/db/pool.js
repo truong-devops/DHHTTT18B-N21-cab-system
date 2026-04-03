@@ -3,6 +3,7 @@ const path = require("path");
 const { Pool } = require("pg");
 
 const config = require("../config");
+const monitoring = require("../monitoring");
 
 const poolConfig = config.db.connectionString
   ? { connectionString: config.db.connectionString, max: config.db.max }
@@ -16,6 +17,49 @@ const poolConfig = config.db.connectionString
     };
 
 const pool = new Pool(poolConfig);
+
+function inferDbOperation(text) {
+  if (typeof text === "string") {
+    const [token] = text.trim().split(/\s+/);
+    return token ? token.toUpperCase() : "QUERY";
+  }
+  if (text && typeof text === "object" && typeof text.name === "string") {
+    return text.name;
+  }
+  return "QUERY";
+}
+
+async function queryWithMetrics(queryFn, text, params) {
+  const startedAt = Date.now();
+  const operation = inferDbOperation(text);
+  try {
+    const result = await queryFn(text, params);
+    monitoring.recordDependencyRequest({
+      dependencyType: "db",
+      dependencyName: "postgres",
+      operation,
+      outcome: "success",
+      durationMs: Date.now() - startedAt
+    });
+    return result;
+  } catch (error) {
+    monitoring.recordDependencyRequest({
+      dependencyType: "db",
+      dependencyName: "postgres",
+      operation,
+      outcome: "error",
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        error_type: String(error && error.code ? error.code : "query_error")
+      }
+    });
+    throw error;
+  }
+}
+
+const originalPoolQuery = pool.query.bind(pool);
+pool.query = (text, params) =>
+  queryWithMetrics(originalPoolQuery, text, params);
 
 function extractUpSql(raw) {
   const lines = raw.split(/\r?\n/);
@@ -97,6 +141,9 @@ async function initDb() {
 
 async function withTransaction(work) {
   const client = await pool.connect();
+  const originalClientQuery = client.query.bind(client);
+  client.query = (text, params) =>
+    queryWithMetrics(originalClientQuery, text, params);
   try {
     await client.query("BEGIN");
     const result = await work(client);

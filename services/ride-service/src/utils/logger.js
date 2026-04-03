@@ -23,6 +23,7 @@ function withTrace(traceOrReq) {
   }
   return logger.child({
     traceId: traceOrReq.traceId || null,
+    requestId: traceOrReq.requestId || null,
     ...(otelTraceId ? { otelTraceId } : {})
   });
 }

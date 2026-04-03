@@ -144,6 +144,18 @@ async function findDispatchCandidates(limit, now) {
   return docs.map(mapNotification);
 }
 
+async function countDispatchBacklog(now) {
+  const db = await getDb();
+  const filter = {
+    status: { $in: ["PENDING", "PARTIAL", "PROCESSING", "SCHEDULED"] },
+    $or: [
+      { scheduledAt: null },
+      { scheduledAt: { $lte: now } }
+    ]
+  };
+  return db.collection("notifications").countDocuments(filter);
+}
+
 async function claimChannel(notificationId, channel, maxAttempts, now) {
   const db = await getDb();
   const objectId = parseId(notificationId);
@@ -221,6 +233,7 @@ module.exports = {
   listByUserId,
   updateNotificationById,
   findDispatchCandidates,
+  countDispatchBacklog,
   claimChannel,
   updateChannelResult,
   mapNotification

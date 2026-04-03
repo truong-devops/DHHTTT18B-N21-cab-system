@@ -7,6 +7,7 @@ const { traceMiddleware } = require("./middleware/trace");
 const { notFoundHandler } = require("./middleware/notFound");
 const { errorHandler } = require("./middleware/errorHandler");
 const logger = require("./utils/logger");
+const monitoring = require("./monitoring");
 
 const app = express();
 app.use(helmet());
@@ -22,6 +23,7 @@ app.use(
   })
 );
 app.use(traceMiddleware);
+app.use(monitoring.createHttpMetricsMiddleware());
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.get("/healthz", (_req, res) => res.json({ ok: true }));

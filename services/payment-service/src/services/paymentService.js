@@ -18,6 +18,7 @@ const { createPayosPaymentLink } = require("./payosService");
 const { generateVietQrCode } = require("../integrations/vietqrClient");
 const config = require("../config");
 const { withTrace } = require("../utils/logger");
+const monitoring = require("../monitoring");
 
 async function resolvePayosQrCode({
   payosData,
@@ -129,6 +130,10 @@ async function createPayment({ payload, idempotency, traceId, requestId, method,
     });
 
     const responseBody = { data: payment };
+    monitoring.recordPaymentStatus(payment.status, "success", {
+      method: String(payment.method || payload.method || "unknown").toLowerCase()
+    });
+
     if (idempotency) {
       await saveIdempotencyKey(client, {
         routeKey: idempotency.routeKey,
@@ -192,6 +197,10 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
   );
 
   if (!canTransition(payment.status, status)) {
+    monitoring.recordPaymentStatus(status, "error", {
+      reason: "invalid_transition",
+      from_status: String(payment.status || "unknown").toLowerCase()
+    });
     throw new ApiError(
       409,
       "INVALID_STATE_TRANSITION",
@@ -239,6 +248,10 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
         occurredAt: envelope.occurredAt
       });
     }
+
+    monitoring.recordPaymentStatus(status, "success", {
+      from_status: String(payment.status || "unknown").toLowerCase()
+    });
 
     return updated;
   });

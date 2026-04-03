@@ -1,0 +1,134 @@
+{
+  "id": null,
+  "uid": "cab-service-overview",
+  "title": "Cab Booking - Service Overview",
+  "tags": ["cab-booking", "service", "http"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "label": "Service",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "Prometheus"
+        },
+        "query": "label_values(cab_service_up, service_name)",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Request Throughput (RPS)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(cab_http_server_requests_total{service_name=~\"$service\"}[5m])) by (service_name)",
+          "legendFormat": "{{service_name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Error Rate (%)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * (sum(rate(cab_http_server_requests_total{service_name=~\"$service\",http_status_code=~\"5..\"}[5m])) by (service_name) / clamp_min(sum(rate(cab_http_server_requests_total{service_name=~\"$service\"}[5m])) by (service_name), 0.001))",
+          "legendFormat": "{{service_name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 Latency (ms)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(cab_http_server_duration_ms_bucket{service_name=~\"$service\"}[5m])) by (service_name, le))",
+          "legendFormat": "{{service_name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "p99 Latency (ms)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(cab_http_server_duration_ms_bucket{service_name=~\"$service\"}[5m])) by (service_name, le))",
+          "legendFormat": "{{service_name}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Active Services",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "count(max_over_time(cab_service_up{service_name=~\"$service\"}[5m]) > 0)",
+          "legendFormat": "services"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Top Failing Endpoints",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 16 },
+      "targets": [
+        {
+          "expr": "topk(10, sum(rate(cab_http_server_requests_total{service_name=~\"$service\",http_status_code=~\"5..\"}[5m])) by (service_name, http_method, http_route, http_status_code))",
+          "format": "table",
+          "instant": false
+        }
+      ]
+    }
+  ]
+}
