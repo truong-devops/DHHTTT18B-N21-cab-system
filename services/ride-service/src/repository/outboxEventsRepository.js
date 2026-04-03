@@ -1,4 +1,5 @@
 const { getDb } = require("../db/mongo");
+const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000;
 
 function mapOutbox(doc) {
   if (!doc) {
@@ -27,8 +28,19 @@ async function claimPendingEvents(limit = 50) {
 
   for (let i = 0; i < limit; i += 1) {
     const now = new Date();
+    const processingTimeoutBefore = new Date(
+      now.getTime() - PROCESSING_TIMEOUT_MS
+    );
     const result = await collection.findOneAndUpdate(
-      { status: "pending" },
+      {
+        $or: [
+          { status: "pending" },
+          {
+            status: "processing",
+            updated_at: { $lt: processingTimeoutBefore }
+          }
+        ]
+      },
       { $set: { status: "processing", updated_at: now } },
       {
         sort: { occurred_at: 1, _id: 1 },
@@ -36,11 +48,16 @@ async function claimPendingEvents(limit = 50) {
       }
     );
 
-    if (!result || !result.value) {
+    const doc =
+      result && Object.prototype.hasOwnProperty.call(result, "value")
+        ? result.value
+        : result;
+
+    if (!doc) {
       break;
     }
 
-    claimed.push(mapOutbox(result.value));
+    claimed.push(mapOutbox(doc));
   }
 
   return claimed;
