@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
+const monitoring = require("./monitoring");
 const { traceMiddleware } = require("./middleware/trace");
 const { requestLogger } = require("./middleware/requestLogger");
 const { authMiddleware } = require("./middleware/auth");
@@ -16,6 +17,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(traceMiddleware);
+app.use(monitoring.createHttpMetricsMiddleware());
 app.use(requestLogger);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));

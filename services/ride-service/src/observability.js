@@ -15,6 +15,7 @@ const { Resource } = require("@opentelemetry/resources");
 const {
   SemanticResourceAttributes
 } = require("@opentelemetry/semantic-conventions");
+const logger = require("./utils/logger");
 
 const serviceName =
   process.env.OTEL_SERVICE_NAME ||
@@ -68,13 +69,19 @@ if (process.env.OTEL_ENABLED !== "false") {
   if (startResult && typeof startResult.then === "function") {
     startResult
       .then(() => {
-        console.log(`[${serviceName}] OTel started`);
+        logger.info({ serviceName }, "OTel started");
       })
       .catch((err) => {
-        console.error(`[${serviceName}] OTel start error`, err);
+        logger.error(
+          {
+            serviceName,
+            err: { message: err.message }
+          },
+          "OTel start error"
+        );
       });
   } else {
-    console.log(`[${serviceName}] OTel started`);
+    logger.info({ serviceName }, "OTel started");
   }
 
   const shutdown = () =>
@@ -85,7 +92,7 @@ if (process.env.OTEL_ENABLED !== "false") {
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 } else {
-  console.log(`[${serviceName}] OTel disabled`);
+  logger.info({ serviceName }, "OTel disabled");
 }
 
 module.exports = { sdk };

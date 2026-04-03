@@ -5,6 +5,7 @@ const { publishToDlq } = require("./producer");
 const redis = require("../cache/redis");
 const { insertInboxEvent } = require("../repository/inboxEventsRepository");
 const logger = require("../utils/logger");
+const monitoring = require("../monitoring");
 
 const kafka = new Kafka({
   clientId: "ride-service",
@@ -27,12 +28,23 @@ async function start() {
 
   await consumer.run({
     eachMessage: async ({ topic, message }) => {
+      const startedAt = Date.now();
       const rawValue = message.value?.toString() || "";
       let envelope;
 
       try {
         envelope = JSON.parse(rawValue);
       } catch (error) {
+        monitoring.recordDependencyRequest({
+          dependencyType: "kafka",
+          dependencyName: topic,
+          operation: "consume",
+          outcome: "error",
+          durationMs: Date.now() - startedAt,
+          attributes: {
+            error_type: "invalid_json"
+          }
+        });
         await publishToDlq({
           topic,
           envelope: {
@@ -53,6 +65,16 @@ async function start() {
       const cacheKey = `inbox:${CONSUMER_NAME}:${eventId}`;
 
       if (!eventId) {
+        monitoring.recordDependencyRequest({
+          dependencyType: "kafka",
+          dependencyName: topic,
+          operation: "consume",
+          outcome: "error",
+          durationMs: Date.now() - startedAt,
+          attributes: {
+            error_type: "missing_event_id"
+          }
+        });
         logger.error(
           { topic },
           "[ride-service] missing eventId"
@@ -62,11 +84,31 @@ async function start() {
 
       const cached = await redis.get(cacheKey);
       if (cached) {
+        monitoring.recordDependencyRequest({
+          dependencyType: "kafka",
+          dependencyName: topic,
+          operation: "consume",
+          outcome: "success",
+          durationMs: Date.now() - startedAt,
+          attributes: {
+            result: "duplicate"
+          }
+        });
         return;
       }
 
       const validation = validatePayload(topic, envelope.payload);
       if (!validation.ok) {
+        monitoring.recordDependencyRequest({
+          dependencyType: "kafka",
+          dependencyName: topic,
+          operation: "consume",
+          outcome: "error",
+          durationMs: Date.now() - startedAt,
+          attributes: {
+            error_type: "schema_validation_failed"
+          }
+        });
         await publishToDlq({
           topic,
           envelope,
@@ -86,6 +128,16 @@ async function start() {
 
       if (!inserted) {
         await redis.set(cacheKey, "1", "EX", CACHE_TTL_SECONDS);
+        monitoring.recordDependencyRequest({
+          dependencyType: "kafka",
+          dependencyName: topic,
+          operation: "consume",
+          outcome: "success",
+          durationMs: Date.now() - startedAt,
+          attributes: {
+            result: "duplicate_db"
+          }
+        });
         return;
       }
 
@@ -97,6 +149,13 @@ async function start() {
           { topic, eventId },
           "[ride-service] consumed event"
         );
+      monitoring.recordDependencyRequest({
+        dependencyType: "kafka",
+        dependencyName: topic,
+        operation: "consume",
+        outcome: "success",
+        durationMs: Date.now() - startedAt
+      });
     }
   });
 }

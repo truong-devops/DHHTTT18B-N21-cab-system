@@ -119,7 +119,8 @@ services:
 
   booking-service:
     build:
-      context: ../services/booking-service
+      context: ..
+      dockerfile: services/booking-service/Dockerfile
     environment:
       SERVICE_NAME: booking-service
       OTEL_SERVICE_NAME: booking-service
@@ -153,7 +154,8 @@ services:
 
   notification-service:
     build:
-      context: ../services/notification-service
+      context: ..
+      dockerfile: services/notification-service/Dockerfile
     environment:
       SERVICE_NAME: notification-service
       OTEL_SERVICE_NAME: notification-service

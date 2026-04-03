@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { Kafka } = require("kafkajs");
 const { validatePayload } = require("./schemaRegistry");
 const logger = require("../utils/logger");
+const monitoring = require("../monitoring");
 
 const kafka = new Kafka({
   clientId: "ride-service",
@@ -32,6 +33,7 @@ async function publishToDlq({
       validationErrors
     }
   };
+  const startedAt = Date.now();
 
   try {
     await producer.send({
@@ -43,7 +45,24 @@ async function publishToDlq({
         }
       ]
     });
+    monitoring.recordDependencyRequest({
+      dependencyType: "kafka",
+      dependencyName: dlqTopic,
+      operation: "publish",
+      outcome: "success",
+      durationMs: Date.now() - startedAt
+    });
   } catch (error) {
+    monitoring.recordDependencyRequest({
+      dependencyType: "kafka",
+      dependencyName: dlqTopic,
+      operation: "publish",
+      outcome: "error",
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        error_type: String(error && error.name ? error.name : "publish_error")
+      }
+    });
     logger.error(
       { err: error, topic: dlqTopic },
       "[ride-service] dlq publish failed"
@@ -84,10 +103,32 @@ async function publish({
   }
 
   const producer = await getProducer();
-  await producer.send({
-    topic,
-    messages: [{ key: eventId, value: JSON.stringify(envelope) }]
-  });
+  const startedAt = Date.now();
+  try {
+    await producer.send({
+      topic,
+      messages: [{ key: eventId, value: JSON.stringify(envelope) }]
+    });
+    monitoring.recordDependencyRequest({
+      dependencyType: "kafka",
+      dependencyName: topic,
+      operation: "publish",
+      outcome: "success",
+      durationMs: Date.now() - startedAt
+    });
+  } catch (error) {
+    monitoring.recordDependencyRequest({
+      dependencyType: "kafka",
+      dependencyName: topic,
+      operation: "publish",
+      outcome: "error",
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        error_type: String(error && error.name ? error.name : "publish_error")
+      }
+    });
+    throw error;
+  }
 
   return { published: true, envelope };
 }

@@ -14,8 +14,10 @@ ENV NPM_CONFIG_FETCH_RETRIES=5 \
 COPY services/auth-service/package*.json ./
 RUN npm install
 
+COPY libs ./libs
 # copy source
-COPY services/auth-service ./
+COPY services/auth-service/src ./src
+COPY services/auth-service/migrations ./migrations
 
 EXPOSE 4001
 CMD ["npm", "run", "start"]

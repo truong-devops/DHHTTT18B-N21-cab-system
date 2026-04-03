@@ -1,0 +1,108 @@
+{
+  "id": null,
+  "uid": "cab-dependency-health",
+  "title": "Cab Booking - Dependency Health",
+  "tags": ["cab-booking", "dependency"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "DB p95 Latency (ms)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(cab_dependency_duration_ms_bucket{dependency_type=\"db\"}[5m])) by (service_name, dependency_name, le))",
+          "legendFormat": "{{service_name}} {{dependency_name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Downstream API p95 Latency (ms)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(cab_dependency_duration_ms_bucket{dependency_type=~\"http|provider\"}[5m])) by (service_name, dependency_name, dependency_operation, le))",
+          "legendFormat": "{{service_name}} {{dependency_name}} {{dependency_operation}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Dependency Errors (req/s)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(cab_dependency_requests_total{outcome=\"error\"}[5m])) by (service_name, dependency_name, dependency_operation)",
+          "legendFormat": "{{service_name}} {{dependency_name}} {{dependency_operation}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Notification Queue Backlog",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        {
+          "expr": "max(cab_queue_backlog{queue_name=\"notification_dispatch\"})",
+          "legendFormat": "notification_dispatch"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Top Failing Dependencies (Error % - 10m)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "topk(10, 100 * (sum(rate(cab_dependency_requests_total{outcome=\"error\"}[10m])) by (service_name, dependency_name, dependency_operation) / clamp_min(sum(rate(cab_dependency_requests_total[10m])) by (service_name, dependency_name, dependency_operation), 0.001)))",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Top Failing Dependencies (Errors/s - 10m)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "topk(10, sum(rate(cab_dependency_requests_total{outcome=\"error\"}[10m])) by (service_name, dependency_name, dependency_operation))",
+          "format": "table",
+          "instant": false
+        }
+      ]
+    }
+  ]
+}

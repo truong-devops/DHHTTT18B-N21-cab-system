@@ -13,7 +13,9 @@ ENV NPM_CONFIG_FETCH_RETRIES=5 \
 COPY services/user-service/package*.json ./
 RUN npm install
 
-COPY services/user-service ./
+COPY libs ./libs
+COPY services/user-service/src ./src
+COPY services/user-service/migrations ./migrations
 
 EXPOSE 4002
 CMD ["npm", "run", "start"]

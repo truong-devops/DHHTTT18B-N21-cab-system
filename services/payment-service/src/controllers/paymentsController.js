@@ -9,6 +9,7 @@ const { withIdempotency, pickIdempotencyHeaders } = require("../services/idempot
 const { hashRequest } = require("../utils/idempotency");
 const { ApiError } = require("../utils/errors");
 const { STATUSES } = require("../domain/paymentStatus");
+const monitoring = require("../monitoring");
 
 function isDevConfirmEnabled() {
   if (process.env.PAYMENT_DEV_CONFIRM === "true") {
@@ -45,28 +46,36 @@ async function createPaymentController(req, res) {
     responseHeaders["content-type"] = "application/json; charset=utf-8";
   }
 
-  const result = await withIdempotency({
-    routeKey,
-    userId,
-    idemKey: idempotencyKey,
-    responseHeaders,
-    requestHash,
-    execute: () => createPayment({
-      payload,
-      idempotency: {
-        routeKey,
-        userId,
-        idemKey: idempotencyKey,
-        requestHash,
-        responseHeaders
-      },
-      traceId: req.traceId,
-      requestId: req.requestId,
-      method: req.method,
-      path: req.originalUrl,
-      authorization: req.authorization
-    })
-  });
+  let result;
+  try {
+    result = await withIdempotency({
+      routeKey,
+      userId,
+      idemKey: idempotencyKey,
+      responseHeaders,
+      requestHash,
+      execute: () => createPayment({
+        payload,
+        idempotency: {
+          routeKey,
+          userId,
+          idemKey: idempotencyKey,
+          requestHash,
+          responseHeaders
+        },
+        traceId: req.traceId,
+        requestId: req.requestId,
+        method: req.method,
+        path: req.originalUrl,
+        authorization: req.authorization
+      })
+    });
+  } catch (error) {
+    monitoring.recordPaymentStatus("create", "error", {
+      reason: "create_payment_failed"
+    });
+    throw error;
+  }
 
   res.status(result.status).set(result.headers).json(result.body);
 }

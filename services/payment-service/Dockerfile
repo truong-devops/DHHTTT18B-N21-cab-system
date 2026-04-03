@@ -15,6 +15,7 @@ COPY package*.json ./
 COPY services/payment-service/package*.json ./services/payment-service/
 COPY libs/validation/package*.json ./libs/validation/
 COPY libs/http/package*.json ./libs/http/
+COPY libs/observability/package*.json ./libs/observability/
 
 RUN npm install
 
@@ -22,6 +23,7 @@ RUN npm install
 COPY services/payment-service ./services/payment-service
 COPY libs/validation ./libs/validation
 COPY libs/http ./libs/http
+COPY libs/observability ./libs/observability
 COPY contracts/events ./contracts/events
 
 WORKDIR /app/services/payment-service

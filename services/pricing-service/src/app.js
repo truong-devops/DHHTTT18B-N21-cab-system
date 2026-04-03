@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
+const monitoring = require("./monitoring");
 const pricingRouter = require("./routes/pricing");
 const { traceMiddleware } = require("./middleware/trace");
 const { httpLogger } = require("./middleware/httpLogger");
@@ -13,6 +14,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(traceMiddleware);
+app.use(monitoring.createHttpMetricsMiddleware());
 app.use(httpLogger);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
