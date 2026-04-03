@@ -8,7 +8,9 @@
   ],
   "scripts": {
     "dev:infra": "docker compose --env-file .env -f infra/docker-compose.dev.yml up -d",
+    "dev:observability": "docker compose --env-file .env -f infra/docker-compose.dev.yml -f infra/observability/docker-compose.observability.yml up -d elasticsearch logstash kibana otel-collector prometheus tempo grafana && docker compose --env-file .env -f infra/docker-compose.dev.yml -f infra/observability/docker-compose.observability.yml up -d",
     "down:infra": "docker compose --env-file .env -f infra/docker-compose.dev.yml down -v",
+    "down:observability": "docker compose --env-file .env -f infra/docker-compose.dev.yml -f infra/observability/docker-compose.observability.yml down -v",
     "logs:kafka": "docker compose --env-file .env -f infra/docker-compose.dev.yml logs -f kafka",
     "health": "node scripts/healthcheck.js",
     "seed:all": "node scripts/seed-all.js",

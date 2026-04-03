@@ -587,3 +587,48 @@ Kafka lag → scale consumers; tune partitions
 
 
 \
+
+## 📈 Observability (ELK logging + OTel metrics/tracing)
+
+### Run full stack (services + observability)
+
+```bash
+npm run dev:observability
+```
+
+This uses:
+- Base services: `infra/docker-compose.dev.yml`
+- Observability overlay: `infra/observability/docker-compose.observability.yml`
+
+### Endpoints
+
+- Kibana (logs): http://localhost:5601
+- Elasticsearch: http://localhost:9200
+- Logstash API: http://localhost:9600
+- Grafana (metrics + traces): http://localhost:3001
+- Prometheus: http://localhost:9090
+- Tempo: http://localhost:3200
+
+### Logging path
+
+- Primary logging path: `Container stdout/stderr -> Logstash -> Elasticsearch -> Kibana`
+- Tracing path: `OpenTelemetry -> OTEL Collector -> Tempo -> Grafana`
+- Metrics path: `OpenTelemetry -> OTEL Collector -> Prometheus -> Grafana`
+
+### Quick verification
+
+```bash
+curl -s http://localhost:9200/_cluster/health?pretty
+curl -s http://localhost:9200/_cat/indices/cab-logs-*?v
+curl -s "http://localhost:9200/cab-logs-*/_search?size=5&sort=@timestamp:desc"
+```
+
+Open Kibana, create data view `cab-logs-*`, then filter by `service.name` and `level`.
+
+### Notes
+
+- Loki is deprecated from the active logging path.
+- Grafana is kept for metrics/traces only.
+- See migration details in `docs/observability/ELK_MIGRATION_NOTES.md`.
+- Docker Desktop default for syslog forwarding is `LOGSTASH_SYSLOG_HOST=host.docker.internal`.
+  On Linux Docker Engine, set `LOGSTASH_SYSLOG_HOST` to a reachable host/IP for Logstash port `5514`.

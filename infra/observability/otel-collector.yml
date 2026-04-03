@@ -14,8 +14,6 @@ exporters:
       insecure: true
   prometheus:
     endpoint: "0.0.0.0:8889"
-  loki:
-    endpoint: http://loki:3100/loki/api/v1/push
   logging:
     loglevel: info
 
@@ -29,7 +27,7 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [prometheus, logging]
-    logs:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [loki, logging]
+    # NOTE:
+    # Primary log pipeline is now Docker stdout -> Logstash -> Elasticsearch.
+    # TODO: if services emit OTLP logs in the future, add an OTLP logs exporter
+    # that forwards to ELK (direct Elasticsearch or via Logstash bridge).
