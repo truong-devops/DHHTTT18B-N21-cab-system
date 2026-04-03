@@ -3,6 +3,9 @@
 Legend: **PASS / PARTIAL / FAIL**  
 Scope: cab-booking-system repo (static audit).
 
+> Historical note: this checklist predates the ELK logging migration on 2026-04-02.
+> See `docs/observability/ELK_MIGRATION_NOTES.md` for the current logging setup.
+
 ## A) Logging
 - **Structured logging (JSON/fields)** — **PARTIAL**  
   Evidence: Pino loggers in ride/driver/payment/user/review services; Morgan "dev" in booking/notification.

@@ -3,6 +3,9 @@
 Date: 2026-02-11  
 Scope: repo static audit (code + config). No runtime checks executed.
 
+> Historical note: this report predates the ELK logging migration on 2026-04-02.
+> See `docs/observability/ELK_MIGRATION_NOTES.md` for current logging architecture.
+
 ## Executive Summary
 **Verdict: FAIL (observability by design)**  
 Reason: basic health endpoints and partial structured logging exist, but there is **no metrics stack, no distributed tracing instrumentation, no centralized logging config, and no dashboards/runbooks**. Correlation IDs exist but are not consistently generated/propagated across all services.

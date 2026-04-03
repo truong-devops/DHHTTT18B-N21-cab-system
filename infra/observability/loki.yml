@@ -1,3 +1,5 @@
+# Deprecated as primary logging backend (migrated to ELK in April 2026).
+# Kept temporarily for rollback/reference only.
 auth_enabled: false
 
 server:

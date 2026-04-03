@@ -1,67 +1,120 @@
-# Observability Architecture (proposed)
+# Observability Architecture (ELK logging + OTel metrics/tracing)
 
-This adds a minimal observability stack for the cab-booking microservices. It does **not** change service code yet; it provides infra + clear integration points.
+Last updated: 2026-04-02
 
 ## Architecture overview
 
 ```
-Service logs/metrics/traces
-  (OpenTelemetry SDK)
-           |
-           v
-   OTEL Collector (4317/4318)
-     |        |        |
-     |        |        +--> Loki (logs)
-     |        +--> Prometheus exporter (metrics)
-     +--> Tempo (traces)
+Application containers
+  -> stdout/stderr logs
+  -> Docker syslog logging driver (overlay compose)
+  -> Logstash (parse/transform)
+  -> Elasticsearch (index + search)
+  -> Kibana (log exploration)
 
-Grafana reads from Prometheus + Loki + Tempo.
+Application OpenTelemetry SDK
+  -> OTEL Collector (OTLP 4317/4318)
+     -> Tempo (traces)
+     -> Prometheus exporter (metrics)
+  -> Grafana (Prometheus + Tempo)
 ```
 
-## Components (dev)
-- **OpenTelemetry Collector**: receives OTLP, exports logs/metrics/traces.
-- **Prometheus**: scrapes metrics from the collector.
-- **Tempo**: trace storage (OTLP).
-- **Loki**: log storage.
-- **Grafana**: dashboards and trace/log correlation.
+## What changed (old vs new)
 
-## Repo changes (infra)
-Added in `infra/observability/`:
-- `docker-compose.observability.yml`
-- `otel-collector.yml`
-- `prometheus.yml`
-- `tempo.yml`
-- `loki.yml`
-- `grafana/provisioning/*`
+Old logging path:
+- OTEL Collector logs pipeline -> Loki
+- Grafana used Loki datasource for logs
 
-## How to run (local)
+New logging path:
+- Docker stdout/stderr -> Logstash -> Elasticsearch -> Kibana
+- Loki removed from active compose pipeline
+- Grafana kept for metrics/traces only (Prometheus + Tempo)
+
+## Why this migration is low-risk
+
+- No business logic changes required for route handling/domain flows.
+- Existing OTel traces/metrics path is preserved.
+- Logging routing is applied via compose overlay (`infra/observability/docker-compose.observability.yml`), so base dev compose remains usable.
+
+## Infra files
+
+Core stack:
+- `infra/observability/docker-compose.observability.yml`
+- `infra/observability/elasticsearch/elasticsearch.yml`
+- `infra/observability/logstash/logstash.yml`
+- `infra/observability/logstash/pipeline/logstash.conf`
+- `infra/observability/kibana/kibana.yml`
+
+Metrics/tracing (kept):
+- `infra/observability/otel-collector.yml`
+- `infra/observability/prometheus.yml`
+- `infra/observability/tempo.yml`
+- `infra/observability/grafana/provisioning/datasources/datasources.yml`
+
+Deprecated:
+- `infra/observability/loki.yml` (kept for rollback reference only)
+
+## Local run
+
+```bash
+npm run dev:observability
 ```
-docker compose -f infra/docker-compose.dev.yml \
-  -f infra/observability/docker-compose.observability.yml up -d
-```
 
-Access points:
-- Grafana: http://localhost:3001 (admin / admin)
+This starts base services + observability overlay.
+
+Environment knobs for syslog routing:
+- `LOGSTASH_SYSLOG_HOST` (default: `host.docker.internal`)
+- `LOGSTASH_SYSLOG_PORT` (default: `5514`)
+
+For Linux Docker Engine, set `LOGSTASH_SYSLOG_HOST` to a host/IP reachable from Docker daemon.
+
+Main endpoints:
+- Kibana: http://localhost:5601
+- Elasticsearch: http://localhost:9200
+- Logstash monitoring API: http://localhost:9600
+- Grafana: http://localhost:3001
 - Prometheus: http://localhost:9090
 - Tempo: http://localhost:3200
-- Loki: http://localhost:3100
-- OTLP: grpc 4317, http 4318
 
-## Integration points (code)
-To fully enable observability-by-design, each service should:
-1) **Structured logging** (JSON, include `traceId`, `requestId`)
-2) **Tracing**: OTel SDK (Express + HTTP + Kafka)
-3) **Metrics**: OTel metrics or Prometheus client
+## Log normalization
 
-### Suggested env vars
+Logstash normalizes these fields when available:
+- `@timestamp`
+- `level`
+- `service.name`
+- `trace_id`
+- `span_id`
+- `message`
+- `environment`
+
+For Pino JSON logs:
+- Maps `serviceName` -> `service.name`
+- Maps `traceId` / `otelTraceId` -> `trace_id`
+- Maps numeric Pino level to text level (`info`, `warn`, `error`, ...)
+
+For non-JSON logs:
+- Keeps original `message`
+- Fallback `service` inferred from container program/tag
+- Fallback `level` from syslog severity, default `info`
+
+## Verification (manual)
+
+1. Generate traffic/logs (any service request).
+2. Check Elasticsearch indices:
+
+```bash
+curl -s http://localhost:9200/_cat/indices/cab-logs-*?v
 ```
-OTEL_SERVICE_NAME=ride-service
-OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-OTEL_RESOURCE_ATTRIBUTES=deployment.environment=dev
+
+3. Check a few documents:
+
+```bash
+curl -s "http://localhost:9200/cab-logs-*/_search?size=5&sort=@timestamp:desc" | jq '.hits.hits[]._source'
 ```
+
+4. Open Kibana and create a data view for `cab-logs-*`.
 
 ## Notes
-- This stack is **infra-only**. Services still need instrumentation.
-- Health endpoints already exist, but there are **no metrics/tracing** in code yet.
-- If you want me to implement instrumentation, tell me which services first.
+
+- OTEL Collector logs pipeline is intentionally not active for ELK yet; primary logging path is Docker -> Logstash.
+- TODO: if services later emit OTLP logs, add a dedicated OTLP logs -> ELK exporter path.
