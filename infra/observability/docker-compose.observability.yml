@@ -1,4 +1,44 @@
+x-app-syslog-logging: &app_syslog_logging
+  driver: syslog
+  options:
+    syslog-address: "tcp://${LOGSTASH_SYSLOG_HOST:-host.docker.internal}:${LOGSTASH_SYSLOG_PORT:-5514}"
+    syslog-format: rfc5424micro
+    tag: "{{.Name}}"
+
 services:
+  # Overlay logging config for application services in infra/docker-compose.dev.yml.
+  # This keeps base compose unchanged; logs are routed to Logstash only when this
+  # observability compose file is included.
+  api-gateway:
+    logging: *app_syslog_logging
+
+  auth-service:
+    logging: *app_syslog_logging
+
+  user-service:
+    logging: *app_syslog_logging
+
+  ride-service:
+    logging: *app_syslog_logging
+
+  booking-service:
+    logging: *app_syslog_logging
+
+  driver-service:
+    logging: *app_syslog_logging
+
+  notification-service:
+    logging: *app_syslog_logging
+
+  pricing-service:
+    logging: *app_syslog_logging
+
+  payment-service:
+    logging: *app_syslog_logging
+
+  review-service:
+    logging: *app_syslog_logging
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.98.0
     command: ["--config=/etc/otel-collector.yml"]
@@ -10,7 +50,6 @@ services:
       - "8889:8889"   # Prometheus scrape (metrics)
     depends_on:
       - tempo
-      - loki
     networks:
       - backend
 
@@ -39,19 +78,52 @@ services:
       - "3001:3000"
     depends_on:
       - prometheus
-      - loki
       - tempo
     networks:
       - backend
 
-  loki:
-    image: grafana/loki:2.9.5
-    command: ["-config.file=/etc/loki/loki.yml"]
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
     volumes:
-      - ./observability/loki.yml:/etc/loki/loki.yml:ro
-      - loki_data:/loki
+      - ./observability/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+      - elasticsearch_data:/usr/share/elasticsearch/data
     ports:
-      - "3100:3100"
+      - "9200:9200"
+    networks:
+      - backend
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    environment:
+      LS_JAVA_OPTS: "-Xms256m -Xmx256m"
+      LOGSTASH_SYSLOG_PORT: ${LOGSTASH_SYSLOG_PORT:-5514}
+      DEPLOY_ENV: ${DEPLOY_ENV:-dev}
+    volumes:
+      - ./observability/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./observability/logstash/pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - "${LOGSTASH_SYSLOG_PORT:-5514}:5514"
+      - "9600:9600"
+    depends_on:
+      - elasticsearch
+    networks:
+      - backend
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    volumes:
+      - ./observability/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
     networks:
       - backend
 
@@ -70,8 +142,8 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
-  loki_data:
   tempo_data:
+  elasticsearch_data:
 
 networks:
   backend:
