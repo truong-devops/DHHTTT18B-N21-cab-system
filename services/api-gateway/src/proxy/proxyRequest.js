@@ -2,6 +2,7 @@ const fetch = require("node-fetch");
 const { propagation, context } = require("@opentelemetry/api");
 const { SERVICE_URLS } = require("../config/services");
 const { sendError } = require("../utils/http");
+const monitoring = require("../monitoring");
 
 const TIMEOUT_MS = Number(
   process.env.PROXY_TIMEOUT_MS || 3000
@@ -49,9 +50,10 @@ function buildUpstreamHeaders(req) {
   return headers;
 }
 
-async function attemptRequest(targetUrl, options) {
+async function attemptRequest(targetUrl, options, dependencyInfo) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const startedAt = Date.now();
   try {
     const response = await fetch(targetUrl, {
       ...options,
@@ -63,7 +65,33 @@ async function attemptRequest(targetUrl, options) {
     const body = contentType.includes("application/json")
       ? JSON.parse(rawBody || "{}")
       : rawBody;
+
+    monitoring.recordDependencyRequest({
+      dependencyType: "http",
+      dependencyName: dependencyInfo.dependencyName,
+      operation: dependencyInfo.operation,
+      outcome: monitoring.toOutcomeFromStatus(response.status),
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        status_code: String(response.status),
+        attempt: dependencyInfo.attempt
+      }
+    });
+
     return { response, body, rawBody, contentType };
+  } catch (error) {
+    monitoring.recordDependencyRequest({
+      dependencyType: "http",
+      dependencyName: dependencyInfo.dependencyName,
+      operation: dependencyInfo.operation,
+      outcome: "error",
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        error_type: String(error && error.name ? error.name : "request_failed"),
+        attempt: dependencyInfo.attempt
+      }
+    });
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
@@ -129,7 +157,11 @@ async function proxyRequest(req, res) {
 
   const shouldRetry = method === "GET";
   try {
-    const result = await attemptRequest(targetUrl, options);
+    const result = await attemptRequest(targetUrl, options, {
+      dependencyName: domain,
+      operation: `proxy_${method.toLowerCase()}`,
+      attempt: "initial"
+    });
     res.status(result.response.status);
     if (result.contentType.includes("application/json")) {
       return res.json(result.body);
@@ -145,7 +177,11 @@ async function proxyRequest(req, res) {
     if (shouldRetry) {
       await sleep(RETRY_BACKOFF_MS);
       try {
-        const result = await attemptRequest(targetUrl, options);
+        const result = await attemptRequest(targetUrl, options, {
+          dependencyName: domain,
+          operation: `proxy_${method.toLowerCase()}`,
+          attempt: "retry"
+        });
         res.status(result.response.status);
         if (result.contentType.includes("application/json")) {
           return res.json(result.body);

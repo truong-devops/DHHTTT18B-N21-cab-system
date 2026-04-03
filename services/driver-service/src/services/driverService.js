@@ -26,6 +26,7 @@ const {
   mapVehicle,
   mapLocation
 } = require("../utils/mapper");
+const monitoring = require("../monitoring");
 const driverRepository = require("../repository/driverRepository");
 const vehicleRepository = require("../repository/vehicleRepository");
 const locationRepository = require("../repository/locationRepository");
@@ -115,6 +116,15 @@ async function setOnline(userId, initialLocation) {
     await updateDriverLocation(driver.id, initialLocation);
   }
 
+  monitoring.recordBusinessEvent({
+    domain: "driver",
+    event: "online_status_changed",
+    outcome: "success",
+    attributes: {
+      status: "online"
+    }
+  });
+
   return { driver: mapDriver(updated) };
 }
 
@@ -144,6 +154,15 @@ async function setOffline(userId) {
 
   const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driver.id);
   await clearOnlineRedis(driver.id, vehicle?.vehicle_type);
+
+  monitoring.recordBusinessEvent({
+    domain: "driver",
+    event: "online_status_changed",
+    outcome: "success",
+    attributes: {
+      status: "offline"
+    }
+  });
 
   return { driver: mapDriver(updated) };
 }
@@ -340,6 +359,15 @@ async function markBusy(driverId, rideId) {
   const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
   await removeFromGeo(driverId, vehicle?.vehicle_type);
 
+  monitoring.recordBusinessEvent({
+    domain: "driver",
+    event: "availability_changed",
+    outcome: "success",
+    attributes: {
+      status: "busy"
+    }
+  });
+
   return { driver: mapDriver(updated), rideId };
 }
 
@@ -372,6 +400,15 @@ async function markAvailable(driverId, rideId) {
   const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
   await updateGeo(driverId, location.lat, location.lng, vehicle?.vehicle_type);
   }
+
+  monitoring.recordBusinessEvent({
+    domain: "driver",
+    event: "availability_changed",
+    outcome: "success",
+    attributes: {
+      status: "available"
+    }
+  });
 
   return { driver: mapDriver(updated || driver) };
 }

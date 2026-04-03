@@ -5,7 +5,7 @@ Drop JSON dashboards here to auto-load into Grafana.
 Grafana is used for metrics and traces in the current setup.
 Logs are centralized in Elasticsearch and explored via Kibana.
 
-Suggested dashboards:
-- API Gateway HTTP RED (rate/errors/duration)
-- Ride service throughput + errors
-- Kafka consumer lag (if metrics added)
+Provisioned dashboards:
+- `service-overview.json` - throughput, error rate, p95/p99 latency, active services, top failing endpoints.
+- `business-flow.json` - rides, booking conversion, payment success rate, notification failures, reviews created.
+- `dependency-health.json` - DB/API latency, dependency error rates, notification queue backlog.

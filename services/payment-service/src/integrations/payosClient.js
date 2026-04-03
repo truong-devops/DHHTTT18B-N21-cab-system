@@ -2,6 +2,7 @@ const { createHttpClient } = require("../../../../libs/http/client");
 const { ApiError } = require("../utils/errors");
 const config = require("../config");
 const { signData } = require("../utils/payosSignature");
+const monitoring = require("../monitoring");
 
 let client;
 
@@ -64,13 +65,34 @@ async function createPaymentLink({ orderCode, amount, description, cancelUrl, re
   const clientInstance = getClient();
 
   let response;
+  const startedAt = Date.now();
   try {
     response = await clientInstance.post(
       "/v2/payment-requests",
       { ...payload, signature },
       { headers: buildHeaders() }
     );
+    monitoring.recordDependencyRequest({
+      dependencyType: "http",
+      dependencyName: "payos",
+      operation: "create_payment_link",
+      outcome: monitoring.toOutcomeFromStatus(response.status),
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        status_code: String(response.status)
+      }
+    });
   } catch (err) {
+    monitoring.recordDependencyRequest({
+      dependencyType: "http",
+      dependencyName: "payos",
+      operation: "create_payment_link",
+      outcome: "error",
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        error_type: String(err && err.code ? err.code : "request_failed")
+      }
+    });
     throw new ApiError(502, "PAYOS_REQUEST_FAILED", err.message || "PayOS request failed");
   }
 
@@ -84,12 +106,33 @@ async function getPaymentRequest(identifier) {
 
   const clientInstance = getClient();
   let response;
+  const startedAt = Date.now();
   try {
     response = await clientInstance.get(
       `/v2/payment-requests/${encodeURIComponent(String(identifier))}`,
       { headers: buildHeaders() }
     );
+    monitoring.recordDependencyRequest({
+      dependencyType: "http",
+      dependencyName: "payos",
+      operation: "get_payment_request",
+      outcome: monitoring.toOutcomeFromStatus(response.status),
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        status_code: String(response.status)
+      }
+    });
   } catch (err) {
+    monitoring.recordDependencyRequest({
+      dependencyType: "http",
+      dependencyName: "payos",
+      operation: "get_payment_request",
+      outcome: "error",
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        error_type: String(err && err.code ? err.code : "request_failed")
+      }
+    });
     throw new ApiError(502, "PAYOS_REQUEST_FAILED", err.message || "PayOS request failed");
   }
 

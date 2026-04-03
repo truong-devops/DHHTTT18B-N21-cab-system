@@ -18,6 +18,7 @@ const {
   toggleRule
 } = require("../repository/surgeRuleRepository");
 const { requireAuthOrInternal } = require("../middleware/auth");
+const monitoring = require("../monitoring");
 
 const router = express.Router();
 
@@ -98,6 +99,11 @@ router.post(
       status: req.body.status,
       zone: req.body.zone
     });
+    monitoring.recordBusinessEvent({
+      domain: "pricing",
+      event: "surge_rule_created",
+      outcome: "success"
+    });
     return sendSuccess(res, req, rule, 201);
   })
 );
@@ -119,6 +125,14 @@ router.patch(
     if (!rule) {
       throw new ApiError(404, "NOT_FOUND", "Rule not found");
     }
+    monitoring.recordBusinessEvent({
+      domain: "pricing",
+      event: "surge_rule_toggled",
+      outcome: "success",
+      attributes: {
+        status: String(rule.status || "unknown").toLowerCase()
+      }
+    });
     return sendSuccess(res, req, rule);
   })
 );
@@ -198,6 +212,14 @@ router.post(
     };
 
     await saveQuote(quoteId, record, QUOTE_TTL_SEC);
+    monitoring.recordBusinessEvent({
+      domain: "pricing",
+      event: "quote_created",
+      outcome: "success",
+      attributes: {
+        service_type: String(serviceType || "unknown").toLowerCase()
+      }
+    });
 
     return sendSuccess(
       res,
@@ -356,6 +378,11 @@ router.post(
       durationMin,
       rateCard: quote.rateCard || {},
       discount: quote.discountApplied
+    });
+    monitoring.recordBusinessEvent({
+      domain: "pricing",
+      event: "quote_finalized",
+      outcome: "success"
     });
 
     return sendSuccess(res, req, {

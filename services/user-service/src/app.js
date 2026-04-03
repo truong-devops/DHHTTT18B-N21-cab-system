@@ -15,6 +15,7 @@
 require("dotenv").config();
 
 const express = require("express");
+const monitoring = require("./monitoring");
 const { traceMiddleware } = require("./middleware/trace");
 const { requestLogger } = require("./middleware/requestLogger");
 const { errorHandler } = require("./middleware/errorHandler");
@@ -26,6 +27,7 @@ const app = express();
 
 app.use(express.json({ limit: "1mb" }));
 app.use(traceMiddleware);
+app.use(monitoring.createHttpMetricsMiddleware());
 app.use(requestLogger);
 
 app.get("/healthz", (_req, res) => res.json({ ok: true }));

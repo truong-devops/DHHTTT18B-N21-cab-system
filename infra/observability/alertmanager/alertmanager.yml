@@ -1,0 +1,50 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: __ALERT_DEFAULT_RECEIVER__
+  group_by: ["alertname", "severity", "service_name", "job"]
+  group_wait: 15s
+  group_interval: 2m
+  repeat_interval: 2h
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: __ALERT_CRITICAL_RECEIVER__
+      continue: true
+    - matchers:
+        - severity="warning"
+      receiver: __ALERT_WARNING_RECEIVER__
+
+receivers:
+  - name: generic-webhook
+    webhook_configs:
+      - url: __ALERT_WEBHOOK_URL__
+        send_resolved: true
+        max_alerts: 0
+
+  - name: slack-notifications
+    slack_configs:
+      - api_url: __SLACK_WEBHOOK_URL__
+        channel: "__SLACK_CHANNEL__"
+        username: cab-alert-bot
+        send_resolved: true
+        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: >-
+          {{- range .Alerts -}}
+          *{{ .Labels.severity | toUpper }}* {{ .Labels.alertname }} | {{ .Annotations.summary }}
+          {{ "\n" }}{{ .Annotations.description }}
+          {{ "\n" }}labels: {{ .Labels }}
+          {{ "\n\n" -}}
+          {{- end -}}
+
+  - name: telegram-notifications
+    telegram_configs:
+      - bot_token: __TELEGRAM_BOT_TOKEN__
+        chat_id: __TELEGRAM_CHAT_ID__
+        send_resolved: true
+        message: >-
+          [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}
+          {{- range .Alerts }}
+          - {{ .Annotations.summary }} | {{ .Annotations.description }}
+          {{- end }}

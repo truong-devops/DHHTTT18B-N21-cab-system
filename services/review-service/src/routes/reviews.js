@@ -32,6 +32,7 @@ const {
   releaseLock
 } = require("../idempotency/store");
 const { validateRequest } = require("../middleware/validateRequest");
+const monitoring = require("../monitoring");
 
 const router = express.Router();
 
@@ -180,6 +181,9 @@ router.post(
         rating: req.body.rating,
         comment: req.body.comment,
         status: req.body.status || "submitted"
+      });
+      monitoring.recordReviewCreated("success", {
+        status: String(review.status || "submitted").toLowerCase()
       });
 
       responseBody = { data: toReviewResponse(review) };

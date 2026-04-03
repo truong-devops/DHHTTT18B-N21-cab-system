@@ -1,0 +1,113 @@
+{
+  "id": null,
+  "uid": "cab-business-flow",
+  "title": "Cab Booking - Business Flow",
+  "tags": ["cab-booking", "business"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Rides Created / Completed / Cancelled (rate)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 9, "w": 16, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(cab_business_events_total{domain=\"ride\",event=\"created\",outcome=\"success\"}[5m])) by (service_name)",
+          "legendFormat": "{{service_name}} created"
+        },
+        {
+          "expr": "sum(rate(cab_business_events_total{domain=\"ride\",event=\"status_changed\",status=\"completed\",outcome=\"success\"}[5m])) by (service_name)",
+          "legendFormat": "{{service_name}} completed"
+        },
+        {
+          "expr": "sum(rate(cab_business_events_total{domain=\"ride\",event=\"status_changed\",status=\"cancelled\",outcome=\"success\"}[5m])) by (service_name)",
+          "legendFormat": "{{service_name}} cancelled"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Payment Success Rate (%)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * (sum(rate(cab_business_events_total{domain=\"payment\",event=\"status_changed\",status=\"paid\",outcome=\"success\"}[5m])) / clamp_min(sum(rate(cab_business_events_total{domain=\"payment\",event=\"status_changed\",status=~\"paid|failed\",outcome=\"success\"}[5m])), 0.001))",
+          "legendFormat": "payment success rate"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Booking Conversion (%)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * (sum(increase(cab_business_events_total{domain=\"booking\",event=\"created\",outcome=\"success\"}[$__range])) / clamp_min(sum(increase(cab_business_events_total{domain=\"booking\",event=\"created\"}[$__range])), 1))",
+          "legendFormat": "booking conversion"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Notification Send Failures",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 9 },
+      "targets": [
+        {
+          "expr": "sum(rate(cab_business_events_total{domain=\"notification\",event=\"send\",outcome=\"error\"}[5m])) by (service_name, channel)",
+          "legendFormat": "{{service_name}} {{channel}}"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Reviews Created",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 17 },
+      "targets": [
+        {
+          "expr": "sum(increase(cab_business_events_total{domain=\"review\",event=\"created\",outcome=\"success\"}[$__range])) by (service_name)",
+          "legendFormat": "{{service_name}}"
+        }
+      ]
+    }
+  ]
+}

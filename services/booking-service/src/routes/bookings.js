@@ -2,10 +2,15 @@ const express = require("express");
 const crypto = require("crypto");
 const { CreateBookingSchema } = require("../schemas/bookingSchemas");
 const bookingRepo = require("../repositories/bookingRepo");
-const { getQuote } = require("../clients/pricingClient");
+const {
+  getQuote,
+  PricingServiceError
+} = require("../clients/pricingClient");
 
 const { publish } = require("../messaging/producer");
 const topics = require("../messaging/topics");
+const monitoring = require("../monitoring");
+const logger = require("../utils/logger");
 
 const router = express.Router();
 
@@ -41,6 +46,9 @@ router.post("/", async (req, res) => {
     // 1) Validate
     const parsed = CreateBookingSchema.safeParse(req.body);
     if (!parsed.success) {
+      monitoring.recordBookingStatus("created", "error", {
+        reason: "validation_error"
+      });
       return res.status(400).json({ error: "Invalid payload", details: parsed.error.flatten() });
     }
 
@@ -65,7 +73,7 @@ router.post("/", async (req, res) => {
     bookingRepo.create(booking);
 
     // 4) Publish event ride.created (để ride-service consume)
-    const traceId = req.header("x-trace-id");
+    const traceId = req.traceId || req.header("x-trace-id");
     const eventId = crypto.randomUUID();
     const event = buildEnvelope({
       eventId,
@@ -80,7 +88,19 @@ router.post("/", async (req, res) => {
         timestamp: new Date().toISOString()
       }
     });
-    await publish(topics.RideCreated, event);
+    await monitoring.measureDependency(
+      {
+        dependencyType: "queue",
+        dependencyName: "kafka",
+        operation: "publish_ride_created",
+        attributes: { topic: topics.RideCreated }
+      },
+      () => publish(topics.RideCreated, event)
+    );
+
+    monitoring.recordBookingStatus("created", "success", {
+      vehicle_type: vehicleType
+    });
 
     // 5) Response
     return res.status(201).json({
@@ -88,7 +108,36 @@ router.post("/", async (req, res) => {
       publishedEvent: { topic: topics.RideCreated, eventId }
     });
   } catch (e) {
-    console.error(e);
+    if (e instanceof PricingServiceError) {
+      monitoring.recordBookingStatus("created", "error", {
+        reason: "pricing_unavailable"
+      });
+      logger.withTrace(req).error(
+        {
+          err: {
+            message: e.message,
+            code: e.code,
+            cause: e.cause?.message || null
+          }
+        },
+        "failed to create booking due to pricing dependency"
+      );
+      return res.status(e.statusCode).json({
+        error: e.message,
+        code: e.code
+      });
+    }
+
+    monitoring.recordBookingStatus("created", "error");
+    logger.withTrace(req).error(
+      {
+        err: {
+          message: e.message,
+          code: e.code || "UNKNOWN"
+        }
+      },
+      "failed to create booking"
+    );
     return res.status(500).json({ error: e.message });
   }
 });
@@ -98,13 +147,18 @@ router.post("/:id/cancel", async (req, res) => {
     const bookingId = req.params.id;
 
     const booking = bookingRepo.getById(bookingId);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
+    if (!booking) {
+      monitoring.recordBookingStatus("cancelled", "error", {
+        reason: "not_found"
+      });
+      return res.status(404).json({ error: "Booking not found" });
+    }
 
     // 1) Update booking state
     const canceled = bookingRepo.cancel(bookingId);
 
     // 2) Publish ride.cancelled event
-    const traceId = req.header("x-trace-id");
+    const traceId = req.traceId || req.header("x-trace-id");
     const eventId = crypto.randomUUID();
     const event = buildEnvelope({
       eventId,
@@ -117,14 +171,33 @@ router.post("/:id/cancel", async (req, res) => {
       }
     });
 
-    await publish(topics.RideCancelled, event);
+    await monitoring.measureDependency(
+      {
+        dependencyType: "queue",
+        dependencyName: "kafka",
+        operation: "publish_ride_cancelled",
+        attributes: { topic: topics.RideCancelled }
+      },
+      () => publish(topics.RideCancelled, event)
+    );
+
+    monitoring.recordBookingStatus("cancelled", "success");
 
     return res.status(200).json({
       booking: canceled,
       publishedEvent: { topic: topics.RideCancelled, eventId }
     });
   } catch (e) {
-    console.error(e);
+    monitoring.recordBookingStatus("cancelled", "error");
+    logger.withTrace(req).error(
+      {
+        err: {
+          message: e.message,
+          code: e.code || "UNKNOWN"
+        }
+      },
+      "failed to cancel booking"
+    );
     return res.status(500).json({ error: e.message });
   }
 });
