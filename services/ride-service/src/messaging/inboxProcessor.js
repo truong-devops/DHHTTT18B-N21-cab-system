@@ -145,10 +145,60 @@ async function handlePaymentFailed(row) {
   });
 }
 
+async function handleRideCancelled(row) {
+  const payload = row.payload || {};
+  if (!payload.rideId) {
+    throw new Error("ride.cancelled missing rideId");
+  }
+
+  const ride = await resolveRideByPaymentRideId(payload.rideId);
+  if (!ride) {
+    return { skipped: true, reason: "ride_not_found", rideId: payload.rideId };
+  }
+
+  const fromStatus = normalizeStatus(ride.status);
+  const toStatus = "CANCELLED";
+  if (fromStatus === toStatus) {
+    return {
+      skipped: true,
+      reason: "already_in_target_state",
+      rideId: ride.id,
+      status: ride.status
+    };
+  }
+
+  if (!isValidTransition(fromStatus, toStatus)) {
+    return {
+      skipped: true,
+      reason: "invalid_state_transition",
+      rideId: ride.id,
+      fromStatus,
+      toStatus
+    };
+  }
+
+  const updated = await updateRideStatus({
+    id: ride.id,
+    status: "cancelled",
+    fromStatus,
+    reason: payload.reason || "cancelled_by_customer",
+    actorId: "booking-service",
+    traceId: row.trace_id || null
+  });
+
+  return {
+    rideId: updated.id,
+    fromStatus: ride.status,
+    toStatus: updated.status
+  };
+}
+
 async function processRow(row) {
   switch (row.topic) {
     case topics.RideCreated:
       return handleRideCreated(row);
+    case topics.RideCancelled:
+      return handleRideCancelled(row);
     case topics.PaymentCompleted:
       return handlePaymentCompleted(row);
     case topics.PaymentFailed:

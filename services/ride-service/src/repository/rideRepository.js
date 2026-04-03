@@ -26,6 +26,15 @@ function mapRide(doc) {
   };
 }
 
+function unwrapFindOneAndUpdateResult(result) {
+  if (!result) {
+    return null;
+  }
+  return Object.prototype.hasOwnProperty.call(result, "value")
+    ? result.value
+    : result;
+}
+
 function buildCursorFilter({ cursor, isDesc }) {
   if (!cursor?.createdAt || !cursor?.id) {
     return null;
@@ -182,7 +191,7 @@ async function updateRideStatus({
           updateOptions
         );
 
-      const rideDoc = rideResult.value;
+      const rideDoc = unwrapFindOneAndUpdateResult(rideResult);
       if (!rideDoc) {
         return null;
       }
@@ -283,7 +292,7 @@ async function updateRideFields(id, fields) {
       { returnDocument: "after" }
     );
 
-  return mapRide(result.value);
+  return mapRide(unwrapFindOneAndUpdateResult(result));
 }
 
 async function addStatusHistory({
@@ -390,11 +399,10 @@ async function claimRideForDriver({ driverId, traceId = null } = {}) {
         updateOptions
       );
 
-    if (!rideResult || !rideResult.value) {
+    const rideDoc = unwrapFindOneAndUpdateResult(rideResult);
+    if (!rideDoc) {
       return null;
     }
-
-    const rideDoc = rideResult.value;
 
     const insertOptions = session ? { session } : {};
     await db.collection("ride_status_history").insertOne(
