@@ -2,6 +2,7 @@ const notificationRepository = require("../repository/notificationRepository");
 const { getProvider } = require("../providers");
 const { deriveOverallStatus } = require("../services/notificationService");
 const logger = require("../utils/logger");
+const monitoring = require("../monitoring");
 
 const DISPATCH_INTERVAL_MS = Number(
   process.env.NOTIFICATION_DISPATCH_INTERVAL_MS || 1000
@@ -106,6 +107,9 @@ async function handleChannel(notification, channel) {
 
   const recipient = claimed.recipient || {};
   if (missingRecipient(channel, recipient)) {
+    monitoring.recordNotificationSend(channel, "error", {
+      reason: "missing_recipient"
+    });
     const updated = await notificationRepository.updateChannelResult(
       claimed.id,
       channel,
@@ -124,6 +128,9 @@ async function handleChannel(notification, channel) {
 
   const provider = getProvider(channel);
   if (!provider) {
+    monitoring.recordNotificationSend(channel, "error", {
+      reason: "provider_not_configured"
+    });
     const updated = await notificationRepository.updateChannelResult(
       claimed.id,
       channel,
@@ -141,11 +148,20 @@ async function handleChannel(notification, channel) {
   }
 
   try {
-    const response = await provider.send({
-      notification: claimed,
-      channel,
-      recipient
-    });
+    const response = await monitoring.measureDependency(
+      {
+        dependencyType: "provider",
+        dependencyName: channel.toLowerCase(),
+        operation: "send_notification"
+      },
+      () =>
+        provider.send({
+          notification: claimed,
+          channel,
+          recipient
+        })
+    );
+    monitoring.recordNotificationSend(channel, "success");
 
     const updated = await notificationRepository.updateChannelResult(
       claimed.id,
@@ -160,6 +176,9 @@ async function handleChannel(notification, channel) {
     );
     await updateOverallStatus(updated);
   } catch (error) {
+    monitoring.recordNotificationSend(channel, "error", {
+      reason: "send_failed"
+    });
     const attempts =
       claimed.perChannelStatus?.[channel]?.attempts || 1;
     const shouldRetry = attempts < MAX_ATTEMPTS;
@@ -182,6 +201,9 @@ async function handleChannel(notification, channel) {
 
 async function dispatchOnce() {
   const now = new Date();
+  const backlog = await notificationRepository.countDispatchBacklog(now);
+  monitoring.setQueueBacklog("notification_dispatch", backlog);
+
   const candidates =
     await notificationRepository.findDispatchCandidates(
       DISPATCH_BATCH_SIZE,

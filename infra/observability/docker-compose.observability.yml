@@ -42,6 +42,8 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.98.0
     command: ["--config=/etc/otel-collector.yml"]
+    environment:
+      DEPLOY_ENV: ${DEPLOY_ENV:-dev}
     volumes:
       - ./observability/otel-collector.yml:/etc/otel-collector.yml:ro
     ports:
@@ -59,9 +61,46 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alerts:/etc/prometheus/alerts:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
+    depends_on:
+      - alertmanager
+    networks:
+      - backend
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.0
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+        sed \
+          -e "s|__ALERT_DEFAULT_RECEIVER__|${ALERT_DEFAULT_RECEIVER:-generic-webhook}|g" \
+          -e "s|__ALERT_WARNING_RECEIVER__|${ALERT_WARNING_RECEIVER:-generic-webhook}|g" \
+          -e "s|__ALERT_CRITICAL_RECEIVER__|${ALERT_CRITICAL_RECEIVER:-generic-webhook}|g" \
+          -e "s|__ALERT_WEBHOOK_URL__|${ALERT_WEBHOOK_URL:-http://host.docker.internal:19093/alerts}|g" \
+          -e "s|__SLACK_WEBHOOK_URL__|${SLACK_WEBHOOK_URL:-http://127.0.0.1:65535/slack}|g" \
+          -e "s|__SLACK_CHANNEL__|${SLACK_CHANNEL:-#cab-alerts}|g" \
+          -e "s|__TELEGRAM_BOT_TOKEN__|${TELEGRAM_BOT_TOKEN:-disabled}|g" \
+          -e "s|__TELEGRAM_CHAT_ID__|${TELEGRAM_CHAT_ID:-1}|g" \
+          /etc/alertmanager/alertmanager.yml > /tmp/alertmanager.rendered.yml
+        exec alertmanager --config.file=/tmp/alertmanager.rendered.yml
+    environment:
+      ALERT_DEFAULT_RECEIVER: ${ALERT_DEFAULT_RECEIVER:-generic-webhook}
+      ALERT_WARNING_RECEIVER: ${ALERT_WARNING_RECEIVER:-generic-webhook}
+      ALERT_CRITICAL_RECEIVER: ${ALERT_CRITICAL_RECEIVER:-generic-webhook}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-http://host.docker.internal:19093/alerts}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-http://127.0.0.1:65535/slack}
+      SLACK_CHANNEL: "${SLACK_CHANNEL:-#cab-alerts}"
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-disabled}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-1}
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
     networks:
       - backend
 

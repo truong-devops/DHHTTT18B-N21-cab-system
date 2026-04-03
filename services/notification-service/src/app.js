@@ -1,20 +1,22 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const morgan = require("morgan");
 const { traceMiddleware } = require("./middleware/trace");
+const { requestLogger } = require("./middleware/requestLogger");
 const { errorHandler } = require("./middleware/errorHandler");
 const notificationsRoutes = require("./routes/notifications");
 const usersRoutes = require("./routes/users");
 const { getDb } = require("./db/mongo");
 const { getDispatcherState } = require("./dispatcher/notificationDispatcher");
+const monitoring = require("./monitoring");
 
 const app = express();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-app.use(morgan("dev"));
 app.use(traceMiddleware);
+app.use(requestLogger);
+app.use(monitoring.createHttpMetricsMiddleware());
 
 app.get("/healthz", (_req, res) => res.json({ ok: true }));
 app.get("/readyz", async (_req, res) => {

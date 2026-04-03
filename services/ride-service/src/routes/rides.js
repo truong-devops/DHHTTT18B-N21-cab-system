@@ -32,6 +32,8 @@ const {
   acquireLock,
   releaseLock
 } = require("../idempotency/store");
+const monitoring = require("../monitoring");
+const logger = require("../utils/logger");
 
 const router = express.Router();
 
@@ -216,6 +218,9 @@ router.post(
         toStatus: ride.status,
         actorId: req.userId,
         traceId: req.traceId
+      });
+      monitoring.recordRideCreated("success", {
+        status: String(ride.status || "requested").toLowerCase()
       });
 
       responseBody = { data: toRideResponse(ride) };
@@ -452,8 +457,19 @@ router.patch(
       const reason = req.body.statusReason || null;
       const actor = req.userId;
       if (!isValidTransition(fromStatus, toStatus)) {
-        console.log(
-          `[ride-service] transition rejected traceId=${req.traceId} rideId=${ride.id} ${fromStatus}->${toStatus} actor=${actor} reason=${reason}`
+        monitoring.recordRideStatus(toStatus, "error", {
+          reason: "invalid_transition",
+          from_status: String(fromStatus || "unknown").toLowerCase()
+        });
+        logger.withTrace(req).warn(
+          {
+            rideId: ride.id,
+            fromStatus,
+            toStatus,
+            actor,
+            reason
+          },
+          "ride transition rejected"
         );
         throw new ApiError(
           409,
@@ -461,8 +477,15 @@ router.patch(
           `Invalid transition from ${fromStatus} to ${toStatus}`
         );
       }
-      console.log(
-        `[ride-service] transition traceId=${req.traceId} rideId=${ride.id} ${fromStatus}->${toStatus} actor=${actor} reason=${reason}`
+      logger.withTrace(req).info(
+        {
+          rideId: ride.id,
+          fromStatus,
+          toStatus,
+          actor,
+          reason
+        },
+        "ride transition"
       );
     }
 
@@ -491,6 +514,9 @@ router.patch(
         actorId: req.userId,
         traceId: req.traceId
       });
+      monitoring.recordRideStatus(ride.status, "success", {
+        from_status: String(fromStatus || "unknown").toLowerCase()
+      });
     }
 
     return res.json({ data: toRideResponse(ride) });
@@ -517,6 +543,10 @@ router.delete(
     const fromStatus = normalizeStatus(ride.status);
     const toStatus = "CANCELLED";
     if (!isValidTransition(fromStatus, toStatus)) {
+      monitoring.recordRideStatus(toStatus, "error", {
+        reason: "invalid_transition",
+        from_status: String(fromStatus || "unknown").toLowerCase()
+      });
       throw new ApiError(
         409,
         "INVALID_STATE_TRANSITION",
@@ -524,8 +554,13 @@ router.delete(
       );
     }
 
-    console.log(
-      `[ride-service] transition traceId=${req.traceId} rideId=${ride.id} ${fromStatus}->${toStatus}`
+    logger.withTrace(req).info(
+      {
+        rideId: ride.id,
+        fromStatus,
+        toStatus
+      },
+      "ride transition"
     );
 
     const updated = await updateRideStatus({
@@ -535,6 +570,9 @@ router.delete(
       reason: req.body?.reason || null,
       actorId: req.userId,
       traceId: req.traceId
+    });
+    monitoring.recordRideStatus(updated.status, "success", {
+      from_status: String(fromStatus || "unknown").toLowerCase()
     });
 
     return res.json({ data: toRideResponse(updated) });

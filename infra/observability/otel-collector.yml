@@ -5,6 +5,15 @@ receivers:
       http:
 
 processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: ${DEPLOY_ENV}
+        action: upsert
   batch:
 
 exporters:
@@ -14,6 +23,8 @@ exporters:
       insecure: true
   prometheus:
     endpoint: "0.0.0.0:8889"
+    resource_to_telemetry_conversion:
+      enabled: false
   logging:
     loglevel: info
 
@@ -21,11 +32,11 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, resource, batch]
       exporters: [otlp/tempo, logging]
     metrics:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, resource, batch]
       exporters: [prometheus, logging]
     # NOTE:
     # Primary log pipeline is now Docker stdout -> Logstash -> Elasticsearch.

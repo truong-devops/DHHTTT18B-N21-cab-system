@@ -2,6 +2,7 @@ const { URL } = require("url");
 const { createHttpClient } = require("../../../../libs/http/client");
 const { ApiError } = require("../utils/errors");
 const config = require("../config");
+const monitoring = require("../monitoring");
 
 const clientCache = new Map();
 
@@ -74,12 +75,33 @@ async function generateVietQrCode({
   const { baseUrl, path } = parseApiUrl(apiUrl);
   const client = getClient(baseUrl);
   let response;
+  const startedAt = Date.now();
   try {
     response = await client.post(path, payload, {
       headers: buildHeaders(headers),
       context: buildContext(headers)
     });
+    monitoring.recordDependencyRequest({
+      dependencyType: "http",
+      dependencyName: "vietqr",
+      operation: "generate_qr",
+      outcome: monitoring.toOutcomeFromStatus(response.status),
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        status_code: String(response.status)
+      }
+    });
   } catch (err) {
+    monitoring.recordDependencyRequest({
+      dependencyType: "http",
+      dependencyName: "vietqr",
+      operation: "generate_qr",
+      outcome: "error",
+      durationMs: Date.now() - startedAt,
+      attributes: {
+        error_type: String(err && err.code ? err.code : "request_failed")
+      }
+    });
     if (err && err.code === "CIRCUIT_OPEN") {
       throw new ApiError(503, "INTERNAL", "VietQR circuit breaker open");
     }

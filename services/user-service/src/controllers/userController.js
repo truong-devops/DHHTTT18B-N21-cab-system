@@ -11,6 +11,7 @@ const {
   encodeCursor,
   decodeCursor
 } = require("../utils/pagination");
+const monitoring = require("../monitoring");
 const { OutboxPublisher } = require("../messaging/publisher");
 const { UserCreated, UserUpdated } = require("../messaging/topics");
 
@@ -80,9 +81,22 @@ async function createUser(req, res, next) {
       await publisher.publish(event, client);
       return user;
     });
+    monitoring.recordBusinessEvent({
+      domain: "user",
+      event: "created",
+      outcome: "success",
+      attributes: {
+        role: String(result.role || "unknown").toLowerCase()
+      }
+    });
 
     return res.status(201).json({ data: result });
   } catch (error) {
+    monitoring.recordBusinessEvent({
+      domain: "user",
+      event: "created",
+      outcome: "error"
+    });
     return next(error);
   }
 }
@@ -172,9 +186,19 @@ async function updateUser(req, res, next) {
       await publisher.publish(event, client);
       return user;
     });
+    monitoring.recordBusinessEvent({
+      domain: "user",
+      event: "updated",
+      outcome: "success"
+    });
 
     return res.json({ data: result });
   } catch (error) {
+    monitoring.recordBusinessEvent({
+      domain: "user",
+      event: "updated",
+      outcome: "error"
+    });
     return next(error);
   }
 }
@@ -190,9 +214,19 @@ async function deleteUser(req, res, next) {
       await publisher.publish(event, client);
       return user;
     });
+    monitoring.recordBusinessEvent({
+      domain: "user",
+      event: "deleted",
+      outcome: "success"
+    });
 
     return res.json({ data: result });
   } catch (error) {
+    monitoring.recordBusinessEvent({
+      domain: "user",
+      event: "deleted",
+      outcome: "error"
+    });
     return next(error);
   }
 }

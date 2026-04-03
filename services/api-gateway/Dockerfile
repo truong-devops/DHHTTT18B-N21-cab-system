@@ -13,7 +13,8 @@ ENV NPM_CONFIG_FETCH_RETRIES=5 \
 COPY services/api-gateway/package*.json ./
 RUN npm install
 
-COPY services/api-gateway ./
+COPY libs ./libs
+COPY services/api-gateway/src ./src
 
 EXPOSE 8080
 CMD ["npm", "run", "start"]

@@ -1,0 +1,113 @@
+groups:
+  - name: cab-monitoring-core
+    rules:
+      - alert: OTelCollectorScrapeMissing
+        expr: up{job="otel-collector"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OTel Collector scrape is down"
+          description: "Prometheus cannot scrape otel-collector:8889 for at least 3 minutes."
+
+      - alert: PrometheusScrapeMissing
+        expr: up{job="prometheus"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus scrape target is down"
+          description: "Prometheus target is not healthy for at least 3 minutes."
+
+      - alert: ServiceDown
+        expr: max_over_time(cab_service_up[2m]) == 0
+        for: 4m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.service_name }} is down"
+          description: "cab_service_up for {{ $labels.service_name }} has been 0 for at least 4 minutes."
+
+      - alert: ServiceMetricsMissing
+        expr: |
+          absent_over_time(cab_service_up{service_name="api-gateway"}[5m])
+          or absent_over_time(cab_service_up{service_name="auth-service"}[5m])
+          or absent_over_time(cab_service_up{service_name="user-service"}[5m])
+          or absent_over_time(cab_service_up{service_name="driver-service"}[5m])
+          or absent_over_time(cab_service_up{service_name="pricing-service"}[5m])
+          or absent_over_time(cab_service_up{service_name="booking-service"}[5m])
+          or absent_over_time(cab_service_up{service_name="ride-service"}[5m])
+          or absent_over_time(cab_service_up{service_name="payment-service"}[5m])
+          or absent_over_time(cab_service_up{service_name="notification-service"}[5m])
+          or absent_over_time(cab_service_up{service_name="review-service"}[5m])
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Service metrics stream missing"
+          description: "At least one critical service has no cab_service_up sample in the last 5 minutes."
+
+      - alert: HighHttpErrorRate
+        expr: |
+          (
+            sum(rate(cab_http_server_requests_total{http_status_code=~"5.."}[10m])) by (service_name)
+            /
+            clamp_min(sum(rate(cab_http_server_requests_total[10m])) by (service_name), 0.001)
+          ) > 0.15
+          and
+          sum(rate(cab_http_server_requests_total[10m])) by (service_name) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 5xx error rate on {{ $labels.service_name }}"
+          description: "5xx ratio is above 15% with traffic > 0.1 rps for at least 15 minutes."
+
+      - alert: HighHttpP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(cab_http_server_duration_ms_bucket[10m])) by (service_name, le)
+          ) > 2000
+          and
+          sum(rate(cab_http_server_requests_total[10m])) by (service_name) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p95 latency on {{ $labels.service_name }}"
+          description: "p95 HTTP latency is above 2000ms with traffic > 0.1 rps for at least 15 minutes."
+
+      - alert: PaymentFailureSpike
+        expr: |
+          (
+            sum(increase(cab_business_events_total{domain="payment",event="status_changed",status="failed",outcome="success"}[15m])) by (service_name)
+            /
+            clamp_min(sum(increase(cab_business_events_total{domain="payment",event="status_changed",status=~"paid|failed",outcome="success"}[15m])) by (service_name), 1)
+          ) > 0.40
+          and
+          sum(increase(cab_business_events_total{domain="payment",event="status_changed",status=~"paid|failed",outcome="success"}[15m])) by (service_name) >= 20
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Payment failures spiking on {{ $labels.service_name }}"
+          description: "Payment failed ratio is above 40% with at least 20 payment outcomes in 15 minutes."
+
+      - alert: QueueBacklogHighWarning
+        expr: max_over_time(cab_queue_backlog[15m]) > 300
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue backlog high on {{ $labels.service_name }}"
+          description: "Queue {{ $labels.queue_name }} backlog exceeded 300 for at least 15 minutes."
+
+      - alert: QueueBacklogHighCritical
+        expr: max_over_time(cab_queue_backlog[10m]) > 600
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Queue backlog critical on {{ $labels.service_name }}"
+          description: "Queue {{ $labels.queue_name }} backlog exceeded 600 for at least 10 minutes."

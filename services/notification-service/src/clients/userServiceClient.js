@@ -1,4 +1,5 @@
 const logger = require("../utils/logger");
+const monitoring = require("../monitoring");
 
 const fetchFn = global.fetch || require("node-fetch");
 
@@ -103,14 +104,37 @@ async function requestWithRetry(url, options, retryCount) {
       () => controller.abort(),
       DEFAULT_TIMEOUT_MS
     );
+    const startedAt = Date.now();
     try {
       const response = await fetchFn(url, {
         ...options,
         signal: controller.signal
       });
+      monitoring.recordDependencyRequest({
+        dependencyType: "http",
+        dependencyName: "user-service",
+        operation: "get_user",
+        outcome: monitoring.toOutcomeFromStatus(response.status),
+        durationMs: Date.now() - startedAt,
+        attributes: {
+          status_code: String(response.status),
+          attempt: String(attempt + 1)
+        }
+      });
       return response;
     } catch (error) {
       lastError = error;
+      monitoring.recordDependencyRequest({
+        dependencyType: "http",
+        dependencyName: "user-service",
+        operation: "get_user",
+        outcome: "error",
+        durationMs: Date.now() - startedAt,
+        attributes: {
+          error_type: String(error && error.name ? error.name : "request_failed"),
+          attempt: String(attempt + 1)
+        }
+      });
       if (attempt < retryCount) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }

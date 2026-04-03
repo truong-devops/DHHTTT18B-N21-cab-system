@@ -21,6 +21,7 @@ const {
   findRefreshToken,
   deleteRefreshToken
 } = require("../repository/tokenRepository");
+const monitoring = require("../monitoring");
 
 const router = express.Router();
 
@@ -41,6 +42,12 @@ router.post(
   asyncHandler(async (req, res) => {
     const { email, username, password, role } = req.body || {};
     if (!email && !username) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "register",
+        outcome: "error",
+        attributes: { reason: "missing_identifier" }
+      });
       throw new ApiError(
         400,
         "VALIDATION_ERROR",
@@ -48,6 +55,12 @@ router.post(
       );
     }
     if (!password || password.length < 6) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "register",
+        outcome: "error",
+        attributes: { reason: "invalid_password" }
+      });
       throw new ApiError(
         400,
         "VALIDATION_ERROR",
@@ -55,6 +68,12 @@ router.post(
       );
     }
     if (!validateRole(role)) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "register",
+        outcome: "error",
+        attributes: { reason: "invalid_role" }
+      });
       throw new ApiError(
         400,
         "VALIDATION_ERROR",
@@ -67,6 +86,12 @@ router.post(
       existingIdentifier
     );
     if (existing) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "register",
+        outcome: "error",
+        attributes: { reason: "user_exists" }
+      });
       throw new ApiError(
         409,
         "CONFLICT",
@@ -86,6 +111,12 @@ router.post(
       });
     } catch (error) {
       if (error?.code === "23505") {
+        monitoring.recordBusinessEvent({
+          domain: "auth",
+          event: "register",
+          outcome: "error",
+          attributes: { reason: "user_exists" }
+        });
         throw new ApiError(
           409,
           "CONFLICT",
@@ -104,6 +135,14 @@ router.post(
       userId: user.id,
       tokenHash: hashRefreshToken(refreshToken),
       expiresAt: buildRefreshExpiry()
+    });
+    monitoring.recordBusinessEvent({
+      domain: "auth",
+      event: "register",
+      outcome: "success",
+      attributes: {
+        role: String(user.role || "unknown").toLowerCase()
+      }
     });
 
     return res.status(201).json({
@@ -129,6 +168,12 @@ router.post(
   asyncHandler(async (req, res) => {
     const { identifier, password } = req.body || {};
     if (!identifier || !password) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "login",
+        outcome: "error",
+        attributes: { reason: "missing_credentials" }
+      });
       throw new ApiError(
         400,
         "VALIDATION_ERROR",
@@ -138,6 +183,12 @@ router.post(
 
     const user = await findUserByIdentifier(identifier);
     if (!user) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "login",
+        outcome: "error",
+        attributes: { reason: "user_not_found" }
+      });
       throw new ApiError(
         401,
         "UNAUTHORIZED",
@@ -145,6 +196,12 @@ router.post(
       );
     }
     if (user.status !== "active") {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "login",
+        outcome: "error",
+        attributes: { reason: "user_inactive" }
+      });
       throw new ApiError(
         403,
         "FORBIDDEN",
@@ -157,6 +214,12 @@ router.post(
       user.password_hash
     );
     if (!valid) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "login",
+        outcome: "error",
+        attributes: { reason: "invalid_password" }
+      });
       throw new ApiError(
         401,
         "UNAUTHORIZED",
@@ -173,6 +236,14 @@ router.post(
       userId: user.id,
       tokenHash: hashRefreshToken(refreshToken),
       expiresAt: buildRefreshExpiry()
+    });
+    monitoring.recordBusinessEvent({
+      domain: "auth",
+      event: "login",
+      outcome: "success",
+      attributes: {
+        role: String(user.role || "unknown").toLowerCase()
+      }
     });
 
     return res.json({
@@ -198,6 +269,12 @@ router.post(
   asyncHandler(async (req, res) => {
     const { refreshToken } = req.body || {};
     if (!refreshToken) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "refresh",
+        outcome: "error",
+        attributes: { reason: "missing_refresh_token" }
+      });
       throw new ApiError(
         400,
         "VALIDATION_ERROR",
@@ -208,6 +285,12 @@ router.post(
     const tokenHash = hashRefreshToken(refreshToken);
     const stored = await findRefreshToken(tokenHash);
     if (!stored) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "refresh",
+        outcome: "error",
+        attributes: { reason: "token_not_found" }
+      });
       throw new ApiError(
         401,
         "UNAUTHORIZED",
@@ -218,6 +301,12 @@ router.post(
     const expiredAt = new Date(stored.expired_at);
     if (Number.isNaN(expiredAt.valueOf()) || expiredAt < new Date()) {
       await deleteRefreshToken(tokenHash);
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "refresh",
+        outcome: "error",
+        attributes: { reason: "token_expired" }
+      });
       throw new ApiError(
         401,
         "UNAUTHORIZED",
@@ -228,6 +317,12 @@ router.post(
     const user = await findUserById(stored.user_id);
     if (!user) {
       await deleteRefreshToken(tokenHash);
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "refresh",
+        outcome: "error",
+        attributes: { reason: "user_not_found" }
+      });
       throw new ApiError(
         401,
         "UNAUTHORIZED",
@@ -246,6 +341,14 @@ router.post(
       userId: user.id,
       tokenHash: hashRefreshToken(nextRefreshToken),
       expiresAt: buildRefreshExpiry()
+    });
+    monitoring.recordBusinessEvent({
+      domain: "auth",
+      event: "refresh",
+      outcome: "success",
+      attributes: {
+        role: String(user.role || "unknown").toLowerCase()
+      }
     });
 
     return res.json({
@@ -271,6 +374,12 @@ router.post(
   asyncHandler(async (req, res) => {
     const { refreshToken } = req.body || {};
     if (!refreshToken) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "logout",
+        outcome: "error",
+        attributes: { reason: "missing_refresh_token" }
+      });
       throw new ApiError(
         400,
         "VALIDATION_ERROR",
@@ -280,6 +389,11 @@ router.post(
 
     const tokenHash = hashRefreshToken(refreshToken);
     await deleteRefreshToken(tokenHash);
+    monitoring.recordBusinessEvent({
+      domain: "auth",
+      event: "logout",
+      outcome: "success"
+    });
     return res.json({ ok: true });
   })
 );
@@ -290,6 +404,12 @@ router.get(
     const authHeader = req.header("authorization") || "";
     const [, token] = authHeader.split(" ");
     if (!token) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "verify",
+        outcome: "error",
+        attributes: { reason: "missing_token" }
+      });
       throw new ApiError(
         401,
         "UNAUTHORIZED",
@@ -299,6 +419,11 @@ router.get(
 
     try {
       const payload = verifyAccessToken(token);
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "verify",
+        outcome: "success"
+      });
       return res.json({
         data: {
           userId: payload.sub || payload.id,
@@ -309,6 +434,12 @@ router.get(
         }
       });
     } catch (error) {
+      monitoring.recordBusinessEvent({
+        domain: "auth",
+        event: "verify",
+        outcome: "error",
+        attributes: { reason: "invalid_token" }
+      });
       throw new ApiError(
         401,
         "UNAUTHORIZED",

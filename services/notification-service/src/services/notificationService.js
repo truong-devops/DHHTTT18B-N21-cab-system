@@ -11,6 +11,7 @@ const {
 const { getUserById } = require("../clients/userServiceClient");
 const notificationRepository = require("../repository/notificationRepository");
 const preferenceRepository = require("../repository/preferenceRepository");
+const monitoring = require("../monitoring");
 
 const MAX_ATTEMPTS = Number(
   process.env.NOTIFICATION_MAX_ATTEMPTS || 5
@@ -266,17 +267,35 @@ async function resolveUserContacts(userId, context) {
 async function createNotification(payload, context) {
   const errors = validatePayload(payload);
   if (errors.length) {
+    monitoring.recordBusinessEvent({
+      domain: "notification",
+      event: "created",
+      outcome: "error",
+      attributes: { reason: "validation_error" }
+    });
     throw new ApiError(400, "VALIDATION_ERROR", "Invalid payload", errors);
   }
 
   const channelResult = normalizeChannels(payload.channels);
   if (!channelResult.ok) {
+    monitoring.recordBusinessEvent({
+      domain: "notification",
+      event: "created",
+      outcome: "error",
+      attributes: { reason: "invalid_channels" }
+    });
     throw new ApiError(400, "VALIDATION_ERROR", channelResult.error);
   }
   const channels = channelResult.value;
 
   const scheduleResult = parseDate(payload.scheduledAt);
   if (!scheduleResult.ok) {
+    monitoring.recordBusinessEvent({
+      domain: "notification",
+      event: "created",
+      outcome: "error",
+      attributes: { reason: "invalid_schedule" }
+    });
     throw new ApiError(400, "VALIDATION_ERROR", scheduleResult.error);
   }
 
@@ -286,6 +305,12 @@ async function createNotification(payload, context) {
     dedupeKey
   );
   if (existing) {
+    monitoring.recordBusinessEvent({
+      domain: "notification",
+      event: "created",
+      outcome: "success",
+      attributes: { deduplicated: "true" }
+    });
     return { notification: existing, created: false };
   }
 
@@ -368,6 +393,12 @@ async function createNotification(payload, context) {
     const created = await notificationRepository.insertNotification(
       notification
     );
+    monitoring.recordBusinessEvent({
+      domain: "notification",
+      event: "created",
+      outcome: "success",
+      attributes: { deduplicated: "false" }
+    });
     return { notification: created, created: true };
   } catch (error) {
     if (String(error?.code) === "11000") {
@@ -375,9 +406,21 @@ async function createNotification(payload, context) {
         dedupeKey
       );
       if (existingDoc) {
+        monitoring.recordBusinessEvent({
+          domain: "notification",
+          event: "created",
+          outcome: "success",
+          attributes: { deduplicated: "true" }
+        });
         return { notification: existingDoc, created: false };
       }
     }
+    monitoring.recordBusinessEvent({
+      domain: "notification",
+      event: "created",
+      outcome: "error",
+      attributes: { reason: "insert_failed" }
+    });
     throw error;
   }
 }
