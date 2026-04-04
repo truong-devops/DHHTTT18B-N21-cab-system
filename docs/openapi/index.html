@@ -244,11 +244,21 @@
         {
           file: "booking-service.openapi.yaml",
           title: "Booking Service",
-          summary: "Create and cancel bookings; emits ride.created events.",
+          summary: "Create/list/get/cancel bookings with idempotency support.",
           highlights: [
-            "Create booking with pickup/dropoff + vehicle type.",
-            "Returns price snapshot and rideId.",
-            "Cancel booking with reason."
+            "Supports rubric payload: pickup + drop + distance_km.",
+            "Calls pricing + ETA and sets initial status REQUESTED.",
+            "Emits ride.created and ride_events (ride_requested)."
+          ]
+        },
+        {
+          file: "eta-service.openapi.yaml",
+          title: "ETA Service",
+          summary: "Rule-based ETA estimation endpoint.",
+          highlights: [
+            "Estimate ETA by distance_km or pickup/drop coordinates.",
+            "Traffic-aware ETA calculation for booking flow.",
+            "Health + readiness endpoints."
           ]
         },
         {

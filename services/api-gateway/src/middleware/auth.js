@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const fetch = require("node-fetch");
 const {
   JWT_SECRET,
   JWT_ALGORITHMS,
@@ -75,7 +76,37 @@ function authMiddleware(req, res, next) {
         : []
     };
     req.userId = userId;
-    return next();
+
+    const authServiceUrl = process.env.AUTH_SERVICE_URL || "";
+    if (!authServiceUrl) {
+      return next();
+    }
+
+    const verifyUrl = `${authServiceUrl.replace(/\/$/, "")}/auth/verify`;
+    return fetch(verifyUrl, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "x-trace-id": req.traceId || ""
+      },
+      timeout: Number(process.env.AUTH_VERIFY_TIMEOUT_MS || 1200)
+    })
+      .then((verifyRes) => {
+        if (verifyRes.status === 200) {
+          return next();
+        }
+        return sendError(
+          res,
+          401,
+          "UNAUTHORIZED",
+          "Invalid token",
+          req.traceId
+        );
+      })
+      .catch(() => {
+        // Fallback to local JWT validation when auth-service verify is unavailable.
+        return next();
+      });
   } catch (error) {
     return sendError(
       res,

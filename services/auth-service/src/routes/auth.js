@@ -12,6 +12,10 @@ const {
   verifyAccessToken
 } = require("../utils/security");
 const {
+  revokeAccessToken,
+  isAccessTokenRevoked
+} = require("../utils/revokedAccessTokenStore");
+const {
   createUser,
   findUserByIdentifier,
   findUserById
@@ -40,7 +44,7 @@ function validateRole(role) {
 router.post(
   "/register",
   asyncHandler(async (req, res) => {
-    const { email, username, password, role } = req.body || {};
+    const { email, username, password, role, name } = req.body || {};
     if (!email && !username) {
       monitoring.recordBusinessEvent({
         domain: "auth",
@@ -104,7 +108,7 @@ router.post(
     try {
       user = await createUser({
         email: email || null,
-        username: username || null,
+        username: username || name || null,
         passwordHash,
         role: role || "user",
         status: "active"
@@ -148,6 +152,7 @@ router.post(
     return res.status(201).json({
       data: {
         id: user.id,
+        user_id: user.id,
         email: user.email,
         username: user.username,
         role: user.role,
@@ -156,9 +161,13 @@ router.post(
       },
       tokens: {
         accessToken,
+        access_token: accessToken,
         refreshToken,
+        refresh_token: refreshToken,
         expiresIn: ACCESS_TOKEN_EXPIRES_IN
-      }
+      },
+      access_token: accessToken,
+      refresh_token: refreshToken
     });
   })
 );
@@ -166,7 +175,13 @@ router.post(
 router.post(
   "/login",
   asyncHandler(async (req, res) => {
-    const { identifier, password } = req.body || {};
+    const {
+      identifier: rawIdentifier,
+      email,
+      username,
+      password
+    } = req.body || {};
+    const identifier = rawIdentifier || email || username;
     if (!identifier || !password) {
       monitoring.recordBusinessEvent({
         domain: "auth",
@@ -249,6 +264,7 @@ router.post(
     return res.json({
       data: {
         id: user.id,
+        user_id: user.id,
         email: user.email,
         username: user.username,
         role: user.role,
@@ -257,9 +273,13 @@ router.post(
       },
       tokens: {
         accessToken,
+        access_token: accessToken,
         refreshToken,
+        refresh_token: refreshToken,
         expiresIn: ACCESS_TOKEN_EXPIRES_IN
-      }
+      },
+      access_token: accessToken,
+      refresh_token: refreshToken
     });
   })
 );
@@ -373,22 +393,36 @@ router.post(
   "/logout",
   asyncHandler(async (req, res) => {
     const { refreshToken } = req.body || {};
-    if (!refreshToken) {
+    const authHeader = req.header("authorization") || "";
+    const [, accessToken] = authHeader.split(" ");
+
+    if (!refreshToken && !accessToken) {
       monitoring.recordBusinessEvent({
         domain: "auth",
         event: "logout",
         outcome: "error",
-        attributes: { reason: "missing_refresh_token" }
+        attributes: { reason: "missing_credentials" }
       });
       throw new ApiError(
         400,
         "VALIDATION_ERROR",
-        "refreshToken is required"
+        "refreshToken or access token is required"
       );
     }
 
-    const tokenHash = hashRefreshToken(refreshToken);
-    await deleteRefreshToken(tokenHash);
+    if (refreshToken) {
+      const tokenHash = hashRefreshToken(refreshToken);
+      await deleteRefreshToken(tokenHash);
+    }
+    if (accessToken) {
+      try {
+        const payload = verifyAccessToken(accessToken);
+        revokeAccessToken(accessToken, payload?.exp);
+      } catch (_error) {
+        // Best-effort revoke for malformed/expired token.
+        revokeAccessToken(accessToken);
+      }
+    }
     monitoring.recordBusinessEvent({
       domain: "auth",
       event: "logout",
@@ -419,6 +453,9 @@ router.get(
 
     try {
       const payload = verifyAccessToken(token);
+      if (isAccessTokenRevoked(token)) {
+        throw new Error("token_revoked");
+      }
       monitoring.recordBusinessEvent({
         domain: "auth",
         event: "verify",
