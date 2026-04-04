@@ -16,10 +16,36 @@ function hasRole(req, roles) {
   return req.user?.roles?.some((role) => roles.includes(role));
 }
 
+function normalizeCompatPayload(rawBody) {
+  const body = rawBody || {};
+  const hasRubricShape =
+    (body.user_id || body.userId) &&
+    (body.message || body.body || body.title);
+
+  if (!hasRubricShape) {
+    return { payload: body, rubricCompat: false };
+  }
+
+  return {
+    rubricCompat: true,
+    payload: {
+      ...body,
+      userId: body.userId || body.user_id,
+      title: body.title || "Ride Notification",
+      body: body.body || body.message,
+      channels: Array.isArray(body.channels) && body.channels.length
+        ? body.channels
+        : ["IN_APP"],
+      sourceService: body.sourceService || "booking-service",
+      sourceAction: body.sourceAction || "BOOKING_CREATED"
+    }
+  };
+}
+
 router.post(
   "/v1/notifications",
   requireAuth,
-  requireRole("service", "admin"),
+  requireRole("service", "admin", "user", "driver"),
   asyncHandler(async (req, res) => {
     const context = {
       traceId: req.traceId,
@@ -31,10 +57,18 @@ router.post(
       userId: req.user?.id
     };
 
-    const result = await createNotification(req.body, context);
-    return res.status(result.created ? 201 : 200).json({
+    const normalized = normalizeCompatPayload(req.body);
+    const result = await createNotification(normalized.payload, context);
+    const statusCode = normalized.rubricCompat
+      ? 200
+      : result.created
+      ? 201
+      : 200;
+
+    return res.status(statusCode).json({
       id: result.notification.id,
       status: result.notification.status,
+      user_id: result.notification.userId,
       perChannelStatus: result.notification.perChannelStatus,
       requestId: req.requestId,
       created: result.created

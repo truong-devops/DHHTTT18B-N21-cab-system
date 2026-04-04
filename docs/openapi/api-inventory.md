@@ -9,6 +9,7 @@ This inventory is derived from code in the repository (routes/controllers/middle
 | auth-service | `services/auth-service` | Express | `/auth/*` |
 | booking-service | `services/booking-service` | Express | `/v1/bookings/*`, `/demo/ride-created` |
 | driver-service | `services/driver-service` | Express | `/v1/driver/*`, `/v1/admin/*`, `/v1/internal/*` |
+| eta-service | `services/eta-service` | Express | `/v1/eta/*` |
 | notification-service | `services/notification-service` | Express | `/v1/notifications/*`, `/v1/users/*` |
 | payment-service | `services/payment-service` | Express | `/v1/payments/*` |
 | pricing-service | `services/pricing-service` | Express | `/v1/pricing/*` |
@@ -22,6 +23,7 @@ This inventory is derived from code in the repository (routes/controllers/middle
 | auth | auth-service | `http://localhost:4001/auth` | `DOMAIN_PREFIX_MAP` rewrites `/v1/auth/*` → `/auth/*` |
 | bookings | booking-service | `http://localhost:3003` | Pass-through |
 | driver / drivers / admin / internal | driver-service | `http://localhost:3003` | Pass-through |
+| eta | eta-service | `http://localhost:3012` | Pass-through |
 | notifications | notification-service | `http://localhost:3010` | `/v1/notifications/users/*` rewrites to `/v1/users/*` |
 | payments | payment-service | `http://localhost:3007` | Pass-through |
 | pricing | pricing-service | `http://localhost:3006` | Pass-through |
@@ -52,9 +54,16 @@ This inventory is derived from code in the repository (routes/controllers/middle
 ### booking-service
 | Method | Path | Auth | Request Model | Response Model |
 |---|---|---|---|---|
-| POST | `/v1/bookings` | Bearer | inline `{ pickup, dropoff, vehicleType }` | `{ booking: Booking, publishedEvent: PublishedEvent }` |
+| GET | `/v1/bookings` | Bearer | query `user_id` (optional) | `{ data: Booking[] }` |
+| POST | `/v1/bookings` | Bearer | inline `{ pickup, drop/dropoff, distance_km, traffic_level, vehicleType }` + optional `Idempotency-Key` | `{ booking: Booking, publishedEvent, additionalEvents[] }` |
+| GET | `/v1/bookings/{id}` | Bearer | — | `{ data: Booking }` |
 | POST | `/v1/bookings/{id}/cancel` | Bearer | — | `{ booking: Booking, publishedEvent: PublishedEvent }` |
 | POST | `/demo/ride-created` | Internal demo | — | `{ ok: true }` |
+
+### eta-service
+| Method | Path | Auth | Request Model | Response Model |
+|---|---|---|---|---|
+| POST | `/v1/eta/estimate` | Bearer (via gateway) / direct internal | `{ pickup/drop }` or `{ distance_km }` | `{ data: { distance_km, traffic_level, eta_minutes } }` |
 
 ### driver-service
 | Method | Path | Auth | Request Model | Response Model |

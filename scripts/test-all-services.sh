@@ -106,6 +106,13 @@ if [[ -n "$QUOTE_ID" ]]; then
   echo
 fi
 
+echo "-- ETA-service: estimate"
+curl -s -X POST "$BASE_URL/v1/eta/estimate" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.78,"lng":106.68},"traffic_level":0.5}'
+echo
+
 echo "-- Booking-service: create + cancel"
 BOOKING_JSON=$(curl -s -X POST "$BASE_URL/v1/bookings" \
   -H "Authorization: Bearer $USER_TOKEN" \

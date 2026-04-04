@@ -70,6 +70,14 @@ function ensurePickupDiffers(pickup, dropoff, errors) {
   }
 }
 
+function normalizeDemandIndex(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return 1;
+  }
+  return Math.max(1, n);
+}
+
 router.use(requireAuthOrInternal);
 
 router.get(
@@ -134,6 +142,61 @@ router.patch(
       }
     });
     return sendSuccess(res, req, rule);
+  })
+);
+
+router.post(
+  "/estimate",
+  validateRequest({
+    bodySchema: {
+      required: ["distance_km"],
+      properties: {
+        distance_km: { type: "number", minimum: 0 },
+        demand_index: { type: "number", minimum: 0 }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const distanceKm = Number(req.body.distance_km);
+    const demandIndex = normalizeDemandIndex(req.body.demand_index);
+    const rateCard = await getRateCard("STANDARD");
+
+    if (!rateCard) {
+      throw new ApiError(
+        500,
+        "INTERNAL",
+        "Rate card unavailable"
+      );
+    }
+
+    const safeDistanceKm = Math.max(0, round(distanceKm, 3));
+    const durationMin = round(
+      estimateDurationMin(
+        safeDistanceKm,
+        Number(rateCard.averageSpeedKmh || 25)
+      ),
+      2
+    );
+
+    const fare = calculateFare({
+      distanceKm: safeDistanceKm,
+      durationMin,
+      rateCard: {
+        ...rateCard,
+        surgeMultiplier: demandIndex
+      },
+      discount: 0
+    });
+
+    return sendSuccess(res, req, {
+      distance_km: safeDistanceKm,
+      demand_index: demandIndex,
+      price: fare.estimatedFare,
+      base_fare: Number(rateCard.baseFare || 0),
+      surge: demandIndex,
+      breakdown: fare.breakdown,
+      currency: rateCard.currency || "VND"
+    });
   })
 );
 

@@ -11,9 +11,18 @@ function mapRow(row) {
   return {
     bookingId: row.booking_id,
     rideId: row.ride_id,
+    userId: row.user_id || null,
     pickup: row.pickup,
     dropoff: row.dropoff,
     vehicleType: row.vehicle_type,
+    distanceKm:
+      row.distance_km == null
+        ? null
+        : Number(row.distance_km),
+    etaMinutes:
+      row.eta_minutes == null
+        ? null
+        : Number(row.eta_minutes),
     priceSnapshot: row.price_snapshot,
     status: row.status,
     createdAt: row.created_at.toISOString(),
@@ -27,15 +36,22 @@ async function create(client, booking) {
   const db = executor(client);
   const result = await db.query(
     `INSERT INTO bookings
-      (booking_id, ride_id, pickup, dropoff, vehicle_type, price_snapshot, status, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      (booking_id, ride_id, user_id, pickup, dropoff, vehicle_type, distance_km, eta_minutes, price_snapshot, status, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       booking.bookingId,
       booking.rideId,
+      booking.userId || null,
       booking.pickup,
       booking.dropoff,
       booking.vehicleType,
+      Number.isFinite(booking.distanceKm)
+        ? booking.distanceKm
+        : null,
+      Number.isFinite(booking.etaMinutes)
+        ? booking.etaMinutes
+        : null,
       booking.priceSnapshot,
       booking.status,
       booking.createdAt || new Date().toISOString()
@@ -66,7 +82,7 @@ async function cancel(client, bookingId) {
   const db = executor(client);
   const result = await db.query(
     `UPDATE bookings
-     SET status = 'CANCELED',
+     SET status = 'CANCELLED',
          cancelled_at = COALESCE(cancelled_at, now()),
          updated_at = now()
      WHERE booking_id = $1
@@ -76,11 +92,29 @@ async function cancel(client, bookingId) {
   return mapRow(result.rows[0]);
 }
 
-async function list(client) {
+async function list(optionsOrClient, maybeClient) {
+  let options = {};
+  let client = maybeClient || null;
+
+  if (
+    optionsOrClient &&
+    typeof optionsOrClient.query === "function"
+  ) {
+    client = optionsOrClient;
+  } else {
+    options = optionsOrClient || {};
+  }
+
   const db = executor(client);
-  const result = await db.query(
-    "SELECT * FROM bookings ORDER BY created_at DESC"
-  );
+  const userId = options.userId || null;
+  const result = userId
+    ? await db.query(
+        "SELECT * FROM bookings WHERE user_id = $1 ORDER BY created_at DESC",
+        [userId]
+      )
+    : await db.query(
+        "SELECT * FROM bookings ORDER BY created_at DESC"
+      );
   return result.rows.map(mapRow);
 }
 

@@ -1,5 +1,8 @@
 const { ApiError } = require("../utils/errors");
 const { verifyAccessToken } = require("../utils/security");
+const {
+  isAccessTokenRevoked
+} = require("../utils/revokedAccessTokenStore");
 
 function requireAuth(req, _res, next) {
   const authHeader = req.header("authorization") || "";
@@ -12,6 +15,11 @@ function requireAuth(req, _res, next) {
 
   try {
     const payload = verifyAccessToken(token);
+    if (isAccessTokenRevoked(token)) {
+      return next(
+        new ApiError(401, "UNAUTHORIZED", "Invalid token")
+      );
+    }
     const userId = payload.sub || payload.id;
     if (!userId) {
       return next(
