@@ -1,0 +1,169 @@
+{
+  "id": null,
+  "uid": "cab-kafka-e2e",
+  "title": "Cab Booking - Kafka End-to-End",
+  "tags": ["cab-booking", "kafka", "outbox", "dlq"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "label": "Service",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "Prometheus"
+        },
+        "query": "label_values(cab_kafka_publish_total, service_name)",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "topic",
+        "type": "query",
+        "label": "Topic",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "Prometheus"
+        },
+        "query": "label_values(cab_kafka_publish_total, topic)",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Consumer Lag (max by service/group/topic)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "max by (service_name, consumer_group, topic) (cab_kafka_consumer_lag{service_name=~\"$service\",topic=~\"$topic\"})",
+          "legendFormat": "{{service_name}} {{consumer_group}} {{topic}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Outbox Backlog",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "max by (service_name, queue_name) (cab_outbox_backlog{service_name=~\"$service\"})",
+          "legendFormat": "{{service_name}} {{queue_name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Publish Success/Error Rate (msg/s)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(cab_kafka_publish_total{service_name=~\"$service\",topic=~\"$topic\",operation!~\"publish_dlq\",outcome=\"success\"}[5m])) by (service_name, topic)",
+          "legendFormat": "success {{service_name}} {{topic}}"
+        },
+        {
+          "expr": "sum(rate(cab_kafka_publish_total{service_name=~\"$service\",topic=~\"$topic\",operation!~\"publish_dlq\",outcome=\"error\"}[5m])) by (service_name, topic)",
+          "legendFormat": "error {{service_name}} {{topic}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Publish Error Ratio (%)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * (sum(rate(cab_kafka_publish_total{service_name=~\"$service\",topic=~\"$topic\",operation!~\"publish_dlq\",outcome=\"error\"}[5m])) by (service_name, topic) / clamp_min(sum(rate(cab_kafka_publish_total{service_name=~\"$service\",topic=~\"$topic\",operation!~\"publish_dlq\"}[5m])) by (service_name, topic), 0.001))",
+          "legendFormat": "{{service_name}} {{topic}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "DLQ Rate (msg/s)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(cab_kafka_dlq_total{service_name=~\"$service\"}[5m])) by (service_name, source_topic, dlq_topic)",
+          "legendFormat": "{{service_name}} {{source_topic}} -> {{dlq_topic}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Retry Rate (msg/s)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(cab_kafka_retry_total{service_name=~\"$service\",topic=~\"$topic\"}[5m])) by (service_name, scope, topic, status)",
+          "legendFormat": "{{service_name}} {{scope}} {{topic}} {{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka Processing Latency p95 (ms)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(cab_kafka_processing_latency_ms_bucket{service_name=~\"$service\",topic=~\"$topic\"}[5m])) by (service_name, pipeline, topic, le))",
+          "legendFormat": "{{service_name}} {{pipeline}} {{topic}}"
+        }
+      ]
+    }
+  ]
+}

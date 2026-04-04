@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cab-booking.local/schemas/events/envelopes/payment.failed",
+  "title": "payment.failed.envelope",
+  "allOf": [
+    { "$ref": "https://cab-booking.local/schemas/events/envelopes/common" },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "PaymentFailed" },
+        "payload": {
+          "$ref": "https://cab-booking.local/schemas/events/payloads/payment.failed"
+        }
+      }
+    }
+  ]
+}

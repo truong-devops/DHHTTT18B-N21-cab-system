@@ -1,22 +1,50 @@
 const { Kafka } = require("kafkajs");
+const config = require("../config");
 
 const kafka = new Kafka({
-  clientId: "booking-service",
-  brokers: [process.env.KAFKA_BROKERS || "localhost:29092"]
+  clientId: config.kafka.clientId,
+  brokers: config.kafka.brokers,
+  retry: config.kafka.producerRetry
 });
 
-const producer = kafka.producer();
-let isConnected = false;
+let producerPromise = null;
 
-async function publish(topic, message) {
-  if (!isConnected) {
-    await producer.connect();
-    isConnected = true;
+async function getProducer() {
+  if (!producerPromise) {
+    const producer = kafka.producer({
+      transactionTimeout: config.kafka.producerConnectTimeoutMs,
+      maxInFlightRequests: config.kafka.producerMaxInFlightRequests,
+      idempotent: true,
+      retry: config.kafka.producerRetry
+    });
+    producerPromise = producer.connect().then(() => producer);
   }
+  return producerPromise;
+}
+
+async function publish(topic, message, options = {}) {
+  const producer = await getProducer();
   await producer.send({
     topic,
-    messages: [{ value: JSON.stringify(message) }]
+    acks: config.kafka.producerAcks,
+    timeout: config.kafka.producerRequestTimeoutMs,
+    messages: [
+      {
+        key: options.key || null,
+        value: JSON.stringify(message),
+        headers: options.headers || undefined
+      }
+    ]
   });
 }
 
-module.exports = { publish };
+async function disconnect() {
+  if (!producerPromise) {
+    return;
+  }
+  const producer = await producerPromise;
+  await producer.disconnect();
+  producerPromise = null;
+}
+
+module.exports = { publish, disconnect };

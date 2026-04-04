@@ -11,6 +11,7 @@ ENV NPM_CONFIG_FETCH_RETRIES=5 \
 
 COPY package.json package-lock.json ./
 COPY libs ./libs
+COPY contracts ./contracts
 COPY services/booking-service/package.json services/booking-service/package.json
 
 RUN npm install --omit=dev \
