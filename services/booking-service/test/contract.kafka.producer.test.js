@@ -1,5 +1,6 @@
 const mockPublish = jest.fn();
 const mockClaimOutboxEvents = jest.fn();
+const mockCountOutboxBacklog = jest.fn();
 const mockMarkOutboxPublished = jest.fn();
 const mockMarkOutboxForRetry = jest.fn();
 const mockMarkOutboxDead = jest.fn();
@@ -10,6 +11,7 @@ jest.mock("../src/messaging/producer", () => ({
 
 jest.mock("../src/repositories/outboxRepo", () => ({
   claimOutboxEvents: (...args) => mockClaimOutboxEvents(...args),
+  countOutboxBacklog: (...args) => mockCountOutboxBacklog(...args),
   markOutboxPublished: (...args) => mockMarkOutboxPublished(...args),
   markOutboxForRetry: (...args) => mockMarkOutboxForRetry(...args),
   markOutboxDead: (...args) => mockMarkOutboxDead(...args)
@@ -23,6 +25,7 @@ describe("booking producer contract guard", () => {
   });
 
   test("invalid topic/type envelope is rejected and moved to retry", async () => {
+    mockCountOutboxBacklog.mockResolvedValue(0);
     mockClaimOutboxEvents.mockResolvedValueOnce([
       {
         id: "1",
