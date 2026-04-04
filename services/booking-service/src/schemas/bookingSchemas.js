@@ -8,8 +8,15 @@ const LatLngSchema = z.object({
 
 const CreateBookingSchema = z.object({
   pickup: LatLngSchema,
-  dropoff: LatLngSchema,
+  drop: LatLngSchema.optional(),
+  dropoff: LatLngSchema.optional(),
+  distance_km: z.number().min(0).optional(),
+  traffic_level: z.number().min(0).max(1).optional(),
   vehicleType: z.enum(["BIKE", "CAR", "SUV"]).default("CAR"),
+  payment_method: z
+    .enum(["CASH", "VIETQR", "PAYOS"])
+    .optional(),
+  user_id: z.string().optional()
 });
 
 module.exports = { CreateBookingSchema };

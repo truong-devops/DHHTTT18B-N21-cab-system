@@ -23,7 +23,13 @@ function loadRatesFromEnv() {
   if (process.env.RATES_JSON) {
     try {
       const parsed = JSON.parse(process.env.RATES_JSON);
-      rates = { ...rates, ...parsed };
+      rates = Object.fromEntries(
+        Object.entries({ ...rates, ...parsed }).map(([key, value]) => {
+          const fallback = DEFAULT_RATES[key] || {};
+          const override = value && typeof value === "object" ? value : {};
+          return [key, { ...fallback, ...override }];
+        })
+      );
     } catch (_err) {
       // ignore invalid override
     }

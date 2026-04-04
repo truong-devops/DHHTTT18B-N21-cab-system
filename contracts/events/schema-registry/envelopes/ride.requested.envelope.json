@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cab-booking.local/schemas/events/envelopes/ride.requested",
+  "title": "ride.requested.envelope",
+  "allOf": [
+    { "$ref": "https://cab-booking.local/schemas/events/envelopes/common" },
+    {
+      "type": "object",
+      "properties": {
+        "type": { "const": "RideRequested" },
+        "payload": {
+          "$ref": "https://cab-booking.local/schemas/events/payloads/ride.requested"
+        }
+      }
+    }
+  ]
+}

@@ -18,7 +18,7 @@ function isStrictObjectSchema(schema) {
 
 function validateCatalogAndSchemas(registry) {
   const errors = [];
-  const topicPattern = /^[a-z][a-z0-9]*(\.[a-z0-9]+)+$/;
+  const topicPattern = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$/;
   const typePattern = /^[A-Z][A-Za-z0-9]*$/;
 
   const schemaRoot = path.join(repoRoot, "contracts/events/schema-registry");

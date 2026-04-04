@@ -1,4 +1,5 @@
 module.exports = {
+  RideEvents: "ride_events",
   RideCreated: "ride.created",
   RideAssigned: "ride.assigned",
   RideCancelled: "ride.cancelled",

@@ -49,6 +49,7 @@ services:
       AUTH_SERVICE_URL: http://auth-service:4001
       BOOKING_SERVICE_URL: http://booking-service:3003
       DRIVER_SERVICE_URL: http://driver-service:3011
+      ETA_SERVICE_URL: http://eta-service:3012
       NOTIFICATION_SERVICE_URL: http://notification-service:3010
       PAYMENT_SERVICE_URL: http://payment-service:3007
       PRICING_SERVICE_URL: http://pricing-service:3006
@@ -59,6 +60,7 @@ services:
       - auth-service
       - booking-service
       - driver-service
+      - eta-service
       - notification-service
       - payment-service
       - pricing-service
@@ -175,11 +177,24 @@ services:
       OUTBOX_RETRY_BASE_MS: 1000
       OUTBOX_RETRY_MAX_MS: 60000
       OUTBOX_PROCESSING_TIMEOUT_MS: 300000
+      ETA_BASE_URL: http://eta-service:3012
       PRICING_BASE_URL: http://pricing-service:3006
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
     depends_on:
       - kafka
       - postgres
+      - eta-service
+    networks:
+      - backend
+
+  eta-service:
+    build:
+      context: ..
+      dockerfile: services/eta-service/Dockerfile
+    environment:
+      SERVICE_NAME: eta-service
+      OTEL_SERVICE_NAME: eta-service
+      PORT: 3012
     networks:
       - backend
 
