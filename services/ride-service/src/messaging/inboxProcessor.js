@@ -1,7 +1,9 @@
 const topics = require("./topics");
+const { publishToDlq } = require("./producer");
 const logger = require("../utils/logger");
 const {
-  listPendingEvents,
+  claimPendingEvents,
+  countInboxBacklog,
   markProcessed,
   markFailed
 } = require("../repository/inboxEventsRepository");
@@ -16,9 +18,13 @@ const {
   normalizeStatus,
   isValidTransition
 } = require("../domain/rideStateMachine");
+const monitoring = require("../monitoring");
 
 const DEFAULT_INTERVAL_MS = 3000;
 const DEFAULT_BATCH_SIZE = 50;
+const WORKER_ID =
+  process.env.INBOX_WORKER_ID ||
+  `${process.env.HOSTNAME || "ride-service"}-${process.pid}`;
 
 async function handleRideCreated(row) {
   const payload = row.payload || {};
@@ -79,7 +85,8 @@ async function applyPaymentStatusToRide({
 }) {
   const ride = await resolveRideByPaymentRideId(payload.rideId);
   if (!ride) {
-    return { skipped: true, reason: "ride_not_found", rideId: payload.rideId };
+    // Keep the event retriable for out-of-order delivery (payment before ride.created).
+    throw new Error(`ride_not_found:${payload.rideId}`);
   }
 
   const fromStatus = normalizeStatus(ride.status);
@@ -209,13 +216,29 @@ async function processRow(row) {
 }
 
 async function tick() {
-  const rows = await listPendingEvents(DEFAULT_BATCH_SIZE);
-  if (!rows.length) return;
+  const backlogBefore = await countInboxBacklog();
+  monitoring.setQueueBacklog("inbox.ride", backlogBefore);
+
+  const rows = await claimPendingEvents(
+    DEFAULT_BATCH_SIZE,
+    WORKER_ID
+  );
+  if (!rows.length) {
+    monitoring.setQueueBacklog("inbox.ride", backlogBefore);
+    return;
+  }
 
   for (const row of rows) {
+    const rowStartedAt = Date.now();
     try {
       const result = await processRow(row);
       await markProcessed(row._id);
+      monitoring.recordKafkaProcessingLatency({
+        pipeline: "inbox_process",
+        topic: row.topic,
+        outcome: "success",
+        durationMs: Date.now() - rowStartedAt
+      });
       logger
         .withTrace(row.trace_id)
         .info(
@@ -229,9 +252,43 @@ async function tick() {
           { err: error, eventId: row.event_id, topic: row.topic },
           "[ride-service] inbox process failed"
         );
-      await markFailed(row._id, error?.message || "failed");
+      const retry = await markFailed(row._id, error?.message || "failed");
+      monitoring.recordKafkaRetry({
+        scope: "inbox",
+        topic: row.topic,
+        status: String(retry?.status || "unknown").toLowerCase(),
+        reason: error?.message || "failed"
+      });
+      monitoring.recordKafkaProcessingLatency({
+        pipeline: "inbox_process",
+        topic: row.topic,
+        outcome: "error",
+        durationMs: Date.now() - rowStartedAt
+      });
+      if (retry?.status === "dead") {
+        await publishToDlq({
+          topic: row.topic,
+          envelope: {
+            eventId: row.event_id,
+            traceId: row.trace_id || null,
+            occurredAt: new Date().toISOString(),
+            type: row.event_type || "UnknownEvent",
+            version: 1,
+            payload: row.payload
+          },
+          errorMessage: error?.message || "failed",
+          metadata: {
+            source: "ride-service.inbox-processor",
+            attemptCount: retry.attemptCount,
+            maxAttempts: retry.maxAttempts
+          }
+        });
+      }
     }
   }
+
+  const backlogAfter = await countInboxBacklog();
+  monitoring.setQueueBacklog("inbox.ride", backlogAfter);
 }
 
 function startInboxProcessor(intervalMs = DEFAULT_INTERVAL_MS) {

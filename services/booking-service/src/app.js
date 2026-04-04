@@ -32,7 +32,9 @@ app.post("/demo/ride-created", async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    await publish(topics.RideCreated, event);
+    await publish(topics.RideCreated, event, {
+      key: event.rideId
+    });
 
     return res.json({
       published: true,

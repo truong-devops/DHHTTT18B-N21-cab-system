@@ -111,3 +111,94 @@ groups:
         annotations:
           summary: "Queue backlog critical on {{ $labels.service_name }}"
           description: "Queue {{ $labels.queue_name }} backlog exceeded 600 for at least 10 minutes."
+
+      - alert: KafkaConsumerLagHighWarning
+        expr: |
+          max by (service_name, consumer_group, topic) (max_over_time(cab_kafka_consumer_lag[10m])) > 500
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka consumer lag high on {{ $labels.service_name }}"
+          description: "Consumer group {{ $labels.consumer_group }} on topic {{ $labels.topic }} has lag above 500 for 10 minutes."
+
+      - alert: KafkaConsumerLagHighCritical
+        expr: |
+          max by (service_name, consumer_group, topic) (max_over_time(cab_kafka_consumer_lag[10m])) > 2000
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kafka consumer lag critical on {{ $labels.service_name }}"
+          description: "Consumer group {{ $labels.consumer_group }} on topic {{ $labels.topic }} has lag above 2000 for 10 minutes."
+
+      - alert: KafkaOutboxBacklogHighWarning
+        expr: |
+          max by (service_name, queue_name) (max_over_time(cab_outbox_backlog[10m])) > 200
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbox backlog high on {{ $labels.service_name }}"
+          description: "Outbox {{ $labels.queue_name }} backlog exceeded 200 for at least 10 minutes."
+
+      - alert: KafkaOutboxBacklogHighCritical
+        expr: |
+          max by (service_name, queue_name) (max_over_time(cab_outbox_backlog[10m])) > 1000
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Outbox backlog critical on {{ $labels.service_name }}"
+          description: "Outbox {{ $labels.queue_name }} backlog exceeded 1000 for at least 10 minutes."
+
+      - alert: KafkaPublishErrorRateHigh
+        expr: |
+          (
+            sum(rate(cab_kafka_publish_total{operation!="publish_dlq",outcome="error"}[10m])) by (service_name, topic)
+            /
+            clamp_min(sum(rate(cab_kafka_publish_total{operation!="publish_dlq"}[10m])) by (service_name, topic), 0.001)
+          ) > 0.05
+          and
+          sum(rate(cab_kafka_publish_total{operation!="publish_dlq"}[10m])) by (service_name, topic) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka publish error rate high on {{ $labels.service_name }}"
+          description: "Kafka publish error ratio on topic {{ $labels.topic }} exceeded 5% with active traffic for at least 10 minutes."
+
+      - alert: KafkaDlqRateHigh
+        expr: |
+          sum(increase(cab_kafka_dlq_total[10m])) by (service_name, source_topic, dlq_topic) >= 20
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DLQ rate high on {{ $labels.service_name }}"
+          description: "At least 20 events were routed to DLQ {{ $labels.dlq_topic }} from {{ $labels.source_topic }} in 10 minutes."
+
+      - alert: KafkaRetryRateHigh
+        expr: |
+          sum(increase(cab_kafka_retry_total{status=~"retry|retriable|dead"}[10m])) by (service_name, scope, topic) >= 30
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka retry pressure high on {{ $labels.service_name }}"
+          description: "Retry decisions for {{ $labels.scope }} on topic {{ $labels.topic }} reached at least 30 in 10 minutes."
+
+      - alert: KafkaProcessingLatencyP95High
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(cab_kafka_processing_latency_ms_bucket[10m])) by (service_name, pipeline, topic, le)
+          ) > 3000
+          and
+          sum(rate(cab_kafka_processing_latency_ms_count[10m])) by (service_name, pipeline, topic) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka processing p95 latency high on {{ $labels.service_name }}"
+          description: "Pipeline {{ $labels.pipeline }} on topic {{ $labels.topic }} has p95 latency above 3000ms for at least 10 minutes."

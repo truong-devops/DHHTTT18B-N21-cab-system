@@ -1,0 +1,56 @@
+name: Event Contracts Governance
+
+on:
+  pull_request:
+    paths:
+      - "contracts/events/**"
+      - "services/**/src/messaging/**"
+      - "services/**/test/contract.kafka*.test.js"
+      - "scripts/contracts/events/**"
+      - "package.json"
+      - ".github/workflows/events-contract-governance.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "contracts/events/**"
+      - "services/**/src/messaging/**"
+      - "services/**/test/contract.kafka*.test.js"
+      - "scripts/contracts/events/**"
+      - "package.json"
+      - ".github/workflows/events-contract-governance.yml"
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate event contracts
+        run: npm run contracts:events:validate
+
+      - name: Backward compatibility check
+        env:
+          EVENT_CONTRACT_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
+        run: npm run contracts:events:compat
+
+      - name: Booking producer contract tests
+        run: npm run test --workspace @services/booking-service -- --watchman=false --runInBand test/contract.kafka.producer.test.js
+
+      - name: Payment producer/consumer contract tests
+        run: npm run test --workspace @services/payment-service -- --watchman=false --runInBand test/contract.kafka.producer.test.js test/contract.kafka.consumer.test.js
+
+      - name: Ride consumer contract tests
+        run: npm run test --workspace @services/ride-service -- --watchman=false --runInBand test/contract.kafka.consumer.test.js

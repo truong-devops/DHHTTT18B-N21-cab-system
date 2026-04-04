@@ -5,6 +5,7 @@ SELECT format('CREATE DATABASE %I OWNER %I', db_name, 'cab')
 FROM (
   VALUES
     ('auth-service_db'),
+    ('booking-service_db'),
     ('user-service_db'),
     ('driver-service_db'),
     ('review-service_db'),

@@ -94,8 +94,11 @@ async function ensureIndexes(db) {
       .collection("inbox_events")
       .createIndex({ topic: 1, received_at: -1 }),
     db
+      .collection("inbox_events")
+      .createIndex({ state: 1, next_retry_at: 1, received_at: 1 }),
+    db
       .collection("outbox_events")
-      .createIndex({ status: 1, occurred_at: 1 }),
+      .createIndex({ status: 1, next_retry_at: 1, occurred_at: 1 }),
     db
       .collection("outbox_events")
       .createIndex({ event_id: 1 }, { unique: true })
