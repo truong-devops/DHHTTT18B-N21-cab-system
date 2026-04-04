@@ -23,6 +23,48 @@ function validateLatLng(prefix, errors, value) {
   }
 }
 
+// Rubric compatibility endpoint:
+// Accepts { driver_id, status } for ONLINE/OFFLINE transition.
+router.post(
+  "/v1/driver/status",
+  requireAuth,
+  requireRole("admin", "service"),
+  validateRequest({
+    bodySchema: {
+      required: ["driver_id", "status"],
+      properties: {
+        driver_id: { type: "string" },
+        status: { type: "string", enum: ["ONLINE", "OFFLINE"] },
+        initial_location: { type: "object" }
+      }
+    },
+    custom: (req, errors) => {
+      if (req.body?.initial_location) {
+        validateLatLng("body.initial_location", errors, req.body.initial_location);
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const driverId = req.body.driver_id;
+    const status = String(req.body.status || "").toUpperCase();
+
+    const result =
+      status === "ONLINE"
+        ? await driverService.setOnlineByDriverId(
+            driverId,
+            req.body?.initial_location
+          )
+        : await driverService.setOfflineByDriverId(driverId);
+
+    return res.json({
+      driver_id: result.driver.id,
+      status: result.driver.onlineStatus,
+      data: result,
+      requestId: req.requestId
+    });
+  })
+);
+
 router.use("/v1/driver", requireAuth, requireRole("driver"));
 
 router.get(

@@ -1,5 +1,44 @@
 openapi: 3.0.3
 info:
   title: booking-service
-  version: 0.1.0
-paths: {}
+  version: 0.2.0
+paths:
+  /v1/bookings:
+    get:
+      summary: List bookings
+      responses:
+        "200":
+          description: OK
+    post:
+      summary: Create booking
+      responses:
+        "201":
+          description: Created
+  /v1/bookings/{id}:
+    get:
+      summary: Get booking by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not found
+  /v1/bookings/{id}/cancel:
+    post:
+      summary: Cancel booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not found

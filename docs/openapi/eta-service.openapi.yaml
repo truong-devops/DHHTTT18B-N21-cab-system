@@ -1,0 +1,105 @@
+openapi: 3.1.0
+info:
+  title: ETA Service API
+  version: 0.1.0
+  description: Rule-based ETA estimation service used by booking-service.
+servers:
+  - url: http://localhost:3012
+    description: Direct eta-service
+  - url: http://localhost:3000
+    description: API Gateway (prefix /v1/eta)
+components:
+  schemas:
+    LatLng:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+    EstimateEtaRequest:
+      type: object
+      properties:
+        pickup:
+          $ref: "#/components/schemas/LatLng"
+        drop:
+          $ref: "#/components/schemas/LatLng"
+        distance_km:
+          type: number
+          minimum: 0
+        traffic_level:
+          type: number
+          minimum: 0
+          maximum: 1
+    EstimateEtaResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            distance_km:
+              type: number
+            traffic_level:
+              type: number
+            eta_minutes:
+              type: integer
+    ErrorPayload:
+      type: object
+      properties:
+        error:
+          type: string
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+  /healthz:
+    get:
+      summary: Liveness check
+      responses:
+        "200":
+          description: OK
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        "200":
+          description: OK
+  /v1/eta/estimate:
+    post:
+      summary: Estimate ETA in minutes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EstimateEtaRequest"
+            examples:
+              byDistance:
+                value:
+                  distance_km: 5
+                  traffic_level: 0.5
+              byRoute:
+                value:
+                  pickup: { lat: 10.76, lng: 106.66 }
+                  drop: { lat: 10.77, lng: 106.70 }
+      responses:
+        "200":
+          description: ETA result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EstimateEtaResponse"
+        "400":
+          description: Missing distance and coordinates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"

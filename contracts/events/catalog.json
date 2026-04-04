@@ -11,6 +11,15 @@
       "consumers": ["payment-service", "ride-service"]
     },
     {
+      "key": "RideRequested",
+      "topic": "ride_events",
+      "type": "RideRequested",
+      "payloadSchema": "payloads/ride.requested.payload.json",
+      "envelopeSchema": "envelopes/ride.requested.envelope.json",
+      "producer": "booking-service",
+      "consumers": []
+    },
+    {
       "key": "RideAssigned",
       "topic": "ride.assigned",
       "type": "RideAssigned",

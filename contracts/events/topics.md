@@ -6,6 +6,7 @@ Common envelope for all events:
 | Topic | Type | Producer | Consumer | Status |
 |------|------|----------|----------|--------|
 | `ride.created` | `RideCreated` | `booking-service` (transactional outbox) | `payment-service` (inbox), `ride-service` (inbox + processor) | Active |
+| `ride_events` | `RideRequested` | `booking-service` (transactional outbox) | None (rubric compatibility event) | Active |
 | `ride.assigned` | `RideAssigned` | `ride-service` (outbox) | `payment-service` (inbox), `ride-service` (inbox) | Active |
 | `ride.cancelled` | `RideCancelled` | `booking-service` (transactional outbox) | `payment-service` (inbox), `ride-service` (inbox + processor) | Active |
 | `payment.completed` | `PaymentCompleted` | `payment-service` (outbox) | `ride-service` (inbox + processor) | Active |

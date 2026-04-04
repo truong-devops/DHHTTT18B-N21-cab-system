@@ -128,6 +128,36 @@ async function setOnline(userId, initialLocation) {
   return { driver: mapDriver(updated) };
 }
 
+async function setOnlineByDriverId(driverId, initialLocation) {
+  const driver = await driverRepository.getDriverById(driverId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+  if (!canGoOnline(driver.status)) {
+    throw new ApiError(403, "FORBIDDEN", "Driver not approved");
+  }
+
+  if (!canTransitionOnlineStatus(driver.online_status, ONLINE_STATUS.ONLINE)) {
+    throw new ApiError(409, "CONFLICT", "Invalid online status transition");
+  }
+
+  const updated = await driverRepository.updateOnlineStatus(
+    driver.id,
+    [ONLINE_STATUS.OFFLINE],
+    ONLINE_STATUS.ONLINE
+  );
+  if (!updated) {
+    throw new ApiError(409, "CONFLICT", "Driver already online");
+  }
+
+  await updateOnlineRedis(driver.id, ONLINE_STATUS.ONLINE);
+  if (initialLocation) {
+    await updateDriverLocation(driver.id, initialLocation);
+  }
+
+  return { driver: mapDriver(updated) };
+}
+
 async function setOffline(userId) {
   const driver = await driverRepository.getDriverByUserId(userId);
   if (!driver) {
@@ -164,6 +194,34 @@ async function setOffline(userId) {
     }
   });
 
+  return { driver: mapDriver(updated) };
+}
+
+async function setOfflineByDriverId(driverId) {
+  const driver = await driverRepository.getDriverById(driverId);
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+
+  const allowForce = FORCE_OFFLINE_WHEN_BUSY;
+  if (!canTransitionOnlineStatus(driver.online_status, ONLINE_STATUS.OFFLINE, allowForce)) {
+    throw new ApiError(409, "CONFLICT", "Invalid online status transition");
+  }
+
+  const allowedCurrent = allowForce
+    ? [ONLINE_STATUS.ONLINE, ONLINE_STATUS.BUSY]
+    : [ONLINE_STATUS.ONLINE];
+  const updated = await driverRepository.updateOnlineStatus(
+    driver.id,
+    allowedCurrent,
+    ONLINE_STATUS.OFFLINE
+  );
+  if (!updated) {
+    throw new ApiError(409, "CONFLICT", "Driver already offline or busy");
+  }
+
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driver.id);
+  await clearOnlineRedis(driver.id, vehicle?.vehicle_type);
   return { driver: mapDriver(updated) };
 }
 
@@ -614,7 +672,9 @@ module.exports = {
   updateDriverProfile,
   upsertVehicle,
   setOnline,
+  setOnlineByDriverId,
   setOffline,
+  setOfflineByDriverId,
   updateDriverLocation,
   heartbeat,
   getDriverInternal,

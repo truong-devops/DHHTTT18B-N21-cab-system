@@ -1,0 +1,13 @@
+openapi: 3.0.3
+info:
+  title: eta-service
+  version: 0.1.0
+paths:
+  /v1/eta/estimate:
+    post:
+      summary: Estimate ETA
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
