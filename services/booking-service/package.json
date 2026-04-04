@@ -5,7 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "jest"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.8.0",
@@ -23,9 +24,11 @@
     "helmet": "^7.2.0",
     "kafkajs": "^2.2.4",
     "morgan": "^1.10.1",
+    "pg": "^8.11.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
     "nodemon": "^3.1.11"
   }
 }

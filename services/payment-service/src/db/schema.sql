@@ -70,10 +70,19 @@ CREATE TABLE IF NOT EXISTS outbox_events (
   request_id text,
   event_type text NOT NULL,
   topic text NOT NULL,
+  partition_key text,
   payload jsonb NOT NULL,
   occurred_at timestamptz NOT NULL,
   status text NOT NULL DEFAULT 'PENDING',
+  attempt_count integer NOT NULL DEFAULT 0,
+  max_attempts integer NOT NULL DEFAULT 10,
+  next_retry_at timestamptz NOT NULL DEFAULT now(),
+  processing_started_at timestamptz,
+  processing_owner text,
   last_error text,
+  last_error_at timestamptz,
+  dlq_topic text,
+  dlq_payload jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   published_at timestamptz
 );
@@ -83,6 +92,8 @@ CREATE INDEX IF NOT EXISTS payments_status_created_at_id_idx ON payments (status
 CREATE INDEX IF NOT EXISTS payments_ride_id_created_at_id_idx ON payments (ride_id, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS payment_status_history_payment_id_occurred_at_idx ON payment_status_history (payment_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS outbox_events_status_created_at_idx ON outbox_events (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS outbox_events_claim_idx ON outbox_events (status, next_retry_at, created_at);
+CREATE INDEX IF NOT EXISTS outbox_events_processing_idx ON outbox_events (status, processing_started_at);
 CREATE INDEX IF NOT EXISTS inbox_events_event_id_idx ON inbox_events (event_id);
 
 CREATE OR REPLACE FUNCTION set_updated_at()

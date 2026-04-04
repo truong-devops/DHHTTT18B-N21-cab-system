@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cab-booking.local/schemas/events/payloads/ride.assigned",
+  "title": "ride.assigned.payload",
+  "type": "object",
+  "required": ["rideId", "driverId", "assignedAt"],
+  "properties": {
+    "rideId": { "type": "string", "minLength": 1 },
+    "driverId": { "type": "string", "minLength": 1 },
+    "assignedAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

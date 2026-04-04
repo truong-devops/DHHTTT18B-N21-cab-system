@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cab-booking.local/schemas/events/payloads/review.created",
+  "title": "review.created.payload",
+  "type": "object",
+  "required": ["reviewId", "rideId", "rating", "createdAt"],
+  "properties": {
+    "reviewId": { "type": "string" },
+    "rideId": { "type": "string" },
+    "riderId": { "type": "string" },
+    "driverId": { "type": "string" },
+    "rating": { "type": "number", "minimum": 1, "maximum": 5 },
+    "comment": { "type": "string" },
+    "status": { "type": "string" },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}
