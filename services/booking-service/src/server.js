@@ -1,9 +1,37 @@
 require("dotenv").config();
 require("./observability");
-const app = require("./app");
-const logger = require("./utils/logger");
 
-const port = Number(process.env.PORT || 3000);
-app.listen(port, () => {
-  logger.info({ port }, "[booking-service] listening");
+const app = require("./app");
+const config = require("./config");
+const logger = require("./utils/logger");
+const { initDb, closeDb } = require("./db/pool");
+const { disconnect } = require("./messaging/producer");
+const { startOutboxPublisher } = require("./messaging/outboxPublisher");
+
+async function start() {
+  await initDb();
+  const stopOutbox = startOutboxPublisher();
+
+  const server = app.listen(config.port, () => {
+    logger.info({ port: config.port }, "[booking-service] listening");
+  });
+
+  const shutdown = async () => {
+    stopOutbox();
+    server.close();
+    await disconnect();
+    await closeDb();
+    process.exit(0);
+  };
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
+}
+
+start().catch((error) => {
+  logger.error(
+    { err: error },
+    "[booking-service] failed to bootstrap service"
+  );
+  process.exit(1);
 });

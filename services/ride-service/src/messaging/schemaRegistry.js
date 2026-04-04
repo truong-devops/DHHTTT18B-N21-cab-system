@@ -1,60 +1,24 @@
-const path = require("path");
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
-const topics = require("./topics");
+const { createEventContractRegistry } = require("../../../../contracts/events/registry");
 
-const ajv = new Ajv({ allErrors: true, strict: false });
-addFormats(ajv);
-const schemaDir = path.resolve(
-  __dirname,
-  "../../../../contracts/events/schema-registry"
-);
-
-const topicSchemaFiles = {
-  [topics.RideCreated]: "ride.created.json",
-  [topics.RideAssigned]: "ride.assigned.json",
-  [topics.DriverLocationUpdated]: "driver.location.updated.json",
-  [topics.PaymentCompleted]: "payment.completed.json",
-  [topics.PaymentFailed]: "payment.failed.json"
-};
-
-function buildPayloadSchema(schema) {
-  if (!schema || schema.type !== "object") {
-    return { type: "object", additionalProperties: true };
-  }
-
-  const payloadSchema = JSON.parse(JSON.stringify(schema));
-  if (payloadSchema.properties) {
-    delete payloadSchema.properties.eventId;
-    delete payloadSchema.properties.type;
-  }
-  if (Array.isArray(payloadSchema.required)) {
-    payloadSchema.required = payloadSchema.required.filter(
-      (key) => !["eventId", "type"].includes(key)
-    );
-  }
-
-  return payloadSchema;
-}
-
-const validatorsByTopic = Object.entries(topicSchemaFiles).reduce(
-  (acc, [topic, fileName]) => {
-    const schemaPath = path.join(schemaDir, fileName);
-    const rawSchema = require(schemaPath);
-    acc[topic] = ajv.compile(buildPayloadSchema(rawSchema));
-    return acc;
-  },
-  {}
-);
+const registry = createEventContractRegistry({ strict: true });
 
 function validatePayload(topic, payload) {
-  const validator = validatorsByTopic[topic];
-  if (!validator) {
-    return { ok: true, errors: [] };
-  }
-
-  const ok = validator(payload);
-  return { ok, errors: validator.errors || [] };
+  const result = registry.validatePayloadByTopic(topic, payload);
+  return {
+    ok: result.valid,
+    errors: result.errors
+  };
 }
 
-module.exports = { validatePayload };
+function validateEnvelope(topic, envelope) {
+  const result = registry.validateEnvelopeByTopic(topic, envelope);
+  return {
+    ok: result.valid,
+    errors: result.errors
+  };
+}
+
+module.exports = {
+  validatePayload,
+  validateEnvelope
+};

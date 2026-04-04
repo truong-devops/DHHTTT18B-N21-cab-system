@@ -12,6 +12,11 @@ function parseBoolean(value, defaultValue = false) {
   return defaultValue;
 }
 
+function parseNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 const config = {
   serviceName: process.env.SERVICE_NAME || "payment-service",
   port: Number(process.env.PORT || 3000),
@@ -34,10 +39,95 @@ const config = {
     consumeTopics: (process.env.KAFKA_CONSUME_TOPICS || "")
       .split(",")
       .map((value) => value.trim())
-      .filter(Boolean)
+      .filter(Boolean),
+    partitionsConsumedConcurrently: parseNumber(
+      process.env.KAFKA_CONSUMER_PARTITIONS_CONCURRENCY,
+      1
+    ),
+    maxMessagesPerBatch: parseNumber(
+      process.env.KAFKA_CONSUMER_MAX_MESSAGES_PER_BATCH,
+      100
+    ),
+    maxBytesPerPartition: parseNumber(
+      process.env.KAFKA_CONSUMER_MAX_BYTES_PER_PARTITION,
+      1048576
+    ),
+    minBytes: parseNumber(
+      process.env.KAFKA_CONSUMER_MIN_BYTES,
+      1
+    ),
+    maxBytes: parseNumber(
+      process.env.KAFKA_CONSUMER_MAX_BYTES,
+      10485760
+    ),
+    maxWaitTimeInMs: parseNumber(
+      process.env.KAFKA_CONSUMER_MAX_WAIT_MS,
+      5000
+    ),
+    sessionTimeout: parseNumber(
+      process.env.KAFKA_CONSUMER_SESSION_TIMEOUT_MS,
+      30000
+    ),
+    heartbeatInterval: parseNumber(
+      process.env.KAFKA_CONSUMER_HEARTBEAT_INTERVAL_MS,
+      3000
+    ),
+    rebalanceTimeout: parseNumber(
+      process.env.KAFKA_CONSUMER_REBALANCE_TIMEOUT_MS,
+      60000
+    ),
+    autoCommitInterval: parseNumber(
+      process.env.KAFKA_CONSUMER_AUTO_COMMIT_INTERVAL_MS,
+      1000
+    ),
+    autoCommitThreshold: parseNumber(
+      process.env.KAFKA_CONSUMER_AUTO_COMMIT_THRESHOLD,
+      1
+    ),
+    retry: {
+      retries: parseNumber(process.env.KAFKA_CONSUMER_RETRY_RETRIES, 8),
+      initialRetryTime: parseNumber(
+        process.env.KAFKA_CONSUMER_RETRY_INITIAL_MS,
+        300
+      ),
+      maxRetryTime: parseNumber(
+        process.env.KAFKA_CONSUMER_RETRY_MAX_MS,
+        30000
+      )
+    },
+    producerRetry: {
+      retries: parseNumber(process.env.KAFKA_PRODUCER_RETRY_RETRIES, 8),
+      initialRetryTime: parseNumber(
+        process.env.KAFKA_PRODUCER_RETRY_INITIAL_MS,
+        300
+      ),
+      maxRetryTime: parseNumber(
+        process.env.KAFKA_PRODUCER_RETRY_MAX_MS,
+        30000
+      )
+    },
+    producerMaxInFlightRequests: parseNumber(
+      process.env.KAFKA_PRODUCER_MAX_IN_FLIGHT_REQUESTS,
+      5
+    ),
+    producerRequestTimeout: parseNumber(
+      process.env.KAFKA_PRODUCER_REQUEST_TIMEOUT_MS,
+      30000
+    ),
+    producerAcks: parseNumber(process.env.KAFKA_PRODUCER_ACKS, -1)
   },
   outbox: {
-    publishIntervalMs: Number(process.env.OUTBOX_PUBLISH_INTERVAL_MS || 5000)
+    publishIntervalMs: Number(process.env.OUTBOX_PUBLISH_INTERVAL_MS || 5000),
+    publishBatchSize: Number(process.env.OUTBOX_PUBLISH_BATCH_SIZE || 50),
+    maxAttempts: Number(process.env.OUTBOX_MAX_ATTEMPTS || 10),
+    retryBaseMs: Number(process.env.OUTBOX_RETRY_BASE_MS || 1000),
+    retryMaxMs: Number(process.env.OUTBOX_RETRY_MAX_MS || 60000),
+    processingTimeoutMs: Number(
+      process.env.OUTBOX_PROCESSING_TIMEOUT_MS || 300000
+    ),
+    workerId:
+      process.env.OUTBOX_WORKER_ID ||
+      `${process.env.HOSTNAME || "payment-service"}-${process.pid}`
   },
   gateway: {
     retryMax: Number(process.env.PAYMENT_GATEWAY_RETRY_MAX || 2),

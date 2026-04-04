@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cab-booking.local/schemas/events/payloads/driver.location.updated",
+  "title": "driver.location.updated.payload",
+  "type": "object",
+  "required": ["driverId", "lat", "lng", "timestamp"],
+  "properties": {
+    "driverId": { "type": "string" },
+    "rideId": { "type": "string" },
+    "lat": { "type": "number" },
+    "lng": { "type": "number" },
+    "heading": { "type": "number" },
+    "speedKph": { "type": "number" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

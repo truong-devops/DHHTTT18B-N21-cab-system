@@ -1,25 +1,17 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "payment.failed",
+  "$id": "https://cab-booking.local/schemas/events/payloads/payment.completed",
+  "title": "payment.completed.payload",
   "type": "object",
-  "required": [
-    "paymentId",
-    "rideId",
-    "amount",
-    "currency",
-    "status",
-    "statusUpdatedAt",
-    "failureReason"
-  ],
+  "required": ["paymentId", "rideId", "amount", "currency", "status", "statusUpdatedAt"],
   "properties": {
     "paymentId": { "type": "string" },
     "rideId": { "type": "string" },
     "amount": { "type": "string", "pattern": "^\\d+(\\.\\d{1,2})?$" },
     "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
     "method": { "type": "string" },
-    "status": { "const": "FAILED" },
-    "statusUpdatedAt": { "type": "string", "format": "date-time" },
-    "failureReason": { "type": "string" }
+    "status": { "const": "PAID" },
+    "statusUpdatedAt": { "type": "string", "format": "date-time" }
   },
   "additionalProperties": false
 }

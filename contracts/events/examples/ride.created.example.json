@@ -1,7 +1,15 @@
 {
-  "eventId": "uuid",
+  "eventId": "evt_ride_created_001",
+  "traceId": "trace_abc123",
+  "occurredAt": "2026-01-01T10:00:00.000Z",
   "type": "RideCreated",
-  "rideId": "r123",
-  "pickup": { "lat": 10.7, "lng": 106.6 },
-  "timestamp": "2025-01-01T10:00:00Z"
+  "version": 1,
+  "payload": {
+    "rideId": "ride_123",
+    "bookingId": "bk_123",
+    "pickup": { "lat": 10.7, "lng": 106.6 },
+    "dropoff": { "lat": 10.8, "lng": 106.7 },
+    "vehicleType": "STANDARD",
+    "timestamp": "2026-01-01T10:00:00.000Z"
+  }
 }

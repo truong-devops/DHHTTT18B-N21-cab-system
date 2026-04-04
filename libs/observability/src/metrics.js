@@ -164,8 +164,31 @@ function createServiceMetrics(options = {}) {
   const queueBacklogGauge = meter.createObservableGauge("cab_queue_backlog", {
     description: "Queue backlog per queue name"
   });
+  const outboxBacklogGauge = meter.createObservableGauge("cab_outbox_backlog", {
+    description: "Outbox backlog per outbox queue"
+  });
+  const kafkaConsumerLagGauge = meter.createObservableGauge("cab_kafka_consumer_lag", {
+    description: "Kafka consumer lag by group/topic/partition"
+  });
+  const kafkaPublishCounter = meter.createCounter("cab_kafka_publish_total", {
+    description: "Kafka publish attempts by topic and outcome"
+  });
+  const kafkaDlqCounter = meter.createCounter("cab_kafka_dlq_total", {
+    description: "Kafka events routed to DLQ"
+  });
+  const kafkaRetryCounter = meter.createCounter("cab_kafka_retry_total", {
+    description: "Kafka retry decisions for outbox/inbox processing"
+  });
+  const kafkaProcessingLatencyHistogram = meter.createHistogram(
+    "cab_kafka_processing_latency_ms",
+    {
+      description: "Kafka processing latency across producer/outbox/consumer pipelines"
+    }
+  );
 
   const queueBacklogState = new Map();
+  const outboxBacklogState = new Map();
+  const kafkaConsumerLagState = new Map();
   const eventLoop = monitorEventLoopDelay({ resolution: 20 });
   eventLoop.enable();
 
@@ -209,6 +232,30 @@ function createServiceMetrics(options = {}) {
         ...baseAttributes,
         queue_name: queueName
       });
+    }
+  });
+
+  outboxBacklogGauge.addCallback((observableResult) => {
+    for (const [queueName, size] of outboxBacklogState.entries()) {
+      observableResult.observe(size, {
+        ...baseAttributes,
+        queue_name: queueName
+      });
+    }
+  });
+
+  kafkaConsumerLagGauge.addCallback((observableResult) => {
+    for (const [lagKey, lagInfo] of kafkaConsumerLagState.entries()) {
+      observableResult.observe(lagInfo.lag, {
+        ...baseAttributes,
+        consumer_group: lagInfo.consumerGroup,
+        topic: lagInfo.topic,
+        partition: lagInfo.partition
+      });
+      // cleanup stale lag records to avoid cardinality growth over time
+      if (Date.now() - lagInfo.updatedAt > 30 * 60 * 1000) {
+        kafkaConsumerLagState.delete(lagKey);
+      }
     }
   });
 
@@ -283,6 +330,102 @@ function createServiceMetrics(options = {}) {
     );
   }
 
+  function setOutboxBacklog(queueName, size) {
+    const normalizedQueue = sanitizeString(queueName, "outbox.default");
+    const normalizedSize = Math.max(0, Number(size) || 0);
+    outboxBacklogState.set(normalizedQueue, normalizedSize);
+    setQueueBacklog(normalizedQueue, normalizedSize);
+  }
+
+  function setKafkaConsumerLag({
+    consumerGroup,
+    topic,
+    partition,
+    lag
+  }) {
+    const normalizedGroup = sanitizeString(consumerGroup, "unknown-group");
+    const normalizedTopic = sanitizeString(topic, "unknown-topic");
+    const normalizedPartition = String(
+      Number.isFinite(Number(partition)) ? Number(partition) : 0
+    );
+    const normalizedLag = Math.max(0, Number(lag) || 0);
+    const lagKey = `${normalizedGroup}:${normalizedTopic}:${normalizedPartition}`;
+
+    kafkaConsumerLagState.set(lagKey, {
+      consumerGroup: normalizedGroup,
+      topic: normalizedTopic,
+      partition: normalizedPartition,
+      lag: normalizedLag,
+      updatedAt: Date.now()
+    });
+  }
+
+  function recordKafkaPublish({
+    topic,
+    outcome = "success",
+    operation = "publish",
+    attributes
+  }) {
+    kafkaPublishCounter.add(1, {
+      ...baseAttributes,
+      topic: sanitizeString(topic, "unknown-topic"),
+      outcome: sanitizeString(outcome, "success"),
+      operation: sanitizeString(operation, "publish"),
+      ...(attributes || {})
+    });
+  }
+
+  function recordKafkaDlq({
+    sourceTopic,
+    dlqTopic,
+    errorType = "unknown_error",
+    attributes
+  }) {
+    kafkaDlqCounter.add(1, {
+      ...baseAttributes,
+      source_topic: sanitizeString(sourceTopic, "unknown-topic"),
+      dlq_topic: sanitizeString(dlqTopic, "unknown-topic"),
+      error_type: sanitizeString(errorType, "unknown_error"),
+      ...(attributes || {})
+    });
+  }
+
+  function recordKafkaRetry({
+    scope = "unknown",
+    topic,
+    status = "retry",
+    reason = "unknown",
+    attributes
+  }) {
+    kafkaRetryCounter.add(1, {
+      ...baseAttributes,
+      scope: sanitizeString(scope, "unknown"),
+      topic: sanitizeString(topic, "unknown-topic"),
+      status: sanitizeString(status, "retry"),
+      reason: sanitizeString(reason, "unknown"),
+      ...(attributes || {})
+    });
+  }
+
+  function recordKafkaProcessingLatency({
+    pipeline = "consumer",
+    topic,
+    outcome = "success",
+    durationMs,
+    attributes
+  }) {
+    if (typeof durationMs !== "number" || !Number.isFinite(durationMs)) {
+      return;
+    }
+    kafkaProcessingLatencyHistogram.record(durationMs, {
+      ...baseAttributes,
+      pipeline: sanitizeString(pipeline, "consumer"),
+      topic: sanitizeString(topic, "unknown-topic"),
+      outcome: sanitizeString(outcome, "success"),
+      ...(attributes || {})
+    });
+  }
+
   function recordDependencyRequest({
     dependencyType,
     dependencyName,
@@ -337,6 +480,12 @@ function createServiceMetrics(options = {}) {
     recordDependencyRequest,
     measureDependency,
     setQueueBacklog,
+    setOutboxBacklog,
+    setKafkaConsumerLag,
+    recordKafkaPublish,
+    recordKafkaDlq,
+    recordKafkaRetry,
+    recordKafkaProcessingLatency,
     recordRideCreated: (outcome = "success", attributes) =>
       recordBusinessEvent({
         domain: "ride",

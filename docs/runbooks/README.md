@@ -1,5 +1,7 @@
 ## Observability Alerting Runbook (Prometheus + Alertmanager)
 
+Kafka E2E runbook: `docs/runbooks/kafka-observability.md`
+
 ### 1) Start stack
 
 ```bash

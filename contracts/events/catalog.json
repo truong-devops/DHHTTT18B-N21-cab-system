@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "key": "RideCreated",
+      "topic": "ride.created",
+      "type": "RideCreated",
+      "payloadSchema": "payloads/ride.created.payload.json",
+      "envelopeSchema": "envelopes/ride.created.envelope.json",
+      "producer": "booking-service",
+      "consumers": ["payment-service", "ride-service"]
+    },
+    {
+      "key": "RideAssigned",
+      "topic": "ride.assigned",
+      "type": "RideAssigned",
+      "payloadSchema": "payloads/ride.assigned.payload.json",
+      "envelopeSchema": "envelopes/ride.assigned.envelope.json",
+      "producer": "ride-service",
+      "consumers": ["payment-service", "ride-service"]
+    },
+    {
+      "key": "RideCancelled",
+      "topic": "ride.cancelled",
+      "type": "RideCancelled",
+      "payloadSchema": "payloads/ride.cancelled.payload.json",
+      "envelopeSchema": "envelopes/ride.cancelled.envelope.json",
+      "producer": "booking-service",
+      "consumers": ["payment-service", "ride-service"]
+    },
+    {
+      "key": "DriverLocationUpdated",
+      "topic": "driver.location.updated",
+      "type": "DriverLocationUpdated",
+      "payloadSchema": "payloads/driver.location.updated.payload.json",
+      "envelopeSchema": "envelopes/driver.location.updated.envelope.json",
+      "producer": "ride-service",
+      "consumers": ["ride-service"]
+    },
+    {
+      "key": "PaymentCompleted",
+      "topic": "payment.completed",
+      "type": "PaymentCompleted",
+      "payloadSchema": "payloads/payment.completed.payload.json",
+      "envelopeSchema": "envelopes/payment.completed.envelope.json",
+      "producer": "payment-service",
+      "consumers": ["ride-service"]
+    },
+    {
+      "key": "PaymentFailed",
+      "topic": "payment.failed",
+      "type": "PaymentFailed",
+      "payloadSchema": "payloads/payment.failed.payload.json",
+      "envelopeSchema": "envelopes/payment.failed.envelope.json",
+      "producer": "payment-service",
+      "consumers": ["ride-service"]
+    },
+    {
+      "key": "ReviewCreated",
+      "topic": "review.created",
+      "type": "ReviewCreated",
+      "payloadSchema": "payloads/review.created.payload.json",
+      "envelopeSchema": "envelopes/review.created.envelope.json",
+      "producer": "review-service",
+      "consumers": []
+    }
+  ]
+}
