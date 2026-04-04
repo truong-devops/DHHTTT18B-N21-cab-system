@@ -20,9 +20,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
-    "@rollup/rollup-win32-x64-msvc": "^4.57.1",
     "@swc/core": "^1.15.11",
-    "@swc/core-win32-x64-msvc": "^1.15.11",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react-swc": "^3.5.0",
