@@ -3,11 +3,11 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "cross-env EXPO_ROUTER_APP_ROOT=app expo start",
+    "start": "cross-env EXPO_ROUTER_APP_ROOT=app EXPO_DEV_SERVER_PORT=8082 RCT_METRO_PORT=8082 expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "cross-env EXPO_ROUTER_APP_ROOT=app expo start --android",
-    "ios": "cross-env EXPO_ROUTER_APP_ROOT=app expo start --ios",
-    "web": "cross-env EXPO_ROUTER_APP_ROOT=app expo start --web",
+    "android": "cross-env EXPO_ROUTER_APP_ROOT=app EXPO_DEV_SERVER_PORT=8082 RCT_METRO_PORT=8082 expo start --android",
+    "ios": "cross-env EXPO_ROUTER_APP_ROOT=app EXPO_DEV_SERVER_PORT=8082 RCT_METRO_PORT=8082 expo start --ios",
+    "web": "cross-env EXPO_ROUTER_APP_ROOT=app EXPO_DEV_SERVER_PORT=8082 RCT_METRO_PORT=8082 expo start --web",
     "lint": "expo lint"
   },
   "dependencies": {
