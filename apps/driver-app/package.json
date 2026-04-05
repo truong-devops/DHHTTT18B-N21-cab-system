@@ -3,11 +3,11 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "EXPO_ROUTER_APP_ROOT=app expo start",
+    "start": "cross-env EXPO_ROUTER_APP_ROOT=app expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "EXPO_ROUTER_APP_ROOT=app expo start --android",
-    "ios": "EXPO_ROUTER_APP_ROOT=app expo start --ios",
-    "web": "EXPO_ROUTER_APP_ROOT=app expo start --web",
+    "android": "cross-env EXPO_ROUTER_APP_ROOT=app expo start --android",
+    "ios": "cross-env EXPO_ROUTER_APP_ROOT=app expo start --ios",
+    "web": "cross-env EXPO_ROUTER_APP_ROOT=app expo start --web",
     "lint": "expo lint"
   },
   "dependencies": {
@@ -65,6 +65,7 @@
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "cross-env": "^7.0.3",
     "typescript": "~5.9.2"
   },
   "private": true
