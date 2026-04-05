@@ -1,4 +1,4 @@
-<#
+﻿<#
     Start the full CAB Booking System stack (Docker infra + 3 UIs) with one command.
 
     Usage examples:
@@ -81,7 +81,7 @@ function Update-ExpoEnv {
         Write-Warning "$EnvPath không tồn tại, bỏ qua."
         return
     }
-    $newLine = "EXPO_PUBLIC_API_BASE_URL=http://$Ip`:3000"
+    $newLine = "EXPO_PUBLIC_API_BASE_URL=http://$Ip:3000"
     $lines = Get-Content $EnvPath
     $updated = $false
     $lines = $lines | ForEach-Object {
@@ -118,8 +118,7 @@ if (-not $SkipInfra) {
     }
 
     if (-not $SkipKafkaBootstrap) {
-        # Give Kafka more time inside the bootstrap script (defaults are short)
-        if (-not $env:KAFKA_BOOTSTRAP_WAIT_ATTEMPTS) { $env:KAFKA_BOOTSTRAP_WAIT_ATTEMPTS = 120 } # up to ~4 minutes with 2s wait
+        if (-not $env:KAFKA_BOOTSTRAP_WAIT_ATTEMPTS) { $env:KAFKA_BOOTSTRAP_WAIT_ATTEMPTS = 120 }
         if (-not $env:KAFKA_BOOTSTRAP_WAIT_MS) { $env:KAFKA_BOOTSTRAP_WAIT_MS = 2000 }
         if ($KafkaVerbose) { $env:KAFKA_BOOTSTRAP_VERBOSE = "true" }
 
@@ -153,7 +152,6 @@ function Start-Ui {
     Write-Host "Launching $Name (npm run $Script) ..."
     Maybe-InstallDependencies -Path $Path
 
-    # Run in its own console with correct working directory (avoids space-in-path issues)
     Start-Process -FilePath "powershell" -WorkingDirectory $Path -ArgumentList "-NoExit", "-Command", "npm run $Script" | Out-Null
     Write-Host "  -> started in its own terminal window."
 }
@@ -161,13 +159,12 @@ function Start-Ui {
 if (-not $SkipUi) {
     $ip = Get-PrimaryIPv4
     Write-Host "Detected host IP: $ip -> cập nhật EXPO_PUBLIC_API_BASE_URL cho 2 app Expo"
-    Update-ExpoEnv -EnvPath "$repoRoot\\apps\\customer-app\\.env" -Ip $ip
-    Update-ExpoEnv -EnvPath "$repoRoot\\apps\\driver-app\\.env" -Ip $ip
+    Update-ExpoEnv -EnvPath "$repoRoot\apps\customer-app\.env" -Ip $ip
+    Update-ExpoEnv -EnvPath "$repoRoot\apps\driver-app\.env" -Ip $ip
 
-    Start-Ui -Name "Admin Dashboard" -Path "$repoRoot\\apps\\admin-dashboard" -Script "dev"
-    # Expo default 'start' shows QR for mobile devices (scan with Expo Go).
-    Start-Ui -Name "Driver App (Expo QR)" -Path "$repoRoot\\apps\\driver-app" -Script "start"
-    Start-Ui -Name "Customer App (Expo QR)" -Path "$repoRoot\\apps\\customer-app" -Script "start"
+    Start-Ui -Name "Admin Dashboard" -Path "$repoRoot\apps\admin-dashboard" -Script "dev"
+    Start-Ui -Name "Driver App (Expo QR)" -Path "$repoRoot\apps\driver-app" -Script "start"
+    Start-Ui -Name "Customer App (Expo QR)" -Path "$repoRoot\apps\customer-app" -Script "start"
 } else {
     Write-Host "SkipUi requested -> UI apps will not be launched."
 }
