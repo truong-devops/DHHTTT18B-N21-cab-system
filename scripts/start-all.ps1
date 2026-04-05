@@ -18,9 +18,7 @@ param(
     [switch] $Seed,
     [switch] $NoInstall,
     [switch] $SkipKafkaBootstrap,
-    [switch] $KafkaVerbose,
-    [string] $PreferredSubnet,
-    [string] $ForceIp
+    [switch] $KafkaVerbose
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,59 +56,6 @@ function Maybe-InstallDependencies {
         npm install
         Pop-Location
     }
-}
-
-function Get-PrimaryIPv4 {
-    if ($ForceIp) {
-        Write-Host "Using forced IP: $ForceIp"
-        return $ForceIp
-    }
-    $all = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.IPAddress -notlike "127.*" -and
-            $_.IPAddress -notlike "169.254.*"
-        } |
-        Sort-Object InterfaceMetric, SkipAsSource
-
-    if ($PreferredSubnet) {
-        $match = $all | Where-Object { $_.IPAddress.StartsWith($PreferredSubnet) } | Select-Object -First 1
-        if ($match) { return $match.IPAddress }
-    }
-
-    $ip = $all | Select-Object -First 1 -ExpandProperty IPAddress
-    if (-not $ip) {
-        Write-Warning "Không tìm thấy IPv4 hợp lệ (không phải loopback/link-local). Giữ nguyên .env hiện có."
-    }
-    return $ip
-}
-
-function Update-ExpoEnv {
-    param(
-        [string] $EnvPath,
-        [string] $Ip
-    )
-    if (-not (Test-Path $EnvPath)) {
-        Write-Warning "$EnvPath không tồn tại, bỏ qua."
-        return
-    }
-    if (-not $Ip -or $Ip -notmatch '^\d{1,3}(\.\d{1,3}){3}$') {
-        Write-Warning "IP không hợp lệ: '$Ip' -> giữ nguyên $EnvPath"
-        return
-    }
-    $newLine = "EXPO_PUBLIC_API_BASE_URL=http://$Ip:3000"
-    $lines = Get-Content $EnvPath
-    $found = $false
-    $lines = $lines | ForEach-Object {
-        if ($_ -match '^EXPO_PUBLIC_API_BASE_URL=') {
-            $found = $true
-            $newLine
-        } else {
-            $_
-        }
-    }
-    if (-not $found) { $lines += $newLine }
-    Set-Content -Path $EnvPath -Value $lines -Encoding UTF8
-    Write-Host "  -> cập nhật $EnvPath với API_BASE_URL=$($newLine.Split('=')[1])"
 }
 
 Push-Location $repoRoot
@@ -171,11 +116,6 @@ function Start-Ui {
 }
 
 if (-not $SkipUi) {
-    $ip = Get-PrimaryIPv4
-    Write-Host "Detected host IP: $ip -> cập nhật EXPO_PUBLIC_API_BASE_URL cho 2 app Expo"
-    Update-ExpoEnv -EnvPath "$repoRoot\apps\customer-app\.env" -Ip $ip
-    Update-ExpoEnv -EnvPath "$repoRoot\apps\driver-app\.env" -Ip $ip
-
     Start-Ui -Name "Admin Dashboard" -Path "$repoRoot\apps\admin-dashboard" -Script "dev"
     Start-Ui -Name "Driver App (Expo QR)" -Path "$repoRoot\apps\driver-app" -Script "start"
     Start-Ui -Name "Customer App (Expo QR)" -Path "$repoRoot\apps\customer-app" -Script "start"
