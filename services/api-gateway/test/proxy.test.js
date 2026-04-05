@@ -11,6 +11,8 @@ describe("api-gateway proxy", () => {
     nock.cleanAll();
     jest.resetModules();
     process.env.RIDE_SERVICE_URL = "http://ride-service.test";
+    process.env.BOOKING_SERVICE_URL = "http://booking-service.test";
+    process.env.DRIVER_SERVICE_URL = "http://driver-service.test";
     process.env.JWT_SECRET = TEST_SECRET;
     process.env.PROXY_TIMEOUT_MS = "20";
     process.env.PROXY_RETRY_BACKOFF_MS = "5";
@@ -19,6 +21,8 @@ describe("api-gateway proxy", () => {
   afterEach(() => {
     nock.cleanAll();
     delete process.env.RIDE_SERVICE_URL;
+    delete process.env.BOOKING_SERVICE_URL;
+    delete process.env.DRIVER_SERVICE_URL;
     delete process.env.JWT_SECRET;
     delete process.env.PROXY_TIMEOUT_MS;
     delete process.env.PROXY_RETRY_BACKOFF_MS;
@@ -106,5 +110,24 @@ describe("api-gateway proxy", () => {
 
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe("UNAUTHORIZED");
+  });
+
+  it("routes /v1/bookings to booking service domain", async () => {
+    const app = require("../src/app");
+    const bookingScope = nock("http://booking-service.test")
+      .post("/v1/bookings")
+      .reply(201, { booking: { booking_id: "bk_1", status: "REQUESTED" } });
+
+    const response = await request(app)
+      .post("/v1/bookings")
+      .set("Authorization", authHeader())
+      .send({
+        pickup: { lat: 10.76, lng: 106.66 },
+        drop: { lat: 10.77, lng: 106.7 }
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.booking.booking_id).toBe("bk_1");
+    expect(bookingScope.isDone()).toBe(true);
   });
 });

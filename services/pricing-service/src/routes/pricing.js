@@ -259,6 +259,7 @@ router.post(
       distanceKm,
       durationMin,
       estimatedFare,
+      surge: Number(rateCard.surgeMultiplier || 1),
       currency: rateCard.currency || "VND",
       breakdown,
       expiresAt,
@@ -290,6 +291,7 @@ router.post(
       {
         quoteId,
         estimatedFare,
+        surge: Number(rateCard.surgeMultiplier || 1),
         currency: record.currency,
         distanceKm,
         durationMin,
@@ -372,6 +374,7 @@ router.get(
     return sendSuccess(res, req, {
       quoteId: quote.quoteId,
       estimatedFare: quote.estimatedFare,
+      surge: Number(quote.surge || quote.rateCard?.surgeMultiplier || 1),
       currency: quote.currency,
       distanceKm: quote.distanceKm,
       durationMin: quote.durationMin,

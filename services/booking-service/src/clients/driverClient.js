@@ -63,6 +63,76 @@ async function getDriverAvailability({
   }
 }
 
+async function listAvailableDrivers({
+  pickup,
+  vehicleType,
+  authorization,
+  traceId,
+  limit = 5
+}) {
+  if (!isAvailabilityCheckEnabled()) {
+    return [];
+  }
+  if (!authorization || !pickup) {
+    return [];
+  }
+
+  try {
+    const res = await http.get("/v1/driver/availability", {
+      headers: {
+        authorization,
+        "x-trace-id": traceId || ""
+      },
+      params: {
+        lat: pickup.lat,
+        lng: pickup.lng,
+        vehicleType,
+        limit
+      }
+    });
+    const items = Array.isArray(res.data?.data?.items)
+      ? res.data.data.items
+      : [];
+    return items.filter((item) => item && item.driverId);
+  } catch (error) {
+    logger.warn(
+      {
+        dependency: "driver-service",
+        operation: "list_available_drivers",
+        reason: error?.code || error?.message
+      },
+      "driver list availability failed"
+    );
+    return [];
+  }
+}
+
+function selectBestDriver(drivers = []) {
+  if (!Array.isArray(drivers) || !drivers.length) {
+    return null;
+  }
+
+  const sorted = [...drivers].sort((a, b) => {
+    const distanceA = Number(a.distanceMeters);
+    const distanceB = Number(b.distanceMeters);
+    const safeDistanceA = Number.isFinite(distanceA) ? distanceA : Number.MAX_SAFE_INTEGER;
+    const safeDistanceB = Number.isFinite(distanceB) ? distanceB : Number.MAX_SAFE_INTEGER;
+    if (safeDistanceA !== safeDistanceB) {
+      return safeDistanceA - safeDistanceB;
+    }
+
+    const ratingA = Number(a.rating);
+    const ratingB = Number(b.rating);
+    const safeRatingA = Number.isFinite(ratingA) ? ratingA : 0;
+    const safeRatingB = Number.isFinite(ratingB) ? ratingB : 0;
+    return safeRatingB - safeRatingA;
+  });
+
+  return sorted[0] || null;
+}
+
 module.exports = {
-  getDriverAvailability
+  getDriverAvailability,
+  listAvailableDrivers,
+  selectBestDriver
 };
