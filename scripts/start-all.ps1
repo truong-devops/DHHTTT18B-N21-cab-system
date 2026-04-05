@@ -77,6 +77,10 @@ function Update-ExpoEnv {
         [string] $EnvPath,
         [string] $Ip
     )
+    if (-not $Ip -or $Ip -notmatch '^\d{1,3}(\.\d{1,3}){3}$') {
+        Write-Warning "IP không hợp lệ: '$Ip' -> giữ nguyên $EnvPath"
+        return
+    }
     if (-not (Test-Path $EnvPath)) {
         Write-Warning "$EnvPath không tồn tại, bỏ qua."
         return
@@ -180,6 +184,5 @@ Write-Host "  PgAdmin:       http://localhost:5050  (user: admin@example.com / a
 Write-Host ""
 Write-Host "Seeded demo accounts (Auth service):"
 Write-Host "  Admin:    admin@cab.local / password"
-Write-Host "  Ops:      ops@cab.local / password"
-Write-Host "  Customer: customer@cab.local / password"
+Write-Host "  Customer: customer@cab.local / 123456"
 Write-Host "  Driver:   driver@cab.local / password"
