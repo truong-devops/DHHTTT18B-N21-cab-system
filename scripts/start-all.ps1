@@ -1,0 +1,142 @@
+<#
+    Start the full CAB Booking System stack (Docker infra + 3 UIs) with one command.
+
+    Usage examples:
+      .\scripts\start-all.ps1                  # Start infra + UIs
+      .\scripts\start-all.ps1 -Observability   # Include observability stack
+      .\scripts\start-all.ps1 -SkipUi          # Only infra (no UIs)
+      .\scripts\start-all.ps1 -Seed            # Seed demo data after infra is up
+
+    Requirements: Docker Desktop running, Docker Compose, Node.js 18+, npm.
+#>
+
+[CmdletBinding()]
+param(
+    [switch] $Observability,
+    [switch] $SkipInfra,
+    [switch] $SkipUi,
+    [switch] $Seed,
+    [switch] $NoInstall,
+    [switch] $SkipKafkaBootstrap,
+    [switch] $KafkaVerbose
+)
+
+$ErrorActionPreference = "Stop"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+
+function Ensure-Command {
+    param([string] $Name)
+    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+        throw "$Name is required but not found. Install it and retry."
+    }
+}
+
+function Ensure-DockerRunning {
+    try {
+        docker info | Out-Null
+    } catch {
+        throw "Docker Desktop is not running. Please start it and rerun the script."
+    }
+}
+
+function Run-NpmScript {
+    param([string] $ScriptName)
+    npm run $ScriptName
+    if ($LASTEXITCODE -ne 0) {
+        throw "npm run $ScriptName failed. Check the output above."
+    }
+}
+
+function Maybe-InstallDependencies {
+    param([string] $Path)
+    if ($NoInstall) { return }
+    if (-not (Test-Path (Join-Path $Path "node_modules"))) {
+        Write-Host "Installing dependencies in $Path ..."
+        Push-Location $Path
+        npm install
+        Pop-Location
+    }
+}
+
+Push-Location $repoRoot
+Write-Host "Repo root: $repoRoot"
+
+Ensure-Command "docker"
+Ensure-Command "npm"
+Ensure-DockerRunning
+
+$composeScript = if ($Observability) { "dev:observability" } else { "dev:infra" }
+
+if (-not $SkipInfra) {
+    $running = docker compose --env-file .env -f infra/docker-compose.dev.yml ps -q 2>$null | Select-Object -First 1
+    if ($running) {
+        Write-Host "Docker stack already running -> skipping 'npm run $composeScript'. Use -SkipInfra:$false to force rerun."
+    } else {
+        Write-Host "Starting backend stack with 'npm run $composeScript' ..."
+        Run-NpmScript $composeScript
+    }
+
+    if (-not $SkipKafkaBootstrap) {
+        # Give Kafka more time inside the bootstrap script (defaults are short)
+        if (-not $env:KAFKA_BOOTSTRAP_WAIT_ATTEMPTS) { $env:KAFKA_BOOTSTRAP_WAIT_ATTEMPTS = 120 } # up to ~4 minutes with 2s wait
+        if (-not $env:KAFKA_BOOTSTRAP_WAIT_MS) { $env:KAFKA_BOOTSTRAP_WAIT_MS = 2000 }
+        if ($KafkaVerbose) { $env:KAFKA_BOOTSTRAP_VERBOSE = "true" }
+
+        Write-Host "Bootstrapping Kafka topics ..."
+        try {
+            Run-NpmScript "kafka:topics:bootstrap"
+        } catch {
+            Write-Warning "Kafka topic bootstrap failed: $($_.Exception.Message). Stack is still up; rerun with -SkipInfra:$false after Kafka is healthy."
+        }
+    } else {
+        Write-Host "SkipKafkaBootstrap requested -> skipping Kafka topic bootstrap."
+    }
+
+    if ($Seed) {
+        Write-Host "Seeding demo data (npm run seed:all) ..."
+        Run-NpmScript "seed:all"
+    }
+} else {
+    Write-Host "SkipInfra requested -> not touching Docker stack."
+}
+
+Pop-Location
+
+function Start-Ui {
+    param(
+        [string] $Name,
+        [string] $Path,
+        [string] $Script
+    )
+
+    Write-Host "Launching $Name (npm run $Script) ..."
+    Maybe-InstallDependencies -Path $Path
+
+    # Run in its own console with correct working directory (avoids space-in-path issues)
+    Start-Process -FilePath "powershell" -WorkingDirectory $Path -ArgumentList "-NoExit", "-Command", "npm run $Script" | Out-Null
+    Write-Host "  -> started in its own terminal window."
+}
+
+if (-not $SkipUi) {
+    Start-Ui -Name "Admin Dashboard" -Path "$repoRoot\\apps\\admin-dashboard" -Script "dev"
+    # Expo default 'start' shows QR for mobile devices (scan with Expo Go).
+    Start-Ui -Name "Driver App (Expo QR)" -Path "$repoRoot\\apps\\driver-app" -Script "start"
+    Start-Ui -Name "Customer App (Expo QR)" -Path "$repoRoot\\apps\\customer-app" -Script "start"
+} else {
+    Write-Host "SkipUi requested -> UI apps will not be launched."
+}
+
+Write-Host ""
+Write-Host "All services launched."
+Write-Host "Quick access:"
+Write-Host "  API Gateway:   http://localhost:3000"
+Write-Host "  Admin UI:      http://localhost:5173  (user: admin@cab.local / password)"
+Write-Host "  Customer Expo: scan QR in its terminal; web dev often http://localhost:19006"
+Write-Host "  Driver Expo:   scan QR in its terminal; web dev often http://localhost:19007"
+Write-Host "  PgAdmin:       http://localhost:5050  (user: admin@example.com / admin123)"
+Write-Host ""
+Write-Host "Seeded demo accounts (Auth service):"
+Write-Host "  Admin:    admin@cab.local / password"
+Write-Host "  Ops:      ops@cab.local / password"
+Write-Host "  Customer: customer@cab.local / password"
+Write-Host "  Driver:   driver@cab.local / password"

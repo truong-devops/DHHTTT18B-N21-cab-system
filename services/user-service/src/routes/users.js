@@ -8,7 +8,7 @@ const {
 } = require("../controllers/userController");
 const { requireAuth, requireAdmin, requireSelfOrAdmin } = require("../middleware/auth");
 const { validateRequest } = require("../middleware/validateRequest");
-const { isEmail, isUUID, ROLE_VALUES, STATUS_VALUES, isNonEmptyString, isPhone } = require("../utils/validators");
+const { isEmail, isUserId, ROLE_VALUES, STATUS_VALUES, isNonEmptyString, isPhone } = require("../utils/validators");
 
 const router = express.Router();
 
@@ -34,7 +34,7 @@ router.post(
 router.get(
   "/v1/users/:id",
   requireAuth,
-  validateRequest({ params: { id: isUUID } }),
+  validateRequest({ params: { id: isUserId } }),
   requireSelfOrAdmin("id"),
   getUserById
 );
@@ -62,7 +62,7 @@ router.patch(
   "/v1/users/:id",
   requireAuth,
   validateRequest({
-    params: { id: isUUID },
+    params: { id: isUserId },
     body: {
       email: optional(isEmail),
       fullName: optional(isNonEmptyString),
@@ -79,7 +79,7 @@ router.delete(
   "/v1/users/:id",
   requireAuth,
   requireAdmin,
-  validateRequest({ params: { id: isUUID } }),
+  validateRequest({ params: { id: isUserId } }),
   deleteUser
 );
 

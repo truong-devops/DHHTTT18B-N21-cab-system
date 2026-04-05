@@ -5,7 +5,7 @@ const {
 } = require("../controllers/userController");
 const { requireInternal } = require("../middleware/internalAuth");
 const { validateRequest } = require("../middleware/validateRequest");
-const { isUUID, isEmail } = require("../utils/validators");
+const { isUserId, isEmail } = require("../utils/validators");
 
 const router = express.Router();
 
@@ -13,7 +13,7 @@ router.use(requireInternal);
 
 router.get(
   "/internal/users/:id",
-  validateRequest({ params: { id: isUUID } }),
+  validateRequest({ params: { id: isUserId } }),
   getInternalUserById
 );
 
