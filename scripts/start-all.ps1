@@ -18,7 +18,9 @@ param(
     [switch] $Seed,
     [switch] $NoInstall,
     [switch] $SkipKafkaBootstrap,
-    [switch] $KafkaVerbose
+    [switch] $KafkaVerbose,
+    [string] $PreferredSubnet,
+    [string] $ForceIp
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,15 +61,25 @@ function Maybe-InstallDependencies {
 }
 
 function Get-PrimaryIPv4 {
-    $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+    if ($ForceIp) {
+        Write-Host "Using forced IP: $ForceIp"
+        return $ForceIp
+    }
+    $all = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
         Where-Object {
             $_.IPAddress -notlike "127.*" -and
             $_.IPAddress -notlike "169.254.*"
         } |
-        Sort-Object InterfaceMetric, SkipAsSource |
-        Select-Object -First 1 -ExpandProperty IPAddress
+        Sort-Object InterfaceMetric, SkipAsSource
+
+    if ($PreferredSubnet) {
+        $match = $all | Where-Object { $_.IPAddress.StartsWith($PreferredSubnet) } | Select-Object -First 1
+        if ($match) { return $match.IPAddress }
+    }
+
+    $ip = $all | Select-Object -First 1 -ExpandProperty IPAddress
     if (-not $ip) {
-        throw "Không tìm thấy IPv4 hợp lệ (không phải loopback/link-local)."
+        Write-Warning "Không tìm thấy IPv4 hợp lệ (không phải loopback/link-local). Giữ nguyên .env hiện có."
     }
     return $ip
 }
@@ -77,28 +89,26 @@ function Update-ExpoEnv {
         [string] $EnvPath,
         [string] $Ip
     )
-    if (-not $Ip -or $Ip -notmatch '^\d{1,3}(\.\d{1,3}){3}$') {
-        Write-Warning "IP không hợp lệ: '$Ip' -> giữ nguyên $EnvPath"
-        return
-    }
     if (-not (Test-Path $EnvPath)) {
         Write-Warning "$EnvPath không tồn tại, bỏ qua."
         return
     }
+    if (-not $Ip -or $Ip -notmatch '^\d{1,3}(\.\d{1,3}){3}$') {
+        Write-Warning "IP không hợp lệ: '$Ip' -> giữ nguyên $EnvPath"
+        return
+    }
     $newLine = "EXPO_PUBLIC_API_BASE_URL=http://$Ip:3000"
     $lines = Get-Content $EnvPath
-    $updated = $false
+    $found = $false
     $lines = $lines | ForEach-Object {
         if ($_ -match '^EXPO_PUBLIC_API_BASE_URL=') {
-            $updated = $true
+            $found = $true
             $newLine
         } else {
             $_
         }
     }
-    if (-not $updated) {
-        $lines += $newLine
-    }
+    if (-not $found) { $lines += $newLine }
     Set-Content -Path $EnvPath -Value $lines -Encoding UTF8
     Write-Host "  -> cập nhật $EnvPath với API_BASE_URL=$($newLine.Split('=')[1])"
 }
