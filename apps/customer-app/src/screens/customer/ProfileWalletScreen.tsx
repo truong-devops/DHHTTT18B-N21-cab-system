@@ -1,8 +1,8 @@
-import React from 'react'
-import { StyleSheet, Text, View, ScrollView } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Card } from '../../components/common/Card'
 import { OutlineButton } from '../../components/common/OutlineButton'
+import { PrimaryButton } from '../../components/common/PrimaryButton'
 import { colors, spacing, typography } from '../../theme/tokens'
 import { useCustomerStore } from '../../store/customerStore'
 
@@ -10,19 +10,30 @@ const primary = '#FF5A1F'
 const primaryDark = '#FF3B1D'
 const sectionBg = '#F9F4F2'
 
-type ItemProps = { icon: string; title: string; tag?: string }
-
-const ItemRow: React.FC<ItemProps> = ({ icon, title, tag }) => (
-  <View style={styles.itemRow}>
-    <Text style={styles.itemIcon}>{icon}</Text>
-    <Text style={styles.itemTitle}>{title}</Text>
-    {tag ? <Text style={styles.tag}>{tag}</Text> : null}
-    <Text style={styles.chevron}>›</Text>
-  </View>
-)
-
 const ProfileWalletScreen = () => {
-  const { user, logout } = useCustomerStore()
+  const { user, logout, updateProfile } = useCustomerStore()
+  const [name, setName] = useState(user?.name || '')
+  const [email, setEmail] = useState(user?.email || '')
+  const [phone, setPhone] = useState(user?.phone || '')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setName(user?.name || '')
+    setEmail(user?.email || '')
+    setPhone(user?.phone || '')
+  }, [user])
+
+  const onSave = async () => {
+    try {
+      setSaving(true)
+      await updateProfile({ name, email, phone })
+      Alert.alert('Thành công', 'Đã cập nhật thông tin tài khoản.')
+    } catch (e: any) {
+      Alert.alert('Lỗi', e?.message || 'Cập nhật thất bại')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <View style={styles.container}>
@@ -34,11 +45,9 @@ const ProfileWalletScreen = () => {
               <Text style={styles.avatarText}>{(user?.name || 'K').charAt(0).toUpperCase()}</Text>
             </View>
             <Text style={styles.name}>{user?.name || 'Khách'}</Text>
-            <Text style={styles.sub}>
-              ★ 4.9 · {user?.phone || '090x xxx xxx'}
-            </Text>
+            <Text style={styles.sub}>★ 4.9 · {user?.phone || '090x xxx xxx'}</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>Thành viên VIP</Text>
+              <Text style={styles.badgeText}>Thành viên</Text>
             </View>
             <View style={styles.editBtn}>
               <Text style={styles.editIcon}>✎</Text>
@@ -46,40 +55,47 @@ const ProfileWalletScreen = () => {
           </LinearGradient>
         </View>
 
-        {/* Group 1 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tài chính & quản lý</Text>
-          <Card style={styles.card}>
-            <ItemRow icon="📊" title="Quản lý chi tiêu" />
-            <View style={styles.divider} />
-            <ItemRow icon="🧭" title="Kế hoạch di chuyển" />
-            <View style={styles.divider} />
-            <ItemRow icon="💼" title="Ví trả sau" tag="Mới" />
-            <View style={styles.divider} />
-            <ItemRow icon="💸" title="Vay tiền mặt" />
-            <View style={styles.divider} />
-            <ItemRow icon="🔗" title="Liên kết tài khoản" />
-          </Card>
-        </View>
-
-        {/* Group 2 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dịch vụ & ưu đãi</Text>
-          <Card style={styles.card}>
-            <ItemRow icon="⚙️" title="Cài đặt chuyến đi" />
-            <View style={styles.divider} />
-            <ItemRow icon="🛡️" title="Bảo hiểm" />
-            <View style={styles.divider} />
-            <ItemRow icon="🎫" title="Khuyến mại" />
-            <View style={styles.divider} />
-            <ItemRow icon="📉" title="Gói tiết kiệm" />
-            <View style={styles.divider} />
-            <ItemRow icon="🎁" title="Giới thiệu & Nhận ưu đãi" />
-            <View style={styles.divider} />
-            <ItemRow icon="💳" title="Thanh toán" />
-            <View style={styles.divider} />
-            <ItemRow icon="🏢" title="Mở tài khoản Doanh nghiệp" tag="Mới" />
-          </Card>
+        {/* Thông tin thật từ backend */}
+        <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg, gap: spacing.sm }}>
+          <Text style={{ ...typography.h2, color: colors.text }}>Thông tin thật</Text>
+          <Text style={{ ...typography.body, color: colors.muted }}>
+            Dữ liệu lấy trực tiếp từ database qua API Gateway.
+          </Text>
+          <View style={styles.formRow}>
+            <Text style={styles.infoLabel}>Họ tên</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Nhập họ tên"
+            />
+          </View>
+          <View style={styles.formRow}>
+            <Text style={styles.infoLabel}>Email</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+          </View>
+          <View style={styles.formRow}>
+            <Text style={styles.infoLabel}>Số điện thoại</Text>
+            <TextInput
+              style={styles.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="09xxxxxxx"
+              keyboardType="phone-pad"
+            />
+          </View>
+          <View style={styles.formRow}>
+            <Text style={styles.infoLabel}>User ID</Text>
+            <Text style={styles.infoValue}>{user?.id}</Text>
+          </View>
+          <PrimaryButton title={saving ? 'Đang lưu...' : 'Lưu thay đổi'} onPress={onSave} disabled={saving} />
         </View>
 
         <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg }}>
@@ -133,30 +149,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   editIcon: { ...typography.body, color: primary },
-
-  section: { paddingHorizontal: spacing.xl, marginTop: spacing.lg, gap: spacing.sm },
-  sectionTitle: { ...typography.h2, color: colors.text },
-  card: { paddingVertical: 4 },
-  itemRow: {
+  infoRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderColor: colors.border
   },
-  itemIcon: { fontSize: 18, width: 28 },
-  itemTitle: { ...typography.body, color: colors.text, flex: 1, marginLeft: spacing.xs },
-  tag: {
-    backgroundColor: primary,
-    color: '#FFF',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 999,
-    fontSize: 11,
-    marginRight: spacing.sm
-  },
-  chevron: { ...typography.body, color: colors.muted },
-  divider: { height: 1, backgroundColor: '#EFEFEF', marginLeft: spacing.md },
-  secondaryBg: { backgroundColor: sectionBg }
+  infoLabel: { ...typography.body, color: colors.muted },
+  infoValue: { ...typography.body, color: colors.text, fontWeight: '600' },
+  formRow: { gap: spacing.xs, marginTop: spacing.sm },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: '#fff',
+    color: colors.text
+  }
 })
 
 export default ProfileWalletScreen

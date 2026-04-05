@@ -1,4 +1,4 @@
--- Seed data for local docker dev.
+-- Seed data for local docker dev (8-digit user IDs)
 -- NOTE: This runs only on first postgres init (empty volume).
 
 -- ============================
@@ -6,10 +6,10 @@
 -- ============================
 \connect "auth-service_db";
 
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE SEQUENCE IF NOT EXISTS user8_seq START 10000050;
 
 CREATE TABLE IF NOT EXISTS users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id char(8) PRIMARY KEY DEFAULT LPAD(nextval('user8_seq')::text,8,'0'),
   email text UNIQUE,
   username text UNIQUE,
   password_hash text NOT NULL,
@@ -27,7 +27,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_username_uq
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
+  user_id char(8) NOT NULL,
   token text NOT NULL UNIQUE,
   expired_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -39,46 +39,11 @@ CREATE INDEX IF NOT EXISTS refresh_tokens_user_id_idx
 -- Password for all seeded users: "password"
 INSERT INTO users (id, email, username, password_hash, role, status)
 VALUES
-  (
-    '11111111-1111-1111-1111-111111111111',
-    'admin@cab.local',
-    'admin',
-    '$2a$10$bN6a9vLpF.1VlTUNHNzj0eQOBKLoXRm.v1OKXEwV3bqUBBSJ8v0dC',
-    'admin',
-    'active'
-  ),
-  (
-    '22222222-2222-2222-2222-222222222222',
-    'ops@cab.local',
-    'ops',
-    '$2a$10$bN6a9vLpF.1VlTUNHNzj0eQOBKLoXRm.v1OKXEwV3bqUBBSJ8v0dC',
-    'ops',
-    'active'
-  ),
-  (
-    '33333333-3333-3333-3333-333333333333',
-    'customer@cab.local',
-    'customer',
-    '$2a$10$bN6a9vLpF.1VlTUNHNzj0eQOBKLoXRm.v1OKXEwV3bqUBBSJ8v0dC',
-    'user',
-    'active'
-  ),
-  (
-    '44444444-4444-4444-4444-444444444444',
-    'driver@cab.local',
-    'driver',
-    '$2a$10$bN6a9vLpF.1VlTUNHNzj0eQOBKLoXRm.v1OKXEwV3bqUBBSJ8v0dC',
-    'driver',
-    'active'
-  ),
-  (
-    '55555555-5555-5555-5555-555555555555',
-    'disabled@cab.local',
-    'disabled',
-    '$2a$10$bN6a9vLpF.1VlTUNHNzj0eQOBKLoXRm.v1OKXEwV3bqUBBSJ8v0dC',
-    'user',
-    'inactive'
-  )
+  ('10000001', 'admin@cab.local', 'admin', '$2a$10$bN6a9vLpF.1VlTUNHNzj0eQOBKLoXRm.v1OKXEwV3bqUBBSJ8v0dC', 'admin', 'active'),
+  ('10000002', 'ops@cab.local', 'ops', '$2a$10$bN6a9vLpF.1VlTUNHNzj0eQOBKLoXRm.v1OKXEwV3bqUBBSJ8v0dC', 'ops', 'active'),
+  ('10000003', 'customer@cab.local', 'customer', '$2a$10$bN6a9vLpF.1VlTUNHNzj0eQOBKLoXRm.v1OKXEwV3bqUBBSJ8v0dC', 'user', 'active'),
+  ('10000004', 'driver@cab.local', 'driver', '$2a$10$bN6a9vLpF.1VlTUNHNzj0eQOBKLoXRm.v1OKXEwV3bqUBBSJ8v0dC', 'driver', 'active'),
+  ('10000005', 'disabled@cab.local', 'disabled', '$2a$10$bN6a9vLpF.1VlTUNHNzj0eQOBKLoXRm.v1OKXEwV3bqUBBSJ8v0dC', 'user', 'inactive')
 ON CONFLICT DO NOTHING;
 
 -- ============================
@@ -87,6 +52,7 @@ ON CONFLICT DO NOTHING;
 \connect "user-service_db";
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE SEQUENCE IF NOT EXISTS user8_seq START 10000050;
 
 DO $$
 BEGIN
@@ -111,7 +77,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id char(8) PRIMARY KEY DEFAULT LPAD(nextval('user8_seq')::text,8,'0'),
   email text NOT NULL UNIQUE,
   full_name text NOT NULL,
   phone text,
@@ -174,54 +140,12 @@ CREATE INDEX IF NOT EXISTS outbox_events_status_occurred_at_idx
 
 INSERT INTO users (id, email, full_name, phone, role, status)
 VALUES
-  (
-    '11111111-1111-1111-1111-111111111111',
-    'admin@cab.local',
-    'Admin User',
-    '0900000000',
-    'admin',
-    'ACTIVE'
-  ),
-  (
-    '33333333-3333-3333-3333-333333333333',
-    'customer@cab.local',
-    'Customer One',
-    '0900000001',
-    'customer',
-    'ACTIVE'
-  ),
-  (
-    '66666666-6666-6666-6666-666666666666',
-    'customer2@cab.local',
-    'Customer Two',
-    '0900000003',
-    'customer',
-    'SUSPENDED'
-  ),
-  (
-    '44444444-4444-4444-4444-444444444444',
-    'driver@cab.local',
-    'Driver One',
-    '0900000002',
-    'driver',
-    'ACTIVE'
-  ),
-  (
-    '77777777-7777-7777-7777-777777777777',
-    'driver2@cab.local',
-    'Driver Two',
-    '0900000004',
-    'driver',
-    'SUSPENDED'
-  ),
-  (
-    '88888888-8888-8888-8888-888888888888',
-    'driver3@cab.local',
-    'Driver Three',
-    '0900000005',
-    'driver',
-    'DELETED'
-  )
+  ('10000001', 'admin@cab.local', 'Admin User', '0900000000', 'admin', 'ACTIVE'),
+  ('10000003', 'customer@cab.local', 'Customer One', '0900000001', 'customer', 'ACTIVE'),
+  ('10000006', 'customer2@cab.local', 'Customer Two', '0900000003', 'customer', 'SUSPENDED'),
+  ('10000004', 'driver@cab.local', 'Driver One', '0900000002', 'driver', 'ACTIVE'),
+  ('10000007', 'driver2@cab.local', 'Driver Two', '0900000004', 'driver', 'SUSPENDED'),
+  ('10000008', 'driver3@cab.local', 'Driver Three', '0900000005', 'driver', 'DELETED')
 ON CONFLICT DO NOTHING;
 
 -- ============================
@@ -241,7 +165,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS drivers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL UNIQUE,
+  user_id char(8) NOT NULL UNIQUE,
   status text NOT NULL DEFAULT 'PENDING',
   online_status text NOT NULL DEFAULT 'OFFLINE',
   full_name text,
@@ -312,30 +236,9 @@ CREATE INDEX IF NOT EXISTS idx_driver_last_locations_recorded_at ON driver_last_
 
 INSERT INTO drivers (id, user_id, status, online_status, full_name, phone)
 VALUES
-  (
-    '99999999-9999-9999-9999-999999999999',
-    '44444444-4444-4444-4444-444444444444',
-    'APPROVED',
-    'ONLINE',
-    'Driver One',
-    '0900000002'
-  ),
-  (
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    '77777777-7777-7777-7777-777777777777',
-    'PENDING',
-    'OFFLINE',
-    'Driver Two',
-    '0900000004'
-  ),
-  (
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    '88888888-8888-8888-8888-888888888888',
-    'SUSPENDED',
-    'BUSY',
-    'Driver Three',
-    '0900000005'
-  )
+  ('99999999-9999-9999-9999-999999999999', '10000004', 'APPROVED', 'ONLINE', 'Driver One', '0900000002'),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '10000007', 'PENDING', 'OFFLINE', 'Driver Two', '0900000004'),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '10000008', 'SUSPENDED', 'BUSY', 'Driver Three', '0900000005')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO driver_vehicles (id, driver_id, vehicle_type, plate_number, brand, model, color, is_active)
@@ -447,7 +350,7 @@ CREATE TABLE IF NOT EXISTS review_status_history (
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   route_key text NOT NULL,
-  user_id uuid NOT NULL,
+  user_id char(8) NOT NULL,
   idem_key text NOT NULL,
   request_hash text NOT NULL,
   response_status integer,
@@ -673,7 +576,7 @@ ON CONFLICT DO NOTHING;
 CREATE TABLE IF NOT EXISTS payments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ride_id text NOT NULL,
-  user_id text,
+  user_id char(8),
   amount numeric(12, 2) NOT NULL,
   currency char(3) NOT NULL,
   method text,
@@ -776,71 +679,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS payments_payos_order_code_uidx
 
 INSERT INTO payments (id, ride_id, user_id, amount, currency, method, status, status_updated_at, created_at, updated_at, failure_reason)
 VALUES
-  (
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    '77777777-7777-7777-7777-777777777777',
-    '33333333-3333-3333-3333-333333333333',
-    85000,
-    'VND',
-    'CASH',
-    'PAID',
-    now(),
-    now(),
-    now(),
-    null
-  ),
-  (
-    'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    '88888888-8888-8888-8888-888888888888',
-    '33333333-3333-3333-3333-333333333333',
-    120000,
-    'VND',
-    'WALLET',
-    'FAILED',
-    now(),
-    now(),
-    now(),
-    'Insufficient balance'
-  ),
-  (
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    '99999999-9999-9999-9999-999999999998',
-    '33333333-3333-3333-3333-333333333333',
-    45000,
-    'VND',
-    'CARD',
-    'INITIATED',
-    now(),
-    now(),
-    now(),
-    null
-  ),
-  (
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    '99999999-9999-9999-9999-999999999997',
-    '33333333-3333-3333-3333-333333333333',
-    99000,
-    'VND',
-    'CARD',
-    'PROCESSING',
-    now(),
-    now(),
-    now(),
-    null
-  ),
-  (
-    'ffffffff-ffff-ffff-ffff-ffffffffffff',
-    '99999999-9999-9999-9999-999999999996',
-    '33333333-3333-3333-3333-333333333333',
-    65000,
-    'VND',
-    'WALLET',
-    'REFUNDED',
-    now(),
-    now(),
-    now(),
-    'Customer refund'
-  )
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '77777777-7777-7777-7777-777777777777', '10000003', 85000, 'VND', 'CASH', 'PAID', now(), now(), now(), null),
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', '88888888-8888-8888-8888-888888888888', '10000003', 120000, 'VND', 'WALLET', 'FAILED', now(), now(), now(), 'Insufficient balance'),
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '99999999-9999-9999-9999-999999999998', '10000003', 45000, 'VND', 'CARD', 'INITIATED', now(), now(), now(), null),
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '99999999-9999-9999-9999-999999999997', '10000003', 99000, 'VND', 'CARD', 'PROCESSING', now(), now(), now(), null),
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', '99999999-9999-9999-9999-999999999996', '10000003', 65000, 'VND', 'WALLET', 'REFUNDED', now(), now(), now(), 'Customer refund')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO payment_status_history (payment_id, from_status, to_status, reason)
