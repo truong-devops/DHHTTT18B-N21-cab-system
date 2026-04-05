@@ -12,25 +12,6 @@ const dropoffDot = "#FF7A00"
 const brand = colors.brand600
 const cardA = "#FFF4F1"
 const cardB = "#F4F7FF"
-const sampleHistory: RideHistoryItem[] = [
-  {
-    id: "sample-1",
-    date: "09:32, 27/11/2024",
-    status: "completed",
-    pickup: "Cổng 1 - Bệnh viện Từ Dũ, Quận 1",
-    destination: "18 Tân Đà, Phường 10, Quận 5",
-    amount: 20000
-  },
-  {
-    id: "sample-2",
-    date: "04:41, 27/11/2024",
-    status: "completed",
-    pickup: "Xe Khách Thanh Phương, Quận 5",
-    destination: "Bệnh viện Ung Bướu, Cơ sở 2 Thủ Đức",
-    amount: 49000
-  }
-]
-
 function monthLabel(dateStr: string) {
   const d = new Date(dateStr)
   if (Number.isNaN(d.getTime())) return "Khác"
@@ -57,8 +38,7 @@ const HistoryScreen = () => {
     })
   }, [loadHistory])
 
-  const displayHistory =
-    history.length >= 2 ? history : [...history, ...sampleHistory.slice(0, 2 - history.length)]
+  const displayHistory = history
 
   const grouped = useMemo(() => groupByMonth(displayHistory), [displayHistory])
 

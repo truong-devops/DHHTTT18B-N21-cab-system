@@ -202,24 +202,37 @@ function buildTopicSpecs() {
 }
 
 function upsertTopic(composeArgs, serviceName, bootstrapServer, spec) {
-  runDockerCompose(composeArgs, [
-    "exec",
-    "-T",
-    serviceName,
-    "kafka-topics",
-    "--bootstrap-server",
-    bootstrapServer,
-    "--create",
-    "--if-not-exists",
-    "--topic",
-    spec.topic,
-    "--partitions",
-    String(spec.partitions),
-    "--replication-factor",
-    String(spec.replicationFactor)
-  ]);
+  const benign = (msg = "") =>
+    msg.includes("Topic with this name already exists") ||
+    msg.includes("already exists") ||
+    msg.includes("already has");
 
-  runDockerCompose(
+  const create = runDockerCompose(
+    composeArgs,
+    [
+      "exec",
+      "-T",
+      serviceName,
+      "kafka-topics",
+      "--bootstrap-server",
+      bootstrapServer,
+      "--create",
+      "--if-not-exists",
+      "--topic",
+      spec.topic,
+      "--partitions",
+      String(spec.partitions),
+      "--replication-factor",
+      String(spec.replicationFactor)
+    ],
+    { capture: true, allowFailure: true }
+  );
+
+  if (create.status !== 0 && !benign(`${create.stdout} ${create.stderr}`)) {
+    throw new Error(create.stderr || create.stdout || "kafka-topics create failed");
+  }
+
+  const alter = runDockerCompose(
     composeArgs,
     [
       "exec",
@@ -235,31 +248,44 @@ function upsertTopic(composeArgs, serviceName, bootstrapServer, spec) {
       "--partitions",
       String(spec.partitions)
     ],
-    { allowFailure: true }
+    { capture: true, allowFailure: true }
   );
+
+  if (alter.status !== 0 && !benign(`${alter.stdout} ${alter.stderr}`)) {
+    throw new Error(alter.stderr || alter.stdout || "kafka-topics alter failed");
+  }
 
   const configPairs = Object.entries(spec.configs)
     .map(([key, value]) => `${key}=${value}`)
     .join(",");
 
-  runDockerCompose(composeArgs, [
-    "exec",
-    "-T",
-    serviceName,
-    "kafka-configs",
-    "--bootstrap-server",
-    bootstrapServer,
-    "--alter",
-    "--entity-type",
-    "topics",
-    "--entity-name",
-    spec.topic,
-    "--add-config",
-    configPairs
-  ]);
+  const configs = runDockerCompose(
+    composeArgs,
+    [
+      "exec",
+      "-T",
+      serviceName,
+      "kafka-configs",
+      "--bootstrap-server",
+      bootstrapServer,
+      "--alter",
+      "--entity-type",
+      "topics",
+      "--entity-name",
+      spec.topic,
+      "--add-config",
+      configPairs
+    ],
+    { capture: true, allowFailure: true }
+  );
+
+  if (configs.status !== 0 && !benign(`${configs.stdout} ${configs.stderr}`)) {
+    throw new Error(configs.stderr || configs.stdout || "kafka-configs alter failed");
+  }
 }
 
 function main() {
+  const verbose = process.env.KAFKA_BOOTSTRAP_VERBOSE === "true";
   const composeArgs = getComposeArgs();
   const serviceName = detectBrokerService(composeArgs);
   const bootstrapServer =
@@ -273,14 +299,33 @@ function main() {
   waitForBroker(composeArgs, serviceName, bootstrapServer);
 
   const specs = buildTopicSpecs();
+  let okCount = 0;
+  let warnCount = 0;
   for (const spec of specs) {
-    console.log(
-      `[kafka-bootstrap] apply ${spec.topic} partitions=${spec.partitions} rf=${spec.replicationFactor}`
-    );
-    upsertTopic(composeArgs, serviceName, bootstrapServer, spec);
+    if (verbose) {
+      console.log(
+        `[kafka-bootstrap] apply ${spec.topic} partitions=${spec.partitions} rf=${spec.replicationFactor}`
+      );
+    }
+    try {
+      upsertTopic(composeArgs, serviceName, bootstrapServer, spec);
+      okCount += 1;
+    } catch (error) {
+      warnCount += 1;
+      console.warn(
+        `[kafka-bootstrap] warning on ${spec.topic}: ${error.message}`
+      );
+    }
   }
 
-  console.log("[kafka-bootstrap] done.");
+  console.log(
+    `[kafka-bootstrap] done. topics processed=${specs.length}, ok=${okCount}, warnings=${warnCount}`
+  );
+  if (!verbose) {
+    console.log(
+      "[kafka-bootstrap] set KAFKA_BOOTSTRAP_VERBOSE=true for per-topic details."
+    );
+  }
 }
 
 main();

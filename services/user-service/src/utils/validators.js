@@ -1,4 +1,4 @@
-const ROLE_VALUES = ["admin", "customer", "driver"];
+const ROLE_VALUES = ["admin", "customer", "driver", "user"];
 const STATUS_VALUES = ["ACTIVE", "SUSPENDED", "DELETED"];
 
 function isEmail(value) {
@@ -8,13 +8,9 @@ function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function isUUID(value) {
-  if (!value || typeof value !== "string") {
-    return false;
-  }
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
-  );
+function isUserId(value) {
+  if (!value || typeof value !== "string") return false;
+  return /^\d{8}$/.test(value);
 }
 
 function isNonEmptyString(value) {
@@ -50,7 +46,7 @@ module.exports = {
   ROLE_VALUES,
   STATUS_VALUES,
   isEmail,
-  isUUID,
+  isUserId,
   isNonEmptyString,
   isPhone,
   normalizeRole,

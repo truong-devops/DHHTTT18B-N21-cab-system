@@ -4,11 +4,13 @@ import { setOnAuthFailure } from '../lib/api'
 import { clearTokens, getRefreshToken, hydrateTokens, setTokens } from '../lib/token-store'
 import * as authApi from '../services/authApi'
 import { customerApi } from '../services/customerApi'
+import * as userApi from '../services/userApi'
 
 type User = {
   id: string
   name: string
   phone: string
+  email?: string | null
 }
 
 type ActiveRide = {
@@ -34,6 +36,7 @@ type CustomerContextValue = {
   login: (identifier: string, otp: string) => Promise<void>
   logout: () => Promise<void>
   loadHistory: () => Promise<void>
+  updateProfile: (data: Partial<Pick<User, 'name' | 'email' | 'phone'>>) => Promise<void>
   chooseOption: (option: RideOption) => void
   startRide: (pickup: string, destination: string) => Promise<void>
   decreaseEta: () => void
@@ -76,13 +79,24 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     resetState()
   }, [resetState])
 
-  const syncUserFromVerify = useCallback((identifier: string, result: authApi.VerifyResponse) => {
-    setAuthenticated(true)
-    setUser({
-      id: result.data.userId,
-      name: identifier,
-      phone: identifier.includes('@') ? 'Không có' : identifier
-    })
+  const syncUserFromProfile = useCallback(async (identifier: string, userId: string) => {
+    try {
+      const profile = await userApi.getUserById(userId)
+      setAuthenticated(true)
+      setUser({
+        id: profile.data.id,
+        name: profile.data.fullName || identifier,
+        phone: profile.data.phone || (identifier.includes('@') ? 'Không có' : identifier),
+        email: profile.data.email
+      })
+    } catch {
+      setAuthenticated(true)
+      setUser({
+        id: userId,
+        name: identifier,
+        phone: identifier.includes('@') ? 'Không có' : identifier
+      })
+    }
   }, [])
 
   const login = useCallback(
@@ -101,13 +115,13 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       try {
         const verified = await authApi.verify()
-        syncUserFromVerify(result.user.name, verified)
+        await syncUserFromProfile(result.user.name, verified.data.userId)
       } catch {
         setAuthenticated(true)
         setUser(result.user)
       }
     },
-    [syncUserFromVerify]
+    [syncUserFromProfile]
   )
 
   useEffect(() => {
@@ -127,7 +141,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         try {
           const verified = await authApi.verify()
           if (!mounted) return
-          syncUserFromVerify('Khách hàng', verified)
+          await syncUserFromProfile('Khách hàng', verified.data.userId)
         } catch {
           await clearTokens()
           if (mounted) {
@@ -144,16 +158,38 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => {
       mounted = false
     }
-  }, [resetState, syncUserFromVerify])
+  }, [resetState, syncUserFromProfile])
 
   const loadHistory = useCallback(async () => {
-    const items = await customerApi.getHistory()
+    if (!user?.id) {
+      setHistory([])
+      return
+    }
+    const items = await customerApi.getHistory(user.id)
     setHistory(items)
-  }, [])
+  }, [user?.id])
 
   const chooseOption = useCallback((option: RideOption) => {
     setSelectedOption(option)
   }, [])
+
+  const updateProfile = useCallback(
+    async (data: Partial<Pick<User, 'name' | 'email' | 'phone'>>) => {
+      if (!user?.id) throw new Error('Không tìm thấy user')
+      const updated = await userApi.updateUser(user.id, {
+        fullName: data.name ?? user.name,
+        email: data.email ?? user.email ?? undefined,
+        phone: data.phone ?? user.phone
+      })
+      setUser({
+        id: updated.data.id,
+        name: updated.data.fullName || user.name,
+        phone: updated.data.phone || user.phone,
+        email: updated.data.email || user.email
+      })
+    },
+    [user]
+  )
 
   const startRide = useCallback(
     async (pickup: string, destinationValue: string) => {
@@ -231,6 +267,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       login,
       logout,
       loadHistory,
+      updateProfile,
       chooseOption,
       startRide,
       decreaseEta,
@@ -249,6 +286,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       login,
       logout,
       loadHistory,
+      updateProfile,
       chooseOption,
       startRide,
       decreaseEta,
