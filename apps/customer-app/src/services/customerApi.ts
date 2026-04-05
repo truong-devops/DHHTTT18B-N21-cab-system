@@ -261,9 +261,10 @@ export const customerApi = {
     })
   },
 
-  async getHistory(): Promise<RideHistoryItem[]> {
+  async getHistory(riderId?: string | null): Promise<RideHistoryItem[]> {
+    if (!riderId) return []
     const [ridesResult, paymentsResult] = await Promise.all([
-      rideApi.listRides({ limit: 50 }),
+      rideApi.listRides({ limit: 50, riderId }),
       paymentApi.listPayments(100)
     ])
 

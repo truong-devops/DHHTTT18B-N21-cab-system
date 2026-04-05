@@ -24,5 +24,8 @@ export const endpoints = {
   review: {
     list: '/v1/reviews',
     create: '/v1/reviews'
+  },
+  user: {
+    detail: (id: string) => `/v1/users/${id}`
   }
 }
