@@ -5,3 +5,10 @@
 .gitignore
 .env
 npm-debug.log*
+**/dist
+**/build
+**/.next
+**/*.log
+tmp
+.cache
+.DS_Store
