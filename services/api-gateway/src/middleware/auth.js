@@ -108,11 +108,15 @@ function authMiddleware(req, res, next) {
         return next();
       });
   } catch (error) {
+    const message =
+      error && error.name === "TokenExpiredError"
+        ? "Token expired"
+        : "Invalid token";
     return sendError(
       res,
       401,
       "UNAUTHORIZED",
-      "Invalid token",
+      message,
       req.traceId
     );
   }
