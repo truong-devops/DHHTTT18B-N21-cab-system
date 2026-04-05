@@ -109,7 +109,7 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
     headers = {},
     auth = true,
     retryAuth = true,
-    timeoutMs = 15000,
+    timeoutMs = 30000,
   } = options;
 
   const url = buildUrl(path, params);

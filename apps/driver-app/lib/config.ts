@@ -1,4 +1,22 @@
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || '';
+import Constants from 'expo-constants';
+
+function inferApiBaseUrl() {
+  const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (fromEnv && fromEnv.trim()) {
+    return fromEnv.trim().replace(/\/+$/, '');
+  }
+
+  // Fallback: use host from Expo dev server (LAN/tunnel)
+  const hostUri = Constants.expoConfig?.hostUri || '';
+  const host = hostUri.split(':')[0];
+  if (host) {
+    return `http://${host}:3000`;
+  }
+
+  return '';
+}
+
+export const API_BASE_URL = inferApiBaseUrl();
 export const WS_BASE_URL = process.env.EXPO_PUBLIC_WS_URL || '';
 
 export function requireApiBaseUrl() {
