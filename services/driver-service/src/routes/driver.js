@@ -65,6 +65,57 @@ router.post(
   })
 );
 
+router.get(
+  "/v1/driver/availability",
+  requireAuth,
+  validateRequest({
+    custom: (req, errors) => {
+      const lat = Number(req.query.lat);
+      const lng = Number(req.query.lng);
+      if (!Number.isFinite(lat)) {
+        errors.push({ path: "query.lat", message: "must be a number" });
+      }
+      if (!Number.isFinite(lng)) {
+        errors.push({ path: "query.lng", message: "must be a number" });
+      }
+      if (req.query.radiusMeters !== undefined) {
+        const radius = Number(req.query.radiusMeters);
+        if (!Number.isFinite(radius)) {
+          errors.push({
+            path: "query.radiusMeters",
+            message: "must be a number"
+          });
+        }
+      }
+      if (req.query.limit !== undefined) {
+        const limit = Number(req.query.limit);
+        if (!Number.isFinite(limit)) {
+          errors.push({ path: "query.limit", message: "must be a number" });
+        }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const items = await driverService.listAvailableDrivers({
+      lat: Number(req.query.lat),
+      lng: Number(req.query.lng),
+      radiusMeters: req.query.radiusMeters,
+      limit: req.query.limit,
+      vehicleType: req.query.vehicleType
+        ? String(req.query.vehicleType).toUpperCase()
+        : null
+    });
+
+    return res.json({
+      data: {
+        count: items.length,
+        items
+      },
+      requestId: req.requestId
+    });
+  })
+);
+
 router.use("/v1/driver", requireAuth, requireRole("driver"));
 
 router.get(

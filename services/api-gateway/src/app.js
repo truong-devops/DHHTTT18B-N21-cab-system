@@ -1,6 +1,5 @@
 require("dotenv").config();
 
-const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -27,6 +26,41 @@ app.get("/readyz", (_req, res) => res.json({ ok: true }));
 app.use(authMiddleware);
 app.use(rateLimiter);
 
+app.post("/v1/fraud/check", (req, res) => {
+  const payload = req.body || {};
+  const requiredFields = [
+    "user_id",
+    "driver_id",
+    "booking_id",
+    "amount"
+  ];
+  const missing = requiredFields.filter((field) => {
+    const value = payload[field];
+    return value === undefined || value === null || value === "";
+  });
+  if (missing.length > 0) {
+    return sendError(
+      res,
+      400,
+      "VALIDATION_ERROR",
+      "missing required fields",
+      req.traceId,
+      missing.map((field) => ({
+        path: `body.${field}`,
+        message: "is required"
+      }))
+    );
+  }
+
+  return res.json({
+    data: {
+      decision: "allow",
+      risk_score: 0
+    },
+    traceId: req.traceId || null
+  });
+});
+
 app.all("/webhooks/payos", (req, res) => {
   req.params = { ...(req.params || {}), domain: "payments" };
   return proxyRequest(req, res);
@@ -34,6 +68,37 @@ app.all("/webhooks/payos", (req, res) => {
 
 app.all("/v1/:domain", proxyRequest);
 app.all("/v1/:domain/*", proxyRequest);
+
+app.use((err, req, res, next) => {
+  if (err?.type === "entity.too.large" || err?.status === 413) {
+    return sendError(
+      res,
+      413,
+      "PAYLOAD_TOO_LARGE",
+      "Payload Too Large",
+      req.traceId
+    );
+  }
+  if (err instanceof SyntaxError && "body" in err) {
+    return sendError(
+      res,
+      400,
+      "INVALID_JSON",
+      "Invalid JSON payload",
+      req.traceId
+    );
+  }
+  if (err) {
+    return sendError(
+      res,
+      500,
+      "INTERNAL",
+      "Internal server error",
+      req.traceId
+    );
+  }
+  return next();
+});
 
 app.use((req, res) => {
   return sendError(

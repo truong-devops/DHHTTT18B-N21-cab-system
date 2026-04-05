@@ -17,6 +17,9 @@ const {
   estimateEta,
   EtaServiceError
 } = require("../clients/etaClient");
+const {
+  getDriverAvailability
+} = require("../clients/driverClient");
 const { hashRequest } = require("../utils/idempotency");
 
 const topics = require("../messaging/topics");
@@ -128,6 +131,17 @@ function mapCreateResponseCompat(body) {
   };
 }
 
+function buildNoDriversPriceSnapshot() {
+  return {
+    quoteId: null,
+    estimatedFare: 0,
+    currency: "VND",
+    distanceKm: null,
+    durationMin: null,
+    reason: "No drivers available"
+  };
+}
+
 router.get("/", async (req, res, next) => {
   try {
     const requestedUserId =
@@ -227,6 +241,92 @@ router.post("/", async (req, res) => {
     const requestHash = idempotencyKey
       ? hashRequest(req.method, routeKey, requestPayload)
       : null;
+    const traceId = req.traceId || req.header("x-trace-id");
+
+    const availability = await getDriverAvailability({
+      pickup,
+      vehicleType,
+      authorization: req.header("authorization") || "",
+      traceId
+    });
+
+    if (availability.checked && !availability.available) {
+      const result = await withTransaction(async (client) => {
+        if (idempotencyKey) {
+          const reservation = await reserveIdempotencyKey(client, {
+            routeKey,
+            userId,
+            idemKey: idempotencyKey,
+            requestHash
+          });
+
+          if (reservation.state === "conflict") {
+            const error = new Error("Idempotency-Key payload mismatch");
+            error.statusCode = 409;
+            error.code = "IDEMPOTENCY_KEY_CONFLICT";
+            throw error;
+          }
+          if (reservation.state === "in_progress") {
+            const error = new Error("Idempotency-Key is being processed");
+            error.statusCode = 409;
+            error.code = "IDEMPOTENCY_IN_PROGRESS";
+            throw error;
+          }
+          if (reservation.state === "replay" && reservation.record) {
+            return {
+              replay: true,
+              responseCode: reservation.record.responseCode || 200,
+              responseBody: reservation.record.responseBody
+            };
+          }
+        }
+
+        const bookingId = `bk_${Date.now()}`;
+        const rideId = `ride_${Date.now()}`;
+        const createdAt = new Date().toISOString();
+        const created = await bookingRepo.create(client, {
+          bookingId,
+          rideId,
+          userId,
+          pickup,
+          dropoff: normalizedDrop,
+          vehicleType,
+          distanceKm: null,
+          etaMinutes: null,
+          priceSnapshot: buildNoDriversPriceSnapshot(),
+          status: "PENDING",
+          createdAt
+        });
+
+        const responseBody = {
+          booking: mapBookingCompat(created),
+          message: "No drivers available",
+          publishedEvent: null,
+          additionalEvents: []
+        };
+        if (idempotencyKey) {
+          await completeIdempotencyKey(client, {
+            routeKey,
+            userId,
+            idemKey: idempotencyKey,
+            responseCode: 201,
+            responseBody
+          });
+        }
+        return {
+          replay: false,
+          responseCode: 201,
+          responseBody
+        };
+      });
+
+      monitoring.recordBookingStatus("created", "error", {
+        reason: "no_drivers_available"
+      });
+      return res
+        .status(result.responseCode)
+        .json(mapCreateResponseCompat(result.responseBody));
+    }
 
     const [quote, eta] = await Promise.all([
       getQuote({
@@ -249,8 +349,6 @@ router.post("/", async (req, res) => {
       : Number.isFinite(Number(quote.distanceKm))
       ? Number(quote.distanceKm)
       : null;
-
-    const traceId = req.traceId || req.header("x-trace-id");
     const result = await withTransaction(async (client) => {
       if (idempotencyKey) {
         const reservation = await reserveIdempotencyKey(client, {
