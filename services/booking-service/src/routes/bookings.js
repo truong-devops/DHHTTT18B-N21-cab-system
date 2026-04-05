@@ -18,8 +18,12 @@ const {
   EtaServiceError
 } = require("../clients/etaClient");
 const {
-  getDriverAvailability
+  getDriverAvailability,
+  listAvailableDrivers,
+  selectBestDriver
 } = require("../clients/driverClient");
+const { createPayment } = require("../clients/paymentClient");
+const { sendNotification } = require("../clients/notificationClient");
 const { hashRequest } = require("../utils/idempotency");
 
 const topics = require("../messaging/topics");
@@ -135,11 +139,95 @@ function buildNoDriversPriceSnapshot() {
   return {
     quoteId: null,
     estimatedFare: 0,
+    surge: 1,
     currency: "VND",
     distanceKm: null,
     durationMin: null,
     reason: "No drivers available"
   };
+}
+
+function normalizePaymentMethod(paymentMethod) {
+  const method = String(paymentMethod || "CASH").toUpperCase();
+  if (["CASH", "VIETQR", "PAYOS"].includes(method)) {
+    return method;
+  }
+  return "CASH";
+}
+
+function resolveAmountFromQuote(quote) {
+  const amount = Number(quote?.estimatedFare);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return 10000;
+  }
+  return Math.max(1, Math.round(amount));
+}
+
+async function buildAiDriverDecision({
+  pickup,
+  vehicleType,
+  authorization,
+  traceId
+}) {
+  const drivers = await listAvailableDrivers({
+    pickup,
+    vehicleType,
+    authorization,
+    traceId,
+    limit: Number(process.env.AI_DRIVER_CANDIDATE_LIMIT || 5)
+  });
+  const selected = selectBestDriver(drivers);
+  return {
+    availableDrivers: drivers,
+    selectedDriver: selected
+  };
+}
+
+async function runBookingIntegrationFlow({
+  booking,
+  quote,
+  paymentMethod,
+  authorization,
+  traceId
+}) {
+  const integrations = {
+    payment: null,
+    notification: null,
+    flow: "skipped"
+  };
+
+  const paymentResult = await createPayment({
+    rideId: booking.rideId,
+    amount: resolveAmountFromQuote(quote),
+    currency: quote?.currency || "VND",
+    method: normalizePaymentMethod(paymentMethod),
+    authorization,
+    traceId,
+    idempotencyKey: `booking-payment-${booking.bookingId}`
+  });
+  integrations.payment = paymentResult;
+
+  const notificationMessage = paymentResult.ok
+    ? `Booking ${booking.bookingId} created. Payment initialized`
+    : `Booking ${booking.bookingId} created. Payment initialization pending`;
+
+  const notificationResult = await sendNotification({
+    userId: booking.userId,
+    title: "Booking Created",
+    message: notificationMessage,
+    sourceService: "booking-service",
+    sourceAction: "BOOKING_PAYMENT_INIT",
+    authorization,
+    traceId
+  });
+  integrations.notification = notificationResult;
+
+  integrations.flow =
+    paymentResult.ok && notificationResult.ok
+      ? "success"
+      : "partial";
+
+  return integrations;
 }
 
 router.get("/", async (req, res, next) => {
@@ -242,11 +330,15 @@ router.post("/", async (req, res) => {
       ? hashRequest(req.method, routeKey, requestPayload)
       : null;
     const traceId = req.traceId || req.header("x-trace-id");
+    const authorization = req.header("authorization") || "";
+    const simulatePricingTimeout =
+      req.body?.simulate_pricing_timeout === true ||
+      req.body?.simulatePricingTimeout === true;
 
     const availability = await getDriverAvailability({
       pickup,
       vehicleType,
-      authorization: req.header("authorization") || "",
+      authorization,
       traceId
     });
 
@@ -332,7 +424,8 @@ router.post("/", async (req, res) => {
       getQuote({
         pickup,
         dropoff: normalizedDrop,
-        vehicleType
+        vehicleType,
+        simulateTimeout: simulatePricingTimeout
       }),
       estimateEta({
         pickup,
@@ -499,9 +592,39 @@ router.post("/", async (req, res) => {
       vehicle_type: vehicleType
     });
 
+    const responsePayload = mapCreateResponseCompat(result.responseBody);
+    if (responsePayload?.booking?.priceSnapshot) {
+      const surge = Number(responsePayload.booking.priceSnapshot.surge);
+      responsePayload.booking.priceSnapshot.surge =
+        Number.isFinite(surge) && surge >= 1 ? surge : 1;
+    }
+
+    if (!result.replay && responsePayload?.booking) {
+      const aiDecision = await buildAiDriverDecision({
+        pickup,
+        vehicleType,
+        authorization,
+        traceId
+      });
+      responsePayload.ai_driver_decision = {
+        available_drivers: aiDecision.availableDrivers,
+        selected_driver: aiDecision.selectedDriver
+      };
+
+      if (parsed.data.payment_method) {
+        responsePayload.integration_flow = await runBookingIntegrationFlow({
+          booking: responsePayload.booking,
+          quote,
+          paymentMethod: parsed.data.payment_method,
+          authorization,
+          traceId
+        });
+      }
+    }
+
     return res
       .status(result.responseCode)
-      .json(mapCreateResponseCompat(result.responseBody));
+      .json(responsePayload);
   } catch (e) {
     if (e instanceof PricingServiceError) {
       monitoring.recordBookingStatus("created", "error", {
@@ -559,6 +682,232 @@ router.post("/", async (req, res) => {
       "failed to create booking"
     );
     return res.status(500).json({ error: e.message });
+  }
+});
+
+router.post("/ai/select-driver", async (req, res) => {
+  try {
+    const pickup = req.body?.pickup || null;
+    const vehicleType = req.body?.vehicleType || "CAR";
+    if (!pickup || !Number.isFinite(Number(pickup.lat)) || !Number.isFinite(Number(pickup.lng))) {
+      return res.status(400).json({
+        error: "pickup.lat and pickup.lng are required"
+      });
+    }
+
+    const traceId = req.traceId || req.header("x-trace-id");
+    const authorization = req.header("authorization") || "";
+    const decision = await buildAiDriverDecision({
+      pickup,
+      vehicleType,
+      authorization,
+      traceId
+    });
+
+    return res.json({
+      data: {
+        pickup,
+        vehicle_type: vehicleType,
+        available_drivers: decision.availableDrivers,
+        selected_driver: decision.selectedDriver,
+        decision_valid: Boolean(decision.selectedDriver)
+      }
+    });
+  } catch (error) {
+    logger.withTrace(req).error(
+      { err: { message: error.message, code: error.code || "UNKNOWN" } },
+      "failed to select driver with ai decision"
+    );
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/:id/mcp-context", async (req, res) => {
+  try {
+    const booking = await bookingRepo.getById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    const traceId = req.traceId || req.header("x-trace-id");
+    const authorization = req.header("authorization") || "";
+    const trafficLevel = Number.isFinite(Number(req.query.traffic_level))
+      ? Math.max(0, Math.min(1, Number(req.query.traffic_level)))
+      : 0.7;
+    const demandIndex = Number.isFinite(Number(req.query.demand_index))
+      ? Math.max(0, Number(req.query.demand_index))
+      : 1.5;
+    const supplyIndex = Number.isFinite(Number(req.query.supply_index))
+      ? Math.max(0, Number(req.query.supply_index))
+      : 0.8;
+
+    const [eta, quote, driverDecision] = await Promise.all([
+      estimateEta({
+        pickup: booking.pickup,
+        drop: booking.dropoff,
+        distanceKm: booking.distanceKm,
+        trafficLevel
+      }),
+      getQuote({
+        pickup: booking.pickup,
+        dropoff: booking.dropoff,
+        vehicleType: booking.vehicleType
+      }),
+      buildAiDriverDecision({
+        pickup: booking.pickup,
+        vehicleType: booking.vehicleType,
+        authorization,
+        traceId
+      })
+    ]);
+
+    return res.json({
+      data: {
+        ride_id: booking.bookingId,
+        pickup: booking.pickup,
+        drop: booking.dropoff,
+        available_drivers: driverDecision.availableDrivers,
+        selected_driver: driverDecision.selectedDriver,
+        traffic_level: trafficLevel,
+        demand_index: demandIndex,
+        supply_index: supplyIndex,
+        eta_minutes: eta.etaMinutes,
+        pricing: {
+          price: Number(quote.estimatedFare || 0),
+          surge: Number(quote.surge || 1),
+          currency: quote.currency || "VND"
+        },
+        permission_ok: true
+      }
+    });
+  } catch (error) {
+    logger.withTrace(req).error(
+      { err: { message: error.message, code: error.code || "UNKNOWN" } },
+      "failed to build mcp context"
+    );
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.patch("/:id/status", async (req, res) => {
+  try {
+    const bookingId = req.params.id;
+    const requestedStatus = String(req.body?.status || "").toUpperCase();
+    if (!requestedStatus) {
+      return res.status(400).json({ error: "status is required" });
+    }
+    if (requestedStatus !== "ACCEPTED") {
+      return res.status(400).json({
+        error: "Only ACCEPTED is supported in this endpoint"
+      });
+    }
+
+    const driverId = String(
+      req.body?.driver_id || req.body?.driverId || ""
+    ).trim();
+    if (!driverId) {
+      return res.status(400).json({
+        error: "driver_id is required for ACCEPTED status"
+      });
+    }
+
+    const traceId = req.traceId || req.header("x-trace-id");
+    const authorization = req.header("authorization") || "";
+
+    const eventId = crypto.randomUUID();
+    const outcome = await withTransaction(async (client) => {
+      const existing = await bookingRepo.getByIdForUpdate(client, bookingId);
+      if (!existing) {
+        return null;
+      }
+
+      const fromStatus = String(existing.status || "").toUpperCase();
+      if (fromStatus !== "REQUESTED" && fromStatus !== "ACCEPTED") {
+        const err = new Error(
+          `Invalid transition from ${fromStatus} to ACCEPTED`
+        );
+        err.statusCode = 409;
+        err.code = "INVALID_STATE_TRANSITION";
+        throw err;
+      }
+
+      const updated =
+        fromStatus === "ACCEPTED"
+          ? existing
+          : await bookingRepo.updateStatus(client, bookingId, "ACCEPTED");
+
+      if (fromStatus !== "ACCEPTED") {
+        const envelope = buildEnvelope({
+          eventId,
+          traceId,
+          type: "RideAccepted",
+          payload: {
+            event_type: "ride_accepted",
+            booking_id: updated.bookingId,
+            ride_id: updated.rideId,
+            driver_id: driverId,
+            status: "ACCEPTED",
+            timestamp: new Date().toISOString()
+          }
+        });
+
+        await outboxRepo.insertOutboxEvent(
+          client,
+          buildOutboxRecord({
+            eventId,
+            topic: topics.RideAccepted,
+            eventType: "RideAccepted",
+            aggregateId: updated.bookingId,
+            partitionKey: updated.rideId,
+            envelope
+          })
+        );
+      }
+
+      return {
+        booking: updated,
+        eventQueued: fromStatus !== "ACCEPTED"
+      };
+    });
+
+    if (!outcome) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    const notification = await sendNotification({
+      userId: driverId,
+      title: "Ride Assigned",
+      message: `Booking ${bookingId} has been accepted`,
+      sourceService: "booking-service",
+      sourceAction: "BOOKING_ACCEPTED",
+      authorization,
+      traceId
+    });
+
+    return res.json({
+      booking: mapBookingCompat(outcome.booking),
+      publishedEvent: outcome.eventQueued
+        ? {
+            topic: topics.RideAccepted,
+            eventId,
+            eventType: "ride_accepted",
+            queued: true
+          }
+        : null,
+      notification
+    });
+  } catch (error) {
+    if (error?.statusCode && error?.code) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        code: error.code
+      });
+    }
+    logger.withTrace(req).error(
+      { err: { message: error.message, code: error.code || "UNKNOWN" } },
+      "failed to update booking status"
+    );
+    return res.status(500).json({ error: error.message });
   }
 });
 
