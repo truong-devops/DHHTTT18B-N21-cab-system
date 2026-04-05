@@ -58,6 +58,47 @@ function Maybe-InstallDependencies {
     }
 }
 
+function Get-PrimaryIPv4 {
+    $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.IPAddress -notlike "127.*" -and
+            $_.IPAddress -notlike "169.254.*"
+        } |
+        Sort-Object InterfaceMetric, SkipAsSource |
+        Select-Object -First 1 -ExpandProperty IPAddress
+    if (-not $ip) {
+        throw "Không tìm thấy IPv4 hợp lệ (không phải loopback/link-local)."
+    }
+    return $ip
+}
+
+function Update-ExpoEnv {
+    param(
+        [string] $EnvPath,
+        [string] $Ip
+    )
+    if (-not (Test-Path $EnvPath)) {
+        Write-Warning "$EnvPath không tồn tại, bỏ qua."
+        return
+    }
+    $newLine = "EXPO_PUBLIC_API_BASE_URL=http://$Ip`:3000"
+    $lines = Get-Content $EnvPath
+    $updated = $false
+    $lines = $lines | ForEach-Object {
+        if ($_ -match '^EXPO_PUBLIC_API_BASE_URL=') {
+            $updated = $true
+            $newLine
+        } else {
+            $_
+        }
+    }
+    if (-not $updated) {
+        $lines += $newLine
+    }
+    Set-Content -Path $EnvPath -Value $lines -Encoding UTF8
+    Write-Host "  -> cập nhật $EnvPath với API_BASE_URL=$($newLine.Split('=')[1])"
+}
+
 Push-Location $repoRoot
 Write-Host "Repo root: $repoRoot"
 
@@ -118,6 +159,11 @@ function Start-Ui {
 }
 
 if (-not $SkipUi) {
+    $ip = Get-PrimaryIPv4
+    Write-Host "Detected host IP: $ip -> cập nhật EXPO_PUBLIC_API_BASE_URL cho 2 app Expo"
+    Update-ExpoEnv -EnvPath "$repoRoot\\apps\\customer-app\\.env" -Ip $ip
+    Update-ExpoEnv -EnvPath "$repoRoot\\apps\\driver-app\\.env" -Ip $ip
+
     Start-Ui -Name "Admin Dashboard" -Path "$repoRoot\\apps\\admin-dashboard" -Script "dev"
     # Expo default 'start' shows QR for mobile devices (scan with Expo Go).
     Start-Ui -Name "Driver App (Expo QR)" -Path "$repoRoot\\apps\\driver-app" -Script "start"
