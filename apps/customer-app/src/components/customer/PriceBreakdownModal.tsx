@@ -66,5 +66,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brand600,
     alignItems: 'center'
   },
-  buttonText: { ...typography.button, color: colors.white }
+  buttonText: { ...typography.body, color: colors.white, fontWeight: '600' }
 })

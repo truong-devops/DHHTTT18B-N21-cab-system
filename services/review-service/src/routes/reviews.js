@@ -4,6 +4,7 @@ const { decodeCursor } = require("@libs/http");
 const {
   createReview,
   getReviewById,
+  getReviewByRideAndRider,
   listReviews,
   updateReviewFields,
   updateReviewStatus,
@@ -53,6 +54,18 @@ function toReviewResponse(row) {
   };
 }
 
+function isReviewUniqueConstraintError(error) {
+  if (!error || error.code !== "23505") {
+    return false;
+  }
+
+  if (error.constraint === "reviews_ride_rider_uq") {
+    return true;
+  }
+
+  return String(error.detail || "").includes("(ride_id, rider_id)");
+}
+
 router.post(
   "/",
   validateRequest({
@@ -81,6 +94,11 @@ router.post(
     const routeKey = "reviews:create";
     let responseBody;
     let responseStatus = 201;
+    const responseHeaders = {
+      "content-type": "application/json",
+      "x-trace-id": req.traceId,
+      "x-request-id": req.requestId
+    };
     const requestHash = crypto
       .createHash("sha256")
       .update(JSON.stringify(req.body || {}))
@@ -174,14 +192,64 @@ router.post(
         requestHash
       });
 
-      const review = await createReview({
-        rideId: req.body.rideId,
-        riderId: req.userId,
-        driverId: req.body.driverId,
-        rating: req.body.rating,
-        comment: req.body.comment,
-        status: req.body.status || "submitted"
-      });
+      let review;
+      try {
+        review = await createReview({
+          rideId: req.body.rideId,
+          riderId: req.userId,
+          driverId: req.body.driverId,
+          rating: req.body.rating,
+          comment: req.body.comment,
+          status: req.body.status || "submitted"
+        });
+      } catch (error) {
+        if (isReviewUniqueConstraintError(error)) {
+          const existingReview = await getReviewByRideAndRider({
+            rideId: req.body.rideId,
+            riderId: req.userId
+          });
+
+          if (existingReview) {
+            responseStatus = 200;
+            responseBody = { data: toReviewResponse(existingReview) };
+
+            await setResponse({
+              routeKey,
+              userId: req.userId,
+              idempotencyKey,
+              responseStatus,
+              responseHeaders,
+              responseBody
+            });
+
+            await saveCachedResponse(cacheKey, {
+              status: responseStatus,
+              headers: responseHeaders,
+              body: responseBody,
+              requestHash,
+              createdAt: new Date().toISOString()
+            });
+
+            return res.status(responseStatus).json(responseBody);
+          }
+
+          throw new ApiError(
+            409,
+            "CONFLICT",
+            "Review already exists for this ride"
+          );
+        }
+
+        if (error?.code === "22P02") {
+          throw new ApiError(
+            400,
+            "VALIDATION_ERROR",
+            "Invalid rideId, driverId, or riderId format"
+          );
+        }
+
+        throw error;
+      }
       monitoring.recordReviewCreated("success", {
         status: String(review.status || "submitted").toLowerCase()
       });
@@ -192,11 +260,7 @@ router.post(
         userId: req.userId,
         idempotencyKey,
         responseStatus,
-        responseHeaders: {
-          "content-type": "application/json",
-          "x-trace-id": req.traceId,
-          "x-request-id": req.requestId
-        },
+        responseHeaders,
         responseBody
       });
 
@@ -209,11 +273,7 @@ router.post(
 
       await saveCachedResponse(cacheKey, {
         status: responseStatus,
-        headers: {
-          "content-type": "application/json",
-          "x-trace-id": req.traceId,
-          "x-request-id": req.requestId
-        },
+        headers: responseHeaders,
         body: responseBody,
         requestHash,
         createdAt: new Date().toISOString()

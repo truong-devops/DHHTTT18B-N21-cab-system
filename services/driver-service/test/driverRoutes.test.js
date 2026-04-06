@@ -12,7 +12,27 @@ jest.mock("../src/services/driverService", () => ({
       vehicle: { type: "CAR", plate: "ABC-123" }
     }
   ]),
-  getDriverMe: jest.fn(async () => ({ driver: { id: "d1" } }))
+  getDriverMe: jest.fn(async () => ({ driver: { id: "d1" } })),
+  getDriverProfileForCustomer: jest.fn(async () => ({
+    driver: {
+      id: "d1",
+      fullName: "Driver One",
+      phone: "0900000001",
+      status: "APPROVED",
+      onlineStatus: "ONLINE"
+    },
+    vehicle: {
+      id: "veh-1",
+      driverId: "d1",
+      vehicleType: "CAR",
+      plateNumber: "ABC-123",
+      brand: "Toyota",
+      model: "Vios",
+      color: "White",
+      isActive: true
+    },
+    location: { lat: 10.1, lng: 20.2, recordedAt: new Date().toISOString() }
+  }))
 }));
 
 const app = require("../src/app");
@@ -57,5 +77,18 @@ describe("driver-service routes (smoke)", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
+  });
+
+  test("customer can fetch driver profile by driverId", async () => {
+    const token = signToken({ sub: "u-customer-1", roles: ["user"] });
+
+    const res = await request(app)
+      .get("/v1/drivers/d1/profile")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.driver.id).toBe("d1");
+    expect(res.body.data.vehicle.plateNumber).toBe("ABC-123");
+    expect(driverService.getDriverProfileForCustomer).toHaveBeenCalledWith("d1");
   });
 });

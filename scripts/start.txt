@@ -1,0 +1,8 @@
+.\scripts\start-all.ps1          (Chạy lần đầu)
+
+.\scripts\start-all.ps1 -NoInstall -SkipInfra -SkipKafkaBootstrap (Bật hết container trước)
+(Nhớ dùng chung WIFFI nhé!)
+
+# Driver app (Expo Go):
+# cd apps/driver-app && npm run start
+# (Avoid running 'npx expo start -c' directly on Node 22)

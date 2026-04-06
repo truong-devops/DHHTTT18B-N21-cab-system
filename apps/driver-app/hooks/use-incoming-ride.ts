@@ -12,6 +12,35 @@ type Options = {
 const DEFAULT_INTERVAL_MS = 2500;
 const MAX_RECONNECT_DELAY = 10000;
 
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function normalizeRide(raw: any): rideApi.Ride | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const resolvedId =
+    typeof raw.id === 'string' && raw.id.trim()
+      ? raw.id.trim()
+      : typeof raw.rideId === 'string' && raw.rideId.trim()
+        ? raw.rideId.trim()
+        : '';
+  if (!resolvedId) return null;
+
+  return {
+    ...(raw as rideApi.Ride),
+    id: resolvedId,
+    pickupLat: toFiniteNumber(raw.pickupLat),
+    pickupLng: toFiniteNumber(raw.pickupLng),
+    dropoffLat: toFiniteNumber(raw.dropoffLat),
+    dropoffLng: toFiniteNumber(raw.dropoffLng)
+  };
+}
+
 function parseEvent(raw: string) {
   try {
     return JSON.parse(raw);
@@ -30,7 +59,8 @@ function extractRide(event: any): rideApi.Ride | null {
     event.data ??
     event;
 
-  if (payload && payload.id) return payload as rideApi.Ride;
+  const normalizedPayload = normalizeRide(payload);
+  if (normalizedPayload) return normalizedPayload;
 
   const rideId = event.rideId ?? event.payload?.rideId ?? event.data?.rideId;
   if (rideId) {
@@ -49,9 +79,9 @@ export function useIncomingRide({
   const [incomingRide, setIncomingRide] = useState<rideApi.Ride | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempt = useRef(0);
 
   const effectiveWsUrl = wsUrl || WS_BASE_URL;
@@ -69,7 +99,12 @@ export function useIncomingRide({
     setError(null);
     try {
       const res = await rideApi.listAssignments();
-      const nextRide = (res.data || [])[0] ?? null;
+      const list = Array.isArray((res as any)?.data)
+        ? (res as any).data
+        : Array.isArray((res as any)?.data?.data)
+          ? (res as any).data.data
+          : [];
+      const nextRide = normalizeRide(list[0]) ?? null;
       setIncomingRide(nextRide);
       setLastUpdateAt(Date.now());
     } catch (err: any) {
@@ -108,16 +143,17 @@ export function useIncomingRide({
   }, [enabled]);
 
   const handleRide = useCallback(async (ride: rideApi.Ride) => {
-    if (!ride?.id) return;
-    if (!ride.pickupLat && !ride.dropoffLat) {
+    const normalized = normalizeRide(ride);
+    if (!normalized?.id) return;
+    if (!normalized.pickupLat && !normalized.dropoffLat) {
       try {
-        const detail = await rideApi.getRide(ride.id);
-        setIncomingRide(detail.data);
+        const detail = await rideApi.getRide(normalized.id);
+        setIncomingRide(normalizeRide(detail.data));
       } catch {
-        setIncomingRide(ride);
+        setIncomingRide(normalized);
       }
     } else {
-      setIncomingRide(ride);
+      setIncomingRide(normalized);
     }
     setLastUpdateAt(Date.now());
   }, []);

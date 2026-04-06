@@ -1,4 +1,4 @@
-<#
+﻿<#
     Start the full CAB Booking System stack (Docker infra + 3 UIs) with one command.
 
     Usage examples:
@@ -23,6 +23,42 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
+function Get-PrimaryIPv4 {
+    $candidates = Get-NetIPConfiguration -ErrorAction SilentlyContinue | Where-Object {
+        $_.IPv4Address -and $_.IPv4Address.Count -gt 0 -and $_.NetAdapter.Status -eq 'Up'
+    } | Sort-Object `
+        { if ($_.InterfaceAlias -match 'vEthernet|Hyper-V|Loopback') { 2 } else { 0 } }, `
+        { if ($_.IPv4DefaultGateway) { 0 } else { 1 } }
+
+    if (-not $candidates) {
+        throw "Không tìm thấy IPv4 hợp lệ (interface Up). Kiểm tra kết nối mạng."
+    }
+
+    $primary = $candidates[0].IPv4Address[0].IPAddress
+    return $primary
+}
+
+function Set-ExpoBaseUrl {
+    param(
+        [string] $EnvPath,
+        [string] $Ip
+    )
+
+    if (-not (Test-Path $EnvPath)) {
+        throw "Không tìm thấy file $EnvPath để cập nhật EXPO_PUBLIC_API_BASE_URL."
+    }
+
+    $baseUrl = "EXPO_PUBLIC_API_BASE_URL=http://$Ip`:3000"
+    $pattern = '^\s*EXPO_PUBLIC_API_BASE_URL\s*='
+    $lines = Get-Content $EnvPath
+
+    # Remove any existing lines for this key (covers spacing / duplicate cases)
+    $lines = $lines | Where-Object { $_ -notmatch $pattern }
+    # Append the fresh value once
+    $lines += $baseUrl
+
+    Set-Content -Path $EnvPath -Value $lines -Encoding ASCII
+}
 
 function Ensure-Command {
     param([string] $Name)
@@ -77,8 +113,7 @@ if (-not $SkipInfra) {
     }
 
     if (-not $SkipKafkaBootstrap) {
-        # Give Kafka more time inside the bootstrap script (defaults are short)
-        if (-not $env:KAFKA_BOOTSTRAP_WAIT_ATTEMPTS) { $env:KAFKA_BOOTSTRAP_WAIT_ATTEMPTS = 120 } # up to ~4 minutes with 2s wait
+        if (-not $env:KAFKA_BOOTSTRAP_WAIT_ATTEMPTS) { $env:KAFKA_BOOTSTRAP_WAIT_ATTEMPTS = 120 }
         if (-not $env:KAFKA_BOOTSTRAP_WAIT_MS) { $env:KAFKA_BOOTSTRAP_WAIT_MS = 2000 }
         if ($KafkaVerbose) { $env:KAFKA_BOOTSTRAP_VERBOSE = "true" }
 
@@ -102,6 +137,25 @@ if (-not $SkipInfra) {
 
 Pop-Location
 
+function Update-ExpoEnv {
+    $ip = Get-PrimaryIPv4
+    Write-Host "Detected IPv4: $ip -> cập nhật EXPO_PUBLIC_API_BASE_URL cho customer & driver ..."
+
+    $expoEnvPaths = @(
+        "$repoRoot\apps\customer-app\.env",
+        "$repoRoot\apps\driver-app\.env"
+    )
+
+    foreach ($envPath in $expoEnvPaths) {
+        if (Test-Path $envPath) {
+            Set-ExpoBaseUrl -EnvPath $envPath -Ip $ip
+            Write-Host "  -> updated $envPath"
+        } else {
+            Write-Warning "  -> skip $envPath (không tìm thấy file)"
+        }
+    }
+}
+
 function Start-Ui {
     param(
         [string] $Name,
@@ -112,16 +166,15 @@ function Start-Ui {
     Write-Host "Launching $Name (npm run $Script) ..."
     Maybe-InstallDependencies -Path $Path
 
-    # Run in its own console with correct working directory (avoids space-in-path issues)
     Start-Process -FilePath "powershell" -WorkingDirectory $Path -ArgumentList "-NoExit", "-Command", "npm run $Script" | Out-Null
     Write-Host "  -> started in its own terminal window."
 }
 
 if (-not $SkipUi) {
-    Start-Ui -Name "Admin Dashboard" -Path "$repoRoot\\apps\\admin-dashboard" -Script "dev"
-    # Expo default 'start' shows QR for mobile devices (scan with Expo Go).
-    Start-Ui -Name "Driver App (Expo QR)" -Path "$repoRoot\\apps\\driver-app" -Script "start"
-    Start-Ui -Name "Customer App (Expo QR)" -Path "$repoRoot\\apps\\customer-app" -Script "start"
+    Update-ExpoEnv
+    Start-Ui -Name "Admin Dashboard" -Path "$repoRoot\apps\admin-dashboard" -Script "dev"
+    Start-Ui -Name "Driver App (Expo QR)" -Path "$repoRoot\apps\driver-app" -Script "start"
+    Start-Ui -Name "Customer App (Expo QR)" -Path "$repoRoot\apps\customer-app" -Script "start"
 } else {
     Write-Host "SkipUi requested -> UI apps will not be launched."
 }
@@ -137,6 +190,5 @@ Write-Host "  PgAdmin:       http://localhost:5050  (user: admin@example.com / a
 Write-Host ""
 Write-Host "Seeded demo accounts (Auth service):"
 Write-Host "  Admin:    admin@cab.local / password"
-Write-Host "  Ops:      ops@cab.local / password"
-Write-Host "  Customer: customer@cab.local / password"
+Write-Host "  Customer: customer@cab.local / 123456"
 Write-Host "  Driver:   driver@cab.local / password"

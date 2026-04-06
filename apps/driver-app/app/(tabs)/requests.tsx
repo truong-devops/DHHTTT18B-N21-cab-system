@@ -9,6 +9,15 @@ import { palette } from '@/lib/theme';
 
 const paymentTags = ['Tiền mặt', 'Ví', 'Thẻ'];
 
+function formatCoordinate(value: unknown, digits: number) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value.toFixed(digits);
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed.toFixed(digits);
+  }
+  return '--';
+}
+
 export default function RequestsScreen() {
   const [ignoredRideId, setIgnoredRideId] = useState<string | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
@@ -32,12 +41,17 @@ export default function RequestsScreen() {
   }, [incomingRide, ignoredRideId]);
 
   const requestTitle = useMemo(() => {
-    if (!activeRequest) return '--';
-    return `Chuyến #${activeRequest.id.slice(0, 6)}`;
+    const requestId = typeof activeRequest?.id === 'string' ? activeRequest.id : '';
+    if (!requestId) return '--';
+    return `Chuyến #${requestId.slice(0, 6)}`;
   }, [activeRequest]);
 
   const handleAccept = async () => {
     if (!activeRequest) return;
+    if (!activeRequest.id) {
+      Alert.alert('Thiếu dữ liệu chuyến', 'Không tìm thấy mã chuyến hợp lệ.');
+      return;
+    }
     const principalDriverId = driver?.userId || driver?.id;
     if (!principalDriverId) {
       Alert.alert('Thiếu hồ sơ', 'Không tìm thấy driverId. Hãy đăng nhập lại.');
@@ -87,6 +101,10 @@ export default function RequestsScreen() {
 
   const handleDecline = async () => {
     if (!activeRequest) return;
+    if (!activeRequest.id) {
+      Alert.alert('Thiếu dữ liệu chuyến', 'Không tìm thấy mã chuyến hợp lệ.');
+      return;
+    }
     const actionKey = `reject:${activeRequest.id}`;
     if (lastActionRef.current === actionKey) return;
     lastActionRef.current = actionKey;
@@ -153,7 +171,8 @@ export default function RequestsScreen() {
               </View>
               <View style={styles.chip}>
                 <Text style={styles.chipText}>
-                  {activeRequest.pickupLat?.toFixed(3) ?? '--'},{activeRequest.pickupLng?.toFixed(3) ?? '--'}
+                  {activeRequest.pickupLabel ||
+                    `${formatCoordinate(activeRequest.pickupLat, 3)},${formatCoordinate(activeRequest.pickupLng, 3)}`}
                 </Text>
               </View>
               <View style={styles.chip}>
@@ -170,11 +189,13 @@ export default function RequestsScreen() {
               <View style={styles.timelineContent}>
                 <Text style={styles.label}>Điểm đón</Text>
                 <Text style={styles.value}>
-                  {activeRequest.pickupLat?.toFixed(5) ?? '--'},{activeRequest.pickupLng?.toFixed(5) ?? '--'}
+                  {activeRequest.pickupLabel ||
+                    `${formatCoordinate(activeRequest.pickupLat, 5)},${formatCoordinate(activeRequest.pickupLng, 5)}`}
                 </Text>
                 <Text style={styles.label}>Điểm đến</Text>
                 <Text style={styles.value}>
-                  {activeRequest.dropoffLat?.toFixed(5) ?? '--'},{activeRequest.dropoffLng?.toFixed(5) ?? '--'}
+                  {activeRequest.dropoffLabel ||
+                    `${formatCoordinate(activeRequest.dropoffLat, 5)},${formatCoordinate(activeRequest.dropoffLng, 5)}`}
                 </Text>
               </View>
             </View>
