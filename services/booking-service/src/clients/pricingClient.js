@@ -4,6 +4,8 @@ const logger = require("../utils/logger");
 
 const baseURL = process.env.PRICING_BASE_URL || "http://localhost:3006";
 const http = axios.create({ baseURL, timeout: 2000 });
+const RETRY_MAX = Number(process.env.PRICING_HTTP_RETRY_MAX || 1);
+const RETRY_BACKOFF_MS = Number(process.env.PRICING_HTTP_RETRY_BACKOFF_MS || 120);
 
 class PricingServiceError extends Error {
   constructor(message, options = {}) {
@@ -19,7 +21,42 @@ function isFallbackEnabled() {
   if (process.env.NODE_ENV === "production") {
     return false;
   }
-  return process.env.ENABLE_PRICING_FALLBACK_MOCK === "true";
+  return process.env.ENABLE_PRICING_FALLBACK_MOCK !== "false";
+}
+
+function isRetryableError(err) {
+  if (!err) {
+    return false;
+  }
+  const code = String(err.code || "").toUpperCase();
+  if (["ECONNABORTED", "ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "EAI_AGAIN"].includes(code)) {
+    return true;
+  }
+  const status = Number(err.response?.status);
+  return Number.isFinite(status) && status >= 500;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function postQuoteWithRetry(payload, headers) {
+  let lastError = null;
+  const totalAttempts = Math.max(1, RETRY_MAX + 1);
+
+  for (let attempt = 1; attempt <= totalAttempts; attempt += 1) {
+    try {
+      return await http.post("/v1/pricing/quotes", payload, { headers });
+    } catch (err) {
+      lastError = err;
+      if (!isRetryableError(err) || attempt >= totalAttempts) {
+        break;
+      }
+      await sleep(RETRY_BACKOFF_MS * attempt);
+    }
+  }
+
+  throw lastError || new Error("pricing_request_failed");
 }
 
 function mapServiceType(vehicleType) {
@@ -37,19 +74,23 @@ function mapServiceType(vehicleType) {
  * Bạn cần pricing-service có endpoint /quote (MVP).
  * Nếu chưa có, bạn có thể tạm mock response ở đây để chạy end-to-end.
  */
-async function getQuote({ pickup, dropoff, vehicleType }) {
+async function getQuote({ pickup, dropoff, vehicleType, simulateTimeout = false }) {
   // Option A: gọi thật
   const startedAt = Date.now();
   try {
+    if (simulateTimeout) {
+      const timeoutError = new Error("simulated pricing timeout");
+      timeoutError.code = "ETIMEDOUT";
+      throw timeoutError;
+    }
     const serviceType = mapServiceType(vehicleType);
     const headers = {};
     if (process.env.INTERNAL_API_KEY) {
       headers["x-internal-key"] = process.env.INTERNAL_API_KEY;
     }
-    const res = await http.post(
-      "/v1/pricing/quotes",
+    const res = await postQuoteWithRetry(
       { pickup, dropoff, serviceType },
-      { headers }
+      headers
     );
     monitoring.recordDependencyRequest({
       dependencyType: "http",
@@ -61,7 +102,12 @@ async function getQuote({ pickup, dropoff, vehicleType }) {
         status_code: String(res.status)
       }
     });
-    return res.data?.data || res.data;
+    const quote = res.data?.data || res.data || {};
+    const surge = Number(quote.surge);
+    return {
+      ...quote,
+      surge: Number.isFinite(surge) && surge >= 1 ? surge : 1
+    };
   } catch (err) {
     monitoring.recordDependencyRequest({
       dependencyType: "http",
@@ -85,6 +131,7 @@ async function getQuote({ pickup, dropoff, vehicleType }) {
       return {
         quoteId: "quote_mock_" + Date.now(),
         estimatedFare: 15000,
+        surge: 1,
         currency: "VND",
         distanceKm: 3.2,
         durationMin: 12,

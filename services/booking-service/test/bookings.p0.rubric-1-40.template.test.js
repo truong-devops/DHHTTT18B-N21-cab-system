@@ -132,7 +132,8 @@ describe("Booking P0 rubric integration frame (1-40)", () => {
       expect(mockGetQuote).toHaveBeenCalledWith({
         pickup: { lat: 10.76, lng: 106.66 },
         dropoff: { lat: 10.77, lng: 106.7 },
-        vehicleType: "CAR"
+        vehicleType: "CAR",
+        simulateTimeout: false
       });
     });
 
@@ -150,7 +151,8 @@ describe("Booking P0 rubric integration frame (1-40)", () => {
       expect(mockGetQuote).toHaveBeenCalledWith({
         pickup: { lat: 10.76, lng: 106.66 },
         dropoff: { lat: 10.78, lng: 106.71 },
-        vehicleType: "SUV"
+        vehicleType: "SUV",
+        simulateTimeout: false
       });
     });
 
@@ -296,4 +298,3 @@ describe("Booking P0 rubric integration frame (1-40)", () => {
     test.todo("Case 40: both events are queued exactly once on successful create");
   });
 });
-
