@@ -80,6 +80,20 @@ async function createPaymentController(req, res) {
   res.status(result.status).set(result.headers).json(result.body);
 }
 
+async function createPaymentInternalController(req, res) {
+  const payload = req.validatedBody || {};
+  const result = await createPayment({
+    payload,
+    idempotency: null,
+    traceId: req.traceId,
+    requestId: req.requestId,
+    method: req.method,
+    path: req.originalUrl,
+    authorization: req.authorization
+  });
+  res.status(result.responseCode).json(result.responseBody);
+}
+
 async function getPaymentController(req, res) {
   const paymentId = req.validatedParams ? req.validatedParams.id : req.params.id;
   const payment = await fetchPayment(paymentId);
@@ -146,6 +160,7 @@ async function confirmPaymentDevController(req, res) {
 module.exports = {
   listPaymentsController,
   createPaymentController,
+  createPaymentInternalController,
   getPaymentController,
   updatePaymentStatusController,
   getVietQrController,

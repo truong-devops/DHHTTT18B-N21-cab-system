@@ -4,11 +4,13 @@ const { asyncHandler } = require("../utils/asyncHandler");
 const {
   listPaymentsController,
   createPaymentController,
+  createPaymentInternalController,
   getPaymentController,
   updatePaymentStatusController,
   getVietQrController,
   confirmPaymentDevController
 } = require("../controllers/paymentsController");
+const config = require("../config");
 const {
   validateCreatePayment,
   validateListPayments,
@@ -16,8 +18,26 @@ const {
   validatePaymentParams
 } = require("../middleware/validatePayments");
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { ApiError } = require("../utils/errors");
 
 const router = express.Router();
+
+function requireInternalApiKey(req, _res, next) {
+  const provided = String(req.get("x-internal-api-key") || "");
+  if (!provided || provided !== String(config.internalApiKey || "")) {
+    return next(
+      new ApiError(401, "UNAUTHORIZED", "Unauthorized")
+    );
+  }
+  return next();
+}
+
+router.post(
+  "/internal/init",
+  requireInternalApiKey,
+  validateCreatePayment,
+  asyncHandler(createPaymentInternalController)
+);
 
 router.use(requireAuth);
 

@@ -183,6 +183,8 @@ fi
 C13=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70},"vehicleType":"CAR"}')
 C13_STATUS=$(echo "$C13" | sed -n '1p')
 C13_BODY=$(echo "$C13" | sed '1d')
+C13_BOOKING_ID=$(echo "$C13_BODY" | json_get "booking.booking_id")
+if [[ -z "$C13_BOOKING_ID" ]]; then C13_BOOKING_ID=$(echo "$C13_BODY" | json_get "booking.bookingId"); fi
 print_case "Case 13 - no drivers online" "booking status PENDING/FAILED + message No drivers available" "$C13_STATUS" "$C13_BODY"
 C13_BOOKING_STATUS=$(echo "$C13_BODY" | json_get "booking.status")
 if [[ -z "$C13_BOOKING_STATUS" ]]; then C13_BOOKING_STATUS=$(echo "$C13_BODY" | json_get "booking.status"); fi
@@ -275,6 +277,10 @@ if [[ "$C18_STATUS" == "401" ]] && echo "$C18_BODY" | contains_text 'Token expir
 # Case 19
 echo "-- Running Case 19"
 IDEM_KEY="idem-${UNIQ_TAG}"
+if [[ -n "${C13_BOOKING_ID:-}" ]]; then
+  call_json POST "/v1/bookings/$C13_BOOKING_ID/cancel" "$USER_TOKEN" '{}' >/dev/null || true
+  sleep 1
+fi
 C19A=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.7601,"lng":106.6601},"drop":{"lat":10.7701,"lng":106.7001},"vehicleType":"CAR"}' "$IDEM_KEY")
 C19A_STATUS=$(echo "$C19A" | sed -n '1p')
 C19A_BODY=$(echo "$C19A" | sed '1d')

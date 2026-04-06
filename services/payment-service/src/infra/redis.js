@@ -41,7 +41,28 @@ function wrapCommand(redis, method, operation = method) {
 
 function getRedis() {
   if (!redisClient) {
-    redisClient = new Redis(config.redis.url);
+    redisClient = new Redis(config.redis.url, {
+      lazyConnect: true,
+      connectTimeout: Number(
+        process.env.REDIS_CONNECT_TIMEOUT_MS || 800
+      ),
+      commandTimeout: Number(
+        process.env.REDIS_COMMAND_TIMEOUT_MS || 800
+      ),
+      maxRetriesPerRequest: Number(
+        process.env.REDIS_MAX_RETRIES_PER_REQUEST || 1
+      ),
+      enableOfflineQueue: false,
+      retryStrategy: (times) => {
+        if (times >= 2) {
+          return null;
+        }
+        return Math.min(times * 100, 300);
+      }
+    });
+    redisClient.on("error", () => {
+      // Best-effort Redis usage for idempotency cache.
+    });
     ["get", "set", "del", "ping"].forEach((command) =>
       wrapCommand(redisClient, command)
     );
