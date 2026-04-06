@@ -55,8 +55,8 @@ const PaymentScreen = () => {
       </Card>
       <PrimaryButton title={loading ? 'Đang xử lý...' : 'Thanh toán'} onPress={handlePay} disabled={loading} />
       <OutlineButton
-        title="Hiển thị mã QR (mock)"
-        onPress={() => push('Hiển thị mã QR VietQR sẽ được thêm khi backend sẵn sàng', 'info')}
+        title="Hien thi ma QR"
+        onPress={() => push('VietQR se duoc mo khi backend thanh toan san sang', 'info')}
       />
       {/* TODO: Add VietQR/card redirect flow once Payment Service integration is enabled */}
     </View>

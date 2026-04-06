@@ -5,9 +5,7 @@ import MapView, { Marker, Polyline } from 'react-native-maps'
 import { useRoutePolyline } from '../../hooks/useRoutePolyline'
 import { colors, spacing, typography } from '../../theme/tokens'
 
-const FALLBACK_REGION = {
-  latitude: 10.776889,
-  longitude: 106.700806,
+const DEFAULT_DELTA = {
   latitudeDelta: 0.012,
   longitudeDelta: 0.012
 }
@@ -15,6 +13,7 @@ const FALLBACK_REGION = {
 type Coordinate = {
   latitude: number
   longitude: number
+  label?: string
 }
 
 type Props = {
@@ -35,8 +34,8 @@ export const CustomerLiveMap: React.FC<Props> = ({
   const [permission, setPermission] = useState<'checking' | 'granted' | 'denied'>('checking')
   const [userCoordinate, setUserCoordinate] = useState<Coordinate | null>(null)
   const [zoomDelta, setZoomDelta] = useState({
-    latitudeDelta: FALLBACK_REGION.latitudeDelta,
-    longitudeDelta: FALLBACK_REGION.longitudeDelta
+    latitudeDelta: DEFAULT_DELTA.latitudeDelta,
+    longitudeDelta: DEFAULT_DELTA.longitudeDelta
   })
   const [locationError, setLocationError] = useState<string | null>(null)
   const routeOrigin = showRoute ? userCoordinate : null
@@ -49,8 +48,7 @@ export const CustomerLiveMap: React.FC<Props> = ({
 
   const polylineCoordinates = useMemo(() => {
     if (!showRoute || !destination || !userCoordinate) return []
-    if (routeCoords.length >= 2) return routeCoords
-    return [userCoordinate, destination]
+    return routeCoords
   }, [destination, routeCoords, showRoute, userCoordinate])
 
   useEffect(() => {
@@ -160,6 +158,15 @@ export const CustomerLiveMap: React.FC<Props> = ({
     )
   }
 
+  if (permission !== 'granted' || !userCoordinate) {
+    return (
+      <View style={styles.blocked}>
+        <ActivityIndicator size="small" color={colors.brand700} />
+        <Text style={styles.blockedText}>Dang lay vi tri GPS...</Text>
+      </View>
+    )
+  }
+
   return (
     <View style={styles.wrapper}>
       <MapView
@@ -167,12 +174,17 @@ export const CustomerLiveMap: React.FC<Props> = ({
           mapRef.current = ref
         }}
         style={StyleSheet.absoluteFillObject}
-        initialRegion={FALLBACK_REGION}
+        initialRegion={{
+          latitude: userCoordinate.latitude,
+          longitude: userCoordinate.longitude,
+          latitudeDelta: zoomDelta.latitudeDelta,
+          longitudeDelta: zoomDelta.longitudeDelta
+        }}
         showsUserLocation
         followsUserLocation
         loadingEnabled>
         {userCoordinate ? <Marker coordinate={userCoordinate} title="Vị trí của bạn" /> : null}
-        {destination ? <Marker coordinate={destination} title="Điểm đến" pinColor="#F97316" /> : null}
+        {destination ? <Marker coordinate={destination} title={destination.label || 'Diem den'} pinColor="#F97316" /> : null}
         {polylineCoordinates.length >= 2 ? (
           <Polyline coordinates={polylineCoordinates} strokeWidth={4} strokeColor="#F97316" />
         ) : null}
@@ -199,7 +211,7 @@ export const CustomerLiveMap: React.FC<Props> = ({
       ) : null}
       {showRoute && !isRouteLoading && routeError ? (
         <View style={styles.routeStatus}>
-          <Text style={styles.routeStatusText}>OSRM không khả dụng, tạm dùng đường thẳng.</Text>
+          <Text style={styles.routeStatusText}>Khong lay duoc lo trinh OSRM: {routeError}</Text>
         </View>
       ) : null}
     </View>

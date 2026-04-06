@@ -17,6 +17,7 @@
     "kafka:topics:bootstrap:prodlike": "KAFKA_COMPOSE_FILES=infra/docker-compose.dev.yml,infra/docker-compose.kafka.prodlike.yml KAFKA_COMPOSE_PROFILES=kafka-prodlike KAFKA_BOOTSTRAP_SERVICE=kafka-1 KAFKA_BOOTSTRAP_SERVER=kafka-1:9092 node scripts/kafka/bootstrap-topics.js",
     "health": "node scripts/healthcheck.js",
     "seed:all": "node scripts/seed-all.js",
+    "seed:customer:real": "node scripts/seed-real-customer.js",
     "generate:payment-types": "openapi-typescript contracts/openapi/payment-service.yaml -o libs/types/src/payment-service.ts",
     "contracts:events:validate": "node scripts/contracts/events/validate-events.js",
     "contracts:events:compat": "node scripts/contracts/events/check-backward-compat.js"

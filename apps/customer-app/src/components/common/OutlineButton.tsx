@@ -1,13 +1,13 @@
 import React from 'react'
-import { Pressable, StyleSheet, Text, ViewStyle, TextStyle } from 'react-native'
+import { Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native'
 import { colors, radius, spacing, typography } from '../../theme/tokens'
 
 type Props = {
   title: string
   onPress?: () => void
   disabled?: boolean
-  style?: ViewStyle
-  textStyle?: TextStyle
+  style?: StyleProp<ViewStyle>
+  textStyle?: StyleProp<TextStyle>
 }
 
 export const OutlineButton: React.FC<Props> = ({ title, onPress, disabled, style, textStyle }) => (

@@ -48,11 +48,11 @@ export function useDriverOnline({ intervalMs = DEFAULT_INTERVAL_MS }: Options = 
   const [error, setError] = useState<string | null>(null);
   const [isSwitching, setIsSwitching] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inFlightRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
   const wsConnectedRef = useRef(false);
-  const reconnectRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempt = useRef(0);
   const connectRef = useRef<() => void>(() => {});
 
@@ -270,10 +270,13 @@ export function useDriverOnline({ intervalMs = DEFAULT_INTERVAL_MS }: Options = 
     [cleanupWs, stopInterval],
   );
 
+  // Trạng thái hiển thị: tránh nhấp nháy "đang cập nhật" mỗi lần gửi GPS.
+  // Chỉ coi là "sending" khi đang bật/tắt online; các lần ping định kỳ vẫn giữ trạng thái online.
   const state: OnlineState = useMemo(() => {
-    if (isSwitching || isSending) return 'sending';
-    return isOnline ? 'online' : 'offline';
-  }, [isOnline, isSending, isSwitching]);
+    if (!isOnline) return 'offline';
+    if (isSwitching) return 'sending';
+    return 'online';
+  }, [isOnline, isSwitching]);
 
   return {
     isOnline,

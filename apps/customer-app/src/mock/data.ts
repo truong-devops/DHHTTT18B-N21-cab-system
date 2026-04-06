@@ -12,9 +12,9 @@ export type RideOption = {
 export type DriverInfo = {
   id: string
   name: string
-  rating: number
-  vehicle: string
-  plate: string
+  rating?: number | null
+  vehicle?: string | null
+  plate?: string | null
 }
 
 export type RideHistoryItem = {

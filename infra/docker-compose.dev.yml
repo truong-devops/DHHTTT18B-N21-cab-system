@@ -114,6 +114,7 @@ services:
       OTEL_SERVICE_NAME: ride-service
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       PORT: 3005
+      AUTO_ASSIGN_DRIVER: "false"
       MONGODB_URI: mongodb://mongo:27017/ride_service
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
@@ -227,6 +228,8 @@ services:
       DATABASE_URL: postgres://cab:cabpass@postgres:5432/driver-service_db
       REDIS_URL: redis://redis:6379
       AUTH_JWT_SECRET: ${JWT_SECRET:-dev-secret}
+      # Allow higher GPS update frequency from driver app
+      MAX_LOCATION_RATE_PER_SEC: ${MAX_LOCATION_RATE_PER_SEC:-5}
     depends_on:
       - postgres
       - redis

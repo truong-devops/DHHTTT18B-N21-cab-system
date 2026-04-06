@@ -24,6 +24,7 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 config.resolver.disableHierarchicalLookup = false;
+config.resolver.blockList = /.*[/\\]node_modules[/\\].*[/\\]\.resources-[^/\\]+[/\\].*/;
 
 const defaultResolveRequest = config.resolver.resolveRequest || resolve;
 config.resolver.resolveRequest = (context, moduleName, platform) => {

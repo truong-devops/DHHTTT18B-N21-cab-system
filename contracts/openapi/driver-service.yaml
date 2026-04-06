@@ -79,6 +79,24 @@ paths:
       responses:
         "200":
           description: OK
+  /v1/drivers/{driverId}/profile:
+    get:
+      summary: Get driver profile for customer
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: driverId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "404":
+          description: Driver not found
   /v1/internal/drivers/available:
     get:
       summary: List available drivers

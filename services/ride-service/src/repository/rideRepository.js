@@ -17,8 +17,10 @@ function mapRide(doc) {
     driver_id: doc.driver_id || null,
     pickup_lat: doc.pickup_lat,
     pickup_lng: doc.pickup_lng,
+    pickup_label: doc.pickup_label || null,
     dropoff_lat: doc.dropoff_lat ?? null,
     dropoff_lng: doc.dropoff_lng ?? null,
+    dropoff_label: doc.dropoff_label || null,
     status: doc.status,
     status_updated_at: doc.status_updated_at,
     created_at: doc.created_at,
@@ -69,8 +71,10 @@ async function createRide({
   driverId = null,
   pickupLat,
   pickupLng,
+  pickupLabel = null,
   dropoffLat = null,
   dropoffLng = null,
+  dropoffLabel = null,
   status,
   traceId = null,
   emitOutbox = true
@@ -86,8 +90,10 @@ async function createRide({
     driver_id: driverId,
     pickup_lat: pickupLat,
     pickup_lng: pickupLng,
+    pickup_label: pickupLabel,
     dropoff_lat: dropoffLat,
     dropoff_lng: dropoffLng,
+    dropoff_label: dropoffLabel,
     status,
     status_updated_at: now,
     created_at: now,
@@ -480,6 +486,15 @@ async function claimRideForDriver({ driverId, traceId = null } = {}) {
   });
 }
 
+async function findNextRequestedRide() {
+  const db = await getDb();
+  const doc = await db.collection("rides").findOne(
+    { status: "requested", driver_id: null },
+    { sort: { created_at: -1, _id: -1 } } // lấy ride mới nhất còn pending
+  );
+  return doc ? mapRide(doc) : null;
+}
+
 module.exports = {
   createRide,
   getRideById,
@@ -489,5 +504,6 @@ module.exports = {
   updateRideFields,
   addStatusHistory,
   listRides,
-  claimRideForDriver
+  claimRideForDriver,
+  findNextRequestedRide
 };

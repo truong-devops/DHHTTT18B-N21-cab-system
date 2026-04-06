@@ -14,6 +14,18 @@ export type TripSummary = {
   totalAmount: number;
 };
 
+function toNormalizedId(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized || null;
+}
+
+function toTimestamp(value: string | null | undefined): number {
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 export function useTrips({ limit = 20 }: Options = {}) {
   const { isAuthenticated } = useAuth();
   const { driver } = useDriver();
@@ -26,6 +38,22 @@ export function useTrips({ limit = 20 }: Options = {}) {
     if (!isAuthenticated) {
       setItems([]);
       setPaymentsByRide({});
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    const primaryDriverId = toNormalizedId(driver?.id);
+    const userDriverId = toNormalizedId(driver?.userId);
+    const driverIds = Array.from(
+      new Set([primaryDriverId, userDriverId].filter((value): value is string => Boolean(value))),
+    );
+
+    if (!driverIds.length) {
+      setItems([]);
+      setPaymentsByRide({});
+      setError(null);
+      setLoading(false);
       return;
     }
 
@@ -33,15 +61,32 @@ export function useTrips({ limit = 20 }: Options = {}) {
     setLoading(true);
     setError(null);
 
-    const driverId = driver?.id || null;
-
     Promise.all([
-      rideApi.listHistory({ limit, driverId }),
+      Promise.all(driverIds.map((driverId) => rideApi.listHistory({ limit, driverId }))),
       paymentApi.listPayments(limit),
     ])
-      .then(([ridesRes, paymentsRes]) => {
+      .then(([rideResponses, paymentsRes]) => {
         if (!mounted) return;
-        setItems(ridesRes.data || []);
+
+        const rideMap = new Map<string, rideApi.Ride>();
+        rideResponses.forEach((response) => {
+          (response.data || []).forEach((ride) => {
+            if (!ride?.id) return;
+            const existing = rideMap.get(ride.id);
+            if (!existing) {
+              rideMap.set(ride.id, ride);
+              return;
+            }
+            if (toTimestamp(ride.createdAt) >= toTimestamp(existing.createdAt)) {
+              rideMap.set(ride.id, { ...existing, ...ride });
+            }
+          });
+        });
+
+        const mergedRides = Array.from(rideMap.values())
+          .sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt))
+          .slice(0, limit);
+        setItems(mergedRides);
 
         const paymentMap: Record<string, number> = {};
         (paymentsRes.data || []).forEach((payment) => {
@@ -54,7 +99,7 @@ export function useTrips({ limit = 20 }: Options = {}) {
       })
       .catch((err: any) => {
         if (!mounted) return;
-        setError(err?.message ?? 'Không thể tải lịch sử');
+        setError(err?.message ?? 'Khong the tai lich su');
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -63,7 +108,7 @@ export function useTrips({ limit = 20 }: Options = {}) {
     return () => {
       mounted = false;
     };
-  }, [driver?.id, isAuthenticated, limit]);
+  }, [driver?.id, driver?.userId, isAuthenticated, limit]);
 
   const summary = useMemo(() => {
     const completed = items.filter((item) => item.status?.toUpperCase() === 'COMPLETED');

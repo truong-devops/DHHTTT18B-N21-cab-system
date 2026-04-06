@@ -14,7 +14,7 @@ export const LiveRouteMap: React.FC<Props> = ({ destination, etaMinutes, onLocat
       label={etaMinutes ? `ETA ${etaMinutes} phút` : 'Theo dõi hành trình'}
       destination={
         destination
-          ? { latitude: destination.lat, longitude: destination.lng }
+          ? { latitude: destination.lat, longitude: destination.lng, label: destination.label }
           : undefined
       }
       showRoute={Boolean(destination)}

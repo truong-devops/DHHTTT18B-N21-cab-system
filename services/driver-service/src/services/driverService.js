@@ -32,9 +32,19 @@ const vehicleRepository = require("../repository/vehicleRepository");
 const locationRepository = require("../repository/locationRepository");
 
 async function getDriverMe(userId) {
-  const driver = await driverRepository.getDriverByUserId(userId);
+  let driver = await driverRepository.getDriverByUserId(userId);
   if (!driver) {
-    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+    // Tự tạo hồ sơ driver khi user có role driver nhưng chưa có bản ghi driver.
+    driver = await driverRepository.createDriver({
+      userId,
+      fullName: null,
+      phone: null
+    });
+    // Đưa về trạng thái sẵn sàng duyệt để app hiển thị được.
+    driver = await driverRepository.updateDriverStatus(
+      driver.id,
+      "APPROVED"
+    );
   }
   const vehicle = await vehicleRepository.getActiveVehicleByDriverId(
     driver.id
@@ -288,6 +298,31 @@ async function getDriverInternal(driverId) {
   }
   const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driver.id);
   return { driver: mapDriver(driver), vehicle: mapVehicle(vehicle) };
+}
+
+async function getDriverProfileForCustomer(driverId) {
+  const driver =
+    (await driverRepository.getDriverById(driverId)) ||
+    (await driverRepository.getDriverByUserId(driverId));
+  if (!driver) {
+    throw new ApiError(404, "NOT_FOUND", "Driver not found");
+  }
+
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driver.id);
+  const location = await getLocationSnapshot(driver.id);
+
+  return {
+    driver: {
+      id: driver.id,
+      userId: driver.user_id,
+      fullName: driver.full_name || null,
+      phone: driver.phone || null,
+      status: driver.status,
+      onlineStatus: driver.online_status
+    },
+    vehicle: mapVehicle(vehicle),
+    location
+  };
 }
 
 async function getLocationInternal(driverId) {
@@ -678,6 +713,7 @@ module.exports = {
   updateDriverLocation,
   heartbeat,
   getDriverInternal,
+  getDriverProfileForCustomer,
   getLocationInternal,
   listAvailableDrivers,
   markBusy,

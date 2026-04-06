@@ -116,6 +116,21 @@ router.get(
   })
 );
 
+router.get(
+  "/v1/drivers/:driverId/profile",
+  requireAuth,
+  validateRequest({
+    paramsSchema: {
+      required: ["driverId"],
+      properties: { driverId: { type: "string" } }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const data = await driverService.getDriverProfileForCustomer(req.params.driverId);
+    return res.json({ data, requestId: req.requestId });
+  })
+);
+
 router.use("/v1/driver", requireAuth, requireRole("driver"));
 
 router.get(

@@ -77,9 +77,9 @@ export function useRideTracking({
   const [isOffline, setIsOffline] = useState(false);
   const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempt = useRef(0);
   const lastActionRef = useRef<string | null>(null);
   const connectRef = useRef<() => void>(() => {});
