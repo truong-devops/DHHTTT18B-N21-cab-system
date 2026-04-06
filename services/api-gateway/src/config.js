@@ -4,7 +4,7 @@ const config = {
   corsOrigin: process.env.CORS_ORIGIN || "",
   jwtAccessSecret: process.env.JWT_ACCESS_SECRET || "",
   proxy: {
-    timeoutMs: Number(process.env.PROXY_TIMEOUT_MS || 3000),
+    timeoutMs: Number(process.env.PROXY_TIMEOUT_MS || 30000),
     retryBackoffMs: Number(process.env.PROXY_RETRY_BACKOFF_MS || 100)
   },
   services: {
