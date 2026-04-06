@@ -69,11 +69,29 @@ async function getById(bookingId, client) {
   return mapRow(result.rows[0]);
 }
 
+async function getByRideId(rideId, client) {
+  const db = executor(client);
+  const result = await db.query(
+    "SELECT * FROM bookings WHERE ride_id = $1 LIMIT 1",
+    [rideId]
+  );
+  return mapRow(result.rows[0]);
+}
+
 async function getByIdForUpdate(client, bookingId) {
   const db = executor(client);
   const result = await db.query(
     "SELECT * FROM bookings WHERE booking_id = $1 LIMIT 1 FOR UPDATE",
     [bookingId]
+  );
+  return mapRow(result.rows[0]);
+}
+
+async function getByRideIdForUpdate(client, rideId) {
+  const db = executor(client);
+  const result = await db.query(
+    "SELECT * FROM bookings WHERE ride_id = $1 LIMIT 1 FOR UPDATE",
+    [rideId]
   );
   return mapRow(result.rows[0]);
 }
@@ -101,6 +119,20 @@ async function updateStatus(client, bookingId, status) {
      WHERE booking_id = $1
      RETURNING *`,
     [bookingId, status]
+  );
+  return mapRow(result.rows[0]);
+}
+
+async function findActiveByUser(userId, client) {
+  const db = executor(client);
+  const result = await db.query(
+    `SELECT *
+       FROM bookings
+      WHERE user_id = $1
+        AND status IN ('PENDING', 'REQUESTED', 'ACCEPTED', 'CONFIRMED')
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [userId]
   );
   return mapRow(result.rows[0]);
 }
@@ -134,8 +166,11 @@ async function list(optionsOrClient, maybeClient) {
 module.exports = {
   create,
   getById,
+  getByRideId,
   getByIdForUpdate,
+  getByRideIdForUpdate,
   cancel,
   updateStatus,
+  findActiveByUser,
   list
 };

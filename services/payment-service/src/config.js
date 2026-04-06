@@ -174,7 +174,10 @@ const config = {
       process.env.AUTH_JWT_SECRET ||
       process.env.JWT_SECRET ||
       ""
-  }
+  },
+  internalApiKey:
+    process.env.INTERNAL_API_KEY ||
+    "dev-internal-key"
 };
 
 module.exports = config;
