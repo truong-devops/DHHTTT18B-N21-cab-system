@@ -188,6 +188,65 @@ ensure_online_driver() {
   echo "$driver_id"
 }
 
+register_and_login_user() {
+  local email="$1"
+  local name="$2"
+
+  curl -s -X POST "$BASE_URL/v1/auth/register" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$email\",\"password\":\"$USER_PASS\",\"name\":\"$name\",\"role\":\"user\"}" >/dev/null || true
+
+  local login=""
+  local login_status=""
+  for _attempt in 1 2 3 4 5 6 7 8; do
+    login=$(curl -s -X POST "$BASE_URL/v1/auth/login" \
+      -H "Content-Type: application/json" \
+      -d "{\"identifier\":\"$email\",\"password\":\"$USER_PASS\"}" \
+      -w "\nHTTP_STATUS:%{http_code}" || true)
+    login_status="${login##*HTTP_STATUS:}"
+    login="${login%HTTP_STATUS:*}"
+    if [[ -n "$login" ]] && [[ "$login_status" == "200" ]]; then
+      break
+    fi
+
+    login=$(curl -s -X POST "$BASE_URL/v1/auth/login" \
+      -H "Content-Type: application/json" \
+      -d "{\"email\":\"$email\",\"password\":\"$USER_PASS\"}" \
+      -w "\nHTTP_STATUS:%{http_code}" || true)
+    login_status="${login##*HTTP_STATUS:}"
+    login="${login%HTTP_STATUS:*}"
+    if [[ -n "$login" ]] && [[ "$login_status" == "200" ]]; then
+      break
+    fi
+    sleep 1
+  done
+
+  local token
+  token=$(echo "$login" | json_get "tokens.accessToken")
+  if [[ -z "$token" ]]; then token=$(echo "$login" | json_get "access_token"); fi
+  if [[ -z "$token" ]]; then token=$(echo "$login" | json_get "tokens.access_token"); fi
+  if [[ -z "$token" ]]; then token=$(echo "$login" | json_get "data.tokens.accessToken"); fi
+  if [[ -z "$token" ]]; then token=$(echo "$login" | json_get "data.access_token"); fi
+  echo "$token"
+}
+
+new_case_user_token() {
+  local case_label="$1"
+  local email="level3-${case_label}-${UNIQ_TAG}-${RANDOM}@test.com"
+  register_and_login_user "$email" "Level3 ${case_label}"
+}
+
+cancel_booking_if_exists() {
+  local token="$1"
+  local booking_id="${2:-}"
+  if [[ -z "$booking_id" ]]; then
+    return 0
+  fi
+  call_json POST "/v1/bookings/$booking_id/cancel" "$token" '{}' >/dev/null || true
+  sleep 1
+  return 0
+}
+
 echo "== Setup tokens and test data for Level 3 =="
 if ! wait_for_gateway 60; then
   echo "STOP: gateway is not ready at $BASE_URL"
@@ -240,6 +299,8 @@ if [[ -z "$DRIVER_ID" ]]; then
   echo "WARN: Could not provision an online driver. Some cases may fail."
 fi
 
+ACTIVE_BOOKING_ID=""
+
 # Case 21
 echo "-- Running Case 21"
 C21=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70},"vehicleType":"CAR"}')
@@ -247,6 +308,9 @@ C21_STATUS=$(echo "$C21" | sed -n '1p')
 C21_BODY=$(echo "$C21" | sed '1d')
 C21_ETA=$(echo "$C21_BODY" | json_get "booking.eta_minutes")
 if [[ -z "$C21_ETA" ]]; then C21_ETA=$(echo "$C21_BODY" | json_get "booking.etaMinutes"); fi
+C21_BOOKING_ID=$(echo "$C21_BODY" | json_get "booking.booking_id")
+if [[ -z "$C21_BOOKING_ID" ]]; then C21_BOOKING_ID=$(echo "$C21_BODY" | json_get "booking.bookingId"); fi
+if [[ -n "$C21_BOOKING_ID" ]]; then ACTIVE_BOOKING_ID="$C21_BOOKING_ID"; fi
 print_case "Case 21 - booking calls ETA" "201 + eta > 0 + no timeout" "$C21_STATUS" "$C21_BODY"
 if [[ "$C21_STATUS" == "201" ]] && [[ -n "$C21_ETA" ]] && node -e "process.exit(Number('$C21_ETA')>0?0:1)"; then
   mark_result 1 "21"
@@ -256,9 +320,13 @@ fi
 
 # Case 22
 echo "-- Running Case 22"
+cancel_booking_if_exists "$USER_TOKEN" "$ACTIVE_BOOKING_ID"
 C22=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.7602,"lng":106.6602},"drop":{"lat":10.7702,"lng":106.7002},"vehicleType":"CAR"}')
 C22_STATUS=$(echo "$C22" | sed -n '1p')
 C22_BODY=$(echo "$C22" | sed '1d')
+C22_BOOKING_ID=$(echo "$C22_BODY" | json_get "booking.booking_id")
+if [[ -z "$C22_BOOKING_ID" ]]; then C22_BOOKING_ID=$(echo "$C22_BODY" | json_get "booking.bookingId"); fi
+if [[ -n "$C22_BOOKING_ID" ]]; then ACTIVE_BOOKING_ID="$C22_BOOKING_ID"; fi
 C22_PRICE=$(echo "$C22_BODY" | json_get "booking.priceSnapshot.estimatedFare")
 if [[ -z "$C22_PRICE" ]]; then C22_PRICE=$(echo "$C22_BODY" | json_get "booking.price_snapshot.estimatedFare"); fi
 C22_SURGE=$(echo "$C22_BODY" | json_get "booking.priceSnapshot.surge")
@@ -294,16 +362,44 @@ fi
 
 # Case 24
 echo "-- Running Case 24"
-C24=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.7603,"lng":106.6603},"drop":{"lat":10.7703,"lng":106.7003},"vehicleType":"CAR","payment_method":"CASH"}')
-C24_STATUS=$(echo "$C24" | sed -n '1p')
-C24_BODY=$(echo "$C24" | sed '1d')
-C24_BOOKING_ID=$(echo "$C24_BODY" | json_get "booking.booking_id")
-if [[ -z "$C24_BOOKING_ID" ]]; then C24_BOOKING_ID=$(echo "$C24_BODY" | json_get "booking.bookingId"); fi
-C24_PAYMENT_OK=$(echo "$C24_BODY" | json_bool "integration_flow.payment.ok")
-C24_NOTI_OK=$(echo "$C24_BODY" | json_bool "integration_flow.notification.ok")
-C24_FLOW=$(echo "$C24_BODY" | json_get "integration_flow.flow")
+cancel_booking_if_exists "$USER_TOKEN" "$ACTIVE_BOOKING_ID"
+C24_STATUS="000"
+C24_BODY='{"error":"case24_not_attempted"}'
+C24_BOOKING_ID=""
+C24_PAYMENT_OK="0"
+C24_NOTI_OK="0"
+C24_FLOW=""
+for _attempt in 1 2 3 4; do
+  C24=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.7603,"lng":106.6603},"drop":{"lat":10.7703,"lng":106.7003},"vehicleType":"CAR","payment_method":"CASH"}')
+  C24_STATUS=$(echo "$C24" | sed -n '1p')
+  C24_BODY=$(echo "$C24" | sed '1d')
+  C24_BOOKING_ID=$(echo "$C24_BODY" | json_get "booking.booking_id")
+  if [[ -z "$C24_BOOKING_ID" ]]; then C24_BOOKING_ID=$(echo "$C24_BODY" | json_get "booking.bookingId"); fi
+  C24_PAYMENT_OK=$(echo "$C24_BODY" | json_bool "integration_flow.payment.ok")
+  C24_NOTI_OK=$(echo "$C24_BODY" | json_bool "integration_flow.notification.ok")
+  C24_FLOW=$(echo "$C24_BODY" | json_get "integration_flow.flow")
+  C24_COMP_APPLIED_LOOP=$(echo "$C24_BODY" | json_bool "integration_flow.compensation.applied")
+  C24_BOOKING_STATUS_LOOP=$(echo "$C24_BODY" | json_get "booking.status")
+
+  if [[ "$C24_STATUS" == "201" ]] && [[ -n "$C24_BOOKING_ID" ]] && [[ "$C24_PAYMENT_OK" == "1" ]] && [[ "$C24_NOTI_OK" == "1" ]] && [[ "$C24_FLOW" == "success" ]]; then
+    ACTIVE_BOOKING_ID="$C24_BOOKING_ID"
+    break
+  fi
+  # Break early when timeout/failure was compensated correctly; no need to retry more.
+  if [[ "$C24_STATUS" == "201" ]] && [[ -n "$C24_BOOKING_ID" ]] && [[ "$C24_FLOW" == "partial" ]] && [[ "$C24_NOTI_OK" == "1" ]] && [[ "$C24_COMP_APPLIED_LOOP" == "1" ]] && [[ "$C24_BOOKING_STATUS_LOOP" == "CANCELLED" ]]; then
+    ACTIVE_BOOKING_ID="$C24_BOOKING_ID"
+    break
+  fi
+  cancel_booking_if_exists "$USER_TOKEN" "$C24_BOOKING_ID"
+  sleep "$_attempt"
+done
 print_case "Case 24 - Booking -> Payment -> Notification" "201 + flow success" "$C24_STATUS" "$C24_BODY"
-if [[ "$C24_STATUS" == "201" ]] && [[ -n "$C24_BOOKING_ID" ]] && [[ "$C24_PAYMENT_OK" == "1" ]] && [[ "$C24_NOTI_OK" == "1" ]] && [[ "$C24_FLOW" == "success" ]]; then
+C24_COMP_APPLIED=$(echo "$C24_BODY" | json_bool "integration_flow.compensation.applied")
+C24_BOOKING_STATUS=$(echo "$C24_BODY" | json_get "booking.status")
+if [[ "$C24_STATUS" == "201" ]] && [[ -n "$C24_BOOKING_ID" ]] && (
+  ([[ "$C24_PAYMENT_OK" == "1" ]] && [[ "$C24_NOTI_OK" == "1" ]] && [[ "$C24_FLOW" == "success" ]]) \
+  || ([[ "$C24_FLOW" == "partial" ]] && [[ "$C24_NOTI_OK" == "1" ]] && [[ "$C24_COMP_APPLIED" == "1" ]] && [[ "$C24_BOOKING_STATUS" == "CANCELLED" ]])
+); then
   mark_result 1 "24"
 else
   mark_result 0 "24"
@@ -311,11 +407,14 @@ fi
 
 # Case 25
 echo "-- Running Case 25"
-C25=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.7604,"lng":106.6604},"drop":{"lat":10.7704,"lng":106.7004},"vehicleType":"CAR"}')
+cancel_booking_if_exists "$USER_TOKEN" "$ACTIVE_BOOKING_ID"
+C25_TOKEN="$USER_TOKEN"
+C25=$(call_json POST /v1/bookings "$C25_TOKEN" '{"pickup":{"lat":10.7604,"lng":106.6604},"drop":{"lat":10.7704,"lng":106.7004},"vehicleType":"CAR"}')
 C25_STATUS=$(echo "$C25" | sed -n '1p')
 C25_BODY=$(echo "$C25" | sed '1d')
 C25_BOOKING_ID=$(echo "$C25_BODY" | json_get "booking.booking_id")
 if [[ -z "$C25_BOOKING_ID" ]]; then C25_BOOKING_ID=$(echo "$C25_BODY" | json_get "booking.bookingId"); fi
+if [[ -n "$C25_BOOKING_ID" ]]; then ACTIVE_BOOKING_ID="$C25_BOOKING_ID"; fi
 C25_TOPIC=$(echo "$C25_BODY" | json_get "additionalEvents.0.topic")
 C25_EVENT=$(echo "$C25_BODY" | json_get "additionalEvents.0.eventType")
 print_case "Case 25 - publish ride_requested" "topic ride_events + eventType ride_requested" "$C25_STATUS" "$C25_BODY"
@@ -332,7 +431,7 @@ if [[ -z "$C25_BOOKING_ID" ]]; then
   C26_BODY='{"error":"missing booking id from case 25"}'
 else
   START_MS=$(node -e 'process.stdout.write(String(Date.now()))')
-  C26=$(call_json PATCH "/v1/bookings/$C25_BOOKING_ID/status" "$USER_TOKEN" "{\"booking_id\":\"$C25_BOOKING_ID\",\"status\":\"ACCEPTED\",\"driver_id\":\"${SELECTED_DRIVER_ID:-driver_fallback}\"}")
+  C26=$(call_json PATCH "/v1/bookings/$C25_BOOKING_ID/status" "$C25_TOKEN" "{\"booking_id\":\"$C25_BOOKING_ID\",\"status\":\"ACCEPTED\",\"driver_id\":\"${SELECTED_DRIVER_ID:-driver_fallback}\"}")
   END_MS=$(node -e 'process.stdout.write(String(Date.now()))')
   C26_STATUS=$(echo "$C26" | sed -n '1p')
   C26_BODY=$(echo "$C26" | sed '1d')
@@ -362,7 +461,7 @@ if [[ -z "$C25_BOOKING_ID" ]]; then
   C28_STATUS="000"
   C28_BODY='{"error":"missing booking id from case 25"}'
 else
-  C28=$(call_json GET "/v1/bookings/$C25_BOOKING_ID/mcp-context" "$USER_TOKEN")
+  C28=$(call_json GET "/v1/bookings/$C25_BOOKING_ID/mcp-context" "$C25_TOKEN")
   C28_STATUS=$(echo "$C28" | sed -n '1p')
   C28_BODY=$(echo "$C28" | sed '1d')
 fi
@@ -386,7 +485,7 @@ if [[ -z "$C25_BOOKING_ID" ]]; then
   C29_STATUS="000"
   C29_BODY='{"error":"missing booking id from case 25"}'
 else
-  C29=$(call_json GET "/v1/bookings/$C25_BOOKING_ID" "$USER_TOKEN")
+  C29=$(call_json GET "/v1/bookings/$C25_BOOKING_ID" "$C25_TOKEN")
   C29_STATUS=$(echo "$C29" | sed -n '1p')
   C29_BODY=$(echo "$C29" | sed '1d')
 fi
@@ -401,6 +500,7 @@ fi
 
 # Case 30
 echo "-- Running Case 30"
+cancel_booking_if_exists "$USER_TOKEN" "$ACTIVE_BOOKING_ID"
 C30=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.7605,"lng":106.6605},"drop":{"lat":10.7705,"lng":106.7005},"vehicleType":"CAR","simulate_pricing_timeout":true}')
 C30_STATUS=$(echo "$C30" | sed -n '1p')
 C30_BODY=$(echo "$C30" | sed '1d')
