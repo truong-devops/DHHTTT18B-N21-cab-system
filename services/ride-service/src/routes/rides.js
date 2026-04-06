@@ -43,7 +43,7 @@ const router = express.Router();
 const AUTO_ASSIGN_DRIVER =
   String(process.env.AUTO_ASSIGN_DRIVER || "false").toLowerCase() === "true";
 const DEFAULT_DRIVER_ID =
-  process.env.DEFAULT_DRIVER_ID || "10000004"; // seeded driver@cab.local
+  String(process.env.DEFAULT_DRIVER_ID || "").trim();
 
 router.use(requireAuth);
 
@@ -214,8 +214,7 @@ router.post(
       const shouldAutoAssign =
         AUTO_ASSIGN_DRIVER &&
         !req.body?.driverId &&
-        DEFAULT_DRIVER_ID &&
-        DEFAULT_DRIVER_ID.trim().length > 0;
+        DEFAULT_DRIVER_ID.length > 0;
 
       const ride = await createRide({
         externalRideId: crypto.randomUUID(),

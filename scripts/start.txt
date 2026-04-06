@@ -1,0 +1,4 @@
+.\scripts\start-all.ps1          (Chạy lần đầu)
+
+.\scripts\start-all.ps1 -NoInstall -SkipInfra -SkipKafkaBootstrap (Bật hết container trước)
+(Nhớ dùng chung WIFFI nhé!)

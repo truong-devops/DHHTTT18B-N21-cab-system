@@ -255,12 +255,13 @@ export const customerApi = {
     if (!isUuid(rideId)) {
       throw new Error('Ride ID khong hop le')
     }
-    if (!isUuid(driverId)) {
+    const normalizedDriverId = typeof driverId === 'string' ? driverId.trim() : ''
+    if (!normalizedDriverId) {
       throw new Error('Driver ID khong hop le')
     }
     return reviewApi.createReview({
       rideId,
-      driverId,
+      driverId: normalizedDriverId,
       rating: stars,
       comment: comment.trim() || undefined
     })

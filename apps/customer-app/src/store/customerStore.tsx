@@ -32,6 +32,28 @@ type ActiveRide = {
 const MIN_REFRESH_GAP_MS = 4000
 const RATE_LIMIT_BACKOFF_MS = 30000
 
+function normalizeIdentifier(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  return normalized || null
+}
+
+function isUuidLike(value: string | null | undefined): boolean {
+  const normalized = normalizeIdentifier(value)
+  if (!normalized) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized)
+}
+
+function resolvePreferredDriverId(...values: Array<string | null | undefined>): string | null {
+  const normalizedValues = values
+    .map((value) => normalizeIdentifier(value))
+    .filter((value): value is string => Boolean(value))
+  if (!normalizedValues.length) return null
+
+  const uuidValue = normalizedValues.find((value) => isUuidLike(value))
+  return uuidValue || normalizedValues[0]
+}
+
 function toFiniteNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string' && value.trim()) {
@@ -226,17 +248,45 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [user]
   )
 
-  const hydrateDriverProfile = useCallback(async (driverId: string) => {
-    if (!driverId) return
+  const hydrateDriverProfile = useCallback(async (lookupDriverId: string) => {
+    const normalizedLookupId = normalizeIdentifier(lookupDriverId)
+    if (!normalizedLookupId) return
 
-    const applyDriverSnapshot = (input: { fullName?: string | null; vehicleType?: string | null; plate?: string | null }) => {
+    const applyDriverSnapshot = (input: {
+      canonicalDriverId?: string | null
+      fullName?: string | null
+      vehicleType?: string | null
+      plate?: string | null
+    }) => {
+      const canonicalDriverId = normalizeIdentifier(input.canonicalDriverId)
       setActiveRide((prev) => {
-        if (!prev || prev.driverId !== driverId) return prev
-        const resolvedName = input.fullName?.trim() || prev.driver?.name || driverId
+        if (!prev) return prev
+
+        const prevDriverId = normalizeIdentifier(prev.driverId)
+        const prevDriverSnapshotId = normalizeIdentifier(prev.driver?.id)
+        const isCurrentDriverMatched =
+          !prevDriverId ||
+          prevDriverId === normalizedLookupId ||
+          (canonicalDriverId ? prevDriverId === canonicalDriverId : false) ||
+          prevDriverSnapshotId === normalizedLookupId ||
+          (canonicalDriverId ? prevDriverSnapshotId === canonicalDriverId : false)
+
+        if (!isCurrentDriverMatched) return prev
+
+        const resolvedDriverId = resolvePreferredDriverId(
+          canonicalDriverId,
+          prevDriverSnapshotId,
+          prevDriverId,
+          normalizedLookupId
+        )
+        if (!resolvedDriverId) return prev
+
+        const resolvedName = input.fullName?.trim() || prev.driver?.name || 'Tai xe'
         return {
           ...prev,
+          driverId: resolvedDriverId,
           driver: {
-            id: driverId,
+            id: resolvedDriverId,
             name: resolvedName,
             rating: prev.driver?.rating,
             vehicle: input.vehicleType?.trim() || prev.driver?.vehicle || undefined,
@@ -247,8 +297,9 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     try {
-      const profile = await getDriverProfileById(driverId)
+      const profile = await getDriverProfileById(normalizedLookupId)
       applyDriverSnapshot({
+        canonicalDriverId: profile.data.driver?.id || null,
         fullName: profile.data.driver?.fullName || null,
         vehicleType: profile.data.vehicle?.vehicleType || null,
         plate: profile.data.vehicle?.plateNumber || null
@@ -259,8 +310,9 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     try {
-      const userProfile = await userApi.getUserById(driverId)
+      const userProfile = await userApi.getUserById(normalizedLookupId)
       applyDriverSnapshot({
+        canonicalDriverId: null,
         fullName: userProfile.data.fullName || null
       })
     } catch {
@@ -332,7 +384,11 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       refreshBlockedUntilRef.current = 0
       const serverRide = response.data
       const serverDriverId = serverRide.driverId || null
-      const resolvedDriverId = serverDriverId || activeRide.driverId || null
+      const resolvedDriverId = resolvePreferredDriverId(
+        serverDriverId,
+        activeRide.driver?.id || null,
+        activeRide.driverId || null
+      )
       const resolvedDriver =
         resolvedDriverId && activeRide.driver?.id === resolvedDriverId ? activeRide.driver : null
       const nextPickupLat = toFiniteNumber(serverRide.pickupLat) ?? activeRide.pickupLat
@@ -405,9 +461,29 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const submitRating = useCallback(
     async (stars: number, comment: string) => {
       if (!activeRide) throw new Error('KhÃ´ng cÃ³ chuyáº¿n Ä‘i Ä‘ang hoáº¡t Ä‘á»™ng')
-      if (!activeRide.driverId) throw new Error('Chua co du lieu tai xe tu he thong')
+      let reviewDriverId = resolvePreferredDriverId(activeRide.driver?.id, activeRide.driverId)
+      if (!reviewDriverId) throw new Error('Chua co du lieu tai xe tu he thong')
 
-      await customerApi.submitRating(activeRide.id, activeRide.driverId, stars, comment)
+      try {
+        const latestRide = await rideApi.getRide(activeRide.id)
+        reviewDriverId = resolvePreferredDriverId(
+          latestRide.data?.driverId || null,
+          reviewDriverId
+        )
+      } catch {
+        // Keep current id when latest ride fetch fails.
+      }
+
+      if (!isUuidLike(reviewDriverId)) {
+        try {
+          const profile = await getDriverProfileById(reviewDriverId)
+          reviewDriverId = resolvePreferredDriverId(profile.data.driver?.id, reviewDriverId)
+        } catch {
+          // Keep current id and let backend validate/accept current format.
+        }
+      }
+
+      await customerApi.submitRating(activeRide.id, reviewDriverId, stars, comment)
 
       setHistory((prev) => [
         {

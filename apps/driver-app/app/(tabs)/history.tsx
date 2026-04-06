@@ -8,7 +8,7 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Lịch sử chuyến</Text>
+        <Text style={styles.title}>Lich su chuyen</Text>
 
         {error ? (
           <View style={styles.errorCard}>
@@ -18,34 +18,40 @@ export default function HistoryScreen() {
 
         <View style={styles.summaryCard}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Hoàn tất</Text>
+            <Text style={styles.summaryLabel}>Hoan tat</Text>
             <Text style={styles.summaryValue}>{summary.completed}</Text>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Đã hủy</Text>
+            <Text style={styles.summaryLabel}>Da huy</Text>
             <Text style={styles.summaryValue}>{summary.cancelled}</Text>
           </View>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Doanh thu</Text>
-            <Text style={styles.summaryValue}>{summary.totalAmount.toLocaleString('vi-VN')} đ</Text>
+            <Text style={styles.summaryValue}>{summary.totalAmount.toLocaleString('vi-VN')} d</Text>
           </View>
         </View>
 
         {loading && items.length === 0 ? (
-          <Text style={styles.emptyText}>Đang tải lịch sử...</Text>
+          <Text style={styles.emptyText}>Dang tai lich su...</Text>
         ) : null}
 
         {items.map((ride) => {
           const status = ride.status?.toUpperCase() ?? '--';
-          const statusLabel = status === 'COMPLETED' ? 'Hoàn tất' : status === 'CANCELLED' ? 'Đã hủy' : status;
+          const statusLabel = status === 'COMPLETED' ? 'Hoan tat' : status === 'CANCELLED' ? 'Da huy' : status;
           const createdAt = ride.createdAt ? new Date(ride.createdAt).toLocaleString('vi-VN') : '--';
-          const route = `${ride.pickupLat?.toFixed(3) ?? '--'},${ride.pickupLng?.toFixed(3) ?? '--'} → ${
-            ride.dropoffLat?.toFixed(3) ?? '--'
-          },${ride.dropoffLng?.toFixed(3) ?? '--'}`;
+          const pickupText =
+            typeof ride.pickupLabel === 'string' && ride.pickupLabel.trim()
+              ? ride.pickupLabel
+              : `${ride.pickupLat?.toFixed(3) ?? '--'},${ride.pickupLng?.toFixed(3) ?? '--'}`;
+          const dropoffText =
+            typeof ride.dropoffLabel === 'string' && ride.dropoffLabel.trim()
+              ? ride.dropoffLabel
+              : `${ride.dropoffLat?.toFixed(3) ?? '--'},${ride.dropoffLng?.toFixed(3) ?? '--'}`;
+          const route = `${pickupText} -> ${dropoffText}`;
           const amountValue = paymentsByRide[ride.id];
           const amountLabel =
             typeof amountValue === 'number' && Number.isFinite(amountValue)
-              ? `${amountValue.toLocaleString('vi-VN')} đ`
+              ? `${amountValue.toLocaleString('vi-VN')} d`
               : '--';
 
           return (
