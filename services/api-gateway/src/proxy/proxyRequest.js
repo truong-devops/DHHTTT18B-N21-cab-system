@@ -5,7 +5,7 @@ const { sendError } = require("../utils/http");
 const monitoring = require("../monitoring");
 
 const TIMEOUT_MS = Number(
-  process.env.PROXY_TIMEOUT_MS || 3000
+  process.env.PROXY_TIMEOUT_MS || 30000
 );
 const RETRY_BACKOFF_MS = Number(
   process.env.PROXY_RETRY_BACKOFF_MS || 100

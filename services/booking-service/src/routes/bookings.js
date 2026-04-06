@@ -188,7 +188,8 @@ async function runBookingIntegrationFlow({
   quote,
   paymentMethod,
   authorization,
-  traceId
+  traceId,
+  simulatePaymentTimeout = false
 }) {
   const integrations = {
     payment: null,
@@ -201,9 +202,11 @@ async function runBookingIntegrationFlow({
     amount: resolveAmountFromQuote(quote),
     currency: quote?.currency || "VND",
     method: normalizePaymentMethod(paymentMethod),
+    userId: booking.userId,
     authorization,
     traceId,
-    idempotencyKey: `booking-payment-${booking.bookingId}`
+    idempotencyKey: `booking-payment-${booking.bookingId}`,
+    simulateTimeout: simulatePaymentTimeout
   });
   integrations.payment = paymentResult;
 
@@ -228,6 +231,66 @@ async function runBookingIntegrationFlow({
       : "partial";
 
   return integrations;
+}
+
+async function compensateBookingAfterPaymentFailure({
+  bookingId,
+  traceId,
+  reason
+}) {
+  return withTransaction(async (client) => {
+    const existing = await bookingRepo.getByIdForUpdate(
+      client,
+      bookingId
+    );
+    if (!existing) {
+      return null;
+    }
+
+    const currentStatus = String(existing.status || "").toUpperCase();
+    if (currentStatus === "CANCELLED") {
+      return {
+        booking: existing,
+        publishedEvent: null,
+        alreadyCancelled: true
+      };
+    }
+
+    const cancelled = await bookingRepo.cancel(client, bookingId);
+    const eventId = crypto.randomUUID();
+    const envelope = buildEnvelope({
+      eventId,
+      traceId,
+      type: "RideCancelled",
+      payload: {
+        rideId: cancelled.rideId,
+        reason: reason || "PAYMENT_INITIALIZATION_FAILED",
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    await outboxRepo.insertOutboxEvent(
+      client,
+      buildOutboxRecord({
+        eventId,
+        topic: topics.RideCancelled,
+        eventType: "RideCancelled",
+        aggregateId: cancelled.bookingId,
+        partitionKey: cancelled.rideId,
+        envelope
+      })
+    );
+
+    return {
+      booking: cancelled,
+      alreadyCancelled: false,
+      publishedEvent: {
+        topic: topics.RideCancelled,
+        eventId,
+        queued: true
+      }
+    };
+  });
 }
 
 router.get("/", async (req, res, next) => {
@@ -256,6 +319,7 @@ router.get("/:id", async (req, res, next) => {
 });
 
 router.post("/", async (req, res) => {
+  let currentUserId = null;
   try {
     if (!req.body?.pickup) {
       monitoring.recordBookingStatus("created", "error", {
@@ -317,6 +381,7 @@ router.post("/", async (req, res) => {
     const normalizedDrop =
       parsed.data.drop || parsed.data.dropoff;
     const userId = resolveUserId(req, parsed.data);
+    currentUserId = userId;
     const idempotencyKey = req.header("idempotency-key") || null;
     const routeKey = "/v1/bookings";
     const requestPayload = {
@@ -334,6 +399,12 @@ router.post("/", async (req, res) => {
     const simulatePricingTimeout =
       req.body?.simulate_pricing_timeout === true ||
       req.body?.simulatePricingTimeout === true;
+    const simulatePaymentTimeout =
+      req.body?.simulate_payment_timeout === true ||
+      req.body?.simulatePaymentTimeout === true;
+    const simulateTxFailureAfterInsert =
+      req.body?.simulate_tx_failure_after_insert === true ||
+      req.body?.simulateTransactionFailureAfterInsert === true;
 
     const availability = await getDriverAvailability({
       pickup,
@@ -373,8 +444,8 @@ router.post("/", async (req, res) => {
           }
         }
 
-        const bookingId = `bk_${Date.now()}`;
-        const rideId = `ride_${Date.now()}`;
+        const bookingId = `bk_${crypto.randomUUID()}`;
+        const rideId = `ride_${crypto.randomUUID()}`;
         const createdAt = new Date().toISOString();
         const created = await bookingRepo.create(client, {
           bookingId,
@@ -389,6 +460,14 @@ router.post("/", async (req, res) => {
           status: "PENDING",
           createdAt
         });
+
+        if (simulateTxFailureAfterInsert) {
+          const error = new Error(
+            "Simulated transaction failure after booking insert"
+          );
+          error.code = "SIMULATED_TX_FAILURE";
+          throw error;
+        }
 
         const responseBody = {
           booking: mapBookingCompat(created),
@@ -472,8 +551,8 @@ router.post("/", async (req, res) => {
         }
       }
 
-      const bookingId = `bk_${Date.now()}`;
-      const rideId = `ride_${Date.now()}`;
+      const bookingId = `bk_${crypto.randomUUID()}`;
+      const rideId = `ride_${crypto.randomUUID()}`;
       const rideCreatedEventId = crypto.randomUUID();
       const rideRequestedEventId = crypto.randomUUID();
       const createdAt = new Date().toISOString();
@@ -491,6 +570,14 @@ router.post("/", async (req, res) => {
         status: "REQUESTED",
         createdAt
       });
+
+      if (simulateTxFailureAfterInsert) {
+        const error = new Error(
+          "Simulated transaction failure after booking insert"
+        );
+        error.code = "SIMULATED_TX_FAILURE";
+        throw error;
+      }
 
       const rideCreatedEnvelope = buildEnvelope({
         eventId: rideCreatedEventId,
@@ -617,8 +704,29 @@ router.post("/", async (req, res) => {
           quote,
           paymentMethod: parsed.data.payment_method,
           authorization,
-          traceId
+          traceId,
+          simulatePaymentTimeout
         });
+
+        if (responsePayload.integration_flow?.payment?.ok === false) {
+          const compensation =
+            await compensateBookingAfterPaymentFailure({
+              bookingId: responsePayload.booking.bookingId,
+              traceId,
+              reason: "PAYMENT_INITIALIZATION_FAILED"
+            });
+          if (compensation?.booking) {
+            responsePayload.booking = mapBookingCompat(
+              compensation.booking
+            );
+          }
+          responsePayload.integration_flow.compensation = {
+            applied: Boolean(compensation?.booking),
+            booking_status: compensation?.booking?.status || null,
+            published_event:
+              compensation?.publishedEvent || null
+          };
+        }
       }
     }
 
@@ -662,6 +770,26 @@ router.post("/", async (req, res) => {
       return res.status(e.statusCode).json({
         error: e.message,
         code: e.code
+      });
+    }
+    if (e?.code === "23505") {
+      const constraint = String(e?.constraint || "");
+      if (constraint === "bookings_one_active_per_user_idx") {
+        const activeBooking =
+          currentUserId && currentUserId !== "anonymous-user"
+            ? await bookingRepo.findActiveByUser(currentUserId)
+            : null;
+        return res.status(409).json({
+          error: "An active booking already exists for this user",
+          code: "ACTIVE_BOOKING_EXISTS",
+          booking: activeBooking
+            ? mapBookingCompat(activeBooking)
+            : null
+        });
+      }
+      return res.status(409).json({
+        error: "Duplicate booking conflict",
+        code: "BOOKING_CONFLICT"
       });
     }
     if (e?.statusCode && e?.code) {
@@ -822,7 +950,11 @@ router.patch("/:id/status", async (req, res) => {
       }
 
       const fromStatus = String(existing.status || "").toUpperCase();
-      if (fromStatus !== "REQUESTED" && fromStatus !== "ACCEPTED") {
+      if (
+        fromStatus !== "REQUESTED" &&
+        fromStatus !== "ACCEPTED" &&
+        fromStatus !== "CONFIRMED"
+      ) {
         const err = new Error(
           `Invalid transition from ${fromStatus} to ACCEPTED`
         );
