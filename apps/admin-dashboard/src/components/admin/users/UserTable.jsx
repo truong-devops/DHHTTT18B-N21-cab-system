@@ -4,6 +4,7 @@ import { labelFrom, roleLabels, userStatusLabels } from '../../../utils/labels.j
 
 function UserTable({ users = [], onSelect }) {
   const columns = [
+    { key: 'id', header: 'User ID', render: (row) => <code>{row.id}</code> },
     { key: 'email', header: 'Email' },
     { key: 'fullName', header: 'Tên' },
     {

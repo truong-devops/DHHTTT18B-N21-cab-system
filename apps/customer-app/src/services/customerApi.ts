@@ -1,6 +1,6 @@
 import type { ApiError } from '../lib/api'
 import type { DriverInfo, LocationPoint, RideHistoryItem, RideOption } from '../mock/data'
-import { destinationPoints, mockDriver, pickupPoint, rideOptions as fallbackRideOptions } from '../mock/data'
+import { destinationPoints, pickupPoint } from '../mock/data'
 import * as authApi from './authApi'
 import * as paymentApi from './paymentApi'
 import * as pricingApi from './pricingApi'
@@ -10,7 +10,6 @@ import * as rideApi from './rideApi'
 type StartRidePayload = {
   pickupLabel: string
   destinationLabel: string
-  option: RideOption
 }
 
 type LivePickup = {
@@ -28,40 +27,13 @@ function normalizeIdentifier(identifier: string) {
   return identifier.trim().toLowerCase()
 }
 
-function resolveLocation(label: string, fallback: LocationPoint): LocationPoint {
-  if (label === pickupPoint.label) {
-    if (livePickupCoordinate) {
-      return {
-        label: pickupPoint.label,
-        lat: livePickupCoordinate.latitude,
-        lng: livePickupCoordinate.longitude
-      }
-    }
-    return pickupPoint
-  }
-  return destinationPoints.find((item) => item.label === label) || fallback
-}
-
 function normalizePrice(value: number) {
   return Math.max(Math.round(value), 12000)
 }
 
-function formatLocation(lat?: number | null, lng?: number | null) {
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return '-'
-  }
-
-  const known = [pickupPoint, ...destinationPoints].find(
-    (point) => Math.abs(point.lat - Number(lat)) < 0.0006 && Math.abs(point.lng - Number(lng)) < 0.0006
-  )
-  if (known) return known.label
-
-  return `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`
-}
-
 function toMethodCode(method: string): 'CASH' | 'WALLET' | 'VIETQR' {
   const normalized = method.trim().toLowerCase()
-  if (normalized === 'wallet' || normalized === 'ví') return 'WALLET'
+  if (normalized === 'wallet' || normalized === 'vi') return 'WALLET'
   if (normalized === 'vietqr') return 'VIETQR'
   return 'CASH'
 }
@@ -69,6 +41,58 @@ function toMethodCode(method: string): 'CASH' | 'WALLET' | 'VIETQR' {
 function isUuid(value: string | undefined) {
   if (!value) return false
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+function buildUserName(identifier: string, user: authApi.AuthUser) {
+  if (user.username && user.username.trim()) return user.username.trim()
+  if (user.email && user.email.trim()) return user.email.trim()
+  return identifier
+}
+
+function buildPhone(identifier: string) {
+  const normalized = identifier.trim()
+  return normalized.includes('@') ? 'N/A' : normalized
+}
+
+function getDestinationPointOrThrow(label: string): LocationPoint {
+  const point = destinationPoints.find((item) => item.label === label)
+  if (!point) {
+    throw new Error(`Khong tim thay toa do diem den: ${label}`)
+  }
+  return point
+}
+
+function getPickupPointOrThrow(label: string): LocationPoint {
+  if (label === pickupPoint.label) {
+    if (!livePickupCoordinate) {
+      throw new Error('Khong lay duoc toa do diem don. Vui long bat GPS va thu lai.')
+    }
+    return {
+      label,
+      lat: livePickupCoordinate.latitude,
+      lng: livePickupCoordinate.longitude
+    }
+  }
+
+  const point = destinationPoints.find((item) => item.label === label)
+  if (!point) {
+    throw new Error(`Khong tim thay toa do diem don: ${label}`)
+  }
+  return point
+}
+
+function formatLocation(lat?: number | null, lng?: number | null) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return '-'
+  }
+  return `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`
+}
+
+function ensureNumberCoordinate(value: number | null | undefined, field: string) {
+  if (!Number.isFinite(value)) {
+    throw new Error(`Du lieu ${field} khong hop le tu backend`)
+  }
+  return Number(value)
 }
 
 async function moveRideToStatus(rideId: string, status: string) {
@@ -82,21 +106,14 @@ async function moveRideToStatus(rideId: string, status: string) {
   }
 }
 
-function buildUserName(identifier: string, user: authApi.AuthUser) {
-  if (user.username && user.username.trim()) return user.username.trim()
-  if (user.email && user.email.trim()) return user.email.trim()
-  return identifier
-}
-
-function buildPhone(identifier: string) {
-  const normalized = identifier.trim()
-  return normalized.includes('@') ? 'Không có' : normalized
-}
-
 export const customerApi = {
   setLivePickupLocation(latitude: number, longitude: number) {
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return
     livePickupCoordinate = { latitude, longitude }
+  },
+
+  getLivePickupLocation() {
+    return livePickupCoordinate
   },
 
   async requestOtp(identifier: string) {
@@ -108,10 +125,10 @@ export const customerApi = {
     const normalizedIdentifier = normalizeIdentifier(identifier)
     const password = otp.trim()
     if (!normalizedIdentifier) {
-      throw new Error('Thiếu số điện thoại/email')
+      throw new Error('Thieu so dien thoai/email')
     }
     if (!password) {
-      throw new Error('Thiếu OTP/mật khẩu')
+      throw new Error('Thieu OTP/mat khau')
     }
 
     let authResult: authApi.AuthResponse
@@ -137,92 +154,88 @@ export const customerApi = {
   },
 
   async getRideOptions(pickupLabel: string, destinationLabel: string): Promise<RideOption[]> {
-    const pickup = resolveLocation(pickupLabel, pickupPoint)
-    const destination = resolveLocation(destinationLabel, destinationPoints[0] || pickupPoint)
+    const pickup = getPickupPointOrThrow(pickupLabel)
+    const destination = getDestinationPointOrThrow(destinationLabel)
 
-    try {
-      const [standardQuote, premiumQuote] = await Promise.all([
-        pricingApi.createQuote(pickup, destination, 'STANDARD'),
-        pricingApi.createQuote(pickup, destination, 'PREMIUM')
-      ])
+    const [standardQuote, premiumQuote] = await Promise.all([
+      pricingApi.createQuote(pickup, destination, 'STANDARD'),
+      pricingApi.createQuote(pickup, destination, 'PREMIUM')
+    ])
 
-      const standardFare = Number(standardQuote.data.estimatedFare || 0)
-      const premiumFare = Number(premiumQuote.data.estimatedFare || 0)
-      const standardEta = Math.max(Math.round(Number(standardQuote.data.durationMin || 6)), 3)
-      const premiumEta = Math.max(Math.round(Number(premiumQuote.data.durationMin || 8)), 4)
+    const standardFare = Number(standardQuote.data.estimatedFare || 0)
+    const premiumFare = Number(premiumQuote.data.estimatedFare || 0)
+    const standardEta = Math.max(Math.round(Number(standardQuote.data.durationMin || 6)), 3)
+    const premiumEta = Math.max(Math.round(Number(premiumQuote.data.durationMin || 8)), 4)
 
-      return [
-        {
-          id: 'bike',
-          name: 'Xe máy',
-          etaMinutes: Math.max(standardEta - 2, 2),
-          price: normalizePrice(standardFare * 0.55),
-          capacity: 1,
-          quoteId: standardQuote.data.quoteId,
-          serviceType: 'STANDARD'
-        },
-        {
-          id: 'car4',
-          name: 'Xe 4 chỗ',
-          etaMinutes: standardEta,
-          price: normalizePrice(standardFare),
-          capacity: 4,
-          surgeLabel:
-            standardQuote.data.breakdown && Number(standardQuote.data.breakdown.surge) > 0
-              ? 'Đang tăng giá'
-              : undefined,
-          quoteId: standardQuote.data.quoteId,
-          serviceType: 'STANDARD'
-        },
-        {
-          id: 'car7',
-          name: 'Xe 7 chỗ',
-          etaMinutes: premiumEta,
-          price: normalizePrice(premiumFare),
-          capacity: 7,
-          quoteId: premiumQuote.data.quoteId,
-          serviceType: 'PREMIUM'
-        }
-      ]
-    } catch {
-      return fallbackRideOptions
-    }
+    return [
+      {
+        id: 'bike',
+        name: 'Xe may',
+        etaMinutes: Math.max(standardEta - 2, 2),
+        price: normalizePrice(standardFare * 0.55),
+        capacity: 1,
+        quoteId: standardQuote.data.quoteId,
+        serviceType: 'STANDARD'
+      },
+      {
+        id: 'car4',
+        name: 'Xe 4 cho',
+        etaMinutes: standardEta,
+        price: normalizePrice(standardFare),
+        capacity: 4,
+        surgeLabel:
+          standardQuote.data.breakdown && Number(standardQuote.data.breakdown.surge) > 0 ? 'Tang gia' : undefined,
+        quoteId: standardQuote.data.quoteId,
+        serviceType: 'STANDARD'
+      },
+      {
+        id: 'car7',
+        name: 'Xe 7 cho',
+        etaMinutes: premiumEta,
+        price: normalizePrice(premiumFare),
+        capacity: 7,
+        quoteId: premiumQuote.data.quoteId,
+        serviceType: 'PREMIUM'
+      }
+    ]
   },
 
-  async startRide({ pickupLabel, destinationLabel, option }: StartRidePayload) {
-    const pickup = resolveLocation(pickupLabel, pickupPoint)
-    const destination = resolveLocation(destinationLabel, destinationPoints[0] || pickupPoint)
+  async startRide({ pickupLabel, destinationLabel }: StartRidePayload) {
+    const pickup = getPickupPointOrThrow(pickupLabel)
+    const destination = getDestinationPointOrThrow(destinationLabel)
 
     const created = await rideApi.createRide({
       pickupLat: pickup.lat,
       pickupLng: pickup.lng,
+      pickupLabel,
       dropoffLat: destination.lat,
       dropoffLng: destination.lng,
+      dropoffLabel: destinationLabel,
       status: 'requested'
     })
 
-    let ride = created.data
-    const assigned = await moveRideToStatus(ride.id, 'ASSIGNED')
-    if (assigned?.data) {
-      ride = assigned.data
+    const ride = created.data
+    const ridePickupLat = ensureNumberCoordinate(ride.pickupLat, 'pickupLat')
+    const ridePickupLng = ensureNumberCoordinate(ride.pickupLng, 'pickupLng')
+    const rideDropoffLat = ensureNumberCoordinate(ride.dropoffLat, 'dropoffLat')
+    const rideDropoffLng = ensureNumberCoordinate(ride.dropoffLng, 'dropoffLng')
+
+    const driver: DriverInfo | null = null
+
+    return {
+      ride,
+      driver,
+      pickup: {
+        label: ride.pickupLabel || pickupLabel,
+        lat: ridePickupLat,
+        lng: ridePickupLng
+      },
+      destination: {
+        label: ride.dropoffLabel || destinationLabel,
+        lat: rideDropoffLat,
+        lng: rideDropoffLng
+      }
     }
-
-    const driver: DriverInfo = ride.driverId
-      ? {
-          id: ride.driverId,
-          name: `Tài xế ${ride.driverId.slice(0, 6)}`,
-          rating: 4.8,
-          vehicle: 'Xe tiêu chuẩn',
-          plate: 'Đang cập nhật'
-        }
-      : {
-          ...mockDriver,
-          id: 'pending-driver',
-          name: 'Đang tìm tài xế',
-          vehicle: option.name
-        }
-
-    return { ride, driver, pickup, destination }
   },
 
   async createPayment(rideId: string, method: string, amount: number) {
@@ -240,22 +253,14 @@ export const customerApi = {
 
   async submitRating(rideId: string, driverId: string | undefined, stars: number, comment: string) {
     if (!isUuid(rideId)) {
-      return {
-        data: {
-          id: `local-${Date.now()}`,
-          rideId,
-          driverId: driverId || 'unknown',
-          rating: stars,
-          comment: comment || '',
-          status: 'submitted'
-        }
-      }
+      throw new Error('Ride ID khong hop le')
     }
-
-    const safeDriverId = isUuid(driverId) ? driverId : rideId
+    if (!isUuid(driverId)) {
+      throw new Error('Driver ID khong hop le')
+    }
     return reviewApi.createReview({
       rideId,
-      driverId: safeDriverId,
+      driverId,
       rating: stars,
       comment: comment.trim() || undefined
     })
@@ -284,10 +289,11 @@ export const customerApi = {
     return filtered.map((ride) => ({
       id: ride.id,
       date: (ride.createdAt || new Date().toISOString()).slice(0, 16).replace('T', ' '),
-      pickup: formatLocation(ride.pickupLat, ride.pickupLng),
-      destination: formatLocation(ride.dropoffLat, ride.dropoffLng),
+      pickup: ride.pickupLabel || formatLocation(ride.pickupLat, ride.pickupLng),
+      destination: ride.dropoffLabel || formatLocation(ride.dropoffLat, ride.dropoffLng),
       amount: Math.round(amountByRideId[ride.id] || 0),
       status: String(ride.status || '').toLowerCase() === 'cancelled' ? 'cancelled' : 'completed'
     }))
   }
 }
+

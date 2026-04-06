@@ -9,8 +9,11 @@ export type Ride = {
   driverId?: string | null;
   pickupLat?: number | null;
   pickupLng?: number | null;
+  pickupLabel?: string | null;
   dropoffLat?: number | null;
   dropoffLng?: number | null;
+  dropoffLabel?: string | null;
+  vehicleType?: string | null;
   status: string;
   statusUpdatedAt?: string;
   createdAt?: string;

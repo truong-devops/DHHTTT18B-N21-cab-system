@@ -27,7 +27,9 @@ export default function DebugScreen() {
     const unsubscribe = subscribeLogs(() => {
       setLogs(getLogs().slice(0, 10));
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const handlePing = async () => {

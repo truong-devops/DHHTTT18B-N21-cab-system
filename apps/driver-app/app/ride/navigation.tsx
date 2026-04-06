@@ -269,13 +269,15 @@ export default function RideNavigationScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.label}>Điểm đón</Text>
             <Text style={styles.value}>
-              {ride.pickupLat?.toFixed(5) ?? '--'},{ride.pickupLng?.toFixed(5) ?? '--'}
+              {ride.pickupLabel ||
+                `${ride.pickupLat?.toFixed(5) ?? '--'},${ride.pickupLng?.toFixed(5) ?? '--'}`}
             </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Điểm đến</Text>
             <Text style={styles.value}>
-              {ride.dropoffLat?.toFixed(5) ?? '--'},{ride.dropoffLng?.toFixed(5) ?? '--'}
+              {ride.dropoffLabel ||
+                `${ride.dropoffLat?.toFixed(5) ?? '--'},${ride.dropoffLng?.toFixed(5) ?? '--'}`}
             </Text>
           </View>
           <View style={styles.infoRow}>

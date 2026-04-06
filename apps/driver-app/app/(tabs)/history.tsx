@@ -86,6 +86,11 @@ const styles = StyleSheet.create({
     color: palette.text,
     marginBottom: 4,
   },
+  emptyText: {
+    color: palette.muted,
+    fontSize: 13,
+    marginTop: 4,
+  },
   errorCard: {
     backgroundColor: '#FFF1F1',
     borderColor: '#FECACA',

@@ -1,7 +1,5 @@
 import { apiRequest } from '../lib/api'
 import { endpoints } from '../lib/endpoints'
-import { mockConfig } from '../mocks/config'
-import { mockCreateReview } from '../mocks/handlers/review'
 
 export type Review = {
   id: string
@@ -24,7 +22,6 @@ type CreateReviewPayload = {
 
 export async function createReview(payload: CreateReviewPayload) {
   const keyBase = String(payload.rideId || '').trim() || Date.now().toString()
-  if (mockConfig.useMockApi) return mockCreateReview(payload)
   return apiRequest<{ data: Review }>({
     method: 'POST',
     path: endpoints.review.create,

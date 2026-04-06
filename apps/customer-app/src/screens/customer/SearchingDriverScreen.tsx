@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
@@ -13,12 +13,27 @@ import { useRealtimeStream } from '../../hooks/useRealtimeStream'
 const SearchingDriverScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, 'SearchingDriver'>>()
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
-  const { startRide } = useCustomerStore()
+  const { startRide, activeRide, assignDriverToActiveRide, refreshActiveRide } = useCustomerStore()
   const { push } = useToast()
   const [status, setStatus] = useState<'searching' | 'found'>('searching')
   const [seconds, setSeconds] = useState(12)
   const ripple = useRef(new Animated.Value(0)).current
+  const hasStartedRef = useRef(false)
+  const hasNavigatedRef = useRef(false)
   const { latestEvent } = useRealtimeStream()
+
+  const goToTracking = useCallback(
+    (showToast = true) => {
+      if (hasNavigatedRef.current) return
+      hasNavigatedRef.current = true
+      setStatus('found')
+      if (showToast) {
+        push('Tài xế đã nhận chuyến', 'success')
+      }
+      navigation.replace('RideTracking')
+    },
+    [navigation, push]
+  )
 
   useEffect(() => {
     const intervalId = setInterval(() => setSeconds((prev) => (prev > 0 ? prev - 1 : 0)), 1000)
@@ -27,25 +42,54 @@ const SearchingDriverScreen = () => {
 
   useEffect(() => {
     if (latestEvent?.type === 'match_status' && latestEvent.status === 'found') {
-      setStatus('found')
-      const navTimer = setTimeout(() => navigation.replace('RideTracking'), 1200)
+      if (latestEvent.driverId) {
+        assignDriverToActiveRide(latestEvent.driverId)
+      }
+      const navTimer = setTimeout(() => goToTracking(), 900)
       return () => clearTimeout(navTimer)
     }
     return undefined
-  }, [latestEvent, navigation])
+  }, [assignDriverToActiveRide, goToTracking, latestEvent])
 
   useEffect(() => {
+    if (hasStartedRef.current) return
+    hasStartedRef.current = true
+
     startRide(route.params.pickup, route.params.destination)
-      .then(() => {
-        // fallback: auto move to tracking after small delay
-        const navTimer = setTimeout(() => navigation.replace('RideTracking'), 2000)
-        return () => clearTimeout(navTimer)
-      })
       .catch((err: any) => {
         push(err?.message || 'Không tìm thấy tài xế', 'danger')
         navigation.goBack()
       })
   }, [navigation, push, route.params.destination, route.params.pickup, startRide])
+
+  useEffect(() => {
+    if (activeRide?.driverId || activeRide?.driver) {
+      goToTracking()
+    }
+  }, [activeRide?.driver, activeRide?.driverId, goToTracking])
+
+  useEffect(() => {
+    if (!activeRide?.id || activeRide?.driverId || activeRide?.driver) return
+
+    let disposed = false
+    const poll = async () => {
+      const updated = await refreshActiveRide()
+      if (disposed || !updated) return
+      if (updated.driverId || updated.driver) {
+        goToTracking()
+      }
+    }
+
+    void poll()
+    const intervalId = setInterval(() => {
+      void poll()
+    }, 4000)
+
+    return () => {
+      disposed = true
+      clearInterval(intervalId)
+    }
+  }, [activeRide?.driver, activeRide?.driverId, activeRide?.id, goToTracking, refreshActiveRide])
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -76,7 +120,7 @@ const SearchingDriverScreen = () => {
       </View>
       <Text style={styles.title}>{status === 'searching' ? 'Đang tìm tài xế' : 'Đã tìm thấy tài xế'}</Text>
       <Text style={styles.subtitle}>
-        Trạng thái thời gian thực... {status === 'searching' ? `${seconds}s` : 'chuẩn bị điều hướng'}
+        Trạng thái thời gian thực... {status === 'searching' ? `${seconds}s` : 'đang điều hướng'}
       </Text>
       <OutlineButton title="Hủy" onPress={() => navigation.goBack()} />
       {/* TODO: Subscribe to real Kafka/SSE matching events when backend ready */}

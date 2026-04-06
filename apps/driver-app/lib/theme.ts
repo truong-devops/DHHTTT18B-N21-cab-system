@@ -8,6 +8,7 @@ export const palette = {
   muted: '#7E5C52',
   border: 'rgba(242, 92, 42, 0.18)',
   card: '#FFFFFF',
+  surface: '#FFFFFF',
   background: '#FFFFFF',
   success: '#0E9F6E',
   warning: '#F59E0B',
