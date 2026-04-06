@@ -1,5 +1,6 @@
 import { apiRequest } from '../lib/api'
 import { endpoints } from '../lib/endpoints'
+import { createIdempotencyKey } from '../utils/idempotency'
 
 export type Review = {
   id: string
@@ -21,12 +22,13 @@ type CreateReviewPayload = {
 }
 
 export async function createReview(payload: CreateReviewPayload) {
-  const keyBase = String(payload.rideId || '').trim() || Date.now().toString()
+  const rideIdPart = String(payload.rideId || '').trim() || 'ride'
+  const idempotencyKey = createIdempotencyKey(`review-${rideIdPart}`)
   return apiRequest<{ data: Review }>({
     method: 'POST',
     path: endpoints.review.create,
     headers: {
-      'Idempotency-Key': `review-${keyBase}`
+      'Idempotency-Key': idempotencyKey
     },
     body: payload
   })

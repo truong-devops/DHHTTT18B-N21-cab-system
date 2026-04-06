@@ -21,13 +21,23 @@ const RatingScreen = () => {
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async () => {
+    if (loading) return
+
     try {
       setLoading(true)
       await submitRating(stars, comment)
       push('Cảm ơn bạn đã đánh giá', 'success')
       navigation.popToTop()
     } catch (err: any) {
-      push(err?.message || 'Gửi đánh giá thất bại', 'danger')
+      const message = String(err?.message || '')
+      if (message.includes('Idempotency key reuse with different request')) {
+        push('Yêu cầu đánh giá trước đó chưa hoàn tất. Vui lòng thử lại sau ít giây.', 'danger')
+      } else if (message.includes('Review already exists for this ride')) {
+        push('Chuyến đi này đã được đánh giá trước đó.', 'info')
+        navigation.popToTop()
+      } else {
+        push(message || 'Gửi đánh giá thất bại', 'danger')
+      }
     } finally {
       setLoading(false)
     }
