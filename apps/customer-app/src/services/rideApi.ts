@@ -1,8 +1,6 @@
 import { apiRequest } from '../lib/api'
 import { endpoints } from '../lib/endpoints'
 import { createIdempotencyKey } from '../utils/idempotency'
-import { mockConfig } from '../mocks/config'
-import { mockCreateRide, mockListRides, mockUpdateRideStatus } from '../mocks/handlers/ride'
 
 export type Ride = {
   id: string
@@ -12,8 +10,10 @@ export type Ride = {
   driverId?: string | null
   pickupLat?: number | null
   pickupLng?: number | null
+  pickupLabel?: string | null
   dropoffLat?: number | null
   dropoffLng?: number | null
+  dropoffLabel?: string | null
   status: string
   statusUpdatedAt?: string
   createdAt?: string
@@ -28,13 +28,14 @@ export type RideListResponse = {
 type CreateRidePayload = {
   pickupLat: number
   pickupLng: number
+  pickupLabel?: string
   dropoffLat?: number
   dropoffLng?: number
+  dropoffLabel?: string
   status?: string
 }
 
 export async function createRide(payload: CreateRidePayload) {
-  if (mockConfig.useMockApi) return mockCreateRide(payload)
   return apiRequest<{ data: Ride }>({
     method: 'POST',
     path: endpoints.ride.list,
@@ -53,7 +54,6 @@ type RideListParams = {
 }
 
 export async function listRides({ limit = 20, cursor, status, riderId }: RideListParams = {}) {
-  if (mockConfig.useMockApi) return mockListRides({ limit })
   return apiRequest<RideListResponse>({
     method: 'GET',
     path: endpoints.ride.list,
@@ -66,8 +66,14 @@ export async function listRides({ limit = 20, cursor, status, riderId }: RideLis
   })
 }
 
+export async function getRide(id: string) {
+  return apiRequest<{ data: Ride }>({
+    method: 'GET',
+    path: endpoints.ride.detail(id)
+  })
+}
+
 export async function updateRideStatus(id: string, status: string) {
-  if (mockConfig.useMockApi) return mockUpdateRideStatus(id, status)
   return apiRequest<{ data: Ride }>({
     method: 'PATCH',
     path: endpoints.ride.update(id),

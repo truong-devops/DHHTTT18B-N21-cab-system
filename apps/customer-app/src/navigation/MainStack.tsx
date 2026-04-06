@@ -1,6 +1,7 @@
-﻿import React from 'react'
+import React from 'react'
+import type { NavigatorScreenParams } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import Tabs from './Tabs'
+import Tabs, { type TabParamList } from './Tabs'
 import DestinationScreen from '../screens/customer/DestinationScreen'
 import RideOptionsScreen from '../screens/customer/RideOptionsScreen'
 import SearchingDriverScreen from '../screens/customer/SearchingDriverScreen'
@@ -9,7 +10,7 @@ import PaymentScreen from '../screens/customer/PaymentScreen'
 import RatingScreen from '../screens/customer/RatingScreen'
 
 export type MainStackParamList = {
-  Tabs: undefined
+  Tabs: NavigatorScreenParams<TabParamList> | undefined
   Destination: undefined
   RideOptions: { pickup: string; destination: string }
   SearchingDriver: { pickup: string; destination: string }

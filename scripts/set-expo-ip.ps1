@@ -1,18 +1,15 @@
 <#
   Set EXPO_PUBLIC_API_BASE_URL for both Expo apps (customer & driver) based on host IPv4.
 
-  Usage examples:
-    # auto-pick first non-loopback IPv4
-    .\scripts\set-expo-ip.ps1
-
-    # force a specific IP
-    .\scripts\set-expo-ip.ps1 -Ip 192.168.56.1
+  Usage:
+    .\scripts\set-expo-ip.ps1            # auto-pick primary IPv4
+    .\scripts\set-expo-ip.ps1 -Ip 192.168.56.1  # force a specific IP
 
   Notes:
-    - Only edits EXPO_PUBLIC_API_BASE_URL lines in:
+    - Updates only EXPO_PUBLIC_API_BASE_URL lines in:
         apps/customer-app/.env
         apps/driver-app/.env
-    - Leaves other lines unchanged.
+    - Leaves other lines untouched.
 #>
 
 [CmdletBinding()]
@@ -27,18 +24,17 @@ function Pick-IPv4 {
     param([string] $PreferredIp)
     if ($PreferredIp) { return $PreferredIp }
 
-    $all = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.IPAddress -notlike "127.*" -and
-            $_.IPAddress -notlike "169.254.*"
-        } |
-        Sort-Object InterfaceMetric, SkipAsSource
+    $candidates = Get-NetIPConfiguration -ErrorAction SilentlyContinue | Where-Object {
+        $_.IPv4Address -and $_.IPv4Address.Count -gt 0 -and $_.NetAdapter.Status -eq 'Up'
+    } | Sort-Object `
+        { if ($_.InterfaceAlias -match 'vEthernet|Hyper-V|Loopback') { 2 } else { 0 } }, `
+        { if ($_.IPv4DefaultGateway) { 0 } else { 1 } }
 
-    if (-not $all) {
-        throw "Không tìm thấy IPv4 hợp lệ. Hãy truyền tham số -Ip."
+    if (-not $candidates) {
+        throw "No valid IPv4 found (interface Up). Pass -Ip to override."
     }
 
-    return ($all | Select-Object -First 1 -ExpandProperty IPAddress)
+    return $candidates[0].IPv4Address[0].IPAddress
 }
 
 function Update-EnvFile {
@@ -47,11 +43,11 @@ function Update-EnvFile {
         [string] $Ip
     )
     if (-not (Test-Path $Path)) {
-        Write-Warning "$Path không tồn tại, bỏ qua."
+        Write-Warning "$Path not found, skipping."
         return
     }
 
-    $newLine = "EXPO_PUBLIC_API_BASE_URL=http://$Ip:3000"
+    $newLine = "EXPO_PUBLIC_API_BASE_URL=http://$Ip`:3000"
     $lines = Get-Content $Path
     $found = $false
     $lines = $lines | ForEach-Object {
@@ -63,7 +59,7 @@ function Update-EnvFile {
         }
     }
     if (-not $found) { $lines += $newLine }
-    Set-Content -Path $Path -Value $lines -Encoding UTF8
+    Set-Content -Path $Path -Value $lines -Encoding ASCII
     Write-Host "Updated $Path -> $newLine"
 }
 
@@ -73,4 +69,4 @@ Write-Host "Using IPv4: $chosenIp"
 Update-EnvFile -Path (Join-Path $repoRoot "apps/customer-app/.env") -Ip $chosenIp
 Update-EnvFile -Path (Join-Path $repoRoot "apps/driver-app/.env") -Ip $chosenIp
 
-Write-Host "Done. Khởi động lại Expo để áp dụng."
+Write-Host "Done. Restart Expo to apply."

@@ -23,23 +23,22 @@ const HomeMapScreen = () => {
   const destinationCoordinate = useMemo(() => {
     const found = destinationPoints.find((point) => point.label === destination)
     if (!found) return null
-    return { latitude: found.lat, longitude: found.lng }
+    return { latitude: found.lat, longitude: found.lng, label: found.label }
   }, [destination])
 
   const quickActions = [
-    { id: 'a1', label: 'Đặt xe', emoji: '🚗', onPress: () => navigation.navigate('Destination') },
-    { id: 'a2', label: 'Lịch sử', emoji: '🕓', onPress: () => navigation.navigate('History') },
-    { id: 'a3', label: 'Ví', emoji: '💳', onPress: () => navigation.navigate('Profile') },
-    { id: 'a4', label: 'Ưu đãi', emoji: '🎁', onPress: () => navigation.navigate('Profile') },
-    { id: 'a5', label: 'Hỗ trợ', emoji: '🛟', onPress: () => {} },
-    { id: 'a6', label: 'Tất cả', emoji: '➕', onPress: () => navigation.navigate('Profile') }
+    { id: 'a1', label: 'Dat xe', emoji: 'CAR', onPress: () => navigation.navigate('Destination') },
+    { id: 'a2', label: 'Lich su', emoji: 'HIS', onPress: () => navigation.navigate('Tabs', { screen: 'History' }) },
+    { id: 'a3', label: 'Vi', emoji: 'WLT', onPress: () => navigation.navigate('Tabs', { screen: 'Wallet' }) },
+    { id: 'a4', label: 'Uu dai', emoji: 'PRM', onPress: () => navigation.navigate('Tabs', { screen: 'Promo' }) },
+    { id: 'a6', label: 'Tat ca', emoji: 'ALL', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
   ]
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xl }}>
       <View style={styles.mapWrap}>
         <CustomerLiveMap
-          label="Bản đồ điểm đón"
+          label="Ban do diem don"
           destination={destinationCoordinate}
           showRoute={Boolean(destinationCoordinate)}
           onLocationChange={(coords) => customerApi.setLivePickupLocation(coords.latitude, coords.longitude)}
@@ -47,22 +46,22 @@ const HomeMapScreen = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.greeting}>Chào {user?.name || 'bạn'}! 👋</Text>
-        <Text style={styles.meta}>Có {nearbyDrivers} tài xế hoạt động gần bạn</Text>
+        <Text style={styles.greeting}>Chao {user?.name || 'ban'}!</Text>
+        <Text style={styles.meta}>Co {nearbyDrivers} tai xe hoat dong gan ban</Text>
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>📍</Text>
+          <Text style={styles.searchIcon}>LOC</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Bạn muốn đi tới đâu?"
+            placeholder="Ban muon di toi dau?"
             placeholderTextColor={colors.muted}
             onFocus={() => navigation.navigate('Destination')}
           />
-          <PrimaryButton title="Đặt hộ" onPress={() => navigation.navigate('Destination')} />
+          <PrimaryButton title="Dat ho" onPress={() => navigation.navigate('Destination')} />
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Dịch vụ nhanh</Text>
+        <Text style={styles.sectionTitle}>Dich vu nhanh</Text>
         <View style={styles.grid}>
           {quickActions.map((item) => (
             <Card key={item.id} style={styles.actionCard} onPress={item.onPress}>
@@ -74,23 +73,23 @@ const HomeMapScreen = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quản lý chi tiêu</Text>
+        <Text style={styles.sectionTitle}>Quan ly chi tieu</Text>
         <Card>
-          <Text style={styles.h2}>Chi tiêu của bạn</Text>
-          <Text style={styles.meta}>Theo dõi và thống kê chi tiêu chuyến đi</Text>
+          <Text style={styles.h2}>Chi tieu cua ban</Text>
+          <Text style={styles.meta}>Theo doi va thong ke chi tieu chuyen di</Text>
         </Card>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Khám phá đa dịch vụ</Text>
+        <Text style={styles.sectionTitle}>Kham pha da dich vu</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md }}>
           <Card style={styles.bannerCard}>
-            <Text style={styles.bannerTitle}>Mở ví nhận quà</Text>
-            <Text style={styles.bannerSub}>Ưu đãi cho khách mới</Text>
+            <Text style={styles.bannerTitle}>Mo vi nhan qua</Text>
+            <Text style={styles.bannerSub}>Uu dai cho khach moi</Text>
           </Card>
           <Card style={styles.bannerCard}>
-            <Text style={styles.bannerTitle}>Giảm giá giờ thấp điểm</Text>
-            <Text style={styles.bannerSub}>Áp dụng cho xe máy & taxi</Text>
+            <Text style={styles.bannerTitle}>Giam gia gio thap diem</Text>
+            <Text style={styles.bannerSub}>Ap dung cho xe may va taxi</Text>
           </Card>
         </ScrollView>
       </View>

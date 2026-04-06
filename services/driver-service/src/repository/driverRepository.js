@@ -1,5 +1,14 @@
 const pool = require("../db/pool");
 
+function isUuidLike(value) {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      value
+    )
+  );
+}
+
 async function getDriverByUserId(userId) {
   const result = await pool.query(
     "SELECT * FROM drivers WHERE user_id = $1",
@@ -9,6 +18,9 @@ async function getDriverByUserId(userId) {
 }
 
 async function getDriverById(id) {
+  if (!isUuidLike(id)) {
+    return null;
+  }
   const result = await pool.query(
     "SELECT * FROM drivers WHERE id = $1",
     [id]

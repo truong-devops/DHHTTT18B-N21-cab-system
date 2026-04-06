@@ -6,6 +6,7 @@ const {
   getActiveRideForDriver,
   listRides,
   claimRideForDriver,
+  findNextRequestedRide,
   updateRideFields,
   updateRideStatus,
   addStatusHistory
@@ -37,6 +38,13 @@ const logger = require("../utils/logger");
 
 const router = express.Router();
 
+// Auto-assign every new ride to a default driver so driver app receives it immediately.
+// Auto-assign is OFF by default; set AUTO_ASSIGN_DRIVER=true to force assign to DEFAULT_DRIVER_ID.
+const AUTO_ASSIGN_DRIVER =
+  String(process.env.AUTO_ASSIGN_DRIVER || "false").toLowerCase() === "true";
+const DEFAULT_DRIVER_ID =
+  process.env.DEFAULT_DRIVER_ID || "10000004"; // seeded driver@cab.local
+
 router.use(requireAuth);
 
 function toRideResponse(row) {
@@ -48,8 +56,10 @@ function toRideResponse(row) {
     driverId: row.driver_id,
     pickupLat: row.pickup_lat,
     pickupLng: row.pickup_lng,
+    pickupLabel: row.pickup_label,
     dropoffLat: row.dropoff_lat,
     dropoffLng: row.dropoff_lng,
+    dropoffLabel: row.dropoff_label,
     status: row.status,
     statusUpdatedAt: row.status_updated_at,
     createdAt: row.created_at,
@@ -61,12 +71,14 @@ router.post(
   "/",
   validateRequest({
     bodySchema: {
-      required: ["pickupLat", "pickupLng"],
+      required: ["pickupLat", "pickupLng", "dropoffLat", "dropoffLng"],
       properties: {
         pickupLat: { type: "number" },
         pickupLng: { type: "number" },
         dropoffLat: { type: "number" },
         dropoffLng: { type: "number" },
+        pickupLabel: { type: "string" },
+        dropoffLabel: { type: "string" },
         bookingId: { type: "string" },
         driverId: { type: "string" },
         status: { type: "string" }
@@ -199,16 +211,26 @@ router.post(
         requestHash
       });
 
+      const shouldAutoAssign =
+        AUTO_ASSIGN_DRIVER &&
+        !req.body?.driverId &&
+        DEFAULT_DRIVER_ID &&
+        DEFAULT_DRIVER_ID.trim().length > 0;
+
       const ride = await createRide({
         externalRideId: crypto.randomUUID(),
         bookingId: req.body.bookingId,
         riderId: req.userId,
-        driverId: req.body.driverId,
+        driverId: shouldAutoAssign ? DEFAULT_DRIVER_ID : req.body.driverId,
         pickupLat: req.body.pickupLat,
         pickupLng: req.body.pickupLng,
+        pickupLabel: req.body.pickupLabel || null,
         dropoffLat: req.body.dropoffLat,
         dropoffLng: req.body.dropoffLng,
-        status: req.body.status || "requested",
+        dropoffLabel: req.body.dropoffLabel || null,
+        status: shouldAutoAssign
+          ? "assigned"
+          : req.body.status || "requested",
         traceId: req.traceId
       });
 
@@ -270,16 +292,12 @@ router.get(
       return res.json({ data: [toRideResponse(active)] });
     }
 
-    const claimed = await claimRideForDriver({
-      driverId,
-      traceId: req.traceId
-    });
-
-    if (!claimed) {
+    // Chỉ trả về chuyến pending, không tự claim; driver phải gọi PATCH để nhận.
+    const pending = await findNextRequestedRide();
+    if (!pending) {
       return res.json({ data: [] });
     }
-
-    return res.json({ data: [toRideResponse(claimed)] });
+    return res.json({ data: [toRideResponse(pending)] });
   })
 );
 
@@ -420,8 +438,10 @@ router.patch(
         driverId: { type: "string" },
         pickupLat: { type: "number" },
         pickupLng: { type: "number" },
+        pickupLabel: { type: "string" },
         dropoffLat: { type: "number" },
         dropoffLng: { type: "number" },
+        dropoffLabel: { type: "string" },
         status: { type: "string" },
         statusReason: { type: "string" }
       }
@@ -493,15 +513,19 @@ router.patch(
       req.body.driverId !== undefined ||
       req.body.pickupLat !== undefined ||
       req.body.pickupLng !== undefined ||
+      req.body.pickupLabel !== undefined ||
       req.body.dropoffLat !== undefined ||
-      req.body.dropoffLng !== undefined
+      req.body.dropoffLng !== undefined ||
+      req.body.dropoffLabel !== undefined
     ) {
       ride = await updateRideFields(req.params.id, {
         driverId: req.body.driverId,
         pickupLat: req.body.pickupLat,
         pickupLng: req.body.pickupLng,
+        pickupLabel: req.body.pickupLabel,
         dropoffLat: req.body.dropoffLat,
-        dropoffLng: req.body.dropoffLng
+        dropoffLng: req.body.dropoffLng,
+        dropoffLabel: req.body.dropoffLabel
       });
     }
 

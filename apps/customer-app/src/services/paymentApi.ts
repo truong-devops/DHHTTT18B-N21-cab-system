@@ -1,8 +1,6 @@
 import { apiRequest } from '../lib/api'
 import { endpoints } from '../lib/endpoints'
 import { createIdempotencyKey } from '../utils/idempotency'
-import { mockConfig } from '../mocks/config'
-import { mockCreatePayment, mockListPayments } from '../mocks/handlers/payment'
 
 export type Payment = {
   id: string
@@ -30,7 +28,6 @@ type CreatePaymentPayload = {
 }
 
 export async function listPayments(limit = 50) {
-  if (mockConfig.useMockApi) return mockListPayments(limit)
   return apiRequest<PaymentListResponse>({
     method: 'GET',
     path: endpoints.payment.list,
@@ -39,7 +36,6 @@ export async function listPayments(limit = 50) {
 }
 
 export async function createPayment(payload: CreatePaymentPayload) {
-  if (mockConfig.useMockApi) return mockCreatePayment(payload)
   return apiRequest<{ data: Payment }>({
     method: 'POST',
     path: endpoints.payment.create,

@@ -11,7 +11,7 @@ export function useIncomingRides({ enabled, intervalMs = 2500, limit = 5 }: Opti
   const [rides, setRides] = useState<rideApi.Ride[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchRides = useCallback(async () => {
     if (!enabled) return;

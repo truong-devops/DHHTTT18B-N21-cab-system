@@ -25,6 +25,12 @@ export const endpoints = {
     list: '/v1/reviews',
     create: '/v1/reviews'
   },
+  driver: {
+    availability: '/v1/driver/availability'
+  },
+  drivers: {
+    profile: (driverId: string) => `/v1/drivers/${driverId}/profile`
+  },
   user: {
     detail: (id: string) => `/v1/users/${id}`
   }
