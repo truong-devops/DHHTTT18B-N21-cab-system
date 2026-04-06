@@ -39,6 +39,7 @@ export type DriverProfileResponse = {
   data: {
     driver: {
       id: string
+      userId?: string | null
       fullName?: string | null
       phone?: string | null
       status?: string | null
