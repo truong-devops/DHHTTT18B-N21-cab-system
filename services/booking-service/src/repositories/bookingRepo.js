@@ -92,6 +92,19 @@ async function cancel(client, bookingId) {
   return mapRow(result.rows[0]);
 }
 
+async function updateStatus(client, bookingId, status) {
+  const db = executor(client);
+  const result = await db.query(
+    `UPDATE bookings
+     SET status = $2,
+         updated_at = now()
+     WHERE booking_id = $1
+     RETURNING *`,
+    [bookingId, status]
+  );
+  return mapRow(result.rows[0]);
+}
+
 async function list(optionsOrClient, maybeClient) {
   let options = {};
   let client = maybeClient || null;
@@ -123,5 +136,6 @@ module.exports = {
   getById,
   getByIdForUpdate,
   cancel,
+  updateStatus,
   list
 };

@@ -20,6 +20,15 @@
       "consumers": []
     },
     {
+      "key": "RideAccepted",
+      "topic": "ride_accepted",
+      "type": "RideAccepted",
+      "payloadSchema": "payloads/ride.accepted.payload.json",
+      "envelopeSchema": "envelopes/ride.accepted.envelope.json",
+      "producer": "booking-service",
+      "consumers": []
+    },
+    {
       "key": "RideAssigned",
       "topic": "ride.assigned",
       "type": "RideAssigned",
