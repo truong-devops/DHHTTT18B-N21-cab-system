@@ -13,9 +13,5 @@ export type RouteResult = {
 
 export interface RoutingProvider {
   name: string;
-  getRoute: (
-    origin: LatLng,
-    destination: LatLng,
-    profile: RouteProfile
-  ) => Promise<RouteResult>;
+  getRoute: (origin: LatLng, destination: LatLng, profile: RouteProfile) => Promise<RouteResult>;
 }

@@ -31,9 +31,7 @@ export default function HistoryScreen() {
           </View>
         </View>
 
-        {loading && items.length === 0 ? (
-          <Text style={styles.emptyText}>Dang tai lich su...</Text>
-        ) : null}
+        {loading && items.length === 0 ? <Text style={styles.emptyText}>Dang tai lich su...</Text> : null}
 
         {items.map((ride) => {
           const status = ride.status?.toUpperCase() ?? '--';
@@ -49,10 +47,7 @@ export default function HistoryScreen() {
               : `${ride.dropoffLat?.toFixed(3) ?? '--'},${ride.dropoffLng?.toFixed(3) ?? '--'}`;
           const route = `${pickupText} -> ${dropoffText}`;
           const amountValue = paymentsByRide[ride.id];
-          const amountLabel =
-            typeof amountValue === 'number' && Number.isFinite(amountValue)
-              ? `${amountValue.toLocaleString('vi-VN')} d`
-              : '--';
+          const amountLabel = typeof amountValue === 'number' && Number.isFinite(amountValue) ? `${amountValue.toLocaleString('vi-VN')} d` : '--';
 
           return (
             <View key={ride.id} style={styles.card}>
@@ -63,9 +58,7 @@ export default function HistoryScreen() {
               <View style={styles.row}>
                 <Text style={styles.time}>{createdAt}</Text>
                 <View style={[styles.statusPill, status === 'COMPLETED' ? styles.statusOk : styles.statusCancel]}>
-                  <Text style={[styles.statusText, status === 'COMPLETED' ? styles.statusOkText : styles.statusCancelText]}>
-                    {statusLabel}
-                  </Text>
+                  <Text style={[styles.statusText, status === 'COMPLETED' ? styles.statusOkText : styles.statusCancelText]}>{statusLabel}</Text>
                 </View>
               </View>
             </View>
@@ -79,34 +72,34 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: palette.background,
+    backgroundColor: palette.background
   },
   container: {
     padding: 20,
     paddingBottom: 32,
-    gap: 12,
+    gap: 12
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
     color: palette.text,
-    marginBottom: 4,
+    marginBottom: 4
   },
   emptyText: {
     color: palette.muted,
     fontSize: 13,
-    marginTop: 4,
+    marginTop: 4
   },
   errorCard: {
     backgroundColor: '#FFF1F1',
     borderColor: '#FECACA',
     borderWidth: 1,
     borderRadius: 12,
-    padding: 12,
+    padding: 12
   },
   errorText: {
     color: '#B91C1C',
-    fontSize: 12,
+    fontSize: 12
   },
   summaryCard: {
     flexDirection: 'row',
@@ -115,68 +108,68 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   summaryItem: {
-    flex: 1,
+    flex: 1
   },
   summaryLabel: {
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   summaryValue: {
     color: palette.text,
     fontWeight: '700',
-    marginTop: 6,
+    marginTop: 6
   },
   card: {
     backgroundColor: palette.card,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
+    gap: 12
   },
   route: {
     color: palette.text,
     fontWeight: '600',
-    flex: 1,
+    flex: 1
   },
   amount: {
     color: palette.redDark,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   time: {
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   statusPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    borderWidth: 1,
+    borderWidth: 1
   },
   statusOk: {
     backgroundColor: palette.redSoft,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   statusCancel: {
     backgroundColor: '#FFF7F4',
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   statusOkText: {
-    color: palette.redDark,
+    color: palette.redDark
   },
   statusCancelText: {
-    color: palette.muted,
-  },
+    color: palette.muted
+  }
 });

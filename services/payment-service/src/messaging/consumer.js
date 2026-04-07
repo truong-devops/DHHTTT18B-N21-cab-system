@@ -1,17 +1,14 @@
-const config = require("../config");
-const { getConsumer } = require("./kafka");
-const { publishToDlq } = require("./dlq");
-const { validateEnvelope } = require("./schemaRegistry");
-const {
-  insertInboxEvent,
-  markInboxProcessed
-} = require("../repositories/inboxRepo");
-const { logger, withTrace } = require("../utils/logger");
-const monitoring = require("../monitoring");
+const config = require('../config');
+const { getConsumer } = require('./kafka');
+const { publishToDlq } = require('./dlq');
+const { validateEnvelope } = require('./schemaRegistry');
+const { insertInboxEvent, markInboxProcessed } = require('../repositories/inboxRepo');
+const { logger, withTrace } = require('../utils/logger');
+const monitoring = require('../monitoring');
 
 function headerValueToString(value) {
   if (value == null) {
-    return "";
+    return '';
   }
   if (Buffer.isBuffer(value)) {
     return value.toString();
@@ -21,15 +18,10 @@ function headerValueToString(value) {
 
 function buildInvalidJsonEnvelope(message, rawValue) {
   return {
-    eventId:
-      headerValueToString(message.headers?.["x-event-id"]) ||
-      message.key?.toString() ||
-      null,
-    traceId:
-      headerValueToString(message.headers?.["x-trace-id"]) ||
-      null,
+    eventId: headerValueToString(message.headers?.['x-event-id']) || message.key?.toString() || null,
+    traceId: headerValueToString(message.headers?.['x-trace-id']) || null,
     occurredAt: new Date().toISOString(),
-    type: "InvalidJson",
+    type: 'InvalidJson',
     version: 1,
     payload: { rawValue }
   };
@@ -37,54 +29,51 @@ function buildInvalidJsonEnvelope(message, rawValue) {
 
 async function processConsumedMessage({ topic, message }) {
   const startedAt = Date.now();
-  const value = message.value ? message.value.toString() : "";
+  const value = message.value ? message.value.toString() : '';
   let envelope;
 
   try {
     envelope = JSON.parse(value);
   } catch (_err) {
     monitoring.recordDependencyRequest({
-      dependencyType: "kafka",
+      dependencyType: 'kafka',
       dependencyName: topic,
-      operation: "consume",
-      outcome: "error",
+      operation: 'consume',
+      outcome: 'error',
       durationMs: Date.now() - startedAt,
-      attributes: { error_type: "invalid_json" }
+      attributes: { error_type: 'invalid_json' }
     });
     await publishToDlq({
       sourceTopic: topic,
       envelope: buildInvalidJsonEnvelope(message, value),
-      errorType: "invalid_json",
-      errorMessage: "Invalid JSON from Kafka"
+      errorType: 'invalid_json',
+      errorMessage: 'Invalid JSON from Kafka'
     });
-    return { handled: true, reason: "invalid_json" };
+    return { handled: true, reason: 'invalid_json' };
   }
 
   const envelopeValidation = validateEnvelope(topic, envelope);
   if (!envelopeValidation.valid) {
     monitoring.recordDependencyRequest({
-      dependencyType: "kafka",
+      dependencyType: 'kafka',
       dependencyName: topic,
-      operation: "consume",
-      outcome: "error",
+      operation: 'consume',
+      outcome: 'error',
       durationMs: Date.now() - startedAt,
-      attributes: { error_type: "invalid_envelope" }
+      attributes: { error_type: 'invalid_envelope' }
     });
     await publishToDlq({
       sourceTopic: topic,
       envelope,
-      errorType: "invalid_envelope",
-      errorMessage: "Envelope schema validation failed",
+      errorType: 'invalid_envelope',
+      errorMessage: 'Envelope schema validation failed',
       details: { validationErrors: envelopeValidation.errors }
     });
-    return { handled: true, reason: "invalid_envelope" };
+    return { handled: true, reason: 'invalid_envelope' };
   }
 
   const eventId = envelope.eventId;
-  const traceId =
-    envelope.traceId ||
-    headerValueToString(message.headers?.["x-trace-id"]) ||
-    "no-trace";
+  const traceId = envelope.traceId || headerValueToString(message.headers?.['x-trace-id']) || 'no-trace';
   const log = withTrace(traceId);
   const inserted = await insertInboxEvent(null, {
     eventId,
@@ -95,47 +84,47 @@ async function processConsumedMessage({ topic, message }) {
 
   if (!inserted) {
     monitoring.recordDependencyRequest({
-      dependencyType: "kafka",
+      dependencyType: 'kafka',
       dependencyName: topic,
-      operation: "consume",
-      outcome: "success",
+      operation: 'consume',
+      outcome: 'success',
       durationMs: Date.now() - startedAt,
-      attributes: { result: "duplicate" }
+      attributes: { result: 'duplicate' }
     });
-    log.info({ eventId, topic }, "Duplicate event, skipping");
-    return { handled: true, reason: "duplicate" };
+    log.info({ eventId, topic }, 'Duplicate event, skipping');
+    return { handled: true, reason: 'duplicate' };
   }
 
   try {
-    log.info({ eventId, topic, type: envelope.type }, "Received event");
+    log.info({ eventId, topic, type: envelope.type }, 'Received event');
     await markInboxProcessed(eventId);
     monitoring.recordDependencyRequest({
-      dependencyType: "kafka",
+      dependencyType: 'kafka',
       dependencyName: topic,
-      operation: "consume",
-      outcome: "success",
+      operation: 'consume',
+      outcome: 'success',
       durationMs: Date.now() - startedAt
     });
-    return { handled: true, reason: "processed" };
+    return { handled: true, reason: 'processed' };
   } catch (err) {
     monitoring.recordDependencyRequest({
-      dependencyType: "kafka",
+      dependencyType: 'kafka',
       dependencyName: topic,
-      operation: "consume",
-      outcome: "error",
+      operation: 'consume',
+      outcome: 'error',
       durationMs: Date.now() - startedAt,
       attributes: {
-        error_type: String(err && err.name ? err.name : "process_error")
+        error_type: String(err && err.name ? err.name : 'process_error')
       }
     });
-    log.error({ err, eventId, topic }, "Inbox processing failed");
+    log.error({ err, eventId, topic }, 'Inbox processing failed');
     await publishToDlq({
       sourceTopic: topic,
       envelope,
-      errorType: "process_error",
-      errorMessage: err?.message || "Inbox processing failed"
+      errorType: 'process_error',
+      errorMessage: err?.message || 'Inbox processing failed'
     });
-    return { handled: true, reason: "process_error_dlq" };
+    return { handled: true, reason: 'process_error_dlq' };
   }
 }
 
@@ -156,20 +145,8 @@ async function startConsumer() {
     autoCommit: true,
     autoCommitInterval: config.kafka.autoCommitInterval,
     autoCommitThreshold: config.kafka.autoCommitThreshold,
-    eachBatch: async ({
-      batch,
-      resolveOffset,
-      heartbeat,
-      commitOffsetsIfNecessary,
-      isRunning,
-      isStale
-    }) => {
-      for (
-        let index = 0;
-        index < batch.messages.length &&
-        index < config.kafka.maxMessagesPerBatch;
-        index += 1
-      ) {
+    eachBatch: async ({ batch, resolveOffset, heartbeat, commitOffsetsIfNecessary, isRunning, isStale }) => {
+      for (let index = 0; index < batch.messages.length && index < config.kafka.maxMessagesPerBatch; index += 1) {
         const message = batch.messages[index];
         if (!isRunning() || isStale()) {
           break;
@@ -192,9 +169,9 @@ async function startConsumer() {
             });
           }
           monitoring.recordKafkaProcessingLatency({
-            pipeline: "consume_event",
+            pipeline: 'consume_event',
             topic: batch.topic,
-            outcome: /invalid|error/i.test(result?.reason || "") ? "error" : "success",
+            outcome: /invalid|error/i.test(result?.reason || '') ? 'error' : 'success',
             durationMs: Date.now() - startedAt
           });
           resolveOffset(message.offset);
@@ -202,9 +179,9 @@ async function startConsumer() {
           await heartbeat();
         } catch (error) {
           monitoring.recordKafkaProcessingLatency({
-            pipeline: "consume_event",
+            pipeline: 'consume_event',
             topic: batch.topic,
-            outcome: "error",
+            outcome: 'error',
             durationMs: Date.now() - startedAt
           });
           logger.error(
@@ -214,7 +191,7 @@ async function startConsumer() {
               offset: message.offset,
               partition: batch.partition
             },
-            "Kafka consume failed before offset commit"
+            'Kafka consume failed before offset commit'
           );
           throw error;
         }

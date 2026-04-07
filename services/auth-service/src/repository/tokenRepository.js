@@ -1,10 +1,6 @@
-const pool = require("../db/pool");
+const pool = require('../db/pool');
 
-async function createRefreshToken({
-  userId,
-  tokenHash,
-  expiresAt
-}) {
+async function createRefreshToken({ userId, tokenHash, expiresAt }) {
   const result = await pool.query(
     `
       INSERT INTO refresh_tokens (user_id, token, expired_at)

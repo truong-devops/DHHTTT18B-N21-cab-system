@@ -1,26 +1,26 @@
-const crypto = require("crypto");
+const crypto = require('crypto');
 
 const DEFAULT_RULES = [
   {
-    id: "sr_standard_peak",
-    name: "CBD Peak",
+    id: 'sr_standard_peak',
+    name: 'CBD Peak',
     multiplier: 1.4,
-    status: "ACTIVE",
-    zone: "District 1"
+    status: 'ACTIVE',
+    zone: 'District 1'
   },
   {
-    id: "sr_airport",
-    name: "Airport Boost",
+    id: 'sr_airport',
+    name: 'Airport Boost',
     multiplier: 1.6,
-    status: "ACTIVE",
-    zone: "Airport"
+    status: 'ACTIVE',
+    zone: 'Airport'
   },
   {
-    id: "sr_late_night",
-    name: "Late Night",
+    id: 'sr_late_night',
+    name: 'Late Night',
     multiplier: 1.2,
-    status: "INACTIVE",
-    zone: "All"
+    status: 'INACTIVE',
+    zone: 'All'
   }
 ];
 
@@ -50,15 +50,15 @@ function createRule(input) {
     id: `sr_${crypto.randomUUID()}`,
     name: input.name,
     multiplier: Number(input.multiplier) || 1,
-    status: input.status || "ACTIVE",
-    zone: input.zone || "All"
+    status: input.status || 'ACTIVE',
+    zone: input.zone || 'All'
   };
   rules = [rule, ...rules];
   return rule;
 }
 
 function toggleRule(id, enabled) {
-  const nextStatus = enabled ? "ACTIVE" : "INACTIVE";
+  const nextStatus = enabled ? 'ACTIVE' : 'INACTIVE';
   const rule = rules.find((item) => item.id === id);
   if (!rule) return null;
   rule.status = nextStatus;

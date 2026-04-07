@@ -1,5 +1,5 @@
-import Header from './Header.jsx'
-import Sidebar from './Sidebar.jsx'
+import Header from './Header.jsx';
+import Sidebar from './Sidebar.jsx';
 
 function AdminLayout({ children }) {
   return (
@@ -10,7 +10,7 @@ function AdminLayout({ children }) {
         <main className="app-content">{children}</main>
       </div>
     </div>
-  )
+  );
 }
 
-export default AdminLayout
+export default AdminLayout;

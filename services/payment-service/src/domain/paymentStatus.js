@@ -1,9 +1,9 @@
 const STATUSES = {
-  INITIATED: "INITIATED",
-  PROCESSING: "PROCESSING",
-  PAID: "PAID",
-  FAILED: "FAILED",
-  REFUNDED: "REFUNDED"
+  INITIATED: 'INITIATED',
+  PROCESSING: 'PROCESSING',
+  PAID: 'PAID',
+  FAILED: 'FAILED',
+  REFUNDED: 'REFUNDED'
 };
 
 // Derived from contracts/state-machines/payment-state.mmd

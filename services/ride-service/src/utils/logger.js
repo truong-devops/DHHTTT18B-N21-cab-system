@@ -1,9 +1,9 @@
-const pino = require("pino");
-const { context, trace } = require("@opentelemetry/api");
+const pino = require('pino');
+const { context, trace } = require('@opentelemetry/api');
 
 const logger = pino({
   base: {
-    serviceName: process.env.SERVICE_NAME || "ride-service"
+    serviceName: process.env.SERVICE_NAME || 'ride-service'
   }
 });
 
@@ -15,7 +15,7 @@ function withTrace(traceOrReq) {
   if (!traceOrReq) {
     return otelTraceId ? logger.child({ otelTraceId }) : logger;
   }
-  if (typeof traceOrReq === "string") {
+  if (typeof traceOrReq === 'string') {
     return logger.child({
       traceId: traceOrReq,
       ...(otelTraceId ? { otelTraceId } : {})

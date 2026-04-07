@@ -1,4 +1,4 @@
-const { ApiError } = require("../utils/errors");
+const { ApiError } = require('../utils/errors');
 
 function validateRequest({ params, query, body, custom } = {}) {
   return (req, _res, next) => {
@@ -10,7 +10,7 @@ function validateRequest({ params, query, body, custom } = {}) {
         if (!validator(value)) {
           errors.push({
             path: `params.${field}`,
-            message: "is invalid"
+            message: 'is invalid'
           });
         }
       });
@@ -22,7 +22,7 @@ function validateRequest({ params, query, body, custom } = {}) {
         if (value !== undefined && !validator(value)) {
           errors.push({
             path: `query.${field}`,
-            message: "is invalid"
+            message: 'is invalid'
           });
         }
       });
@@ -34,25 +34,18 @@ function validateRequest({ params, query, body, custom } = {}) {
         if (!validator(value)) {
           errors.push({
             path: `body.${field}`,
-            message: "is invalid"
+            message: 'is invalid'
           });
         }
       });
     }
 
-    if (typeof custom === "function") {
+    if (typeof custom === 'function') {
       custom(req, errors);
     }
 
     if (errors.length) {
-      return next(
-        new ApiError(
-          400,
-          "VALIDATION_ERROR",
-          "Invalid request",
-          errors
-        )
-      );
+      return next(new ApiError(400, 'VALIDATION_ERROR', 'Invalid request', errors));
     }
 
     return next();

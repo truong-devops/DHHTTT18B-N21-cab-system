@@ -1,16 +1,5 @@
 import { useEffect, useState } from 'react';
-import { 
-  Alert, 
-  SafeAreaView, 
-  StyleSheet, 
-  Text, 
-  TextInput, 
-  View, 
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView
-} from 'react-native';
+import { Alert, SafeAreaView, StyleSheet, Text, TextInput, View, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import Svg, { Path, Circle, Rect, Ellipse, G } from 'react-native-svg';
 import { Card } from '@/components/ui/card';
@@ -23,54 +12,40 @@ import { palette } from '@/lib/theme';
 const DriverIllustration = () => (
   <Svg width="200" height="200" viewBox="0 0 200 200" fill="none">
     {/* Car Body */}
-    <Path
-      d="M40 120 L50 100 L70 95 L130 95 L150 100 L160 120 L160 145 L40 145 Z"
-      fill="#FF5722"
-    />
-    
+    <Path d="M40 120 L50 100 L70 95 L130 95 L150 100 L160 120 L160 145 L40 145 Z" fill="#FF5722" />
+
     {/* Car Top */}
-    <Path
-      d="M60 100 L70 80 L130 80 L140 100 Z"
-      fill="#FF7043"
-    />
-    
+    <Path d="M60 100 L70 80 L130 80 L140 100 Z" fill="#FF7043" />
+
     {/* Windows */}
-    <Path
-      d="M65 95 L72 82 L95 82 L95 95 Z"
-      fill="#E3F2FD"
-      opacity="0.6"
-    />
-    <Path
-      d="M105 95 L105 82 L128 82 L135 95 Z"
-      fill="#E3F2FD"
-      opacity="0.6"
-    />
-    
+    <Path d="M65 95 L72 82 L95 82 L95 95 Z" fill="#E3F2FD" opacity="0.6" />
+    <Path d="M105 95 L105 82 L128 82 L135 95 Z" fill="#E3F2FD" opacity="0.6" />
+
     {/* Wheels */}
     <Circle cx="70" cy="145" r="15" fill="#424242" />
     <Circle cx="70" cy="145" r="8" fill="#757575" />
     <Circle cx="130" cy="145" r="15" fill="#424242" />
     <Circle cx="130" cy="145" r="8" fill="#757575" />
-    
+
     {/* Headlights */}
     <Rect x="35" y="120" width="8" height="6" rx="2" fill="#FFF59D" />
     <Rect x="157" y="120" width="8" height="6" rx="2" fill="#FFF59D" />
-    
+
     {/* Driver (person in car) */}
     <Circle cx="85" cy="90" r="12" fill="#FFCCBC" />
-    
+
     {/* Driver body */}
     <Rect x="78" y="100" width="14" height="20" rx="2" fill="#1976D2" />
-    
+
     {/* Steering wheel */}
     <Circle cx="95" cy="110" r="6" fill="#616161" stroke="#424242" strokeWidth="1.5" />
-    
+
     {/* Road lines */}
     <Rect x="10" y="165" width="30" height="4" rx="2" fill="#FFC107" />
     <Rect x="50" y="165" width="30" height="4" rx="2" fill="#FFC107" />
     <Rect x="120" y="165" width="30" height="4" rx="2" fill="#FFC107" />
     <Rect x="160" y="165" width="30" height="4" rx="2" fill="#FFC107" />
-    
+
     {/* Background elements - clouds */}
     <Ellipse cx="40" cy="30" rx="20" ry="12" fill="#E0E0E0" opacity="0.5" />
     <Ellipse cx="55" cy="28" rx="18" ry="10" fill="#E0E0E0" opacity="0.5" />
@@ -82,7 +57,7 @@ const DriverIllustration = () => (
 export default function LoginScreen() {
   const { login, isAuthenticated, isReady } = useAuth();
   const { refresh } = useDriver();
-  
+
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -128,25 +103,17 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.flex}
-      >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.container}>
             {/* Header Section */}
             <View style={styles.header}>
               <View style={styles.illustrationContainer}>
                 <DriverIllustration />
               </View>
-              
+
               <Text style={styles.title}>Đăng nhập tài xế</Text>
-              <Text style={styles.subtitle}>
-                Vui lòng đăng nhập để bắt đầu nhận chuyến
-              </Text>
+              <Text style={styles.subtitle}>Vui lòng đăng nhập để bắt đầu nhận chuyến</Text>
             </View>
 
             {/* Login Card */}
@@ -189,13 +156,8 @@ export default function LoginScreen() {
                     secureTextEntry={!showPassword}
                     style={[styles.input, styles.passwordInput]}
                   />
-                  <TouchableOpacity 
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeButton}
-                  >
-                    <Text style={styles.eyeText}>
-                      {showPassword ? 'Ẩn' : 'Hiện'}
-                    </Text>
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+                    <Text style={styles.eyeText}>{showPassword ? 'Ẩn' : 'Hiện'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -206,11 +168,7 @@ export default function LoginScreen() {
               </TouchableOpacity>
 
               {/* Login Button */}
-              <PrimaryButton 
-                title={loading ? 'Đang đăng nhập...' : 'Đăng nhập'} 
-                onPress={handleLogin}
-                disabled={loading}
-              />
+              <PrimaryButton title={loading ? 'Đang đăng nhập...' : 'Đăng nhập'} onPress={handleLogin} disabled={loading} />
             </Card>
 
             {/* Footer */}
@@ -230,46 +188,46 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF'
   },
   flex: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
-    flexGrow: 1,
+    flexGrow: 1
   },
   container: {
     flex: 1,
     padding: 24,
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   center: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   loadingText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#1F2937'
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 40
   },
   illustrationContainer: {
-    marginBottom: 24,
+    marginBottom: 24
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 8,
+    marginBottom: 8
   },
   subtitle: {
     fontSize: 15,
     color: '#6B7280',
-    textAlign: 'center',
+    textAlign: 'center'
   },
   card: {
     gap: 20,
@@ -280,7 +238,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 3,
+    elevation: 3
   },
   errorContainer: {
     backgroundColor: '#FEE2E2',
@@ -288,20 +246,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#DC2626',
+    borderLeftColor: '#DC2626'
   },
   errorText: {
     color: '#DC2626',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '500'
   },
   inputContainer: {
-    gap: 8,
+    gap: 8
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: '#374151'
   },
   input: {
     borderWidth: 1.5,
@@ -311,48 +269,48 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 15,
     color: '#1F2937',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F9FAFB'
   },
   passwordWrapper: {
-    position: 'relative',
+    position: 'relative'
   },
   passwordInput: {
-    paddingRight: 60,
+    paddingRight: 60
   },
   eyeButton: {
     position: 'absolute',
     right: 16,
     top: 0,
     bottom: 0,
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   eyeText: {
     color: '#FF5722',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginTop: -8,
+    marginTop: -8
   },
   forgotText: {
     color: '#FF5722',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 32,
+    marginTop: 32
   },
   footerText: {
     color: '#6B7280',
-    fontSize: 15,
+    fontSize: 15
   },
   registerText: {
     color: '#FF5722',
     fontSize: 15,
-    fontWeight: '600',
-  },
+    fontWeight: '600'
+  }
 });

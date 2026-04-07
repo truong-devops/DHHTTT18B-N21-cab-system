@@ -1,5 +1,5 @@
-﻿import { StyleSheet } from 'react-native'
-import { colors, spacing, radius, typography } from './tokens'
+﻿import { StyleSheet } from 'react-native';
+import { colors, spacing, radius, typography } from './tokens';
 
 export const commonStyles = StyleSheet.create({
   screen: {
@@ -19,4 +19,4 @@ export const commonStyles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.md
   }
-})
+});

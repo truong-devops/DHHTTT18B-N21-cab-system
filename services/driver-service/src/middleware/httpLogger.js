@@ -1,11 +1,10 @@
-const logger = require("../utils/logger");
+const logger = require('../utils/logger');
 
 function httpLogger(req, res, next) {
   const start = process.hrtime.bigint();
 
-  res.on("finish", () => {
-    const durationMs =
-      Number(process.hrtime.bigint() - start) / 1e6;
+  res.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
     logger.withTrace(req).info({
       method: req.method,
       path: req.originalUrl,

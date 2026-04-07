@@ -1,18 +1,14 @@
-jest.mock("../src/infra/redis", () => ({
+jest.mock('../src/infra/redis', () => ({
   getRedis: jest.fn()
 }));
 
-jest.mock("../src/repositories/idempotencyRepo", () => ({
+jest.mock('../src/repositories/idempotencyRepo', () => ({
   getIdempotencyKey: jest.fn()
 }));
 
-const { getRedis } = require("../src/infra/redis");
-const { getIdempotencyKey } = require("../src/repositories/idempotencyRepo");
-const {
-  withIdempotency,
-  buildIdempotencyRedisKey,
-  pickIdempotencyHeaders
-} = require("../src/services/idempotencyService");
+const { getRedis } = require('../src/infra/redis');
+const { getIdempotencyKey } = require('../src/repositories/idempotencyRepo');
+const { withIdempotency, buildIdempotencyRedisKey, pickIdempotencyHeaders } = require('../src/services/idempotencyService');
 
 function createRedisStub() {
   const store = new Map();
@@ -20,12 +16,12 @@ function createRedisStub() {
     store,
     get: jest.fn(async (key) => (store.has(key) ? store.get(key) : null)),
     set: jest.fn(async (key, value, ...args) => {
-      const useNx = args.includes("NX");
+      const useNx = args.includes('NX');
       if (useNx && store.has(key)) {
         return null;
       }
       store.set(key, value);
-      return "OK";
+      return 'OK';
     }),
     del: jest.fn(async (key) => {
       store.delete(key);
@@ -34,23 +30,21 @@ function createRedisStub() {
   };
 }
 
-describe("idempotency service", () => {
+describe('idempotency service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test("returns cached response from redis", async () => {
+  test('returns cached response from redis', async () => {
     const redis = createRedisStub();
-    redis.get.mockResolvedValueOnce(
-      JSON.stringify({ status: 201, headers: { "x-trace-id": "t1" }, body: { data: { id: "pay_1" } } })
-    );
+    redis.get.mockResolvedValueOnce(JSON.stringify({ status: 201, headers: { 'x-trace-id': 't1' }, body: { data: { id: 'pay_1' } } }));
     getRedis.mockReturnValue(redis);
 
     const execute = jest.fn();
     const result = await withIdempotency({
-      routeKey: "payments:create",
-      userId: "user_1",
-      idemKey: "idem_1",
+      routeKey: 'payments:create',
+      userId: 'user_1',
+      idemKey: 'idem_1',
       responseHeaders: {},
       execute
     });
@@ -61,24 +55,24 @@ describe("idempotency service", () => {
     expect(getIdempotencyKey).not.toHaveBeenCalled();
   });
 
-  test("falls back to db and caches to redis", async () => {
+  test('falls back to db and caches to redis', async () => {
     const redis = createRedisStub();
     redis.get.mockResolvedValueOnce(null);
     getRedis.mockReturnValue(redis);
     getIdempotencyKey.mockResolvedValueOnce({
-      requestHash: "hash_db",
+      requestHash: 'hash_db',
       responseCode: 201,
-      responseHeaders: { "x-trace-id": "t2" },
-      responseBody: { data: { id: "pay_db" } }
+      responseHeaders: { 'x-trace-id': 't2' },
+      responseBody: { data: { id: 'pay_db' } }
     });
 
     const execute = jest.fn();
     const result = await withIdempotency({
-      routeKey: "payments:create",
-      userId: "user_1",
-      idemKey: "idem_2",
+      routeKey: 'payments:create',
+      userId: 'user_1',
+      idemKey: 'idem_2',
       responseHeaders: {},
-      requestHash: "hash_db",
+      requestHash: 'hash_db',
       execute
     });
 
@@ -88,31 +82,31 @@ describe("idempotency service", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  test("rejects idempotency reuse when payload hash differs", async () => {
+  test('rejects idempotency reuse when payload hash differs', async () => {
     getRedis.mockReturnValue(null);
     getIdempotencyKey.mockResolvedValueOnce({
-      requestHash: "hash_a",
+      requestHash: 'hash_a',
       responseCode: 201,
-      responseHeaders: { "x-trace-id": "t3" },
-      responseBody: { data: { id: "pay_existing" } }
+      responseHeaders: { 'x-trace-id': 't3' },
+      responseBody: { data: { id: 'pay_existing' } }
     });
 
     await expect(
       withIdempotency({
-        routeKey: "payments:create",
-        userId: "user_1",
-        idemKey: "idem_4",
+        routeKey: 'payments:create',
+        userId: 'user_1',
+        idemKey: 'idem_4',
         responseHeaders: {},
-        requestHash: "hash_b",
+        requestHash: 'hash_b',
         execute: jest.fn()
       })
     ).rejects.toMatchObject({
       status: 409,
-      code: "IDEMPOTENCY_KEY_CONFLICT"
+      code: 'IDEMPOTENCY_KEY_CONFLICT'
     });
   });
 
-  test("executes handler after acquiring lock", async () => {
+  test('executes handler after acquiring lock', async () => {
     const redis = createRedisStub();
     redis.get.mockResolvedValueOnce(null);
     getRedis.mockReturnValue(redis);
@@ -120,14 +114,14 @@ describe("idempotency service", () => {
 
     const execute = jest.fn().mockResolvedValue({
       responseCode: 201,
-      responseBody: { data: { id: "pay_new" } }
+      responseBody: { data: { id: 'pay_new' } }
     });
 
     const result = await withIdempotency({
-      routeKey: "payments:create",
-      userId: "user_1",
-      idemKey: "idem_3",
-      responseHeaders: { "content-type": "application/json" },
+      routeKey: 'payments:create',
+      userId: 'user_1',
+      idemKey: 'idem_3',
+      responseHeaders: { 'content-type': 'application/json' },
       execute
     });
 
@@ -138,37 +132,37 @@ describe("idempotency service", () => {
     expect(redis.del).toHaveBeenCalled();
   });
 
-  test("throws when lock is held and no cached response", async () => {
+  test('throws when lock is held and no cached response', async () => {
     const redis = createRedisStub();
     getRedis.mockReturnValue(redis);
     getIdempotencyKey.mockResolvedValueOnce(null);
 
-    const redisKey = buildIdempotencyRedisKey("payments:create", "user_1", "idem_4");
-    redis.store.set(`${redisKey}:lock`, "locked");
+    const redisKey = buildIdempotencyRedisKey('payments:create', 'user_1', 'idem_4');
+    redis.store.set(`${redisKey}:lock`, 'locked');
 
     await expect(
       withIdempotency({
-        routeKey: "payments:create",
-        userId: "user_1",
-        idemKey: "idem_4",
+        routeKey: 'payments:create',
+        userId: 'user_1',
+        idemKey: 'idem_4',
         responseHeaders: {},
         execute: jest.fn()
       })
-    ).rejects.toThrow("Idempotency-Key is being processed");
+    ).rejects.toThrow('Idempotency-Key is being processed');
   });
 
-  test("picks idempotency headers from response", () => {
+  test('picks idempotency headers from response', () => {
     const headers = pickIdempotencyHeaders({
-      "Content-Type": "application/json",
-      "X-Trace-Id": "trace",
-      "X-Request-Id": "req",
-      "x-extra": "nope"
+      'Content-Type': 'application/json',
+      'X-Trace-Id': 'trace',
+      'X-Request-Id': 'req',
+      'x-extra': 'nope'
     });
 
     expect(headers).toEqual({
-      "content-type": "application/json",
-      "x-trace-id": "trace",
-      "x-request-id": "req"
+      'content-type': 'application/json',
+      'x-trace-id': 'trace',
+      'x-request-id': 'req'
     });
   });
 });

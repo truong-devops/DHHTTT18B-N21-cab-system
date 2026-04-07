@@ -1,47 +1,46 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
-export const isMock = import.meta.env.VITE_MOCK === 'true'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+export const isMock = import.meta.env.VITE_MOCK === 'true';
 
 function getToken() {
-  return localStorage.getItem('admin_token')
+  return localStorage.getItem('admin_token');
 }
 
 export async function apiRequest(path, options = {}) {
-  const token = getToken()
-  const { headers: optionHeaders, cache: optionCache, ...rest } = options
+  const token = getToken();
+  const { headers: optionHeaders, cache: optionCache, ...rest } = options;
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(optionHeaders || {}),
-  }
+    ...(optionHeaders || {})
+  };
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     cache: optionCache ?? 'no-store',
     ...rest,
-    headers,
-  })
+    headers
+  });
 
   if (response.status === 304) {
-    return null
+    return null;
   }
 
-  const text = await response.text()
-  let payload = null
+  const text = await response.text();
+  let payload = null;
   if (text) {
     try {
-      payload = JSON.parse(text)
+      payload = JSON.parse(text);
     } catch {
-      payload = { message: text }
+      payload = { message: text };
     }
   }
 
   if (!response.ok) {
-    const message =
-      payload?.error?.message || payload?.message || 'Yêu cầu thất bại'
-    const error = new Error(message)
-    error.status = response.status
-    error.payload = payload
-    throw error
+    const message = payload?.error?.message || payload?.message || 'Yêu cầu thất bại';
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
   }
 
-  return payload
+  return payload;
 }

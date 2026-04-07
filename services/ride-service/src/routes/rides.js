@@ -1,5 +1,5 @@
-const express = require("express");
-const crypto = require("crypto");
+const express = require('express');
+const crypto = require('crypto');
 const {
   createRide,
   getRideById,
@@ -10,40 +10,24 @@ const {
   updateRideFields,
   updateRideStatus,
   addStatusHistory
-} = require("../repository/rideRepository");
-const {
-  getByKey,
-  createKey,
-  setResponse
-} = require("../repository/idempotencyRepository");
-const { requireAuth } = require("../middleware/auth");
-const { ApiError } = require("../utils/errors");
-const { asyncHandler } = require("../utils/asyncHandler");
-const { encodeCursor, decodeCursor } = require("@libs/http");
-const { validateRequest } = require("../middleware/validateRequest");
-const {
-  normalizeStatus,
-  isValidTransition
-} = require("../domain/rideStateMachine");
-const {
-  buildIdempotencyKey,
-  buildLockKey,
-  getCachedResponse,
-  saveCachedResponse,
-  acquireLock,
-  releaseLock
-} = require("../idempotency/store");
-const monitoring = require("../monitoring");
-const logger = require("../utils/logger");
+} = require('../repository/rideRepository');
+const { getByKey, createKey, setResponse } = require('../repository/idempotencyRepository');
+const { requireAuth } = require('../middleware/auth');
+const { ApiError } = require('../utils/errors');
+const { asyncHandler } = require('../utils/asyncHandler');
+const { encodeCursor, decodeCursor } = require('@libs/http');
+const { validateRequest } = require('../middleware/validateRequest');
+const { normalizeStatus, isValidTransition } = require('../domain/rideStateMachine');
+const { buildIdempotencyKey, buildLockKey, getCachedResponse, saveCachedResponse, acquireLock, releaseLock } = require('../idempotency/store');
+const monitoring = require('../monitoring');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
 // Auto-assign every new ride to a default driver so driver app receives it immediately.
 // Auto-assign is OFF by default; set AUTO_ASSIGN_DRIVER=true to force assign to DEFAULT_DRIVER_ID.
-const AUTO_ASSIGN_DRIVER =
-  String(process.env.AUTO_ASSIGN_DRIVER || "false").toLowerCase() === "true";
-const DEFAULT_DRIVER_ID =
-  String(process.env.DEFAULT_DRIVER_ID || "").trim();
+const AUTO_ASSIGN_DRIVER = String(process.env.AUTO_ASSIGN_DRIVER || 'false').toLowerCase() === 'true';
+const DEFAULT_DRIVER_ID = String(process.env.DEFAULT_DRIVER_ID || '').trim();
 
 router.use(requireAuth);
 
@@ -68,39 +52,39 @@ function toRideResponse(row) {
 }
 
 router.post(
-  "/",
+  '/',
   validateRequest({
     bodySchema: {
-      required: ["pickupLat", "pickupLng", "dropoffLat", "dropoffLng"],
+      required: ['pickupLat', 'pickupLng', 'dropoffLat', 'dropoffLng'],
       properties: {
-        pickupLat: { type: "number" },
-        pickupLng: { type: "number" },
-        dropoffLat: { type: "number" },
-        dropoffLng: { type: "number" },
-        pickupLabel: { type: "string" },
-        dropoffLabel: { type: "string" },
-        bookingId: { type: "string" },
-        driverId: { type: "string" },
-        status: { type: "string" }
+        pickupLat: { type: 'number' },
+        pickupLng: { type: 'number' },
+        dropoffLat: { type: 'number' },
+        dropoffLng: { type: 'number' },
+        pickupLabel: { type: 'string' },
+        dropoffLabel: { type: 'string' },
+        bookingId: { type: 'string' },
+        driverId: { type: 'string' },
+        status: { type: 'string' }
       }
     },
     custom: (req, errors) => {
-      if (!req.header("Idempotency-Key")) {
+      if (!req.header('Idempotency-Key')) {
         errors.push({
-          path: "headers.Idempotency-Key",
-          message: "is required"
+          path: 'headers.Idempotency-Key',
+          message: 'is required'
         });
       }
     }
   }),
   asyncHandler(async (req, res) => {
-    const idempotencyKey = req.header("Idempotency-Key");
+    const idempotencyKey = req.header('Idempotency-Key');
 
-    const routeKey = "rides:create";
+    const routeKey = 'rides:create';
     const requestHash = crypto
-      .createHash("sha256")
+      .createHash('sha256')
       .update(JSON.stringify(req.body || {}))
-      .digest("hex");
+      .digest('hex');
     const cacheKey = buildIdempotencyKey({
       routeKey,
       userId: req.userId,
@@ -114,23 +98,13 @@ router.post(
 
     const cached = await getCachedResponse(cacheKey);
     if (cached) {
-      if (
-        cached.requestHash &&
-        cached.requestHash !== requestHash
-      ) {
-        throw new ApiError(
-          409,
-          "CONFLICT",
-          "Idempotency key reuse with different request"
-        );
+      if (cached.requestHash && cached.requestHash !== requestHash) {
+        throw new ApiError(409, 'CONFLICT', 'Idempotency key reuse with different request');
       }
       if (cached.headers) {
         Object.entries(cached.headers).forEach(([key, value]) => {
           const headerKey = String(key).toLowerCase();
-          if (
-            headerKey === "x-trace-id" ||
-            headerKey === "x-request-id"
-          ) {
+          if (headerKey === 'x-trace-id' || headerKey === 'x-request-id') {
             return;
           }
           if (value) {
@@ -144,11 +118,7 @@ router.post(
     let lockAcquired = false;
     lockAcquired = await acquireLock(lockKey);
     if (!lockAcquired) {
-      throw new ApiError(
-        409,
-        "IDEMPOTENCY_IN_PROGRESS",
-        "Idempotency key is being processed"
-      );
+      throw new ApiError(409, 'IDEMPOTENCY_IN_PROGRESS', 'Idempotency key is being processed');
     }
 
     let responseBody;
@@ -161,21 +131,13 @@ router.post(
         idempotencyKey
       });
       if (existing && existing.request_hash !== requestHash) {
-        throw new ApiError(
-          409,
-          "CONFLICT",
-          "Idempotency key reuse with different request"
-        );
+        throw new ApiError(409, 'CONFLICT', 'Idempotency key reuse with different request');
       }
       if (existing && existing.response_status) {
-        const responseHeaders =
-          existing.response_headers || {};
+        const responseHeaders = existing.response_headers || {};
         Object.entries(responseHeaders).forEach(([key, value]) => {
           const headerKey = String(key).toLowerCase();
-          if (
-            headerKey === "x-trace-id" ||
-            headerKey === "x-request-id"
-          ) {
+          if (headerKey === 'x-trace-id' || headerKey === 'x-request-id') {
             return;
           }
           if (value) {
@@ -192,16 +154,10 @@ router.post(
           createdAt: new Date().toISOString()
         });
 
-        return res
-          .status(existing.response_status)
-          .json(responseBody);
+        return res.status(existing.response_status).json(responseBody);
       }
       if (existing && !existing.response_status) {
-        throw new ApiError(
-          409,
-          "CONFLICT",
-          "Idempotency key is being processed"
-        );
+        throw new ApiError(409, 'CONFLICT', 'Idempotency key is being processed');
       }
 
       await createKey({
@@ -211,10 +167,7 @@ router.post(
         requestHash
       });
 
-      const shouldAutoAssign =
-        AUTO_ASSIGN_DRIVER &&
-        !req.body?.driverId &&
-        DEFAULT_DRIVER_ID.length > 0;
+      const shouldAutoAssign = AUTO_ASSIGN_DRIVER && !req.body?.driverId && DEFAULT_DRIVER_ID.length > 0;
 
       const ride = await createRide({
         externalRideId: crypto.randomUUID(),
@@ -227,9 +180,7 @@ router.post(
         dropoffLat: req.body.dropoffLat,
         dropoffLng: req.body.dropoffLng,
         dropoffLabel: req.body.dropoffLabel || null,
-        status: shouldAutoAssign
-          ? "assigned"
-          : req.body.status || "requested",
+        status: shouldAutoAssign ? 'assigned' : req.body.status || 'requested',
         traceId: req.traceId
       });
 
@@ -240,16 +191,16 @@ router.post(
         actorId: req.userId,
         traceId: req.traceId
       });
-      monitoring.recordRideCreated("success", {
-        status: String(ride.status || "requested").toLowerCase()
+      monitoring.recordRideCreated('success', {
+        status: String(ride.status || 'requested').toLowerCase()
       });
 
       responseBody = { data: toRideResponse(ride) };
 
       const responseHeaders = {
-        "content-type": "application/json",
-        "x-trace-id": req.traceId,
-        "x-request-id": req.requestId
+        'content-type': 'application/json',
+        'x-trace-id': req.traceId,
+        'x-request-id': req.requestId
       };
 
       await setResponse({
@@ -279,11 +230,11 @@ router.post(
 );
 
 router.get(
-  "/assignments",
+  '/assignments',
   asyncHandler(async (req, res) => {
     const driverId = req.userId;
     if (!driverId) {
-      throw new ApiError(401, "UNAUTHORIZED", "Missing driver identity");
+      throw new ApiError(401, 'UNAUTHORIZED', 'Missing driver identity');
     }
 
     const active = await getActiveRideForDriver(driverId);
@@ -301,19 +252,19 @@ router.get(
 );
 
 router.get(
-  "/:id",
+  '/:id',
   validateRequest({
     paramsSchema: {
-      required: ["id"],
+      required: ['id'],
       properties: {
-        id: { type: "string" }
+        id: { type: 'string' }
       }
     }
   }),
   asyncHandler(async (req, res) => {
     const ride = await getRideById(req.params.id);
     if (!ride) {
-      throw new ApiError(404, "NOT_FOUND", "Ride not found");
+      throw new ApiError(404, 'NOT_FOUND', 'Ride not found');
     }
 
     return res.json({ data: toRideResponse(ride) });
@@ -321,24 +272,24 @@ router.get(
 );
 
 router.get(
-  "/",
+  '/',
   validateRequest({
     querySchema: {
       properties: {
-        status: { type: "string" },
-        riderId: { type: "string" },
-        driverId: { type: "string" },
-        limit: { type: "string" },
-        cursor: { type: "string" },
-        sort: { type: "string" }
+        status: { type: 'string' },
+        riderId: { type: 'string' },
+        driverId: { type: 'string' },
+        limit: { type: 'string' },
+        cursor: { type: 'string' },
+        sort: { type: 'string' }
       }
     },
     custom: (req, errors) => {
-      const sort = req.query.sort || "-createdAt";
-      if (!["-createdAt", "createdAt"].includes(sort)) {
+      const sort = req.query.sort || '-createdAt';
+      if (!['-createdAt', 'createdAt'].includes(sort)) {
         errors.push({
-          path: "query.sort",
-          message: "must be createdAt or -createdAt"
+          path: 'query.sort',
+          message: 'must be createdAt or -createdAt'
         });
       }
 
@@ -347,8 +298,8 @@ router.get(
         cursor = decodeCursor(req.query.cursor);
         if (!cursor) {
           errors.push({
-            path: "query.cursor",
-            message: "is invalid"
+            path: 'query.cursor',
+            message: 'is invalid'
           });
         }
       }
@@ -358,14 +309,14 @@ router.get(
       const limit = Number.isFinite(limitRaw) ? limitRaw : 20;
       if (hasLimit && !Number.isFinite(limitRaw)) {
         errors.push({
-          path: "query.limit",
-          message: "must be a number"
+          path: 'query.limit',
+          message: 'must be a number'
         });
       }
       if (limit < 1 || limit > 100) {
         errors.push({
-          path: "query.limit",
-          message: "must be between 1 and 100"
+          path: 'query.limit',
+          message: 'must be between 1 and 100'
         });
       }
 
@@ -379,34 +330,19 @@ router.get(
   asyncHandler(async (req, res) => {
     const { limit, cursor, sort } = req.pagination;
     const roles = req.user?.roles || [];
-    const canListAll =
-      roles.includes("admin") ||
-      roles.includes("ops") ||
-      roles.includes("driver");
+    const canListAll = roles.includes('admin') || roles.includes('ops') || roles.includes('driver');
     const requestedRiderId = req.query.riderId || null;
     const requestedDriverId = req.query.driverId || null;
-    const riderId = requestedRiderId
-      ? canListAll
-        ? requestedRiderId
-        : req.userId
-      : canListAll
-        ? null
-        : req.userId;
-    const driverId = requestedDriverId
-      ? canListAll
-        ? requestedDriverId
-        : req.userId
-      : null;
+    const riderId = requestedRiderId ? (canListAll ? requestedRiderId : req.userId) : canListAll ? null : req.userId;
+    const driverId = requestedDriverId ? (canListAll ? requestedDriverId : req.userId) : null;
 
     const rows = await listRides({
       limit,
       cursor,
-      status: req.query.status
-        ? String(req.query.status).toLowerCase()
-        : null,
+      status: req.query.status ? String(req.query.status).toLowerCase() : null,
       riderId,
       driverId,
-      sort: sort === "-createdAt" ? "-created_at" : "created_at"
+      sort: sort === '-createdAt' ? '-created_at' : 'created_at'
     });
 
     const data = rows.map(toRideResponse);
@@ -424,40 +360,35 @@ router.get(
 );
 
 router.patch(
-  "/:id",
+  '/:id',
   validateRequest({
     paramsSchema: {
-      required: ["id"],
+      required: ['id'],
       properties: {
-        id: { type: "string" }
+        id: { type: 'string' }
       }
     },
     bodySchema: {
       properties: {
-        driverId: { type: "string" },
-        pickupLat: { type: "number" },
-        pickupLng: { type: "number" },
-        pickupLabel: { type: "string" },
-        dropoffLat: { type: "number" },
-        dropoffLng: { type: "number" },
-        dropoffLabel: { type: "string" },
-        status: { type: "string" },
-        statusReason: { type: "string" }
+        driverId: { type: 'string' },
+        pickupLat: { type: 'number' },
+        pickupLng: { type: 'number' },
+        pickupLabel: { type: 'string' },
+        dropoffLat: { type: 'number' },
+        dropoffLng: { type: 'number' },
+        dropoffLabel: { type: 'string' },
+        status: { type: 'string' },
+        statusReason: { type: 'string' }
       }
     },
     custom: (req, errors) => {
-      const hasUpdatableFields = [
-        "driverId",
-        "pickupLat",
-        "pickupLng",
-        "dropoffLat",
-        "dropoffLng",
-        "status"
-      ].some((field) => req.body?.[field] !== undefined);
+      const hasUpdatableFields = ['driverId', 'pickupLat', 'pickupLng', 'dropoffLat', 'dropoffLng', 'status'].some(
+        (field) => req.body?.[field] !== undefined
+      );
       if (!hasUpdatableFields) {
         errors.push({
-          path: "body",
-          message: "at least one field is required"
+          path: 'body',
+          message: 'at least one field is required'
         });
       }
     }
@@ -465,7 +396,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     let ride = await getRideById(req.params.id);
     if (!ride) {
-      throw new ApiError(404, "NOT_FOUND", "Ride not found");
+      throw new ApiError(404, 'NOT_FOUND', 'Ride not found');
     }
 
     let fromStatus = null;
@@ -476,9 +407,9 @@ router.patch(
       const reason = req.body.statusReason || null;
       const actor = req.userId;
       if (!isValidTransition(fromStatus, toStatus)) {
-        monitoring.recordRideStatus(toStatus, "error", {
-          reason: "invalid_transition",
-          from_status: String(fromStatus || "unknown").toLowerCase()
+        monitoring.recordRideStatus(toStatus, 'error', {
+          reason: 'invalid_transition',
+          from_status: String(fromStatus || 'unknown').toLowerCase()
         });
         logger.withTrace(req).warn(
           {
@@ -488,13 +419,9 @@ router.patch(
             actor,
             reason
           },
-          "ride transition rejected"
+          'ride transition rejected'
         );
-        throw new ApiError(
-          409,
-          "INVALID_STATE_TRANSITION",
-          `Invalid transition from ${fromStatus} to ${toStatus}`
-        );
+        throw new ApiError(409, 'INVALID_STATE_TRANSITION', `Invalid transition from ${fromStatus} to ${toStatus}`);
       }
       logger.withTrace(req).info(
         {
@@ -504,7 +431,7 @@ router.patch(
           actor,
           reason
         },
-        "ride transition"
+        'ride transition'
       );
     }
 
@@ -537,8 +464,8 @@ router.patch(
         actorId: req.userId,
         traceId: req.traceId
       });
-      monitoring.recordRideStatus(ride.status, "success", {
-        from_status: String(fromStatus || "unknown").toLowerCase()
+      monitoring.recordRideStatus(ride.status, 'success', {
+        from_status: String(fromStatus || 'unknown').toLowerCase()
       });
     }
 
@@ -547,12 +474,12 @@ router.patch(
 );
 
 router.delete(
-  "/:id",
+  '/:id',
   validateRequest({
     paramsSchema: {
-      required: ["id"],
+      required: ['id'],
       properties: {
-        id: { type: "string" }
+        id: { type: 'string' }
       }
     }
   }),
@@ -560,21 +487,17 @@ router.delete(
     const ride = await getRideById(req.params.id);
 
     if (!ride) {
-      throw new ApiError(404, "NOT_FOUND", "Ride not found");
+      throw new ApiError(404, 'NOT_FOUND', 'Ride not found');
     }
 
     const fromStatus = normalizeStatus(ride.status);
-    const toStatus = "CANCELLED";
+    const toStatus = 'CANCELLED';
     if (!isValidTransition(fromStatus, toStatus)) {
-      monitoring.recordRideStatus(toStatus, "error", {
-        reason: "invalid_transition",
-        from_status: String(fromStatus || "unknown").toLowerCase()
+      monitoring.recordRideStatus(toStatus, 'error', {
+        reason: 'invalid_transition',
+        from_status: String(fromStatus || 'unknown').toLowerCase()
       });
-      throw new ApiError(
-        409,
-        "INVALID_STATE_TRANSITION",
-        `Invalid transition from ${fromStatus} to ${toStatus}`
-      );
+      throw new ApiError(409, 'INVALID_STATE_TRANSITION', `Invalid transition from ${fromStatus} to ${toStatus}`);
     }
 
     logger.withTrace(req).info(
@@ -583,19 +506,19 @@ router.delete(
         fromStatus,
         toStatus
       },
-      "ride transition"
+      'ride transition'
     );
 
     const updated = await updateRideStatus({
       id: req.params.id,
-      status: "cancelled",
+      status: 'cancelled',
       fromStatus,
       reason: req.body?.reason || null,
       actorId: req.userId,
       traceId: req.traceId
     });
-    monitoring.recordRideStatus(updated.status, "success", {
-      from_status: String(fromStatus || "unknown").toLowerCase()
+    monitoring.recordRideStatus(updated.status, 'success', {
+      from_status: String(fromStatus || 'unknown').toLowerCase()
     });
 
     return res.json({ data: toRideResponse(updated) });

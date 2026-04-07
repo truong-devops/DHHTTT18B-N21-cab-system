@@ -1,22 +1,22 @@
-import Badge from '../../common/Badge.jsx'
-import Modal from '../../common/Modal.jsx'
-import { labelFrom, logLevelLabels } from '../../../utils/labels.js'
+import Badge from '../../common/Badge.jsx';
+import Modal from '../../common/Modal.jsx';
+import { labelFrom, logLevelLabels } from '../../../utils/labels.js';
 
 function toBadgeVariant(level) {
-  if (level === 'ERROR') return 'danger'
-  if (level === 'WARN') return 'warning'
-  return 'info'
+  if (level === 'ERROR') return 'danger';
+  if (level === 'WARN') return 'warning';
+  return 'info';
 }
 
 function formatTime(value) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString()
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
 }
 
 function LogDetailModal({ log, onClose }) {
-  if (!log) return null
+  if (!log) return null;
 
   return (
     <Modal title="Log detail" onClose={onClose}>
@@ -31,10 +31,7 @@ function LogDetailModal({ log, onClose }) {
           <strong>Service:</strong> {log.service || '-'}
         </div>
         <div style={{ marginBottom: 8 }}>
-          <strong>Level:</strong>{' '}
-          <Badge variant={toBadgeVariant(log.level)}>
-            {labelFrom(logLevelLabels, log.level)}
-          </Badge>
+          <strong>Level:</strong> <Badge variant={toBadgeVariant(log.level)}>{labelFrom(logLevelLabels, log.level)}</Badge>
         </div>
         <div style={{ marginBottom: 8 }}>
           <strong>Request ID:</strong> {log.requestId || '-'}
@@ -45,7 +42,7 @@ function LogDetailModal({ log, onClose }) {
         </div>
       </div>
     </Modal>
-  )
+  );
 }
 
-export default LogDetailModal
+export default LogDetailModal;

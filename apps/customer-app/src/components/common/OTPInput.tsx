@@ -1,38 +1,38 @@
-import React, { useEffect, useRef } from 'react'
-import { StyleSheet, TextInput, View } from 'react-native'
-import { colors, spacing, typography } from '../../theme/tokens'
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, TextInput, View } from 'react-native';
+import { colors, spacing, typography } from '../../theme/tokens';
 
 type Props = {
-  value: string
-  length?: number
-  onChange: (next: string) => void
-}
+  value: string;
+  length?: number;
+  onChange: (next: string) => void;
+};
 
 export const OTPInput: React.FC<Props> = ({ value, length = 6, onChange }) => {
-  const inputs = useRef<Array<TextInput | null>>([])
-  const digits = value.split('').slice(0, length)
+  const inputs = useRef<Array<TextInput | null>>([]);
+  const digits = value.split('').slice(0, length);
 
   useEffect(() => {
     if (value.length > length) {
-      onChange(value.slice(0, length))
+      onChange(value.slice(0, length));
     }
-  }, [value, length, onChange])
+  }, [value, length, onChange]);
 
   const handleChange = (char: string, index: number) => {
-    const chars = value.split('')
-    chars[index] = char.replace(/\s/g, '').slice(-1)
-    const nextValue = chars.join('').slice(0, length)
-    onChange(nextValue)
+    const chars = value.split('');
+    chars[index] = char.replace(/\s/g, '').slice(-1);
+    const nextValue = chars.join('').slice(0, length);
+    onChange(nextValue);
     if (char && index < length - 1) {
-      inputs.current[index + 1]?.focus()
+      inputs.current[index + 1]?.focus();
     }
-  }
+  };
 
   const handleKeyPress = (key: string, index: number) => {
     if (key === 'Backspace' && !digits[index] && index > 0) {
-      inputs.current[index - 1]?.focus()
+      inputs.current[index - 1]?.focus();
     }
-  }
+  };
 
   return (
     <View style={styles.row}>
@@ -40,7 +40,7 @@ export const OTPInput: React.FC<Props> = ({ value, length = 6, onChange }) => {
         <TextInput
           key={idx}
           ref={(node) => {
-            inputs.current[idx] = node
+            inputs.current[idx] = node;
           }}
           value={digits[idx] || ''}
           keyboardType="number-pad"
@@ -52,8 +52,8 @@ export const OTPInput: React.FC<Props> = ({ value, length = 6, onChange }) => {
         />
       ))}
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'center' },
@@ -69,4 +69,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card
   },
   boxFilled: { borderColor: colors.brand600 }
-})
+});

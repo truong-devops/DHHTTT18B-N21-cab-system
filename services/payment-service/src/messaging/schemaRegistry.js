@@ -1,4 +1,4 @@
-const { createEventContractRegistry } = require("../../../../contracts/events/registry");
+const { createEventContractRegistry } = require('../../../../contracts/events/registry');
 
 const registry = createEventContractRegistry({ strict: true });
 

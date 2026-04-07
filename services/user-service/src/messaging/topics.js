@@ -1,4 +1,4 @@
 module.exports = {
-  UserCreated: "user.created",
-  UserUpdated: "user.updated"
+  UserCreated: 'user.created',
+  UserUpdated: 'user.updated'
 };

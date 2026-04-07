@@ -14,6 +14,6 @@ export function useProfile() {
     auth,
     driver,
     walletTotal,
-    earnings,
+    earnings
   };
 }

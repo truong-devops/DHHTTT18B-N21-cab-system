@@ -1,11 +1,11 @@
-const crypto = require("crypto");
+const crypto = require('crypto');
 
-const config = require("../config");
-const { getRedis } = require("../infra/redis");
-const { getIdempotencyKey } = require("../repositories/idempotencyRepo");
-const { ApiError } = require("../utils/errors");
+const config = require('../config');
+const { getRedis } = require('../infra/redis');
+const { getIdempotencyKey } = require('../repositories/idempotencyRepo');
+const { ApiError } = require('../utils/errors');
 
-const IDEMPOTENCY_HEADERS = new Set(["content-type", "x-trace-id", "x-request-id"]);
+const IDEMPOTENCY_HEADERS = new Set(['content-type', 'x-trace-id', 'x-request-id']);
 
 function buildIdempotencyRedisKey(routeKey, userId, idemKey) {
   return `idempo:${routeKey}:${userId}:${idemKey}`;
@@ -13,7 +13,7 @@ function buildIdempotencyRedisKey(routeKey, userId, idemKey) {
 
 function pickIdempotencyHeaders(headers) {
   const selected = {};
-  if (!headers || typeof headers !== "object") {
+  if (!headers || typeof headers !== 'object') {
     return selected;
   }
   for (const [key, value] of Object.entries(headers)) {
@@ -26,12 +26,12 @@ function pickIdempotencyHeaders(headers) {
 }
 
 function parseCachedResponse(raw) {
-  if (!raw || typeof raw !== "string") {
+  if (!raw || typeof raw !== 'string') {
     return null;
   }
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
+    if (!parsed || typeof parsed !== 'object') {
       return null;
     }
     const status = Number(parsed.status);
@@ -88,7 +88,7 @@ async function cacheResponse(redis, redisKey, payload) {
   }
   try {
     const raw = JSON.stringify(payload);
-    await redis.set(redisKey, raw, "EX", config.idempotency.ttlSeconds, "NX");
+    await redis.set(redisKey, raw, 'EX', config.idempotency.ttlSeconds, 'NX');
   } catch (err) {
     return;
   }
@@ -99,14 +99,8 @@ async function acquireLock(redis, lockKey, token) {
     return true;
   }
   try {
-    const result = await redis.set(
-      lockKey,
-      token,
-      "PX",
-      config.idempotency.lockTtlMs,
-      "NX"
-    );
-    return result === "OK";
+    const result = await redis.set(lockKey, token, 'PX', config.idempotency.lockTtlMs, 'NX');
+    return result === 'OK';
   } catch (err) {
     return true;
   }
@@ -132,12 +126,12 @@ async function getStoredResponse({ routeKey, userId, idemKey, requestHash }) {
   const cached = await getResponseFromRedis(redis, redisKey);
   if (cached) {
     if (requestHash && cached.requestHash && cached.requestHash !== requestHash) {
-      throw new ApiError(409, "IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key payload mismatch");
+      throw new ApiError(409, 'IDEMPOTENCY_KEY_CONFLICT', 'Idempotency-Key payload mismatch');
     }
     if (requestHash && !cached.requestHash) {
       const record = await getResponseFromDb(routeKey, userId, idemKey);
       if (record && record.requestHash && record.requestHash !== requestHash) {
-        throw new ApiError(409, "IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key payload mismatch");
+        throw new ApiError(409, 'IDEMPOTENCY_KEY_CONFLICT', 'Idempotency-Key payload mismatch');
       }
       if (record && record.requestHash) {
         await cacheResponse(redis, redisKey, { ...cached, requestHash: record.requestHash });
@@ -149,7 +143,7 @@ async function getStoredResponse({ routeKey, userId, idemKey, requestHash }) {
   const record = await getResponseFromDb(routeKey, userId, idemKey);
   if (record) {
     if (requestHash && record.requestHash && record.requestHash !== requestHash) {
-      throw new ApiError(409, "IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key payload mismatch");
+      throw new ApiError(409, 'IDEMPOTENCY_KEY_CONFLICT', 'Idempotency-Key payload mismatch');
     }
     await cacheResponse(redis, redisKey, record);
     return record;
@@ -173,7 +167,7 @@ async function withIdempotency({ routeKey, userId, idemKey, requestHash, respons
     if (stored) {
       return { ...stored, cached: true };
     }
-    throw new ApiError(409, "IDEMPOTENCY_IN_PROGRESS", "Idempotency-Key is being processed");
+    throw new ApiError(409, 'IDEMPOTENCY_IN_PROGRESS', 'Idempotency-Key is being processed');
   }
 
   try {

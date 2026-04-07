@@ -1,7 +1,7 @@
-const crypto = require("crypto");
+const crypto = require('crypto');
 
 function sortObjectByKey(object) {
-  if (!object || typeof object !== "object" || Array.isArray(object)) {
+  if (!object || typeof object !== 'object' || Array.isArray(object)) {
     return object;
   }
   return Object.keys(object)
@@ -13,36 +13,36 @@ function sortObjectByKey(object) {
 }
 
 function normalizeValue(value) {
-  if (value === null || value === undefined || value === "null" || value === "undefined") {
-    return "";
+  if (value === null || value === undefined || value === 'null' || value === 'undefined') {
+    return '';
   }
   if (Array.isArray(value)) {
     const sorted = value.map((item) => sortObjectByKey(item));
     return JSON.stringify(sorted);
   }
-  if (typeof value === "object") {
+  if (typeof value === 'object') {
     return JSON.stringify(sortObjectByKey(value));
   }
   return String(value);
 }
 
 function buildSignaturePayload(data) {
-  if (!data || typeof data !== "object") {
-    return "";
+  if (!data || typeof data !== 'object') {
+    return '';
   }
   return Object.keys(data)
     .sort()
     .map((key) => `${key}=${normalizeValue(data[key])}`)
-    .join("&");
+    .join('&');
 }
 
 function signData(data, checksumKey) {
   const payload = buildSignaturePayload(data);
-  return crypto.createHmac("sha256", checksumKey).update(payload).digest("hex");
+  return crypto.createHmac('sha256', checksumKey).update(payload).digest('hex');
 }
 
 function timingSafeEquals(a, b) {
-  if (typeof a !== "string" || typeof b !== "string") {
+  if (typeof a !== 'string' || typeof b !== 'string') {
     return false;
   }
   const left = Buffer.from(a);
@@ -58,7 +58,7 @@ function isValidSignature(data, signature, checksumKey) {
     return false;
   }
   const expected = signData(data, checksumKey).toLowerCase();
-  const actual = String(signature || "").toLowerCase();
+  const actual = String(signature || '').toLowerCase();
   return timingSafeEquals(expected, actual);
 }
 

@@ -22,10 +22,12 @@ Application OpenTelemetry SDK
 ## What changed (old vs new)
 
 Old logging path:
+
 - OTEL Collector logs pipeline -> Loki
 - Grafana used Loki datasource for logs
 
 New logging path:
+
 - Docker stdout/stderr -> Logstash -> Elasticsearch -> Kibana
 - Loki removed from active compose pipeline
 - Grafana kept for metrics/traces only (Prometheus + Tempo)
@@ -39,6 +41,7 @@ New logging path:
 ## Infra files
 
 Core stack:
+
 - `infra/observability/docker-compose.observability.yml`
 - `infra/observability/elasticsearch/elasticsearch.yml`
 - `infra/observability/logstash/logstash.yml`
@@ -46,12 +49,14 @@ Core stack:
 - `infra/observability/kibana/kibana.yml`
 
 Metrics/tracing (kept):
+
 - `infra/observability/otel-collector.yml`
 - `infra/observability/prometheus.yml`
 - `infra/observability/tempo.yml`
 - `infra/observability/grafana/provisioning/datasources/datasources.yml`
 
 Deprecated:
+
 - `infra/observability/loki.yml` (kept for rollback reference only)
 
 ## Local run
@@ -63,12 +68,14 @@ npm run dev:observability
 This starts base services + observability overlay.
 
 Environment knobs for syslog routing:
+
 - `LOGSTASH_SYSLOG_HOST` (default: `host.docker.internal`)
 - `LOGSTASH_SYSLOG_PORT` (default: `5514`)
 
 For Linux Docker Engine, set `LOGSTASH_SYSLOG_HOST` to a host/IP reachable from Docker daemon.
 
 Main endpoints:
+
 - Kibana: http://localhost:5601
 - Elasticsearch: http://localhost:9200
 - Logstash monitoring API: http://localhost:9600
@@ -79,6 +86,7 @@ Main endpoints:
 ## Log normalization
 
 Logstash normalizes these fields when available:
+
 - `@timestamp`
 - `level`
 - `service.name`
@@ -88,11 +96,13 @@ Logstash normalizes these fields when available:
 - `environment`
 
 For Pino JSON logs:
+
 - Maps `serviceName` -> `service.name`
 - Maps `traceId` / `otelTraceId` -> `trace_id`
 - Maps numeric Pino level to text level (`info`, `warn`, `error`, ...)
 
 For non-JSON logs:
+
 - Keeps original `message`
 - Fallback `service` inferred from container program/tag
 - Fallback `level` from syslog severity, default `info`

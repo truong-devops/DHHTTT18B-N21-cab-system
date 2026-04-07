@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       syncTokens(result.tokens.accessToken, result.tokens.refreshToken);
       setUser(result.data);
     },
-    [syncTokens],
+    [syncTokens]
   );
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser({
                 id: me.data.userId,
                 role: me.data.role ?? null,
-                roles: me.data.roles ?? null,
+                roles: me.data.roles ?? null
               });
             }
           } catch {
@@ -108,9 +108,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isReady,
       isAuthenticated: Boolean(accessToken),
       login,
-      logout,
+      logout
     }),
-    [user, accessToken, refreshToken, isReady, login, logout],
+    [user, accessToken, refreshToken, isReady, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

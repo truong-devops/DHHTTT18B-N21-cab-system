@@ -1,6 +1,6 @@
-import type { RoutingProvider } from './provider'
-import { osrmProvider } from './osrmProvider'
+import type { RoutingProvider } from './provider';
+import { osrmProvider } from './osrmProvider';
 
 export const getRoutingProvider = (): RoutingProvider => {
-  return osrmProvider
-}
+  return osrmProvider;
+};

@@ -1,4 +1,4 @@
-const { pool } = require("./pool");
+const { pool } = require('./pool');
 
 async function insertInboxEvent(client, event) {
   const executor = client || pool;
@@ -13,10 +13,7 @@ async function insertInboxEvent(client, event) {
 }
 
 async function markInboxProcessed(eventId) {
-  await pool.query(
-    "UPDATE inbox_events SET processed_at = now() WHERE event_id = $1",
-    [eventId]
-  );
+  await pool.query('UPDATE inbox_events SET processed_at = now() WHERE event_id = $1', [eventId]);
 }
 
 module.exports = { insertInboxEvent, markInboxProcessed };

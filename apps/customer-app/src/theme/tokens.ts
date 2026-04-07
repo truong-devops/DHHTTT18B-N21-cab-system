@@ -16,7 +16,7 @@ export const colors = {
   danger: '#DC2626',
   info: '#2563EB',
   warning: '#F59E0B'
-}
+};
 
 export const spacing = {
   xs: 4,
@@ -25,14 +25,14 @@ export const spacing = {
   lg: 16,
   xl: 24,
   xxl: 32
-}
+};
 
 export const radius = {
   card: 8,
   button: 10,
   input: 10,
   pill: 999
-}
+};
 
 export const typography = {
   title: { fontSize: 20, lineHeight: 24, fontWeight: '600' as const },
@@ -40,5 +40,4 @@ export const typography = {
   h3: { fontSize: 15, lineHeight: 20, fontWeight: '600' as const },
   body: { fontSize: 14, lineHeight: 20, fontWeight: '400' as const },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '400' as const }
-}
-
+};

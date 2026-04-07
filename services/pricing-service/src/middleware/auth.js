@@ -1,39 +1,33 @@
-const jwt = require("jsonwebtoken");
-const { ApiError } = require("../utils/errors");
+const jwt = require('jsonwebtoken');
+const { ApiError } = require('../utils/errors');
 
 function requireAuthOrInternal(req, _res, next) {
-  const internalKey = req.header("x-internal-key") || "";
-  const expectedInternal = process.env.INTERNAL_API_KEY || "";
+  const internalKey = req.header('x-internal-key') || '';
+  const expectedInternal = process.env.INTERNAL_API_KEY || '';
   if (expectedInternal && internalKey === expectedInternal) {
     req.internal = true;
     return next();
   }
 
-  const authHeader = req.header("authorization") || "";
-  const [, token] = authHeader.split(" ");
+  const authHeader = req.header('authorization') || '';
+  const [, token] = authHeader.split(' ');
 
   if (!token) {
-    return next(
-      new ApiError(401, "UNAUTHORIZED", "Missing authorization token")
-    );
+    return next(new ApiError(401, 'UNAUTHORIZED', 'Missing authorization token'));
   }
 
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    return next(
-      new ApiError(500, "INTERNAL", "JWT secret not configured")
-    );
+    return next(new ApiError(500, 'INTERNAL', 'JWT secret not configured'));
   }
 
   try {
     const payload = jwt.verify(token, secret, {
-      algorithms: ["HS256"]
+      algorithms: ['HS256']
     });
     const id = payload.sub || payload.id;
     if (!id) {
-      return next(
-        new ApiError(401, "UNAUTHORIZED", "Invalid token subject")
-      );
+      return next(new ApiError(401, 'UNAUTHORIZED', 'Invalid token subject'));
     }
 
     req.user = {
@@ -44,9 +38,7 @@ function requireAuthOrInternal(req, _res, next) {
     req.userId = id;
     return next();
   } catch (error) {
-    return next(
-      new ApiError(401, "UNAUTHORIZED", "Invalid token")
-    );
+    return next(new ApiError(401, 'UNAUTHORIZED', 'Invalid token'));
   }
 }
 

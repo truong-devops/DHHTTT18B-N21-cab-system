@@ -49,7 +49,7 @@ export interface ErrorResponse {
 }
 
 export interface paths {
-  "/v1/reviews": {
+  '/v1/reviews': {
     get: {
       parameters: {
         query?: {
@@ -57,13 +57,13 @@ export interface paths {
           riderId?: string;
           limit?: number;
           cursor?: string;
-          sort?: "-createdAt" | "createdAt";
+          sort?: '-createdAt' | 'createdAt';
         };
       };
       responses: {
         200: {
           content: {
-            "application/json": ReviewListResponse;
+            'application/json': ReviewListResponse;
           };
         };
       };
@@ -71,24 +71,24 @@ export interface paths {
     post: {
       parameters: {
         header?: {
-          "Idempotency-Key": string;
+          'Idempotency-Key': string;
         };
       };
       requestBody: {
         content: {
-          "application/json": CreateReviewRequest;
+          'application/json': CreateReviewRequest;
         };
       };
       responses: {
         201: {
           content: {
-            "application/json": ReviewResponse;
+            'application/json': ReviewResponse;
           };
         };
       };
     };
   };
-  "/v1/reviews/{id}": {
+  '/v1/reviews/{id}': {
     get: {
       parameters: {
         path: {
@@ -98,7 +98,7 @@ export interface paths {
       responses: {
         200: {
           content: {
-            "application/json": ReviewResponse;
+            'application/json': ReviewResponse;
           };
         };
       };
@@ -111,13 +111,13 @@ export interface paths {
       };
       requestBody: {
         content: {
-          "application/json": UpdateReviewRequest;
+          'application/json': UpdateReviewRequest;
         };
       };
       responses: {
         200: {
           content: {
-            "application/json": ReviewResponse;
+            'application/json': ReviewResponse;
           };
         };
       };
@@ -131,7 +131,7 @@ export interface paths {
       responses: {
         200: {
           content: {
-            "application/json": ReviewResponse;
+            'application/json': ReviewResponse;
           };
         };
       };

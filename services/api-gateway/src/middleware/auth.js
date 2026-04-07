@@ -1,12 +1,7 @@
-const jwt = require("jsonwebtoken");
-const fetch = require("node-fetch");
-const {
-  JWT_SECRET,
-  JWT_ALGORITHMS,
-  PUBLIC_DOMAINS,
-  PUBLIC_PATHS
-} = require("../config/security");
-const { sendError } = require("../utils/http");
+const jwt = require('jsonwebtoken');
+const fetch = require('node-fetch');
+const { JWT_SECRET, JWT_ALGORITHMS, PUBLIC_DOMAINS, PUBLIC_PATHS } = require('../config/security');
+const { sendError } = require('../utils/http');
 
 function isPublicRequest(req) {
   if (PUBLIC_PATHS.has(req.path)) {
@@ -26,27 +21,15 @@ function authMiddleware(req, res, next) {
     return next();
   }
 
-  const authHeader = req.header("authorization") || "";
-  const [, token] = authHeader.split(" ");
+  const authHeader = req.header('authorization') || '';
+  const [, token] = authHeader.split(' ');
 
   if (!token) {
-    return sendError(
-      res,
-      401,
-      "UNAUTHORIZED",
-      "Missing authorization token",
-      req.traceId
-    );
+    return sendError(res, 401, 'UNAUTHORIZED', 'Missing authorization token', req.traceId);
   }
 
   if (!JWT_SECRET) {
-    return sendError(
-      res,
-      500,
-      "INTERNAL",
-      "JWT secret not configured",
-      req.traceId
-    );
+    return sendError(res, 500, 'INTERNAL', 'JWT secret not configured', req.traceId);
   }
 
   try {
@@ -55,39 +38,29 @@ function authMiddleware(req, res, next) {
     });
     const userId = payload.sub || payload.id;
     if (!userId) {
-      return sendError(
-        res,
-        401,
-        "UNAUTHORIZED",
-        "Invalid token subject",
-        req.traceId
-      );
+      return sendError(res, 401, 'UNAUTHORIZED', 'Invalid token subject', req.traceId);
     }
 
-    const roles = Array.isArray(payload.roles)
-      ? payload.roles
-      : [];
+    const roles = Array.isArray(payload.roles) ? payload.roles : [];
     req.user = {
       id: userId,
       role: payload.role || roles[0] || null,
       roles,
-      scopes: Array.isArray(payload.scopes)
-        ? payload.scopes
-        : []
+      scopes: Array.isArray(payload.scopes) ? payload.scopes : []
     };
     req.userId = userId;
 
-    const authServiceUrl = process.env.AUTH_SERVICE_URL || "";
+    const authServiceUrl = process.env.AUTH_SERVICE_URL || '';
     if (!authServiceUrl) {
       return next();
     }
 
-    const verifyUrl = `${authServiceUrl.replace(/\/$/, "")}/auth/verify`;
+    const verifyUrl = `${authServiceUrl.replace(/\/$/, '')}/auth/verify`;
     return fetch(verifyUrl, {
-      method: "GET",
+      method: 'GET',
       headers: {
         authorization: `Bearer ${token}`,
-        "x-trace-id": req.traceId || ""
+        'x-trace-id': req.traceId || ''
       },
       timeout: Number(process.env.AUTH_VERIFY_TIMEOUT_MS || 1200)
     })
@@ -95,30 +68,15 @@ function authMiddleware(req, res, next) {
         if (verifyRes.status === 200) {
           return next();
         }
-        return sendError(
-          res,
-          401,
-          "UNAUTHORIZED",
-          "Invalid token",
-          req.traceId
-        );
+        return sendError(res, 401, 'UNAUTHORIZED', 'Invalid token', req.traceId);
       })
       .catch(() => {
         // Fallback to local JWT validation when auth-service verify is unavailable.
         return next();
       });
   } catch (error) {
-    const message =
-      error && error.name === "TokenExpiredError"
-        ? "Token expired"
-        : "Invalid token";
-    return sendError(
-      res,
-      401,
-      "UNAUTHORIZED",
-      message,
-      req.traceId
-    );
+    const message = error && error.name === 'TokenExpiredError' ? 'Token expired' : 'Invalid token';
+    return sendError(res, 401, 'UNAUTHORIZED', message, req.traceId);
   }
 }
 

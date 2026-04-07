@@ -1,3 +1,3 @@
-const outboxDb = require("../db/outbox");
+const outboxDb = require('../db/outbox');
 
 module.exports = outboxDb;

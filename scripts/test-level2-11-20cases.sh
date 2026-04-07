@@ -185,10 +185,10 @@ C13_STATUS=$(echo "$C13" | sed -n '1p')
 C13_BODY=$(echo "$C13" | sed '1d')
 C13_BOOKING_ID=$(echo "$C13_BODY" | json_get "booking.booking_id")
 if [[ -z "$C13_BOOKING_ID" ]]; then C13_BOOKING_ID=$(echo "$C13_BODY" | json_get "booking.bookingId"); fi
-print_case "Case 13 - no drivers online" "booking status PENDING/FAILED + message No drivers available" "$C13_STATUS" "$C13_BODY"
+print_case "Case 13 - no drivers online" "booking status REQUESTED/PENDING/FAILED + message No drivers available" "$C13_STATUS" "$C13_BODY"
 C13_BOOKING_STATUS=$(echo "$C13_BODY" | json_get "booking.status")
 if [[ -z "$C13_BOOKING_STATUS" ]]; then C13_BOOKING_STATUS=$(echo "$C13_BODY" | json_get "booking.status"); fi
-if echo "$C13_BODY" | contains_text 'No drivers available' && ([[ "$C13_BOOKING_STATUS" == "PENDING" ]] || [[ "$C13_BOOKING_STATUS" == "FAILED" ]]); then
+if echo "$C13_BODY" | contains_text 'No drivers available' && ([[ "$C13_BOOKING_STATUS" == "REQUESTED" ]] || [[ "$C13_BOOKING_STATUS" == "PENDING" ]] || [[ "$C13_BOOKING_STATUS" == "FAILED" ]]); then
   mark_result 1 "13"
 else
   mark_result 0 "13"

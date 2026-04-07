@@ -4,6 +4,7 @@ ExpressJS microservice for notifications (REST + MongoDB).
 Contract: /contracts/openapi/notification-service.yaml
 
 ## Features
+
 - REST API for other services to send notifications
 - MongoDB persistence with idempotency (dedupeKey)
 - Async dispatch + retry (no Kafka)
@@ -17,14 +18,17 @@ Contract: /contracts/openapi/notification-service.yaml
 - `SERVICE_NAME` (default: notification-service)
 
 ### Auth
+
 - `AUTH_JWT_SECRET` (HS256) or `AUTH_PUBLIC_KEY` (RS256)
   - Fallback: `JWT_SECRET`
 
 ### MongoDB
+
 - `MONGODB_URI` (default: mongodb://localhost:27017/notification_service)
 - `MONGODB_DB` (optional override)
 
 ### User-service integration
+
 - `USER_SERVICE_BASE_URL` (default: http://localhost:4004)
 - `INTERNAL_API_KEY` (required to call /internal/users/:id)
 - `USER_SERVICE_TIMEOUT_MS` (default: 2000)
@@ -32,6 +36,7 @@ Contract: /contracts/openapi/notification-service.yaml
 - `USER_CACHE_TTL_MS` (default: 300000)
 
 ### Dispatcher
+
 - `NOTIFICATION_DISPATCH_INTERVAL_MS` (default: 1000)
 - `NOTIFICATION_DISPATCH_BATCH_SIZE` (default: 10)
 - `NOTIFICATION_MAX_ATTEMPTS` (default: 5)
@@ -53,10 +58,12 @@ npm start
 ## API
 
 ### Health
+
 - `GET /healthz`
 - `GET /readyz`
 
 ### Service-to-service (role: service/admin)
+
 - `POST /v1/notifications`
 - `POST /v1/notifications/batch`
 - `POST /v1/notifications/:id/retry`
@@ -64,11 +71,13 @@ npm start
 - `GET /v1/notifications/:id` (service/admin or owner)
 
 ### User APIs
+
 - `GET /v1/users/:userId/notifications`
 - `GET /v1/users/:userId/preferences`
 - `PUT /v1/users/:userId/preferences`
 
 ## Payload rules
+
 - **Template mode**: `templateKey` + `data`
 - **Raw mode**: `title`/`body` + `data`
 - If `recipient` missing, service will call user-service to resolve contacts.
@@ -80,6 +89,7 @@ npm start
 ## Example requests
 
 ### Ride-service: RIDE_ASSIGNED (PUSH + IN_APP)
+
 ```bash
 curl -X POST http://localhost:3010/v1/notifications \
   -H "Authorization: Bearer <JWT>" \
@@ -97,6 +107,7 @@ curl -X POST http://localhost:3010/v1/notifications \
 ```
 
 ### Payment-service: PAYMENT_FAILED (SMS + IN_APP)
+
 ```bash
 curl -X POST http://localhost:3010/v1/notifications \
   -H "Authorization: Bearer <JWT>" \
@@ -115,6 +126,7 @@ curl -X POST http://localhost:3010/v1/notifications \
 ```
 
 ### Batch send
+
 ```bash
 curl -X POST http://localhost:3010/v1/notifications/batch \
   -H "Authorization: Bearer <JWT>" \
@@ -143,12 +155,14 @@ curl -X POST http://localhost:3010/v1/notifications/batch \
 ```
 
 ### User notifications
+
 ```bash
 curl -X GET "http://localhost:3010/v1/users/u_customer_1/notifications?status=PENDING&limit=20" \
   -H "Authorization: Bearer <JWT>"
 ```
 
 ### Preferences
+
 ```bash
 curl -X PUT http://localhost:3010/v1/users/u_customer_1/preferences \
   -H "Authorization: Bearer <JWT>" \

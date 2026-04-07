@@ -15,7 +15,7 @@ const DEFAULT_REGION = {
   latitude: 10.76,
   longitude: 106.66,
   latitudeDelta: 0.01,
-  longitudeDelta: 0.01,
+  longitudeDelta: 0.01
 };
 
 type GeoPoint = {
@@ -38,8 +38,7 @@ function distanceMeters(a: GeoPoint, b: GeoPoint) {
   const lat2 = toRad(b.latitude);
   const sinDLat = Math.sin(dLat / 2);
   const sinDLng = Math.sin(dLng / 2);
-  const h =
-    sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+  const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
@@ -64,22 +63,21 @@ export default function RequestsScreen() {
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [driverLocation, setDriverLocation] = useState<GeoPoint>({
     latitude: DEFAULT_REGION.latitude,
-    longitude: DEFAULT_REGION.longitude,
+    longitude: DEFAULT_REGION.longitude
   });
   const [zoomDelta, setZoomDelta] = useState({
     latitudeDelta: DEFAULT_REGION.latitudeDelta,
-    longitudeDelta: DEFAULT_REGION.longitudeDelta,
+    longitudeDelta: DEFAULT_REGION.longitudeDelta
   });
   const { driver } = useDriver();
   const { setActiveRide } = useRide();
   const { incomingRide, isSearching, error, isOnline } = useRequests({
     intervalMs: 2500,
-    limit: 1,
+    limit: 1
   });
   const showError = false;
 
-  const activeRequest =
-    incomingRide && incomingRide.id !== ignoredRideId ? incomingRide : null;
+  const activeRequest = incomingRide && incomingRide.id !== ignoredRideId ? incomingRide : null;
 
   useEffect(() => {
     if (incomingRide && incomingRide.id !== ignoredRideId) {
@@ -97,8 +95,7 @@ export default function RequestsScreen() {
     Alert.alert(
       'Chuyến mới',
       `#${activeRequest.id.slice(0, 6)} tại ${
-        activeRequest.pickupLabel ||
-        `${formatCoordinate(activeRequest.pickupLat, 3)}, ${formatCoordinate(activeRequest.pickupLng, 3)}`
+        activeRequest.pickupLabel || `${formatCoordinate(activeRequest.pickupLat, 3)}, ${formatCoordinate(activeRequest.pickupLng, 3)}`
       }`,
       [
         {
@@ -106,16 +103,16 @@ export default function RequestsScreen() {
           style: 'destructive',
           onPress: () => {
             void handleDecline();
-          },
+          }
         },
         {
           text: 'Nhận ngay',
           onPress: () => {
             void handleAccept();
-          },
-        },
+          }
+        }
       ],
-      { cancelable: true },
+      { cancelable: true }
     );
   }, [activeRequest]);
 
@@ -137,17 +134,17 @@ export default function RequestsScreen() {
           {
             accuracy: Location.Accuracy.High,
             timeInterval: 1000,
-            distanceInterval: 5,
+            distanceInterval: 5
           },
           (loc) => {
             const next = {
               latitude: loc.coords.latitude,
-              longitude: loc.coords.longitude,
+              longitude: loc.coords.longitude
             };
             const prev = smoothedRef.current ?? next;
             const smoothed = {
               latitude: prev.latitude + SMOOTHING_ALPHA * (next.latitude - prev.latitude),
-              longitude: prev.longitude + SMOOTHING_ALPHA * (next.longitude - prev.longitude),
+              longitude: prev.longitude + SMOOTHING_ALPHA * (next.longitude - prev.longitude)
             };
             const delta = distanceMeters(prev, smoothed);
             if (delta >= MIN_MOVE_METERS || !smoothedRef.current) {
@@ -155,7 +152,7 @@ export default function RequestsScreen() {
               if (isMounted) setDriverLocation(smoothed);
             }
             if (isMounted) setGpsError(null);
-          },
+          }
         );
         locationRef.current = subscription;
       } catch (err: any) {
@@ -187,7 +184,7 @@ export default function RequestsScreen() {
     }
     return {
       latitude: activeRequest.pickupLat,
-      longitude: activeRequest.pickupLng,
+      longitude: activeRequest.pickupLng
     };
   }, [activeRequest]);
 
@@ -197,9 +194,9 @@ export default function RequestsScreen() {
       {
         ...driverLocation,
         latitudeDelta: zoomDelta.latitudeDelta,
-        longitudeDelta: zoomDelta.longitudeDelta,
+        longitudeDelta: zoomDelta.longitudeDelta
       },
-      350,
+      350
     );
   }, [driverLocation, zoomDelta]);
 
@@ -223,9 +220,7 @@ export default function RequestsScreen() {
       return;
     }
     const currentStatus = String(activeRequest.status || '').toUpperCase();
-    const alreadyOwned =
-      activeRequest.driverId === principalDriverId &&
-      ['ASSIGNED', 'ARRIVING', 'IN_PROGRESS'].includes(currentStatus);
+    const alreadyOwned = activeRequest.driverId === principalDriverId && ['ASSIGNED', 'ARRIVING', 'IN_PROGRESS'].includes(currentStatus);
     if (alreadyOwned) {
       setActiveRide(activeRequest);
       router.push('/ride/navigation');
@@ -243,9 +238,7 @@ export default function RequestsScreen() {
       if (err?.status === 409 || err?.code === 'INVALID_STATE_TRANSITION') {
         const stillOwned =
           activeRequest.driverId === principalDriverId &&
-          ['ASSIGNED', 'ARRIVING', 'IN_PROGRESS'].includes(
-            String(activeRequest.status || '').toUpperCase(),
-          );
+          ['ASSIGNED', 'ARRIVING', 'IN_PROGRESS'].includes(String(activeRequest.status || '').toUpperCase());
         if (stillOwned) {
           setActiveRide(activeRequest);
           router.push('/ride/navigation');
@@ -311,7 +304,8 @@ export default function RequestsScreen() {
             initialRegion={DEFAULT_REGION}
             provider={PROVIDER_GOOGLE}
             scrollEnabled={false}
-            zoomEnabled={false}>
+            zoomEnabled={false}
+          >
             <Marker coordinate={driverLocation} title="Tài xế" description="Vị trí hiện tại" />
           </MapView>
           <View style={styles.mapBadge}>
@@ -325,16 +319,12 @@ export default function RequestsScreen() {
               <Text style={styles.zoomText}>－</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.mapText}>
-            {gpsError ? gpsError : 'Khu vực trung tâm, Q1'}
-          </Text>
+          <Text style={styles.mapText}>{gpsError ? gpsError : 'Khu vực trung tâm, Q1'}</Text>
         </View>
 
         {!activeRequest ? (
           <View style={styles.card}>
-            <Text style={styles.emptyText}>
-              {isSearching ? 'Đang tải yêu cầu...' : isOnline ? 'Chưa có yêu cầu mới' : 'Tài xế đang OFFLINE'}
-            </Text>
+            <Text style={styles.emptyText}>{isSearching ? 'Đang tải yêu cầu...' : isOnline ? 'Chưa có yêu cầu mới' : 'Tài xế đang OFFLINE'}</Text>
             {showError && error ? <Text style={styles.emptySub}>{error}</Text> : null}
           </View>
         ) : (
@@ -356,8 +346,7 @@ export default function RequestsScreen() {
               </View>
               <View style={styles.chip}>
                 <Text style={styles.chipText}>
-                  {activeRequest.pickupLabel ||
-                    `${formatCoordinate(activeRequest.pickupLat, 3)},${formatCoordinate(activeRequest.pickupLng, 3)}`}
+                  {activeRequest.pickupLabel || `${formatCoordinate(activeRequest.pickupLat, 3)},${formatCoordinate(activeRequest.pickupLng, 3)}`}
                 </Text>
               </View>
               <View style={styles.chip}>
@@ -374,13 +363,11 @@ export default function RequestsScreen() {
               <View style={styles.timelineContent}>
                 <Text style={styles.label}>Điểm đón</Text>
                 <Text style={styles.value}>
-                  {activeRequest.pickupLabel ||
-                    `${formatCoordinate(activeRequest.pickupLat, 5)},${formatCoordinate(activeRequest.pickupLng, 5)}`}
+                  {activeRequest.pickupLabel || `${formatCoordinate(activeRequest.pickupLat, 5)},${formatCoordinate(activeRequest.pickupLng, 5)}`}
                 </Text>
                 <Text style={styles.label}>Điểm đến</Text>
                 <Text style={styles.value}>
-                  {activeRequest.dropoffLabel ||
-                    `${formatCoordinate(activeRequest.dropoffLat, 5)},${formatCoordinate(activeRequest.dropoffLng, 5)}`}
+                  {activeRequest.dropoffLabel || `${formatCoordinate(activeRequest.dropoffLat, 5)},${formatCoordinate(activeRequest.dropoffLng, 5)}`}
                 </Text>
               </View>
             </View>
@@ -394,16 +381,16 @@ export default function RequestsScreen() {
               <TouchableOpacity
                 style={[styles.secondary, (isAccepting || isRejecting) && styles.disabledButton]}
                 onPress={handleDecline}
-                disabled={isAccepting || isRejecting}>
+                disabled={isAccepting || isRejecting}
+              >
                 <Text style={styles.secondaryText}>Từ chối</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.primary, (isAccepting || isRejecting) && styles.disabledButton]}
                 onPress={handleAccept}
-                disabled={isAccepting || isRejecting}>
-                <Text style={styles.primaryText}>
-                  {isAccepting ? 'Đang nhận...' : 'Nhận chuyến'}
-                </Text>
+                disabled={isAccepting || isRejecting}
+              >
+                <Text style={styles.primaryText}>{isAccepting ? 'Đang nhận...' : 'Nhận chuyến'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -416,33 +403,33 @@ export default function RequestsScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: palette.background,
+    backgroundColor: palette.background
   },
   container: {
     padding: 20,
     paddingBottom: 32,
-    gap: 16,
+    gap: 16
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: palette.text,
+    color: palette.text
   },
   timerPill: {
     backgroundColor: palette.redSoft,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 999,
+    borderRadius: 999
   },
   timerText: {
     color: palette.redDark,
     fontWeight: '700',
-    fontSize: 12,
+    fontSize: 12
   },
   mapPreview: {
     backgroundColor: palette.surface,
@@ -453,7 +440,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'flex-end',
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'hidden'
   },
   mapBadge: {
     position: 'absolute',
@@ -464,12 +451,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   mapBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: palette.redDark,
+    color: palette.redDark
   },
   mapText: {
     textAlign: 'center',
@@ -479,13 +466,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
     alignSelf: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 10
   },
   zoomControls: {
     position: 'absolute',
     right: 12,
     top: 12,
-    gap: 8,
+    gap: 8
   },
   zoomButton: {
     width: 36,
@@ -495,101 +482,101 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   zoomText: {
     fontSize: 18,
     fontWeight: '700',
-    color: palette.redDark,
+    color: palette.redDark
   },
   card: {
     backgroundColor: palette.card,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   emptyText: {
     color: palette.muted,
-    textAlign: 'center',
+    textAlign: 'center'
   },
   emptySub: {
     color: palette.muted,
     textAlign: 'center',
     marginTop: 6,
-    fontSize: 12,
+    fontSize: 12
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 12
   },
   eyebrow: {
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    color: palette.muted,
+    color: palette.muted
   },
   requestTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: palette.text,
-    marginTop: 4,
+    marginTop: 4
   },
   pricePill: {
     backgroundColor: palette.redSoft,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   priceText: {
     color: palette.redDark,
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 14
   },
   priceSub: {
     color: palette.muted,
-    fontSize: 10,
+    fontSize: 10
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 12
   },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   chipText: {
     color: palette.text,
-    fontSize: 12,
+    fontSize: 12
   },
   timeline: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 12
   },
   timelineLine: {
     width: 12,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   timelineDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: palette.red,
+    backgroundColor: palette.red
   },
   timelineBar: {
     width: 2,
     flex: 1,
     backgroundColor: palette.border,
-    marginVertical: 4,
+    marginVertical: 4
   },
   timelineDotOutline: {
     width: 10,
@@ -597,51 +584,51 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 2,
     borderColor: palette.red,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff'
   },
   timelineContent: {
     flex: 1,
-    gap: 6,
+    gap: 6
   },
   label: {
     fontSize: 12,
-    color: palette.muted,
+    color: palette.muted
   },
   value: {
     color: palette.text,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   noteBox: {
     backgroundColor: palette.redSoft,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 12
   },
   noteLabel: {
     fontSize: 12,
-    color: palette.muted,
+    color: palette.muted
   },
   noteText: {
     color: palette.text,
-    marginTop: 6,
+    marginTop: 6
   },
   actions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 12
   },
   disabledButton: {
-    opacity: 0.6,
+    opacity: 0.6
   },
   primary: {
     flex: 1,
     backgroundColor: palette.red,
     borderRadius: 12,
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 12
   },
   primaryText: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '700'
   },
   secondary: {
     flex: 1,
@@ -650,10 +637,10 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     alignItems: 'center',
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff'
   },
   secondaryText: {
     color: palette.redDark,
-    fontWeight: '700',
-  },
+    fontWeight: '700'
+  }
 });

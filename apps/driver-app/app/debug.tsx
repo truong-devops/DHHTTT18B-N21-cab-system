@@ -20,7 +20,7 @@ export default function DebugScreen() {
   const [ping, setPing] = useState<PingState>({
     loading: false,
     data: null,
-    error: null,
+    error: null
   });
 
   useEffect(() => {
@@ -38,14 +38,14 @@ export default function DebugScreen() {
       const res = await apiRequest({
         method: 'GET',
         path: '/health',
-        auth: false,
+        auth: false
       });
       setPing({ loading: false, data: JSON.stringify(res, null, 2), error: null });
     } catch (err: any) {
       setPing({
         loading: false,
         data: null,
-        error: err?.message ?? 'Ping thất bại',
+        error: err?.message ?? 'Ping thất bại'
       });
     }
   };
@@ -110,11 +110,11 @@ export default function DebugScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: palette.background,
+    backgroundColor: palette.background
   },
   container: {
     padding: 20,
-    gap: 16,
+    gap: 16
   },
   closeButton: {
     paddingHorizontal: 12,
@@ -122,25 +122,25 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: palette.border,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff'
   },
   closeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: palette.text,
+    color: palette.text
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: palette.text,
-    marginBottom: 8,
+    marginBottom: 8
   },
   monoText: {
     fontSize: 12,
-    color: palette.text,
+    color: palette.text
   },
   pingButton: {
-    marginTop: 12,
+    marginTop: 12
   },
   responseBox: {
     marginTop: 12,
@@ -148,49 +148,49 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: palette.border,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F9FAFB'
   },
   responseText: {
     fontSize: 11,
-    color: palette.text,
+    color: palette.text
   },
   logRow: {
     borderTopWidth: 1,
     borderTopColor: palette.border,
     paddingTop: 10,
-    marginTop: 10,
+    marginTop: 10
   },
   logHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   logMethod: {
     fontWeight: '700',
     color: palette.text,
-    fontSize: 12,
+    fontSize: 12
   },
   logStatus: {
     fontSize: 11,
-    color: palette.muted,
+    color: palette.muted
   },
   logUrl: {
     fontSize: 11,
     color: palette.text,
-    marginTop: 4,
+    marginTop: 4
   },
   logMeta: {
     fontSize: 10,
     color: palette.muted,
-    marginTop: 4,
+    marginTop: 4
   },
   mutedText: {
     fontSize: 12,
-    color: palette.muted,
+    color: palette.muted
   },
   errorText: {
     marginTop: 8,
     color: palette.redDark,
-    fontSize: 12,
-  },
+    fontSize: 12
+  }
 });

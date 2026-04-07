@@ -1,9 +1,9 @@
-const config = require("../config");
-const { getPaymentRequest } = require("../integrations/payosClient");
-const { listPendingPayosPayments } = require("../repositories/paymentsRepo");
-const { changePaymentStatus } = require("./paymentService");
-const { STATUSES } = require("../domain/paymentStatus");
-const { logger, withTrace } = require("../utils/logger");
+const config = require('../config');
+const { getPaymentRequest } = require('../integrations/payosClient');
+const { listPendingPayosPayments } = require('../repositories/paymentsRepo');
+const { changePaymentStatus } = require('./paymentService');
+const { STATUSES } = require('../domain/paymentStatus');
+const { logger, withTrace } = require('../utils/logger');
 
 function hasPollingCredentials() {
   return Boolean(config.payos.clientId && config.payos.apiKey);
@@ -11,39 +11,39 @@ function hasPollingCredentials() {
 
 function normalizePayosStatus(value) {
   if (value == null) {
-    return "";
+    return '';
   }
   return String(value).trim().toUpperCase();
 }
 
 function mapPayosStatus({ status, code, desc }) {
   const normalized = normalizePayosStatus(status);
-  if (!normalized || normalized === "PENDING" || normalized === "PROCESSING") {
+  if (!normalized || normalized === 'PENDING' || normalized === 'PROCESSING') {
     return null;
   }
 
-  if (normalized === "PAID") {
+  if (normalized === 'PAID') {
     return { status: STATUSES.PAID };
   }
 
-  if (normalized === "CANCELLED") {
+  if (normalized === 'CANCELLED') {
     return {
       status: STATUSES.FAILED,
-      failureReason: desc || code || "PAYOS_CANCELLED"
+      failureReason: desc || code || 'PAYOS_CANCELLED'
     };
   }
 
-  if (normalized === "EXPIRED") {
+  if (normalized === 'EXPIRED') {
     return {
       status: STATUSES.FAILED,
-      failureReason: desc || code || "PAYOS_EXPIRED"
+      failureReason: desc || code || 'PAYOS_EXPIRED'
     };
   }
 
-  if (normalized === "FAILED") {
+  if (normalized === 'FAILED') {
     return {
       status: STATUSES.FAILED,
-      failureReason: desc || code || "PAYOS_FAILED"
+      failureReason: desc || code || 'PAYOS_FAILED'
     };
   }
 
@@ -75,14 +75,13 @@ async function fetchPayosRequestData(payment) {
 async function syncPayosPayment(payment) {
   const traceId = `payos-sync-${payment.id}`;
   const requestId =
-    (payment.payos && payment.payos.paymentLinkId) ||
-    (payment.payos && payment.payos.orderCode ? String(payment.payos.orderCode) : null);
+    (payment.payos && payment.payos.paymentLinkId) || (payment.payos && payment.payos.orderCode ? String(payment.payos.orderCode) : null);
   const log = withTrace(traceId, requestId);
 
   const remote = await fetchPayosRequestData(payment);
   if (!remote) {
-    log.warn({ paymentId: payment.id }, "PayOS sync skipped due to missing identifier");
-    return { handled: false, reason: "missing_identifier" };
+    log.warn({ paymentId: payment.id }, 'PayOS sync skipped due to missing identifier');
+    return { handled: false, reason: 'missing_identifier' };
   }
 
   const mapped = mapPayosStatus({
@@ -91,19 +90,16 @@ async function syncPayosPayment(payment) {
     desc: remote.desc
   });
   if (!mapped) {
-    return { handled: false, reason: "non_terminal" };
+    return { handled: false, reason: 'non_terminal' };
   }
 
   try {
     const updated = await changePaymentStatus({
       paymentId: payment.id,
-      statusUpdate:
-        mapped.status === STATUSES.FAILED
-          ? { status: mapped.status, failureReason: mapped.failureReason }
-          : { status: mapped.status },
+      statusUpdate: mapped.status === STATUSES.FAILED ? { status: mapped.status, failureReason: mapped.failureReason } : { status: mapped.status },
       traceId,
       requestId,
-      actor: "payos-sync"
+      actor: 'payos-sync'
     });
     log.info(
       {
@@ -111,16 +107,13 @@ async function syncPayosPayment(payment) {
         fromStatus: payment.status,
         toStatus: updated.status
       },
-      "PayOS payment status synchronized"
+      'PayOS payment status synchronized'
     );
     return { handled: true, payment: updated };
   } catch (err) {
-    if (err && err.code === "INVALID_STATE_TRANSITION") {
-      log.warn(
-        { paymentId: payment.id, targetStatus: mapped.status },
-        "PayOS sync ignored due to state transition"
-      );
-      return { handled: false, reason: "state_transition" };
+    if (err && err.code === 'INVALID_STATE_TRANSITION') {
+      log.warn({ paymentId: payment.id, targetStatus: mapped.status }, 'PayOS sync ignored due to state transition');
+      return { handled: false, reason: 'state_transition' };
     }
     throw err;
   }
@@ -128,10 +121,10 @@ async function syncPayosPayment(payment) {
 
 async function syncPayosPaymentsBatch() {
   if (!config.payos.autoSyncEnabled) {
-    return { skipped: true, reason: "disabled" };
+    return { skipped: true, reason: 'disabled' };
   }
   if (!hasPollingCredentials()) {
-    return { skipped: true, reason: "config_missing" };
+    return { skipped: true, reason: 'config_missing' };
   }
 
   const batchSize = Number(config.payos.autoSyncBatchSize);
@@ -150,10 +143,7 @@ async function syncPayosPaymentsBatch() {
       }
     } catch (err) {
       const traceId = `payos-sync-${payment.id}`;
-      withTrace(traceId).error(
-        { err, paymentId: payment.id },
-        "PayOS sync failed for payment"
-      );
+      withTrace(traceId).error({ err, paymentId: payment.id }, 'PayOS sync failed for payment');
     }
   }
 
@@ -162,11 +152,11 @@ async function syncPayosPaymentsBatch() {
 
 function startPayosAutoSync() {
   if (!config.payos.autoSyncEnabled) {
-    logger.info("PayOS auto sync disabled");
+    logger.info('PayOS auto sync disabled');
     return null;
   }
   if (!hasPollingCredentials()) {
-    logger.info("PayOS auto sync skipped due to missing credentials");
+    logger.info('PayOS auto sync skipped due to missing credentials');
     return null;
   }
 
@@ -182,19 +172,19 @@ function startPayosAutoSync() {
     try {
       await syncPayosPaymentsBatch();
     } catch (err) {
-      logger.error({ err }, "PayOS auto sync batch failed");
+      logger.error({ err }, 'PayOS auto sync batch failed');
     } finally {
       running = false;
     }
   };
 
   run().catch((err) => {
-    logger.error({ err }, "PayOS auto sync initial run failed");
+    logger.error({ err }, 'PayOS auto sync initial run failed');
   });
 
   const timer = setInterval(() => {
     run().catch((err) => {
-      logger.error({ err }, "PayOS auto sync run failed");
+      logger.error({ err }, 'PayOS auto sync run failed');
     });
   }, safeIntervalMs);
 

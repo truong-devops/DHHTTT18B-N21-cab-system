@@ -7,7 +7,7 @@ paths:
     post:
       summary: Estimate ETA
       responses:
-        "200":
+        '200':
           description: OK
-        "400":
+        '400':
           description: Bad request

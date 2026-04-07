@@ -1,12 +1,12 @@
-const crypto = require("crypto");
+const crypto = require('crypto');
 
 const store = new Map();
 
 function hashToken(token) {
   return crypto
-    .createHash("sha256")
-    .update(String(token || ""))
-    .digest("hex");
+    .createHash('sha256')
+    .update(String(token || ''))
+    .digest('hex');
 }
 
 function cleanupExpired() {
@@ -22,9 +22,7 @@ function revokeAccessToken(token, expSec) {
   cleanupExpired();
   const hashed = hashToken(token);
   const fallbackExp = Math.floor(Date.now() / 1000) + 15 * 60;
-  const exp = Number.isFinite(Number(expSec))
-    ? Number(expSec)
-    : fallbackExp;
+  const exp = Number.isFinite(Number(expSec)) ? Number(expSec) : fallbackExp;
   store.set(hashed, exp);
 }
 
@@ -38,4 +36,3 @@ module.exports = {
   revokeAccessToken,
   isAccessTokenRevoked
 };
-

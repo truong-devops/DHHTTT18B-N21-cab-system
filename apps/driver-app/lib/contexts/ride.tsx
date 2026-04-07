@@ -14,9 +14,9 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       activeRide,
-      setActiveRide,
+      setActiveRide
     }),
-    [activeRide],
+    [activeRide]
   );
 
   return <RideContext.Provider value={value}>{children}</RideContext.Provider>;

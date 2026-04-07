@@ -30,7 +30,7 @@ export async function login(identifier: string, password: string) {
     method: 'POST',
     path: endpoints.auth.login,
     body: { identifier, password },
-    auth: false,
+    auth: false
   });
 }
 
@@ -40,14 +40,14 @@ export async function refresh(refreshToken: string) {
     path: endpoints.auth.refresh,
     body: { refreshToken },
     auth: false,
-    retryAuth: false,
+    retryAuth: false
   });
 }
 
 export async function getMe() {
   return apiRequest<VerifyResponse>({
     method: 'GET',
-    path: endpoints.auth.verify,
+    path: endpoints.auth.verify
   });
 }
 
@@ -57,6 +57,6 @@ export async function logout(refreshToken: string) {
     path: endpoints.auth.logout,
     body: { refreshToken },
     auth: false,
-    retryAuth: false,
+    retryAuth: false
   });
 }

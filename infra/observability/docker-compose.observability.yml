@@ -1,9 +1,9 @@
 x-app-syslog-logging: &app_syslog_logging
   driver: syslog
   options:
-    syslog-address: "tcp://${LOGSTASH_SYSLOG_HOST:-host.docker.internal}:${LOGSTASH_SYSLOG_PORT:-5514}"
+    syslog-address: 'tcp://${LOGSTASH_SYSLOG_HOST:-host.docker.internal}:${LOGSTASH_SYSLOG_PORT:-5514}'
     syslog-format: rfc5424micro
-    tag: "{{.Name}}"
+    tag: '{{.Name}}'
 
 services:
   # Overlay logging config for application services in infra/docker-compose.dev.yml.
@@ -41,15 +41,15 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.98.0
-    command: ["--config=/etc/otel-collector.yml"]
+    command: ['--config=/etc/otel-collector.yml']
     environment:
       DEPLOY_ENV: ${DEPLOY_ENV:-dev}
     volumes:
       - ./observability/otel-collector.yml:/etc/otel-collector.yml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-      - "8889:8889"   # Prometheus scrape (metrics)
+      - '4317:4317' # OTLP gRPC
+      - '4318:4318' # OTLP HTTP
+      - '8889:8889' # Prometheus scrape (metrics)
     depends_on:
       - tempo
     networks:
@@ -64,7 +64,7 @@ services:
       - ./observability/prometheus/alerts:/etc/prometheus/alerts:ro
       - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - '9090:9090'
     depends_on:
       - alertmanager
     networks:
@@ -94,13 +94,13 @@ services:
       ALERT_CRITICAL_RECEIVER: ${ALERT_CRITICAL_RECEIVER:-generic-webhook}
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-http://host.docker.internal:19093/alerts}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-http://127.0.0.1:65535/slack}
-      SLACK_CHANNEL: "${SLACK_CHANNEL:-#cab-alerts}"
+      SLACK_CHANNEL: '${SLACK_CHANNEL:-#cab-alerts}'
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-disabled}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-1}
     volumes:
       - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports:
-      - "9093:9093"
+      - '9093:9093'
     networks:
       - backend
 
@@ -108,13 +108,13 @@ services:
     image: grafana/grafana:10.4.2
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_SIGN_UP: 'false'
     volumes:
       - grafana_data:/var/lib/grafana
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
-      - "3001:3000"
+      - '3001:3000'
     depends_on:
       - prometheus
       - tempo
@@ -125,29 +125,29 @@ services:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     environment:
       discovery.type: single-node
-      xpack.security.enabled: "false"
-      xpack.security.enrollment.enabled: "false"
-      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      xpack.security.enabled: 'false'
+      xpack.security.enrollment.enabled: 'false'
+      ES_JAVA_OPTS: '-Xms512m -Xmx512m'
     volumes:
       - ./observability/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
       - elasticsearch_data:/usr/share/elasticsearch/data
     ports:
-      - "9200:9200"
+      - '9200:9200'
     networks:
       - backend
 
   logstash:
     image: docker.elastic.co/logstash/logstash:8.13.4
     environment:
-      LS_JAVA_OPTS: "-Xms256m -Xmx256m"
+      LS_JAVA_OPTS: '-Xms256m -Xmx256m'
       LOGSTASH_SYSLOG_PORT: ${LOGSTASH_SYSLOG_PORT:-5514}
       DEPLOY_ENV: ${DEPLOY_ENV:-dev}
     volumes:
       - ./observability/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
       - ./observability/logstash/pipeline:/usr/share/logstash/pipeline:ro
     ports:
-      - "${LOGSTASH_SYSLOG_PORT:-5514}:5514"
-      - "9600:9600"
+      - '${LOGSTASH_SYSLOG_PORT:-5514}:5514'
+      - '9600:9600'
     depends_on:
       - elasticsearch
     networks:
@@ -160,7 +160,7 @@ services:
     volumes:
       - ./observability/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
     ports:
-      - "5601:5601"
+      - '5601:5601'
     depends_on:
       - elasticsearch
     networks:
@@ -168,13 +168,13 @@ services:
 
   tempo:
     image: grafana/tempo:2.4.1
-    command: ["-config.file=/etc/tempo/tempo.yml"]
+    command: ['-config.file=/etc/tempo/tempo.yml']
     volumes:
       - ./observability/tempo.yml:/etc/tempo/tempo.yml:ro
       - tempo_data:/var/tempo
     ports:
-      - "3200:3200"
-      - "4319:4317"
+      - '3200:3200'
+      - '4319:4317'
     networks:
       - backend
 

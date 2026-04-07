@@ -24,11 +24,7 @@ function toFiniteNumber(value: unknown): number | undefined {
 function normalizeRide(raw: any): rideApi.Ride | null {
   if (!raw || typeof raw !== 'object') return null;
   const resolvedId =
-    typeof raw.id === 'string' && raw.id.trim()
-      ? raw.id.trim()
-      : typeof raw.rideId === 'string' && raw.rideId.trim()
-        ? raw.rideId.trim()
-        : '';
+    typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : typeof raw.rideId === 'string' && raw.rideId.trim() ? raw.rideId.trim() : '';
   if (!resolvedId) return null;
 
   return {
@@ -51,13 +47,7 @@ function parseEvent(raw: string) {
 
 function extractRide(event: any): rideApi.Ride | null {
   if (!event) return null;
-  const payload =
-    event.ride ??
-    event.payload?.ride ??
-    event.data?.ride ??
-    event.payload ??
-    event.data ??
-    event;
+  const payload = event.ride ?? event.payload?.ride ?? event.data?.ride ?? event.payload ?? event.data ?? event;
 
   const normalizedPayload = normalizeRide(payload);
   if (normalizedPayload) return normalizedPayload;
@@ -70,12 +60,7 @@ function extractRide(event: any): rideApi.Ride | null {
   return null;
 }
 
-export function useIncomingRide({
-  enabled,
-  intervalMs = DEFAULT_INTERVAL_MS,
-  limit = 1,
-  wsUrl,
-}: Options) {
+export function useIncomingRide({ enabled, intervalMs = DEFAULT_INTERVAL_MS, limit = 1, wsUrl }: Options) {
   const [incomingRide, setIncomingRide] = useState<rideApi.Ride | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
@@ -99,11 +84,7 @@ export function useIncomingRide({
     setError(null);
     try {
       const res = await rideApi.listAssignments();
-      const list = Array.isArray((res as any)?.data)
-        ? (res as any).data
-        : Array.isArray((res as any)?.data?.data)
-          ? (res as any).data.data
-          : [];
+      const list = Array.isArray((res as any)?.data) ? (res as any).data : Array.isArray((res as any)?.data?.data) ? (res as any).data.data : [];
       const nextRide = normalizeRide(list[0]) ?? null;
       setIncomingRide(nextRide);
       setLastUpdateAt(Date.now());

@@ -39,24 +39,23 @@ export type DriverProfileResponse = {
 export async function getMe() {
   return apiRequest<DriverProfileResponse>({
     method: 'GET',
-    path: endpoints.driver.me,
+    path: endpoints.driver.me
   });
 }
 
 export async function setOnline(lat?: number, lng?: number) {
-  const hasInitialLocation =
-    Number.isFinite(lat as number) && Number.isFinite(lng as number);
+  const hasInitialLocation = Number.isFinite(lat as number) && Number.isFinite(lng as number);
   return apiRequest({
     method: 'POST',
     path: endpoints.driver.online,
-    body: hasInitialLocation ? { initialLocation: { lat, lng } } : {},
+    body: hasInitialLocation ? { initialLocation: { lat, lng } } : {}
   });
 }
 
 export async function setOffline() {
   return apiRequest({
     method: 'POST',
-    path: endpoints.driver.offline,
+    path: endpoints.driver.offline
   });
 }
 
@@ -73,7 +72,7 @@ export async function sendLocation(payload: DriverLocationPayload) {
   // Backend validates optional numeric fields as number-only, so skip null/NaN.
   const body: Record<string, unknown> = {
     lat: payload.lat,
-    lng: payload.lng,
+    lng: payload.lng
   };
   if (Number.isFinite(payload.heading as number)) body.heading = payload.heading;
   if (Number.isFinite(payload.speed as number)) body.speed = payload.speed;
@@ -83,13 +82,13 @@ export async function sendLocation(payload: DriverLocationPayload) {
   return apiRequest({
     method: 'POST',
     path: endpoints.driver.location,
-    body,
+    body
   });
 }
 
 export async function heartbeat() {
   return apiRequest({
     method: 'POST',
-    path: endpoints.driver.heartbeat,
+    path: endpoints.driver.heartbeat
   });
 }

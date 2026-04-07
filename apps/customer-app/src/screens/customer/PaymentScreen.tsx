@@ -1,40 +1,40 @@
-import React, { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import type { MainStackParamList } from '../../navigation/MainStack'
-import { Card } from '../../components/common/Card'
-import { PrimaryButton } from '../../components/common/PrimaryButton'
-import { OutlineButton } from '../../components/common/OutlineButton'
-import { colors, spacing, typography } from '../../theme/tokens'
-import { useCustomerStore } from '../../store/customerStore'
-import { formatVnd } from '../../utils/format'
-import { useToast } from '../../hooks/useToast'
+import React, { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MainStackParamList } from '../../navigation/MainStack';
+import { Card } from '../../components/common/Card';
+import { PrimaryButton } from '../../components/common/PrimaryButton';
+import { OutlineButton } from '../../components/common/OutlineButton';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { useCustomerStore } from '../../store/customerStore';
+import { formatVnd } from '../../utils/format';
+import { useToast } from '../../hooks/useToast';
 
 const methods = [
   { label: 'Tiền mặt', code: 'CASH' },
   { label: 'Thẻ/Wallet', code: 'WALLET' },
   { label: 'VietQR', code: 'VIETQR' }
-]
+];
 
 const PaymentScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
-  const { activeRide, completeRidePayment } = useCustomerStore()
-  const [method, setMethod] = useState(methods[0])
-  const [loading, setLoading] = useState(false)
-  const { push } = useToast()
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const { activeRide, completeRidePayment } = useCustomerStore();
+  const [method, setMethod] = useState(methods[0]);
+  const [loading, setLoading] = useState(false);
+  const { push } = useToast();
 
   const handlePay = async () => {
     try {
-      setLoading(true)
-      await completeRidePayment(method.label)
-      navigation.replace('Rating')
+      setLoading(true);
+      await completeRidePayment(method.label);
+      navigation.replace('Rating');
     } catch (err: any) {
-      push(err?.message || 'Thanh toán thất bại', 'danger')
+      push(err?.message || 'Thanh toán thất bại', 'danger');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <View style={styles.container}>
@@ -54,20 +54,17 @@ const PaymentScreen = () => {
         )}
       </Card>
       <PrimaryButton title={loading ? 'Đang xử lý...' : 'Thanh toán'} onPress={handlePay} disabled={loading} />
-      <OutlineButton
-        title="Hien thi ma QR"
-        onPress={() => push('VietQR se duoc mo khi backend thanh toan san sang', 'info')}
-      />
+      <OutlineButton title="Hien thi ma QR" onPress={() => push('VietQR se duoc mo khi backend thanh toan san sang', 'info')} />
       {/* TODO: Add VietQR/card redirect flow once Payment Service integration is enabled */}
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.xl, gap: spacing.md },
   title: { ...typography.title, color: colors.text },
   label: { ...typography.body, color: colors.muted },
   amount: { ...typography.title, color: colors.brand700 }
-})
+});
 
-export default PaymentScreen
+export default PaymentScreen;

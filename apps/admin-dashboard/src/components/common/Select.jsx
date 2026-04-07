@@ -7,7 +7,7 @@ function Select({ label, helper, className = '', children, ...props }) {
       </select>
       {helper && <div className="input-helper">{helper}</div>}
     </div>
-  )
+  );
 }
 
-export default Select
+export default Select;

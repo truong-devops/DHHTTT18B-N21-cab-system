@@ -1,27 +1,27 @@
-import React, { useState } from 'react'
-import { LayoutAnimation, Platform, Pressable, StyleSheet, View } from 'react-native'
-import { colors, spacing } from '../../theme/tokens'
+import React, { useState } from 'react';
+import { LayoutAnimation, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { colors, spacing } from '../../theme/tokens';
 
 type Props = {
-  collapsedHeight?: number
-  children: React.ReactNode
-}
+  collapsedHeight?: number;
+  children: React.ReactNode;
+};
 
 export const BottomSheet: React.FC<Props> = ({ collapsedHeight = 140, children }) => {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(false);
 
   const toggle = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
-    setExpanded((prev) => !prev)
-  }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded((prev) => !prev);
+  };
 
   return (
     <Pressable style={[styles.container, expanded ? styles.expanded : { height: collapsedHeight }]} onPress={toggle}>
       <View style={styles.drag} />
       {children}
     </Pressable>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -49,4 +49,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginBottom: spacing.sm
   }
-})
+});

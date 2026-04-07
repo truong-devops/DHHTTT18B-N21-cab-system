@@ -1,5 +1,5 @@
-const { pool } = require("../db/pool");
-const config = require("../config");
+const { pool } = require('../db/pool');
+const config = require('../config');
 
 function executor(client) {
   return client || pool;
@@ -10,11 +10,7 @@ function parseCount(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function computeRetryDelayMs({
-  attemptCount,
-  baseMs = config.outbox.retryBaseMs,
-  maxMs = config.outbox.retryMaxMs
-}) {
+function computeRetryDelayMs({ attemptCount, baseMs = config.outbox.retryBaseMs, maxMs = config.outbox.retryMaxMs }) {
   const normalizedAttempt = Math.max(1, parseCount(attemptCount, 1));
   const exponent = Math.max(0, normalizedAttempt - 1);
   const delay = Math.round(baseMs * Math.pow(2, exponent));
@@ -98,12 +94,7 @@ async function markOutboxPublished(id) {
   );
 }
 
-async function markOutboxDead({
-  id,
-  error,
-  dlqTopic = null,
-  dlqPayload = null
-}) {
+async function markOutboxDead({ id, error, dlqTopic = null, dlqPayload = null }) {
   await pool.query(
     `UPDATE outbox_events
      SET status = 'DEAD',
@@ -115,16 +106,11 @@ async function markOutboxDead({
          dlq_payload = $4,
          updated_at = now()
      WHERE id = $1`,
-    [id, error || "max_retries_exceeded", dlqTopic, dlqPayload]
+    [id, error || 'max_retries_exceeded', dlqTopic, dlqPayload]
   );
 }
 
-async function markOutboxForRetry({
-  id,
-  error,
-  retryBaseMs = config.outbox.retryBaseMs,
-  retryMaxMs = config.outbox.retryMaxMs
-}) {
+async function markOutboxForRetry({ id, error, retryBaseMs = config.outbox.retryBaseMs, retryMaxMs = config.outbox.retryMaxMs }) {
   const increment = await pool.query(
     `UPDATE outbox_events
      SET attempt_count = attempt_count + 1
@@ -143,7 +129,7 @@ async function markOutboxForRetry({
       error
     });
     return {
-      status: "DEAD",
+      status: 'DEAD',
       attemptCount: row.attempt_count,
       maxAttempts: row.max_attempts,
       eventId: row.event_id,
@@ -167,11 +153,11 @@ async function markOutboxForRetry({
          next_retry_at = now() + (($3::text || ' milliseconds')::interval),
          updated_at = now()
      WHERE id = $1`,
-    [id, error || "publish_failed", delayMs]
+    [id, error || 'publish_failed', delayMs]
   );
 
   return {
-    status: "RETRY",
+    status: 'RETRY',
     attemptCount: row.attempt_count,
     maxAttempts: row.max_attempts,
     retryInMs: delayMs,

@@ -1,4 +1,4 @@
-const { pool } = require("./pool");
+const { pool } = require('./pool');
 
 function mapIdempotencyRow(row) {
   if (!row) {
@@ -42,15 +42,7 @@ async function saveIdempotencyKey(client, data) {
     )
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (route_key, user_id, idem_key) DO NOTHING`,
-    [
-      data.routeKey,
-      data.userId,
-      data.idemKey,
-      data.requestHash,
-      data.responseCode,
-      data.responseHeaders || {},
-      data.responseBody
-    ]
+    [data.routeKey, data.userId, data.idemKey, data.requestHash, data.responseCode, data.responseHeaders || {}, data.responseBody]
   );
 }
 

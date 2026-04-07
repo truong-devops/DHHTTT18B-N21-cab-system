@@ -1,39 +1,39 @@
-import React, { useEffect, useState } from 'react'
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
-import { OutlineButton } from '../../components/common/OutlineButton'
-import { PrimaryButton } from '../../components/common/PrimaryButton'
-import { colors, spacing, typography } from '../../theme/tokens'
-import { useCustomerStore } from '../../store/customerStore'
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { OutlineButton } from '../../components/common/OutlineButton';
+import { PrimaryButton } from '../../components/common/PrimaryButton';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { useCustomerStore } from '../../store/customerStore';
 
-const primary = '#FF5A1F'
-const primaryDark = '#FF3B1D'
-const sectionBg = '#F9F4F2'
+const primary = '#FF5A1F';
+const primaryDark = '#FF3B1D';
+const sectionBg = '#F9F4F2';
 
 const ProfileWalletScreen = () => {
-  const { user, logout, updateProfile } = useCustomerStore()
-  const [name, setName] = useState(user?.name || '')
-  const [email, setEmail] = useState(user?.email || '')
-  const [phone, setPhone] = useState(user?.phone || '')
-  const [saving, setSaving] = useState(false)
+  const { user, logout, updateProfile } = useCustomerStore();
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setName(user?.name || '')
-    setEmail(user?.email || '')
-    setPhone(user?.phone || '')
-  }, [user])
+    setName(user?.name || '');
+    setEmail(user?.email || '');
+    setPhone(user?.phone || '');
+  }, [user]);
 
   const onSave = async () => {
     try {
-      setSaving(true)
-      await updateProfile({ name, email, phone })
-      Alert.alert('Thành công', 'Đã cập nhật thông tin tài khoản.')
+      setSaving(true);
+      await updateProfile({ name, email, phone });
+      Alert.alert('Thành công', 'Đã cập nhật thông tin tài khoản.');
     } catch (e: any) {
-      Alert.alert('Lỗi', e?.message || 'Cập nhật thất bại')
+      Alert.alert('Lỗi', e?.message || 'Cập nhật thất bại');
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   return (
     <View style={styles.container}>
@@ -58,17 +58,10 @@ const ProfileWalletScreen = () => {
         {/* Thông tin thật từ backend */}
         <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg, gap: spacing.sm }}>
           <Text style={{ ...typography.h2, color: colors.text }}>Thông tin thật</Text>
-          <Text style={{ ...typography.body, color: colors.muted }}>
-            Dữ liệu lấy trực tiếp từ database qua API Gateway.
-          </Text>
+          <Text style={{ ...typography.body, color: colors.muted }}>Dữ liệu lấy trực tiếp từ database qua API Gateway.</Text>
           <View style={styles.formRow}>
             <Text style={styles.infoLabel}>Họ tên</Text>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="Nhập họ tên"
-            />
+            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Nhập họ tên" />
           </View>
           <View style={styles.formRow}>
             <Text style={styles.infoLabel}>Email</Text>
@@ -83,13 +76,7 @@ const ProfileWalletScreen = () => {
           </View>
           <View style={styles.formRow}>
             <Text style={styles.infoLabel}>Số điện thoại</Text>
-            <TextInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="09xxxxxxx"
-              keyboardType="phone-pad"
-            />
+            <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="09xxxxxxx" keyboardType="phone-pad" />
           </View>
           <View style={styles.formRow}>
             <Text style={styles.infoLabel}>User ID</Text>
@@ -103,8 +90,8 @@ const ProfileWalletScreen = () => {
         </View>
       </ScrollView>
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: sectionBg },
@@ -169,6 +156,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     color: colors.text
   }
-})
+});
 
-export default ProfileWalletScreen
+export default ProfileWalletScreen;

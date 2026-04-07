@@ -1,30 +1,30 @@
-import React, { useMemo } from 'react'
-import { Dimensions, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import type { MainStackParamList } from '../../navigation/MainStack'
-import { CustomerLiveMap } from '../../components/map/CustomerLiveMap'
-import { Card } from '../../components/common/Card'
-import { PrimaryButton } from '../../components/common/PrimaryButton'
-import { colors, spacing, typography } from '../../theme/tokens'
-import { destinationPoints } from '../../mock/data'
-import { useCustomerStore } from '../../store/customerStore'
-import { customerApi } from '../../services/customerApi'
-import { useRealtimeStream } from '../../hooks/useRealtimeStream'
+import React, { useMemo } from 'react';
+import { Dimensions, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MainStackParamList } from '../../navigation/MainStack';
+import { CustomerLiveMap } from '../../components/map/CustomerLiveMap';
+import { Card } from '../../components/common/Card';
+import { PrimaryButton } from '../../components/common/PrimaryButton';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { destinationPoints } from '../../mock/data';
+import { useCustomerStore } from '../../store/customerStore';
+import { customerApi } from '../../services/customerApi';
+import { useRealtimeStream } from '../../hooks/useRealtimeStream';
 
-const { height: screenH } = Dimensions.get('window')
-const MAP_HEIGHT = Math.max(200, Math.round(screenH / 3))
+const { height: screenH } = Dimensions.get('window');
+const MAP_HEIGHT = Math.max(200, Math.round(screenH / 3));
 
 const HomeMapScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
-  const { destination, user } = useCustomerStore()
-  const { nearbyDrivers } = useRealtimeStream()
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const { destination, user } = useCustomerStore();
+  const { nearbyDrivers } = useRealtimeStream();
 
   const destinationCoordinate = useMemo(() => {
-    const found = destinationPoints.find((point) => point.label === destination)
-    if (!found) return null
-    return { latitude: found.lat, longitude: found.lng, label: found.label }
-  }, [destination])
+    const found = destinationPoints.find((point) => point.label === destination);
+    if (!found) return null;
+    return { latitude: found.lat, longitude: found.lng, label: found.label };
+  }, [destination]);
 
   const quickActions = [
     { id: 'a1', label: 'Dat xe', emoji: 'CAR', onPress: () => navigation.navigate('Destination') },
@@ -32,7 +32,7 @@ const HomeMapScreen = () => {
     { id: 'a3', label: 'Vi', emoji: 'WLT', onPress: () => navigation.navigate('Tabs', { screen: 'Wallet' }) },
     { id: 'a4', label: 'Uu dai', emoji: 'PRM', onPress: () => navigation.navigate('Tabs', { screen: 'Promo' }) },
     { id: 'a6', label: 'Tat ca', emoji: 'ALL', onPress: () => navigation.navigate('Tabs', { screen: 'Profile' }) }
-  ]
+  ];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xl }}>
@@ -94,8 +94,8 @@ const HomeMapScreen = () => {
         </ScrollView>
       </View>
     </ScrollView>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
@@ -122,6 +122,6 @@ const styles = StyleSheet.create({
   bannerCard: { width: 240, padding: spacing.lg, gap: spacing.xs },
   bannerTitle: { ...typography.h2, color: colors.text },
   bannerSub: { ...typography.body, color: colors.muted }
-})
+});
 
-export default HomeMapScreen
+export default HomeMapScreen;

@@ -1,20 +1,20 @@
-require("dotenv").config();
-require("./observability");
+require('dotenv').config();
+require('./observability');
 
-const app = require("./app");
-const config = require("./config");
-const { initDb } = require("./db/pool");
-const { startOutboxPublisher } = require("./messaging/outboxPublisher");
-const { startConsumer } = require("./messaging/consumer");
-const { disconnectKafka } = require("./messaging/kafka");
-const { startPayosAutoSync } = require("./services/payosAutoSyncService");
-const { logger } = require("./utils/logger");
+const app = require('./app');
+const config = require('./config');
+const { initDb } = require('./db/pool');
+const { startOutboxPublisher } = require('./messaging/outboxPublisher');
+const { startConsumer } = require('./messaging/consumer');
+const { disconnectKafka } = require('./messaging/kafka');
+const { startPayosAutoSync } = require('./services/payosAutoSyncService');
+const { logger } = require('./utils/logger');
 
 async function start() {
   await initDb();
 
   const server = app.listen(config.port, () => {
-    logger.info({ port: config.port }, "Service started");
+    logger.info({ port: config.port }, 'Service started');
   });
 
   const stopOutbox = startOutboxPublisher();
@@ -22,7 +22,7 @@ async function start() {
   const stopPayosAutoSync = startPayosAutoSync();
 
   const shutdown = async () => {
-    logger.info("Service shutting down");
+    logger.info('Service shutting down');
     server.close();
     if (stopOutbox) {
       stopOutbox();
@@ -37,11 +37,11 @@ async function start() {
     process.exit(0);
   };
 
-  process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 start().catch((err) => {
-  logger.error({ err }, "Failed to start service");
+  logger.error({ err }, 'Failed to start service');
   process.exit(1);
 });

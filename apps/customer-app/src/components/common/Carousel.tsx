@@ -1,30 +1,30 @@
-import React, { useMemo, useRef } from 'react'
-import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { colors, spacing, typography } from '../../theme/tokens'
+import React, { useMemo, useRef } from 'react';
+import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { colors, spacing, typography } from '../../theme/tokens';
 
 type Slide = {
-  title: string
-  subtitle?: string
-}
+  title: string;
+  subtitle?: string;
+};
 
 type Props = {
-  slides: Slide[]
-  activeIndex: number
-  onIndexChange?: (index: number) => void
-}
+  slides: Slide[];
+  activeIndex: number;
+  onIndexChange?: (index: number) => void;
+};
 
-const { width } = Dimensions.get('window')
+const { width } = Dimensions.get('window');
 
 export const Carousel: React.FC<Props> = ({ slides, activeIndex, onIndexChange }) => {
-  const scrollRef = useRef<ScrollView>(null)
-  const safeSlides = useMemo(() => slides.filter((s) => s.title), [slides])
+  const scrollRef = useRef<ScrollView>(null);
+  const safeSlides = useMemo(() => slides.filter((s) => s.title), [slides]);
 
   const handleMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width)
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
     if (nextIndex !== activeIndex) {
-      onIndexChange?.(nextIndex)
+      onIndexChange?.(nextIndex);
     }
-  }
+  };
 
   return (
     <View>
@@ -45,19 +45,12 @@ export const Carousel: React.FC<Props> = ({ slides, activeIndex, onIndexChange }
       </ScrollView>
       <View style={styles.dotsRow}>
         {safeSlides.map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.dot,
-              index === activeIndex ? styles.dotActive : null,
-              index === activeIndex ? { width: 24 } : null
-            ]}
-          />
+          <View key={index} style={[styles.dot, index === activeIndex ? styles.dotActive : null, index === activeIndex ? { width: 24 } : null]} />
         ))}
       </View>
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   scrollContent: { alignItems: 'center' },
@@ -78,4 +71,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border
   },
   dotActive: { backgroundColor: colors.brand600 }
-})
+});
