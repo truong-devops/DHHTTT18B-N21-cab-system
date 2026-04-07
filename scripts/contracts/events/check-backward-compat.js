@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-const { execSync } = require("child_process");
+const { execSync } = require('child_process');
 
 function parseArgs(argv) {
   const args = {};
   for (let i = 2; i < argv.length; i += 1) {
-    if (argv[i] === "--base-ref" && argv[i + 1]) {
+    if (argv[i] === '--base-ref' && argv[i + 1]) {
       args.baseRef = argv[i + 1];
       i += 1;
     }
@@ -13,7 +13,7 @@ function parseArgs(argv) {
 }
 
 function run(cmd) {
-  return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+  return execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 }
 
 function tryRun(cmd) {
@@ -36,7 +36,7 @@ function normalizeType(value) {
   if (Array.isArray(value)) {
     return value;
   }
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return [value];
   }
   return [];
@@ -53,10 +53,10 @@ function isTypeSuperset(oldSchema, nextSchema) {
 
 function comparePrimitiveConstraints(oldSchema, nextSchema, path, errors) {
   if (oldSchema.pattern && nextSchema.pattern !== oldSchema.pattern) {
-    errors.push(`${path}: pattern changed from ${oldSchema.pattern} to ${nextSchema.pattern || "none"}`);
+    errors.push(`${path}: pattern changed from ${oldSchema.pattern} to ${nextSchema.pattern || 'none'}`);
   }
   if (oldSchema.format && nextSchema.format !== oldSchema.format) {
-    errors.push(`${path}: format changed from ${oldSchema.format} to ${nextSchema.format || "none"}`);
+    errors.push(`${path}: format changed from ${oldSchema.format} to ${nextSchema.format || 'none'}`);
   }
 
   if (oldSchema.minLength != null && (nextSchema.minLength == null || nextSchema.minLength > oldSchema.minLength)) {
@@ -91,7 +91,7 @@ function compareEnumsAndConst(oldSchema, nextSchema, path, errors) {
     } else if (Array.isArray(nextSchema.enum)) {
       const missing = oldSchema.enum.filter((item) => !nextSchema.enum.includes(item));
       if (missing.length) {
-        errors.push(`${path}: enum removed values ${missing.join(", ")}`);
+        errors.push(`${path}: enum removed values ${missing.join(', ')}`);
       }
     } else {
       errors.push(`${path}: enum removed`);
@@ -112,7 +112,7 @@ function compareSchemas(oldSchema, nextSchema, path, errors) {
 
   comparePrimitiveConstraints(oldSchema, nextSchema, path, errors);
 
-  if (oldSchema.type === "object" || (Array.isArray(oldSchema.type) && oldSchema.type.includes("object"))) {
+  if (oldSchema.type === 'object' || (Array.isArray(oldSchema.type) && oldSchema.type.includes('object'))) {
     const oldRequired = new Set(oldSchema.required || []);
     const nextRequired = new Set(nextSchema.required || []);
     for (const key of nextRequired) {
@@ -139,7 +139,7 @@ function compareSchemas(oldSchema, nextSchema, path, errors) {
     }
   }
 
-  if (oldSchema.type === "array" || (Array.isArray(oldSchema.type) && oldSchema.type.includes("array"))) {
+  if (oldSchema.type === 'array' || (Array.isArray(oldSchema.type) && oldSchema.type.includes('array'))) {
     if (oldSchema.items && nextSchema.items) {
       compareSchemas(oldSchema.items, nextSchema.items, `${path}[]`, errors);
     }
@@ -157,7 +157,7 @@ function detectBaseRef() {
   if (process.env.GITHUB_BASE_REF) {
     return `origin/${process.env.GITHUB_BASE_REF}`;
   }
-  return "HEAD~1";
+  return 'HEAD~1';
 }
 
 function main() {
@@ -168,13 +168,13 @@ function main() {
     process.exit(0);
   }
 
-  const oldCatalog = parseJsonFromGit(baseRef, "contracts/events/catalog.json");
+  const oldCatalog = parseJsonFromGit(baseRef, 'contracts/events/catalog.json');
   if (!oldCatalog) {
-    console.log("No previous contracts/events/catalog.json found. Nothing to compare.");
+    console.log('No previous contracts/events/catalog.json found. Nothing to compare.');
     process.exit(0);
   }
 
-  const nextCatalog = require("../../../contracts/events/catalog.json");
+  const nextCatalog = require('../../../contracts/events/catalog.json');
   const errors = [];
 
   const nextEventsByTopic = new Map((nextCatalog.events || []).map((event) => [event.topic, event]));
@@ -186,37 +186,27 @@ function main() {
       continue;
     }
     if (nextEvent.type !== oldEvent.type) {
-      errors.push(
-        `Type changed for topic ${oldEvent.topic}: ${oldEvent.type} -> ${nextEvent.type}`
-      );
+      errors.push(`Type changed for topic ${oldEvent.topic}: ${oldEvent.type} -> ${nextEvent.type}`);
     }
 
-    const oldPayload = parseJsonFromGit(
-      baseRef,
-      `contracts/events/schema-registry/${oldEvent.payloadSchema}`
-    );
+    const oldPayload = parseJsonFromGit(baseRef, `contracts/events/schema-registry/${oldEvent.payloadSchema}`);
     if (!oldPayload) {
       continue;
     }
 
     const nextPayload = require(`../../../contracts/events/schema-registry/${nextEvent.payloadSchema}`);
-    compareSchemas(
-      oldPayload,
-      nextPayload,
-      `${oldEvent.topic}.payload`,
-      errors
-    );
+    compareSchemas(oldPayload, nextPayload, `${oldEvent.topic}.payload`, errors);
   }
 
   if (errors.length) {
-    console.error("Event contract backward compatibility check failed:\n");
+    console.error('Event contract backward compatibility check failed:\n');
     for (const error of errors) {
       console.error(`- ${error}`);
     }
     process.exit(1);
   }
 
-  console.log("Event contract backward compatibility check passed.");
+  console.log('Event contract backward compatibility check passed.');
 }
 
 main();

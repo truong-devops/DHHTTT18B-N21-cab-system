@@ -1,6 +1,6 @@
-const crypto = require("crypto");
-const topics = require("./topics");
-const { STATUSES } = require("../domain/paymentStatus");
+const crypto = require('crypto');
+const topics = require('./topics');
+const { STATUSES } = require('../domain/paymentStatus');
 
 function buildEnvelope(type, traceId, payload) {
   return {
@@ -27,11 +27,7 @@ function buildPaymentCompleted(payment, traceId) {
   }
   return {
     topic: topics.PaymentCompleted,
-    envelope: buildEnvelope(
-      "PaymentCompleted",
-      traceId,
-      payload
-    )
+    envelope: buildEnvelope('PaymentCompleted', traceId, payload)
   };
 }
 
@@ -50,11 +46,7 @@ function buildPaymentFailed(payment, traceId) {
   }
   return {
     topic: topics.PaymentFailed,
-    envelope: buildEnvelope(
-      "PaymentFailed",
-      traceId,
-      payload
-    )
+    envelope: buildEnvelope('PaymentFailed', traceId, payload)
   };
 }
 

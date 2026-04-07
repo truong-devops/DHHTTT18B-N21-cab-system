@@ -1,20 +1,20 @@
-import { createContext, useCallback, useMemo, useState } from 'react'
-import Toast from '../components/common/Toast.jsx'
+import { createContext, useCallback, useMemo, useState } from 'react';
+import Toast from '../components/common/Toast.jsx';
 
-const ToastContext = createContext(null)
+const ToastContext = createContext(null);
 
 export function ToastProvider({ children }) {
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState([]);
 
   const push = useCallback((message, variant = 'info') => {
-    const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString()
-    setItems((prev) => [...prev, { id, message, variant }])
+    const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+    setItems((prev) => [...prev, { id, message, variant }]);
     setTimeout(() => {
-      setItems((prev) => prev.filter((item) => item.id !== id))
-    }, 3000)
-  }, [])
+      setItems((prev) => prev.filter((item) => item.id !== id));
+    }, 3000);
+  }, []);
 
-  const value = useMemo(() => ({ push }), [push])
+  const value = useMemo(() => ({ push }), [push]);
 
   return (
     <ToastContext.Provider value={value}>
@@ -25,7 +25,7 @@ export function ToastProvider({ children }) {
         ))}
       </div>
     </ToastContext.Provider>
-  )
+  );
 }
 
-export { ToastContext }
+export { ToastContext };

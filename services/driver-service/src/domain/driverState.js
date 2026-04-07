@@ -1,14 +1,14 @@
 const DRIVER_STATUS = {
-  PENDING: "PENDING",
-  APPROVED: "APPROVED",
-  SUSPENDED: "SUSPENDED",
-  DELETED: "DELETED"
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  SUSPENDED: 'SUSPENDED',
+  DELETED: 'DELETED'
 };
 
 const ONLINE_STATUS = {
-  OFFLINE: "OFFLINE",
-  ONLINE: "ONLINE",
-  BUSY: "BUSY"
+  OFFLINE: 'OFFLINE',
+  ONLINE: 'ONLINE',
+  BUSY: 'BUSY'
 };
 
 function canGoOnline(driverStatus) {
@@ -30,11 +30,7 @@ function canTransitionOnlineStatus(current, next, allowForceOffline) {
   if (current === ONLINE_STATUS.BUSY && next === ONLINE_STATUS.ONLINE) {
     return true;
   }
-  if (
-    current === ONLINE_STATUS.BUSY &&
-    next === ONLINE_STATUS.OFFLINE &&
-    allowForceOffline
-  ) {
+  if (current === ONLINE_STATUS.BUSY && next === ONLINE_STATUS.OFFLINE && allowForceOffline) {
     return true;
   }
 

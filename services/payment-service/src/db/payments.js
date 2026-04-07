@@ -1,5 +1,5 @@
-const { pool } = require("./pool");
-const { applyCursorQuery } = require("../../../../libs/http/cursor");
+const { pool } = require('./pool');
+const { applyCursorQuery } = require('../../../../libs/http/cursor');
 
 function toIso(value) {
   if (!value) {
@@ -116,28 +116,17 @@ async function insertStatusHistory(client, data) {
       trace_id
     )
      VALUES ($1, $2, $3, $4, $5, COALESCE($6, now()), $7)`,
-    [
-      data.paymentId,
-      data.fromStatus || null,
-      data.toStatus,
-      data.reason || null,
-      data.actorId || null,
-      data.occurredAt || null,
-      data.traceId || null
-    ]
+    [data.paymentId, data.fromStatus || null, data.toStatus, data.reason || null, data.actorId || null, data.occurredAt || null, data.traceId || null]
   );
 }
 
 async function getPaymentById(id) {
-  const result = await pool.query("SELECT * FROM payments WHERE id = $1", [id]);
+  const result = await pool.query('SELECT * FROM payments WHERE id = $1', [id]);
   return mapPaymentRow(result.rows[0]);
 }
 
 async function getPaymentByPayosOrderCode(orderCode) {
-  const result = await pool.query(
-    "SELECT * FROM payments WHERE payos_order_code = $1",
-    [orderCode]
-  );
+  const result = await pool.query('SELECT * FROM payments WHERE payos_order_code = $1', [orderCode]);
   return mapPaymentRow(result.rows[0]);
 }
 
@@ -157,7 +146,7 @@ async function updatePaymentStatus(client, paymentId, status, failureReason) {
 }
 
 async function listPayments({ limit, cursor, sort, status, rideId }) {
-  const builder = { where: [], values: [], orderBy: "", limit: 20 };
+  const builder = { where: [], values: [], orderBy: '', limit: 20 };
 
   if (status) {
     builder.values.push(status);
@@ -176,8 +165,8 @@ async function listPayments({ limit, cursor, sort, status, rideId }) {
     sort
   });
 
-  const whereClause = builder.where.length ? `WHERE ${builder.where.join(" AND ")}` : "";
-  const orderByClause = builder.orderBy ? `ORDER BY ${builder.orderBy}` : "ORDER BY created_at DESC, id DESC";
+  const whereClause = builder.where.length ? `WHERE ${builder.where.join(' AND ')}` : '';
+  const orderByClause = builder.orderBy ? `ORDER BY ${builder.orderBy}` : 'ORDER BY created_at DESC, id DESC';
   builder.values.push(builder.limit);
   const limitIndex = builder.values.length;
   const query = `SELECT * FROM payments ${whereClause} ${orderByClause} LIMIT $${limitIndex}`;
@@ -188,9 +177,7 @@ async function listPayments({ limit, cursor, sort, status, rideId }) {
   const hasMore = rows.length > safeLimit;
   const items = hasMore ? rows.slice(0, safeLimit) : rows;
   const last = items[items.length - 1];
-  const nextCursor = hasMore && last
-    ? { createdAt: last.createdAt, id: last.id }
-    : null;
+  const nextCursor = hasMore && last ? { createdAt: last.createdAt, id: last.id } : null;
 
   return { items, nextCursor };
 }

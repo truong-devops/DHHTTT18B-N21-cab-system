@@ -1,6 +1,6 @@
-const redis = require("../cache/redis");
+const redis = require('../cache/redis');
 
-const QUOTE_PREFIX = "quote:";
+const QUOTE_PREFIX = 'quote:';
 
 function buildKey(quoteId) {
   return `${QUOTE_PREFIX}${quoteId}`;
@@ -9,7 +9,7 @@ function buildKey(quoteId) {
 async function saveQuote(quoteId, quote, ttlSeconds) {
   const key = buildKey(quoteId);
   const payload = JSON.stringify(quote);
-  await redis.set(key, payload, "EX", ttlSeconds);
+  await redis.set(key, payload, 'EX', ttlSeconds);
 }
 
 async function getQuote(quoteId) {

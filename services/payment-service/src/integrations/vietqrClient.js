@@ -1,8 +1,8 @@
-const { URL } = require("url");
-const { createHttpClient } = require("../../../../libs/http/client");
-const { ApiError } = require("../utils/errors");
-const config = require("../config");
-const monitoring = require("../monitoring");
+const { URL } = require('url');
+const { createHttpClient } = require('../../../../libs/http/client');
+const { ApiError } = require('../utils/errors');
+const config = require('../config');
+const monitoring = require('../monitoring');
 
 const clientCache = new Map();
 
@@ -19,7 +19,7 @@ function getClient(baseUrl) {
           backoffMultiplier: config.gateway.retryMultiplier,
           maxBackoffMs: config.gateway.retryMaxMs,
           jitter: config.gateway.retryJitter,
-          methods: ["POST"]
+          methods: ['POST']
         }
       })
     );
@@ -30,10 +30,10 @@ function getClient(baseUrl) {
 function buildHeaders(headers) {
   const result = {};
   if (headers.clientId) {
-    result["x-client-id"] = headers.clientId;
+    result['x-client-id'] = headers.clientId;
   }
   if (headers.apiKey) {
-    result["x-api-key"] = headers.apiKey;
+    result['x-api-key'] = headers.apiKey;
   }
   return result;
 }
@@ -53,16 +53,7 @@ function parseApiUrl(apiUrl) {
   return { baseUrl, path };
 }
 
-async function generateVietQrCode({
-  apiUrl,
-  bankBin,
-  accountNumber,
-  accountName,
-  amount,
-  addInfo,
-  format,
-  headers
-}) {
+async function generateVietQrCode({ apiUrl, bankBin, accountNumber, accountName, amount, addInfo, format, headers }) {
   const payload = {
     acqId: bankBin,
     accountNo: accountNumber,
@@ -82,9 +73,9 @@ async function generateVietQrCode({
       context: buildContext(headers)
     });
     monitoring.recordDependencyRequest({
-      dependencyType: "http",
-      dependencyName: "vietqr",
-      operation: "generate_qr",
+      dependencyType: 'http',
+      dependencyName: 'vietqr',
+      operation: 'generate_qr',
       outcome: monitoring.toOutcomeFromStatus(response.status),
       durationMs: Date.now() - startedAt,
       attributes: {
@@ -93,37 +84,37 @@ async function generateVietQrCode({
     });
   } catch (err) {
     monitoring.recordDependencyRequest({
-      dependencyType: "http",
-      dependencyName: "vietqr",
-      operation: "generate_qr",
-      outcome: "error",
+      dependencyType: 'http',
+      dependencyName: 'vietqr',
+      operation: 'generate_qr',
+      outcome: 'error',
       durationMs: Date.now() - startedAt,
       attributes: {
-        error_type: String(err && err.code ? err.code : "request_failed")
+        error_type: String(err && err.code ? err.code : 'request_failed')
       }
     });
-    if (err && err.code === "CIRCUIT_OPEN") {
-      throw new ApiError(503, "INTERNAL", "VietQR circuit breaker open");
+    if (err && err.code === 'CIRCUIT_OPEN') {
+      throw new ApiError(503, 'INTERNAL', 'VietQR circuit breaker open');
     }
-    const errorCode = err && err.code ? err.code : "";
-    if (errorCode === "ECONNABORTED" || errorCode === "ETIMEDOUT") {
-      throw new ApiError(504, "INTERNAL", "VietQR request timed out");
+    const errorCode = err && err.code ? err.code : '';
+    if (errorCode === 'ECONNABORTED' || errorCode === 'ETIMEDOUT') {
+      throw new ApiError(504, 'INTERNAL', 'VietQR request timed out');
     }
-    throw new ApiError(502, "INTERNAL", err.message || "VietQR request failed");
+    throw new ApiError(502, 'INTERNAL', err.message || 'VietQR request failed');
   }
 
   if (response.status >= 400) {
-    throw new ApiError(502, "INTERNAL", "VietQR provider error");
+    throw new ApiError(502, 'INTERNAL', 'VietQR provider error');
   }
 
   const body = response.data || {};
-  if (String(body.code) !== "00") {
-    throw new ApiError(502, "INTERNAL", body.desc || "VietQR generation failed");
+  if (String(body.code) !== '00') {
+    throw new ApiError(502, 'INTERNAL', body.desc || 'VietQR generation failed');
   }
 
   const qrCode = body.data ? body.data.qrCode : null;
   if (!qrCode) {
-    throw new ApiError(502, "INTERNAL", "VietQR response missing qrCode");
+    throw new ApiError(502, 'INTERNAL', 'VietQR response missing qrCode');
   }
 
   return {

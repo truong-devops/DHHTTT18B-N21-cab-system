@@ -1,4 +1,4 @@
-const { pool } = require("../db/pool");
+const { pool } = require('../db/pool');
 
 function mapRow(row) {
   if (!row) {
@@ -33,7 +33,7 @@ async function reserveIdempotencyKey(client, data) {
 
   if (insertResult.rows[0]) {
     return {
-      state: "reserved",
+      state: 'reserved',
       record: mapRow(insertResult.rows[0])
     };
   }
@@ -49,15 +49,15 @@ async function reserveIdempotencyKey(client, data) {
   );
   const existing = mapRow(existingResult.rows[0]);
   if (!existing) {
-    return { state: "in_progress", record: null };
+    return { state: 'in_progress', record: null };
   }
   if (existing.requestHash !== data.requestHash) {
-    return { state: "conflict", record: existing };
+    return { state: 'conflict', record: existing };
   }
   if (existing.responseBody) {
-    return { state: "replay", record: existing };
+    return { state: 'replay', record: existing };
   }
-  return { state: "in_progress", record: existing };
+  return { state: 'in_progress', record: existing };
 }
 
 async function completeIdempotencyKey(client, data) {
@@ -70,13 +70,7 @@ async function completeIdempotencyKey(client, data) {
       WHERE route_key = $1
         AND user_id = $2
         AND idem_key = $3`,
-    [
-      data.routeKey,
-      data.userId,
-      data.idemKey,
-      data.responseCode,
-      data.responseBody
-    ]
+    [data.routeKey, data.userId, data.idemKey, data.responseCode, data.responseBody]
   );
 }
 

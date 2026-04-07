@@ -1,6 +1,7 @@
 <div align="center">
 
-# 🚕 CAB Booking System  
+# 🚕 CAB Booking System
+
 ### Microservices · Real-time · Event-driven · AI-enabled · Zero Trust
 
 A modern taxi/cab booking platform designed for **high scalability**, **near real-time location updates**, **event-driven workflows**, **AI-assisted driver matching**, and **Zero Trust security**.
@@ -38,22 +39,28 @@ A modern taxi/cab booking platform designed for **high scalability**, **near rea
 ## ✨ Key Features
 
 ### 🚖 Core Ride Experience
+
 - **Ride Booking** — End-to-end booking lifecycle built on **scalable microservices**.
 - **Real-time GPS Tracking** — Live driver ↔ passenger updates with **< 1s perceived latency**.
 
 ### 🧠 Intelligence & Optimization
+
 - **AI Driver Matching** — Uses **Redis Geo + Feature Store + scoring** with a safe **rule-based fallback**.
 - **ETA Service** — **Event-driven**, cache-first ETA computation; **routing/traffic provider agnostic** and AI-ready.
 - **Surge Pricing** — **Near real-time** demand/supply pricing, **decoupled** from the booking flow.
 
 ### 🔄 Event-driven Backbone
+
 - **Event-driven Architecture** — Kafka/RabbitMQ powered workflows for **loose coupling**, **high throughput**, and **eventual consistency**.
 
 ### 💳 Payments & Consistency
+
 - **Payment Reliability** — **Idempotency**, **retry/backoff**, and a **Saga (choreography-based)** approach for distributed consistency.
 
 ### 🔐 Security by Design
+
 - **Zero Trust Security** — End-to-end security from **client → gateway → services → data**, with strict verification and least privilege.
+
 ---
 
 ## Architecture Overview
@@ -108,11 +115,12 @@ flowchart LR
   PAY <--> KAFKA
   NOTI <--> KAFKA
 ```
+
 ## 🏗️ Why this layout?
 
 This architecture is intentionally split into clear layers to keep the platform **secure**, **scalable**, and **easy to evolve**.
 
-- **API Gateway** acts as the *single entry point* and enforces:
+- **API Gateway** acts as the _single entry point_ and enforces:
   - Authentication & authorization
   - Routing
   - Rate limiting / quotas
@@ -133,44 +141,44 @@ This architecture is intentionally split into clear layers to keep the platform 
 
 > Service names may vary in your repository. Keep this list aligned with `/services`.
 
-| Service | Responsibility | Key Outputs / Notes |
-|--------|----------------|---------------------|
-| **API Gateway** | Entry point, routing, authZ/authN, rate limit, validation | Protects all downstream services |
-| **Auth Service** | Register/Login, JWT issuance, refresh token rotation, RBAC claims | Issues access/refresh tokens |
-| **User Service** | Customer profiles, preferences, ride history | Owns customer domain data |
-| **Driver Service** | Driver profile, KYC (optional), availability, vehicle, rating | Owns driver domain data |
-| **Booking Service** | Creates ride requests, persists booking, snapshots price | Emits `ride.created` |
-| **Ride Service** | Ride lifecycle state machine, ride status updates, coordination | Consumes `ride.assigned`, manages states |
-| **Pricing Service** | Fare estimation, surge multiplier, pricing consistency | Provides quote + surge, snapshot per booking |
-| **Payment Service** | Payment execution, idempotency, retry/backoff, saga choreography | Emits `payment.completed` / `payment.failed` |
-| **Notification Service** | Push/SMS/email/in-app notifications | Consumes ride/payment events |
-| **Review Service** | Ratings & feedback after ride completion | Feeds quality + recommendation signals |
+| Service                  | Responsibility                                                    | Key Outputs / Notes                          |
+| ------------------------ | ----------------------------------------------------------------- | -------------------------------------------- |
+| **API Gateway**          | Entry point, routing, authZ/authN, rate limit, validation         | Protects all downstream services             |
+| **Auth Service**         | Register/Login, JWT issuance, refresh token rotation, RBAC claims | Issues access/refresh tokens                 |
+| **User Service**         | Customer profiles, preferences, ride history                      | Owns customer domain data                    |
+| **Driver Service**       | Driver profile, KYC (optional), availability, vehicle, rating     | Owns driver domain data                      |
+| **Booking Service**      | Creates ride requests, persists booking, snapshots price          | Emits `ride.created`                         |
+| **Ride Service**         | Ride lifecycle state machine, ride status updates, coordination   | Consumes `ride.assigned`, manages states     |
+| **Pricing Service**      | Fare estimation, surge multiplier, pricing consistency            | Provides quote + surge, snapshot per booking |
+| **Payment Service**      | Payment execution, idempotency, retry/backoff, saga choreography  | Emits `payment.completed` / `payment.failed` |
+| **Notification Service** | Push/SMS/email/in-app notifications                               | Consumes ride/payment events                 |
+| **Review Service**       | Ratings & feedback after ride completion                          | Feeds quality + recommendation signals       |
 
 ---
 
 ## 🗄️ Data, Messaging, and Real-time Layer
 
-| Component | Technology | Used For |
-|----------|------------|---------|
-| **Transactional DB** | **PostgreSQL** | Auth / User / Driver / Booking / Ride data |
-| **Document Store** | **MongoDB** | Notifications, Reviews, logs-like documents |
-| **Hot Store + Geo** | **Redis** | Ride state cache, pricing metrics, Geo index for nearby queries |
-| **Event Backbone** | **Kafka** | Async workflows, decoupling, eventual consistency |
-| **Real-time Transport** | **WebSocket** | Driver GPS streaming & passenger live tracking |
+| Component               | Technology     | Used For                                                        |
+| ----------------------- | -------------- | --------------------------------------------------------------- |
+| **Transactional DB**    | **PostgreSQL** | Auth / User / Driver / Booking / Ride data                      |
+| **Document Store**      | **MongoDB**    | Notifications, Reviews, logs-like documents                     |
+| **Hot Store + Geo**     | **Redis**      | Ride state cache, pricing metrics, Geo index for nearby queries |
+| **Event Backbone**      | **Kafka**      | Async workflows, decoupling, eventual consistency               |
+| **Real-time Transport** | **WebSocket**  | Driver GPS streaming & passenger live tracking                  |
 
 ---
 
 ## 🗂️ Repository Structure
 
-| Folder | What it Contains | Typical Examples |
-|-------|-------------------|------------------|
-| `apps/` | Frontend clients | `driver-app/`, `admin-web/` |
-| `services/` | Backend microservices | `auth-service/`, `booking-service/`, `payment-service/`, `gateway/` |
-| `contracts/` | API + event contracts | OpenAPI specs, Kafka/RabbitMQ schemas |
-| `libs/` | Shared libraries | logging, validation, HTTP clients, auth helpers |
-| `infra/` | Local/dev infrastructure | docker-compose, Kafka/Redis/Postgres configs |
-| `scripts/` | Automation helpers | migrations, seeding, lint/test helpers |
-| `docs/` | Architecture & runbooks | diagrams, ADRs, operational guides |
+| Folder       | What it Contains         | Typical Examples                                                    |
+| ------------ | ------------------------ | ------------------------------------------------------------------- |
+| `apps/`      | Frontend clients         | `driver-app/`, `admin-web/`                                         |
+| `services/`  | Backend microservices    | `auth-service/`, `booking-service/`, `payment-service/`, `gateway/` |
+| `contracts/` | API + event contracts    | OpenAPI specs, Kafka/RabbitMQ schemas                               |
+| `libs/`      | Shared libraries         | logging, validation, HTTP clients, auth helpers                     |
+| `infra/`     | Local/dev infrastructure | docker-compose, Kafka/Redis/Postgres configs                        |
+| `scripts/`   | Automation helpers       | migrations, seeding, lint/test helpers                              |
+| `docs/`      | Architecture & runbooks  | diagrams, ADRs, operational guides                                  |
 
 This README follows the repository layout below.
 
@@ -266,6 +274,7 @@ sequenceDiagram
   User->>User: Create profile in User DB
   User-->>Bus: Publish UserProfileCreated (optional)
 ```
+
 ✅ Benefits
 
 Clear separation of concerns:
@@ -308,6 +317,7 @@ sequenceDiagram
   Auth-->>GW: new accessToken + new refreshToken
   GW-->>Client: New token pair
 ```
+
 ✅ Key points
 
 Access Token is short-lived → limits damage if stolen.
@@ -317,11 +327,13 @@ Refresh Token Rotation invalidates the previous refresh token on each refresh �
 Redis-backed sessions allow fast checks, revocation, and logout across devices.
 
 Gateway enforcement keeps auth/policy verification consistent across all services.
-### 3) Booking End-to-End (Create → Assign → Ride) — *No Separate Matching Service*
+
+### 3) Booking End-to-End (Create → Assign → Ride) — _No Separate Matching Service_
 
 **Goal:** Keep the workflow **simple and consistent** by handling driver selection inside the **Booking Service** (no dedicated Matching microservice).
 
 **High-level lifecycle**
+
 1. Customer requests a ride.
 2. Booking Service stores booking + **price snapshot**.
 3. Booking Service selects a driver (rule-based / internal logic) and publishes `ride.assigned`.
@@ -356,6 +368,7 @@ sequenceDiagram
   GW->>Ride: Confirm acceptance
   Noti-->>Customer: Push: "Driver assigned"
 ```
+
 ✅ Notes
 
 Price snapshot guarantees billing consistency even if surge changes later.
@@ -364,11 +377,12 @@ Removing a separate Matching service reduces operational complexity for smaller 
 
 You can later extract Matching into its own service if load/ML requirements grow (no contract change needed if you keep the same events).
 
-### 4) Real-time GPS Update (Driver → Passenger) — *No ETA Service*
+### 4) Real-time GPS Update (Driver → Passenger) — _No ETA Service_
 
 **Goal:** Deliver **near real-time** driver location updates to passengers via WebSocket, while still publishing events for **monitoring/analytics** (optional) without coupling them to the realtime channel.
 
 **Flow summary**
+
 - Driver streams GPS updates through **WebSocket** to the Realtime Gateway.
 - Realtime Gateway forwards updates to **Ride Service**.
 - Ride Service updates **Redis Geo** for fast geo queries and publishes `driver.location.updated`.
@@ -392,6 +406,7 @@ sequenceDiagram
 
   RT-->>Customer: Push live driver location (< 1s)
 ```
+
 ✅ Notes
 
 Redis Geo supports fast geo queries (e.g., “drivers near pickup point”).
@@ -405,7 +420,8 @@ WebSocket is optimized for UI latency; Redis/Event Bus support scalability behin
 **Goal:** Payments must be **non-blocking** and resilient to **PSP latency/outages** while ensuring consistent state across services.
 
 **Principles**
-- **Retry with exponential backoff** on timeouts/transient failures  
+
+- **Retry with exponential backoff** on timeouts/transient failures
 - **Payment Service = source of truth** (single authoritative payment state)
 - **Event-driven updates** for eventual consistency across the platform
 - **PSP-agnostic design** (easy to add/switch multiple PSP providers)
@@ -426,6 +442,7 @@ flowchart TD
 
   H --> I[Notify customer<br/>and trigger compensation if needed]
 ```
+
 ✅ Notes
 
 Use an idempotency key per payment attempt to prevent double charging.
@@ -442,17 +459,18 @@ Consumers (Ride/Booking/Notification/Wallet) should be idempotent when handling 
 
 ### Core Topics
 
-| Topic | Producer | Consumers |
-|------|----------|-----------|
-| `ride.created` | Booking Service | *(Optional)* internal booking handlers / future extensions |
-| `ride.assigned` | Booking Service | Notification Service, Ride Service |
-| `driver.location.updated` | Ride Service | *(Optional)* Monitoring/Analytics |
-| `payment.completed` | Payment Service | Ride Service, *(Optional)* Wallet/Ledger |
-| `payment.failed` | Payment Service | Notification Service |
+| Topic                     | Producer        | Consumers                                                  |
+| ------------------------- | --------------- | ---------------------------------------------------------- |
+| `ride.created`            | Booking Service | _(Optional)_ internal booking handlers / future extensions |
+| `ride.assigned`           | Booking Service | Notification Service, Ride Service                         |
+| `driver.location.updated` | Ride Service    | _(Optional)_ Monitoring/Analytics                          |
+| `payment.completed`       | Payment Service | Ride Service, _(Optional)_ Wallet/Ledger                   |
+| `payment.failed`          | Payment Service | Notification Service                                       |
 
 > ✅ Adjust consumers based on your actual implementation (you mentioned **no ETA** and **no separate Matching service**).
 
 ### Example Event Payload — `ride.created`
+
 ```json
 {
   "eventId": "uuid",
@@ -462,6 +480,7 @@ Consumers (Ride/Booking/Notification/Wallet) should be idempotent when handling 
   "timestamp": "2025-01-01T10:00:00Z"
 }
 ```
+
 Recommended event fields
 
 eventId: unique UUID (supports deduplication)
@@ -477,10 +496,12 @@ data (optional): nested object for payload versioning
 ## 🧰 Installation & Running Locally
 
 ### ✅ Prerequisites
+
 - **Docker** + **Docker Compose**
 - **Node.js 18+** (npm included)
 
 ### 1) Start infrastructure & services (Docker Compose)
+
 From the repository root (or `infra/` depending on your setup):
 
 ```bash
@@ -585,7 +606,6 @@ Payment PSP timeout → retry/backoff; provider down → failover strategy
 Kafka lag → scale consumers; tune partitions
 ```
 
-
 \
 
 ## 📈 Observability (ELK logging + OTel metrics/tracing)
@@ -597,6 +617,7 @@ npm run dev:observability
 ```
 
 This uses:
+
 - Base services: `infra/docker-compose.dev.yml`
 - Observability overlay: `infra/observability/docker-compose.observability.yml`
 

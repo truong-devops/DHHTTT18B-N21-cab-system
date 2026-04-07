@@ -1,9 +1,9 @@
 function loadObservabilityModule() {
   const candidates = [
-    "../libs/observability/src",
-    "../../libs/observability/src",
-    "../../../libs/observability/src",
-    "../../../../libs/observability/src"
+    '../libs/observability/src',
+    '../../libs/observability/src',
+    '../../../libs/observability/src',
+    '../../../../libs/observability/src'
   ];
 
   for (const candidate of candidates) {
@@ -14,16 +14,13 @@ function loadObservabilityModule() {
     }
   }
 
-  throw new Error("Unable to load @libs/observability module");
+  throw new Error('Unable to load @libs/observability module');
 }
 
 const { createServiceMetrics } = loadObservabilityModule();
 
 const metrics = createServiceMetrics({
-  serviceName:
-    process.env.OTEL_SERVICE_NAME ||
-    process.env.SERVICE_NAME ||
-    "api-gateway"
+  serviceName: process.env.OTEL_SERVICE_NAME || process.env.SERVICE_NAME || 'api-gateway'
 });
 
 module.exports = metrics;

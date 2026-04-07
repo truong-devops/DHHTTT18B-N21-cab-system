@@ -1,74 +1,71 @@
-import { createContext, useEffect, useMemo, useState } from 'react'
-import { authService } from '../services/auth.service.js'
+import { createContext, useEffect, useMemo, useState } from 'react';
+import { authService } from '../services/auth.service.js';
 
-const AuthContext = createContext(null)
+const AuthContext = createContext(null);
 
-const STORAGE_KEY = 'admin_token'
+const STORAGE_KEY = 'admin_token';
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [token, setToken] = useState(localStorage.getItem(STORAGE_KEY))
-  const [ready, setReady] = useState(false)
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem(STORAGE_KEY));
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    let mounted = true
+    let mounted = true;
 
     async function init() {
       if (!token) {
-        setReady(true)
-        return
+        setReady(true);
+        return;
       }
 
-      const result = await authService.me(token)
-      if (!mounted) return
+      const result = await authService.me(token);
+      if (!mounted) return;
 
       if (result?.user) {
-        setUser(result.user)
+        setUser(result.user);
       } else {
-        localStorage.removeItem(STORAGE_KEY)
-        setToken(null)
+        localStorage.removeItem(STORAGE_KEY);
+        setToken(null);
       }
-      setReady(true)
+      setReady(true);
     }
 
-    init()
+    init();
     return () => {
-      mounted = false
-    }
-  }, [token])
+      mounted = false;
+    };
+  }, [token]);
 
   const login = async (payload) => {
-    const result = await authService.login(payload)
+    const result = await authService.login(payload);
     if (result?.token) {
-      localStorage.setItem(STORAGE_KEY, result.token)
-      setToken(result.token)
+      localStorage.setItem(STORAGE_KEY, result.token);
+      setToken(result.token);
     }
     if (result?.user) {
-      setUser(result.user)
+      setUser(result.user);
     }
-    return result
-  }
+    return result;
+  };
 
-  const register = async (payload) => authService.register(payload)
+  const register = async (payload) => authService.register(payload);
 
   const logout = () => {
-    localStorage.removeItem(STORAGE_KEY)
-    setToken(null)
-    setUser(null)
-  }
+    localStorage.removeItem(STORAGE_KEY);
+    setToken(null);
+    setUser(null);
+  };
 
   const hasRole = (roles) => {
-    if (!user) return false
-    const userRoles = new Set([user.role, ...(user.roles || [])])
-    return roles.some((role) => userRoles.has(role))
-  }
+    if (!user) return false;
+    const userRoles = new Set([user.role, ...(user.roles || [])]);
+    return roles.some((role) => userRoles.has(role));
+  };
 
-  const value = useMemo(
-    () => ({ user, token, ready, login, register, logout, hasRole }),
-    [user, token, ready]
-  )
+  const value = useMemo(() => ({ user, token, ready, login, register, logout, hasRole }), [user, token, ready]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export { AuthContext }
+export { AuthContext };

@@ -3,17 +3,7 @@
   "$id": "https://cab-booking.local/schemas/events/payloads/ride.requested",
   "title": "ride.requested.payload",
   "type": "object",
-  "required": [
-    "event_type",
-    "ride_id",
-    "booking_id",
-    "user_id",
-    "pickup",
-    "drop",
-    "distance_km",
-    "eta_minutes",
-    "timestamp"
-  ],
+  "required": ["event_type", "ride_id", "booking_id", "user_id", "pickup", "drop", "distance_km", "eta_minutes", "timestamp"],
   "properties": {
     "event_type": { "const": "ride_requested" },
     "ride_id": { "type": "string", "minLength": 1 },

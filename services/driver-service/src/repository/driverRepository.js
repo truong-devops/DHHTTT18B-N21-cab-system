@@ -1,19 +1,11 @@
-const pool = require("../db/pool");
+const pool = require('../db/pool');
 
 function isUuidLike(value) {
-  return (
-    typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      value
-    )
-  );
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 async function getDriverByUserId(userId) {
-  const result = await pool.query(
-    "SELECT * FROM drivers WHERE user_id = $1",
-    [userId]
-  );
+  const result = await pool.query('SELECT * FROM drivers WHERE user_id = $1', [userId]);
   return result.rows[0] || null;
 }
 
@@ -21,10 +13,7 @@ async function getDriverById(id) {
   if (!isUuidLike(id)) {
     return null;
   }
-  const result = await pool.query(
-    "SELECT * FROM drivers WHERE id = $1",
-    [id]
-  );
+  const result = await pool.query('SELECT * FROM drivers WHERE id = $1', [id]);
   return result.rows[0] || null;
 }
 
@@ -62,7 +51,7 @@ async function updateDriverProfile(id, fields) {
   const result = await pool.query(
     `
       UPDATE drivers
-      SET ${columns.join(", ")}
+      SET ${columns.join(', ')}
       WHERE id = $${index}
       RETURNING *
     `,
@@ -111,7 +100,7 @@ async function listDrivers({ status, onlineStatus, limit = 20, offset = 0 }) {
     values.push(onlineStatus);
   }
 
-  const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+  const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
   values.push(limit);
   values.push(offset);
 

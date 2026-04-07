@@ -34,4 +34,4 @@ export const endpoints = {
   user: {
     detail: (id: string) => `/v1/users/${id}`
   }
-}
+};

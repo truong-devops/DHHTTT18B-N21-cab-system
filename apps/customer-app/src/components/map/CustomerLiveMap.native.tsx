@@ -1,87 +1,86 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import * as Location from 'expo-location'
-import MapView, { Marker, Polyline } from 'react-native-maps'
-import { useRoutePolyline } from '../../hooks/useRoutePolyline'
-import { colors, spacing, typography } from '../../theme/tokens'
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Location from 'expo-location';
+import MapView, { Marker, Polyline } from 'react-native-maps';
+import { useRoutePolyline } from '../../hooks/useRoutePolyline';
+import { colors, spacing, typography } from '../../theme/tokens';
 
 const DEFAULT_DELTA = {
   latitudeDelta: 0.012,
   longitudeDelta: 0.012
-}
+};
 
 type Coordinate = {
-  latitude: number
-  longitude: number
-  label?: string
-}
+  latitude: number;
+  longitude: number;
+  label?: string;
+};
 
 type Props = {
-  label?: string
-  destination?: Coordinate | null
-  showRoute?: boolean
-  onLocationChange?: (coords: Coordinate) => void
-}
+  label?: string;
+  destination?: Coordinate | null;
+  showRoute?: boolean;
+  onLocationChange?: (coords: Coordinate) => void;
+};
 
-export const CustomerLiveMap: React.FC<Props> = ({
-  label = 'Bản đồ trực tiếp',
-  destination,
-  showRoute = false,
-  onLocationChange
-}) => {
-  const mapRef = useRef<MapView | null>(null)
-  const locationSubRef = useRef<Location.LocationSubscription | null>(null)
-  const [permission, setPermission] = useState<'checking' | 'granted' | 'denied'>('checking')
-  const [userCoordinate, setUserCoordinate] = useState<Coordinate | null>(null)
+export const CustomerLiveMap: React.FC<Props> = ({ label = 'Bản đồ trực tiếp', destination, showRoute = false, onLocationChange }) => {
+  const mapRef = useRef<MapView | null>(null);
+  const locationSubRef = useRef<Location.LocationSubscription | null>(null);
+  const [permission, setPermission] = useState<'checking' | 'granted' | 'denied'>('checking');
+  const [userCoordinate, setUserCoordinate] = useState<Coordinate | null>(null);
   const [zoomDelta, setZoomDelta] = useState({
     latitudeDelta: DEFAULT_DELTA.latitudeDelta,
     longitudeDelta: DEFAULT_DELTA.longitudeDelta
-  })
-  const [locationError, setLocationError] = useState<string | null>(null)
-  const routeOrigin = showRoute ? userCoordinate : null
-  const routeDestination = showRoute ? destination || null : null
-  const { coords: routeCoords, isLoading: isRouteLoading, error: routeError } = useRoutePolyline({
+  });
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const routeOrigin = showRoute ? userCoordinate : null;
+  const routeDestination = showRoute ? destination || null : null;
+  const {
+    coords: routeCoords,
+    isLoading: isRouteLoading,
+    error: routeError
+  } = useRoutePolyline({
     origin: routeOrigin,
     destination: routeDestination,
     profile: 'car'
-  })
+  });
 
   const polylineCoordinates = useMemo(() => {
-    if (!showRoute || !destination || !userCoordinate) return []
-    return routeCoords
-  }, [destination, routeCoords, showRoute, userCoordinate])
+    if (!showRoute || !destination || !userCoordinate) return [];
+    return routeCoords;
+  }, [destination, routeCoords, showRoute, userCoordinate]);
 
   useEffect(() => {
-    let mounted = true
+    let mounted = true;
 
     const start = async () => {
       try {
-        const existing = await Location.getForegroundPermissionsAsync()
-        let status = existing.status
+        const existing = await Location.getForegroundPermissionsAsync();
+        let status = existing.status;
         if (status !== 'granted') {
-          const requested = await Location.requestForegroundPermissionsAsync()
-          status = requested.status
+          const requested = await Location.requestForegroundPermissionsAsync();
+          status = requested.status;
         }
 
-        if (!mounted) return
+        if (!mounted) return;
         if (status !== 'granted') {
-          setPermission('denied')
-          setLocationError('Cần cấp quyền vị trí để hiển thị bản đồ trực tiếp.')
-          return
+          setPermission('denied');
+          setLocationError('Cần cấp quyền vị trí để hiển thị bản đồ trực tiếp.');
+          return;
         }
 
-        setPermission('granted')
+        setPermission('granted');
         const current = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced
-        })
-        if (!mounted) return
+        });
+        if (!mounted) return;
 
         const initial = {
           latitude: current.coords.latitude,
           longitude: current.coords.longitude
-        }
-        setUserCoordinate(initial)
-        onLocationChange?.(initial)
+        };
+        setUserCoordinate(initial);
+        onLocationChange?.(initial);
 
         const sub = await Location.watchPositionAsync(
           {
@@ -90,37 +89,37 @@ export const CustomerLiveMap: React.FC<Props> = ({
             distanceInterval: 20
           },
           (next) => {
-            if (!mounted) return
+            if (!mounted) return;
             const value = {
               latitude: next.coords.latitude,
               longitude: next.coords.longitude
-            }
-            setUserCoordinate(value)
-            onLocationChange?.(value)
+            };
+            setUserCoordinate(value);
+            onLocationChange?.(value);
           }
-        )
-        locationSubRef.current = sub
+        );
+        locationSubRef.current = sub;
       } catch (error: any) {
-        if (!mounted) return
-        setPermission('denied')
-        setLocationError(error?.message || 'Không thể lấy vị trí hiện tại của bạn.')
+        if (!mounted) return;
+        setPermission('denied');
+        setLocationError(error?.message || 'Không thể lấy vị trí hiện tại của bạn.');
       }
-    }
+    };
 
-    void start()
+    void start();
 
     return () => {
-      mounted = false
+      mounted = false;
       if (locationSubRef.current) {
-        locationSubRef.current.remove()
-        locationSubRef.current = null
+        locationSubRef.current.remove();
+        locationSubRef.current = null;
       }
-    }
-  }, [onLocationChange])
+    };
+  }, [onLocationChange]);
 
   useEffect(() => {
-    if (!mapRef.current || !userCoordinate) return
-    if (polylineCoordinates.length >= 2) return
+    if (!mapRef.current || !userCoordinate) return;
+    if (polylineCoordinates.length >= 2) return;
     mapRef.current.animateToRegion(
       {
         latitude: userCoordinate.latitude,
@@ -129,25 +128,25 @@ export const CustomerLiveMap: React.FC<Props> = ({
         longitudeDelta: zoomDelta.longitudeDelta
       },
       350
-    )
-  }, [polylineCoordinates, userCoordinate, zoomDelta])
+    );
+  }, [polylineCoordinates, userCoordinate, zoomDelta]);
 
   useEffect(() => {
-    if (!mapRef.current) return
-    if (polylineCoordinates.length < 2) return
+    if (!mapRef.current) return;
+    if (polylineCoordinates.length < 2) return;
     mapRef.current.fitToCoordinates(polylineCoordinates, {
       edgePadding: { top: 100, bottom: 120, left: 60, right: 60 },
       animated: true
-    })
-  }, [polylineCoordinates])
+    });
+  }, [polylineCoordinates]);
 
   const handleZoom = (factor: number) => {
     setZoomDelta((prev) => {
-      const nextLat = Math.min(0.08, Math.max(0.0015, prev.latitudeDelta * factor))
-      const nextLng = Math.min(0.08, Math.max(0.0015, prev.longitudeDelta * factor))
-      return { latitudeDelta: nextLat, longitudeDelta: nextLng }
-    })
-  }
+      const nextLat = Math.min(0.08, Math.max(0.0015, prev.latitudeDelta * factor));
+      const nextLng = Math.min(0.08, Math.max(0.0015, prev.longitudeDelta * factor));
+      return { latitudeDelta: nextLat, longitudeDelta: nextLng };
+    });
+  };
 
   if (permission === 'denied') {
     return (
@@ -155,7 +154,7 @@ export const CustomerLiveMap: React.FC<Props> = ({
         <Text style={styles.blockedTitle}>Không thể truy cập vị trí</Text>
         <Text style={styles.blockedText}>{locationError || 'Vui lòng bật quyền vị trí trong cài đặt thiết bị.'}</Text>
       </View>
-    )
+    );
   }
 
   if (permission !== 'granted' || !userCoordinate) {
@@ -164,14 +163,14 @@ export const CustomerLiveMap: React.FC<Props> = ({
         <ActivityIndicator size="small" color={colors.brand700} />
         <Text style={styles.blockedText}>Dang lay vi tri GPS...</Text>
       </View>
-    )
+    );
   }
 
   return (
     <View style={styles.wrapper}>
       <MapView
         ref={(ref: MapView | null) => {
-          mapRef.current = ref
+          mapRef.current = ref;
         }}
         style={StyleSheet.absoluteFillObject}
         initialRegion={{
@@ -182,12 +181,11 @@ export const CustomerLiveMap: React.FC<Props> = ({
         }}
         showsUserLocation
         followsUserLocation
-        loadingEnabled>
+        loadingEnabled
+      >
         {userCoordinate ? <Marker coordinate={userCoordinate} title="Vị trí của bạn" /> : null}
         {destination ? <Marker coordinate={destination} title={destination.label || 'Diem den'} pinColor="#F97316" /> : null}
-        {polylineCoordinates.length >= 2 ? (
-          <Polyline coordinates={polylineCoordinates} strokeWidth={4} strokeColor="#F97316" />
-        ) : null}
+        {polylineCoordinates.length >= 2 ? <Polyline coordinates={polylineCoordinates} strokeWidth={4} strokeColor="#F97316" /> : null}
       </MapView>
 
       <View style={styles.badge}>
@@ -215,8 +213,8 @@ export const CustomerLiveMap: React.FC<Props> = ({
         </View>
       ) : null}
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -293,4 +291,4 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.brand700
   }
-})
+});

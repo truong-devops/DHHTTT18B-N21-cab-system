@@ -18,11 +18,11 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
-  'speedometer': 'speed',
+  speedometer: 'speed',
   'car.fill': 'directions-car',
   'clock.fill': 'schedule',
   'creditcard.fill': 'account-balance-wallet',
-  'person.fill': 'person',
+  'person.fill': 'person'
 } as IconMapping;
 
 /**
@@ -34,7 +34,7 @@ export function IconSymbol({
   name,
   size = 24,
   color,
-  style,
+  style
 }: {
   name: IconSymbolName;
   size?: number;

@@ -1,42 +1,31 @@
-const { withTransaction } = require("../db/pool");
-const {
-  insertPayment,
-  insertStatusHistory,
-  getPaymentById,
-  updatePaymentStatus,
-  listPayments
-} = require("../repositories/paymentsRepo");
-const { saveIdempotencyKey } = require("../repositories/idempotencyRepo");
-const { insertOutboxEvent } = require("../repositories/outboxRepo");
-const { encodeCursor, decodeCursor } = require("../../../../libs/http/cursor");
-const { hashRequest } = require("../utils/idempotency");
-const { ApiError } = require("../utils/errors");
-const { STATUSES, canTransition } = require("../domain/paymentStatus");
-const { buildPaymentCompleted, buildPaymentFailed } = require("../messaging/events");
-const { generateVietQr } = require("./vietqrService");
-const { createPayosPaymentLink } = require("./payosService");
-const { generateVietQrCode } = require("../integrations/vietqrClient");
-const config = require("../config");
-const { withTrace } = require("../utils/logger");
-const monitoring = require("../monitoring");
+const { withTransaction } = require('../db/pool');
+const { insertPayment, insertStatusHistory, getPaymentById, updatePaymentStatus, listPayments } = require('../repositories/paymentsRepo');
+const { saveIdempotencyKey } = require('../repositories/idempotencyRepo');
+const { insertOutboxEvent } = require('../repositories/outboxRepo');
+const { encodeCursor, decodeCursor } = require('../../../../libs/http/cursor');
+const { hashRequest } = require('../utils/idempotency');
+const { ApiError } = require('../utils/errors');
+const { STATUSES, canTransition } = require('../domain/paymentStatus');
+const { buildPaymentCompleted, buildPaymentFailed } = require('../messaging/events');
+const { generateVietQr } = require('./vietqrService');
+const { createPayosPaymentLink } = require('./payosService');
+const { generateVietQrCode } = require('../integrations/vietqrClient');
+const config = require('../config');
+const { withTrace } = require('../utils/logger');
+const monitoring = require('../monitoring');
 
-async function resolvePayosQrCode({
-  payosData,
-  traceId,
-  requestId,
-  authorization
-}) {
+async function resolvePayosQrCode({ payosData, traceId, requestId, authorization }) {
   if (!payosData || !payosData.qrCode) {
     return payosData;
   }
-  if (config.payos.qrSource !== "VIETQR") {
+  if (config.payos.qrSource !== 'VIETQR') {
     return payosData;
   }
 
   const bankBin = payosData.bankBin;
   const accountNumber = payosData.accountNumber;
   const accountName = payosData.accountName;
-  const addInfo = payosData.description || String(payosData.orderCode || "");
+  const addInfo = payosData.description || String(payosData.orderCode || '');
   const amount = Number(payosData.amount);
   if (!bankBin || !accountNumber || !accountName || !addInfo || !Number.isFinite(amount)) {
     return payosData;
@@ -64,21 +53,16 @@ async function resolvePayosQrCode({
       qrCode: vietqr.qrDataUrl || vietqr.qrCode || payosData.qrCode
     };
   } catch (err) {
-    withTrace(traceId, requestId).warn(
-      { err, orderCode: payosData.orderCode },
-      "Fallback to PayOS QR due to VietQR generation error"
-    );
+    withTrace(traceId, requestId).warn({ err, orderCode: payosData.orderCode }, 'Fallback to PayOS QR due to VietQR generation error');
     return payosData;
   }
 }
 
 async function createPayment({ payload, idempotency, traceId, requestId, method, path, authorization }) {
-  const requestHash = idempotency
-    ? (idempotency.requestHash || hashRequest(method, path, payload))
-    : null;
-  const paymentMethod = payload.method || "";
+  const requestHash = idempotency ? idempotency.requestHash || hashRequest(method, path, payload) : null;
+  const paymentMethod = payload.method || '';
   const rawPayosData =
-    paymentMethod === "PAYOS"
+    paymentMethod === 'PAYOS'
       ? await createPayosPaymentLink({
           amount: payload.amount,
           currency: payload.currency,
@@ -87,7 +71,7 @@ async function createPayment({ payload, idempotency, traceId, requestId, method,
         })
       : null;
   const payosData =
-    paymentMethod === "PAYOS"
+    paymentMethod === 'PAYOS'
       ? await resolvePayosQrCode({
           payosData: rawPayosData,
           traceId,
@@ -96,7 +80,7 @@ async function createPayment({ payload, idempotency, traceId, requestId, method,
         })
       : null;
   const vietqrData =
-    paymentMethod === "VIETQR"
+    paymentMethod === 'VIETQR'
       ? await generateVietQr({
           amount: payload.amount,
           currency: payload.currency,
@@ -130,8 +114,8 @@ async function createPayment({ payload, idempotency, traceId, requestId, method,
     });
 
     const responseBody = { data: payment };
-    monitoring.recordPaymentStatus(payment.status, "success", {
-      method: String(payment.method || payload.method || "unknown").toLowerCase()
+    monitoring.recordPaymentStatus(payment.status, 'success', {
+      method: String(payment.method || payload.method || 'unknown').toLowerCase()
     });
 
     if (idempotency) {
@@ -153,7 +137,7 @@ async function createPayment({ payload, idempotency, traceId, requestId, method,
 async function fetchPayment(paymentId) {
   const payment = await getPaymentById(paymentId);
   if (!payment) {
-    throw new ApiError(404, "NOT_FOUND", "Payment not found");
+    throw new ApiError(404, 'NOT_FOUND', 'Payment not found');
   }
   return payment;
 }
@@ -168,9 +152,7 @@ async function fetchPayments(parsedQuery) {
     status: parsedQuery.status,
     rideId: parsedQuery.rideId
   });
-  const nextCursor = result.nextCursor
-    ? encodeCursor(result.nextCursor)
-    : null;
+  const nextCursor = result.nextCursor ? encodeCursor(result.nextCursor) : null;
   const response = { data: result.items };
   if (nextCursor) {
     response.nextCursor = nextCursor;
@@ -182,8 +164,8 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
   const { status, failureReason } = statusUpdate;
   const payment = await fetchPayment(paymentId);
 
-  const trace = traceId || "no-trace";
-  const actorLabel = actor || "system";
+  const trace = traceId || 'no-trace';
+  const actorLabel = actor || 'system';
   const log = withTrace(trace, requestId);
   log.info(
     {
@@ -193,19 +175,15 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
       actor: actorLabel,
       reason: failureReason || null
     },
-    "Payment status transition"
+    'Payment status transition'
   );
 
   if (!canTransition(payment.status, status)) {
-    monitoring.recordPaymentStatus(status, "error", {
-      reason: "invalid_transition",
-      from_status: String(payment.status || "unknown").toLowerCase()
+    monitoring.recordPaymentStatus(status, 'error', {
+      reason: 'invalid_transition',
+      from_status: String(payment.status || 'unknown').toLowerCase()
     });
-    throw new ApiError(
-      409,
-      "INVALID_STATE_TRANSITION",
-      `Cannot transition from ${payment.status} to ${status}`
-    );
+    throw new ApiError(409, 'INVALID_STATE_TRANSITION', `Cannot transition from ${payment.status} to ${status}`);
   }
 
   if (payment.status === status) {
@@ -249,8 +227,8 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
       });
     }
 
-    monitoring.recordPaymentStatus(status, "success", {
-      from_status: String(payment.status || "unknown").toLowerCase()
+    monitoring.recordPaymentStatus(status, 'success', {
+      from_status: String(payment.status || 'unknown').toLowerCase()
     });
 
     return updated;
@@ -260,7 +238,7 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
 async function fetchVietQr(paymentId) {
   const payment = await fetchPayment(paymentId);
   if (!payment.vietqr) {
-    throw new ApiError(409, "CONFLICT", "VietQR data is not available for this payment");
+    throw new ApiError(409, 'CONFLICT', 'VietQR data is not available for this payment');
   }
   return {
     paymentId: payment.id,

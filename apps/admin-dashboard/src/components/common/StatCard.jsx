@@ -5,7 +5,7 @@ function StatCard({ label, value, children }) {
       <div className="stat-value">{value}</div>
       {children}
     </div>
-  )
+  );
 }
 
-export default StatCard
+export default StatCard;

@@ -1,22 +1,22 @@
-const express = require("express");
-const { requireAuth, requireRole } = require("../middleware/auth");
-const { validateRequest } = require("../middleware/validateRequest");
-const { asyncHandler } = require("../utils/asyncHandler");
-const driverService = require("../services/driverService");
+const express = require('express');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const { validateRequest } = require('../middleware/validateRequest');
+const { asyncHandler } = require('../utils/asyncHandler');
+const driverService = require('../services/driverService');
 
 const router = express.Router();
 
-router.use("/v1/admin", requireAuth, requireRole("admin", "service"));
+router.use('/v1/admin', requireAuth, requireRole('admin', 'service'));
 
 router.post(
-  "/v1/admin/drivers",
+  '/v1/admin/drivers',
   validateRequest({
     bodySchema: {
-      required: ["userId"],
+      required: ['userId'],
       properties: {
-        userId: { type: "string" },
-        fullName: { type: "string" },
-        phone: { type: "string" }
+        userId: { type: 'string' },
+        fullName: { type: 'string' },
+        phone: { type: 'string' }
       }
     }
   }),
@@ -34,11 +34,11 @@ router.post(
 );
 
 router.patch(
-  "/v1/admin/drivers/:driverId/approve",
+  '/v1/admin/drivers/:driverId/approve',
   validateRequest({
     paramsSchema: {
-      required: ["driverId"],
-      properties: { driverId: { type: "string" } }
+      required: ['driverId'],
+      properties: { driverId: { type: 'string' } }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -48,11 +48,11 @@ router.patch(
 );
 
 router.patch(
-  "/v1/admin/drivers/:driverId/suspend",
+  '/v1/admin/drivers/:driverId/suspend',
   validateRequest({
     paramsSchema: {
-      required: ["driverId"],
-      properties: { driverId: { type: "string" } }
+      required: ['driverId'],
+      properties: { driverId: { type: 'string' } }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -62,19 +62,19 @@ router.patch(
 );
 
 router.get(
-  "/v1/admin/drivers",
+  '/v1/admin/drivers',
   validateRequest({
     custom: (req, errors) => {
       if (req.query.page !== undefined) {
         const page = Number(req.query.page);
         if (!Number.isFinite(page)) {
-          errors.push({ path: "query.page", message: "must be a number" });
+          errors.push({ path: 'query.page', message: 'must be a number' });
         }
       }
       if (req.query.limit !== undefined) {
         const limit = Number(req.query.limit);
         if (!Number.isFinite(limit)) {
-          errors.push({ path: "query.limit", message: "must be a number" });
+          errors.push({ path: 'query.limit', message: 'must be a number' });
         }
       }
     }

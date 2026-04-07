@@ -17,7 +17,7 @@ const MAX_RECONNECT_DELAY = 10000;
 
 const STATUS_ALIASES: Record<string, string> = {
   ARRIVED: 'ARRIVING',
-  STARTED: 'IN_PROGRESS',
+  STARTED: 'IN_PROGRESS'
 };
 
 function normalizeStatus(status?: string | null) {
@@ -47,13 +47,7 @@ function parseEvent(raw: string) {
 
 function extractRide(event: any): rideApi.Ride | null {
   if (!event) return null;
-  const payload =
-    event.ride ??
-    event.payload?.ride ??
-    event.data?.ride ??
-    event.payload ??
-    event.data ??
-    event;
+  const payload = event.ride ?? event.payload?.ride ?? event.data?.ride ?? event.payload ?? event.data ?? event;
 
   if (payload?.id) return payload as rideApi.Ride;
 
@@ -65,12 +59,7 @@ function extractRide(event: any): rideApi.Ride | null {
   return null;
 }
 
-export function useRideTracking({
-  rideId,
-  enabled,
-  intervalMs = DEFAULT_INTERVAL_MS,
-  wsUrl,
-}: Options) {
+export function useRideTracking({ rideId, enabled, intervalMs = DEFAULT_INTERVAL_MS, wsUrl }: Options) {
   const [ride, setRide] = useState<rideApi.Ride | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +95,7 @@ export function useRideTracking({
     } catch (err: any) {
       const offline = isNetworkError(err);
       setIsOffline(offline);
-      setError(offline ? 'Mất kết nối, đang thử lại...' : err?.message ?? 'Không thể tải chuyến');
+      setError(offline ? 'Mất kết nối, đang thử lại...' : (err?.message ?? 'Không thể tải chuyến'));
     } finally {
       setLoading(false);
     }
@@ -160,7 +149,7 @@ export function useRideTracking({
       setError(null);
       setIsOffline(false);
     },
-    [rideId],
+    [rideId]
   );
 
   const connectWs = useCallback(() => {
@@ -183,8 +172,8 @@ export function useRideTracking({
             JSON.stringify({
               action: 'subscribe',
               topics: ['ride.updated', 'ride.status.changed', 'ride.assigned'],
-              rideId,
-            }),
+              rideId
+            })
           );
         } catch {
           // best-effort subscribe
@@ -217,16 +206,7 @@ export function useRideTracking({
       startPolling();
       scheduleReconnect();
     }
-  }, [
-    cleanupWs,
-    effectiveWsUrl,
-    enabled,
-    handleRideUpdate,
-    rideId,
-    scheduleReconnect,
-    startPolling,
-    stopPolling,
-  ]);
+  }, [cleanupWs, effectiveWsUrl, enabled, handleRideUpdate, rideId, scheduleReconnect, startPolling, stopPolling]);
 
   useEffect(() => {
     connectRef.current = connectWs;
@@ -252,14 +232,14 @@ export function useRideTracking({
       } catch (err: any) {
         const offline = isNetworkError(err);
         setIsOffline(offline);
-        setError(offline ? 'Mất kết nối, đang thử lại...' : err?.message ?? 'Không thể cập nhật trạng thái');
+        setError(offline ? 'Mất kết nối, đang thử lại...' : (err?.message ?? 'Không thể cập nhật trạng thái'));
         lastActionRef.current = null;
         throw err;
       } finally {
         setIsUpdating(false);
       }
     },
-    [ride?.status, rideId],
+    [ride?.status, rideId]
   );
 
   useEffect(() => {
@@ -301,6 +281,6 @@ export function useRideTracking({
     phase,
     isUpdating,
     refresh: fetchRide,
-    updateStatus,
+    updateStatus
   };
 }

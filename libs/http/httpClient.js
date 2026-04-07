@@ -8,19 +8,16 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function createCircuitBreaker({
-  failureThreshold = DEFAULT_FAILURE_THRESHOLD,
-  cooldownMs = DEFAULT_COOLDOWN_MS
-} = {}) {
+function createCircuitBreaker({ failureThreshold = DEFAULT_FAILURE_THRESHOLD, cooldownMs = DEFAULT_COOLDOWN_MS } = {}) {
   let failures = 0;
-  let state = "CLOSED";
+  let state = 'CLOSED';
   let openedAt = 0;
 
   function canRequest() {
-    if (state === "OPEN") {
+    if (state === 'OPEN') {
       const now = Date.now();
       if (now - openedAt >= cooldownMs) {
-        state = "HALF_OPEN";
+        state = 'HALF_OPEN';
         return true;
       }
       return false;
@@ -30,13 +27,13 @@ function createCircuitBreaker({
 
   function onSuccess() {
     failures = 0;
-    state = "CLOSED";
+    state = 'CLOSED';
   }
 
   function onFailure() {
     failures += 1;
     if (failures >= failureThreshold) {
-      state = "OPEN";
+      state = 'OPEN';
       openedAt = Date.now();
     }
   }
@@ -51,17 +48,16 @@ function createCircuitBreaker({
 function pickHeaders(headers = {}) {
   const result = {};
   const auth = headers.Authorization || headers.authorization;
-  const traceId = headers["x-trace-id"] || headers["X-Trace-Id"];
-  const requestId =
-    headers["x-request-id"] || headers["X-Request-Id"];
+  const traceId = headers['x-trace-id'] || headers['X-Trace-Id'];
+  const requestId = headers['x-request-id'] || headers['X-Request-Id'];
   if (auth) {
     result.Authorization = auth;
   }
   if (traceId) {
-    result["x-trace-id"] = traceId;
+    result['x-trace-id'] = traceId;
   }
   if (requestId) {
-    result["x-request-id"] = requestId;
+    result['x-request-id'] = requestId;
   }
   return result;
 }
@@ -74,7 +70,7 @@ function createHttpClient({
   circuitBreaker
 } = {}) {
   if (!baseUrl) {
-    throw new Error("baseUrl is required");
+    throw new Error('baseUrl is required');
   }
 
   const breaker =
@@ -86,8 +82,8 @@ function createHttpClient({
 
   async function request(method, path, options = {}) {
     if (!breaker.canRequest()) {
-      const error = new Error("Circuit breaker open");
-      error.code = "CIRCUIT_OPEN";
+      const error = new Error('Circuit breaker open');
+      error.code = 'CIRCUIT_OPEN';
       throw error;
     }
 
@@ -97,38 +93,30 @@ function createHttpClient({
       ...(options.headers || {})
     };
 
-    if (options.body && !headers["content-type"]) {
-      headers["content-type"] = "application/json";
+    if (options.body && !headers['content-type']) {
+      headers['content-type'] = 'application/json';
     }
 
     async function attempt() {
       const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        timeoutMs
-      );
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const response = await fetch(url, {
           method,
           headers,
-          body: options.body
-            ? JSON.stringify(options.body)
-            : undefined,
+          body: options.body ? JSON.stringify(options.body) : undefined,
           signal: controller.signal
         });
-        const contentType =
-          response.headers.get("content-type") || "";
+        const contentType = response.headers.get('content-type') || '';
         const rawBody = await response.text();
-        const body = contentType.includes("application/json")
-          ? JSON.parse(rawBody || "{}")
-          : rawBody;
+        const body = contentType.includes('application/json') ? JSON.parse(rawBody || '{}') : rawBody;
         return { response, body };
       } finally {
         clearTimeout(timeout);
       }
     }
 
-    const isGet = method.toUpperCase() === "GET";
+    const isGet = method.toUpperCase() === 'GET';
     let lastError;
     const attempts = isGet ? retryCount + 1 : 1;
     for (let i = 0; i < attempts; i += 1) {
@@ -149,11 +137,11 @@ function createHttpClient({
 
   return {
     request,
-    get: (path, options) => request("GET", path, options),
-    post: (path, options) => request("POST", path, options),
-    put: (path, options) => request("PUT", path, options),
-    patch: (path, options) => request("PATCH", path, options),
-    del: (path, options) => request("DELETE", path, options)
+    get: (path, options) => request('GET', path, options),
+    post: (path, options) => request('POST', path, options),
+    put: (path, options) => request('PUT', path, options),
+    patch: (path, options) => request('PATCH', path, options),
+    del: (path, options) => request('DELETE', path, options)
   };
 }
 

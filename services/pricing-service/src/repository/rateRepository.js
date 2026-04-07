@@ -1,13 +1,8 @@
-const redis = require("../cache/redis");
-const {
-  loadRatesFromEnv,
-  loadCouponDiscounts
-} = require("../config/rates");
+const redis = require('../cache/redis');
+const { loadRatesFromEnv, loadCouponDiscounts } = require('../config/rates');
 
-const RATE_PREFIX = "rates:";
-const RATE_CACHE_TTL_SEC = Number(
-  process.env.RATE_CACHE_TTL_SEC || 900
-);
+const RATE_PREFIX = 'rates:';
+const RATE_CACHE_TTL_SEC = Number(process.env.RATE_CACHE_TTL_SEC || 900);
 
 const rates = loadRatesFromEnv();
 const couponDiscounts = loadCouponDiscounts();
@@ -38,12 +33,7 @@ async function getRateCard(serviceType) {
 
   if (RATE_CACHE_TTL_SEC > 0) {
     try {
-      await redis.set(
-        key,
-        JSON.stringify(rateCard),
-        "EX",
-        RATE_CACHE_TTL_SEC
-      );
+      await redis.set(key, JSON.stringify(rateCard), 'EX', RATE_CACHE_TTL_SEC);
     } catch (_err) {
       // ignore cache errors
     }

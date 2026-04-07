@@ -1,6 +1,6 @@
-import Badge from '../../common/Badge.jsx'
-import Table from '../../common/Table.jsx'
-import { labelFrom, roleLabels, userStatusLabels } from '../../../utils/labels.js'
+import Badge from '../../common/Badge.jsx';
+import Table from '../../common/Table.jsx';
+import { labelFrom, roleLabels, userStatusLabels } from '../../../utils/labels.js';
 
 function UserTable({ users = [], onSelect }) {
   const columns = [
@@ -10,16 +10,12 @@ function UserTable({ users = [], onSelect }) {
     {
       key: 'role',
       header: 'Vai trò',
-      render: (row) => labelFrom(roleLabels, row.role),
+      render: (row) => labelFrom(roleLabels, row.role)
     },
     {
       key: 'status',
       header: 'Trạng thái',
-      render: (row) => (
-        <Badge variant={row.status === 'ACTIVE' ? 'success' : 'danger'}>
-          {labelFrom(userStatusLabels, row.status)}
-        </Badge>
-      ),
+      render: (row) => <Badge variant={row.status === 'ACTIVE' ? 'success' : 'danger'}>{labelFrom(userStatusLabels, row.status)}</Badge>
     },
     {
       key: 'action',
@@ -28,11 +24,11 @@ function UserTable({ users = [], onSelect }) {
         <button className="btn btn-ghost" onClick={() => onSelect?.(row)}>
           Xem
         </button>
-      ),
-    },
-  ]
-
-  return <Table columns={columns} data={users} total={users.length} />
-}
-
-export default UserTable
+      )
+    }
+  ];
+
+  return <Table columns={columns} data={users} total={users.length} />;
+}
+
+export default UserTable;

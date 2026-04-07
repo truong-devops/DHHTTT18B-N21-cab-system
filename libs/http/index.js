@@ -1,9 +1,5 @@
-const {
-  encodeCursor,
-  decodeCursor,
-  applyCursorQuery
-} = require("./cursor");
-const { createHttpClient } = require("./httpClient");
+const { encodeCursor, decodeCursor, applyCursorQuery } = require('./cursor');
+const { createHttpClient } = require('./httpClient');
 
 module.exports = {
   encodeCursor,

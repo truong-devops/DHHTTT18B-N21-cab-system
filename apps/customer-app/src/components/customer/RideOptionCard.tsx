@@ -1,14 +1,14 @@
-﻿import React from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import type { RideOption } from '../../mock/data'
-import { colors, spacing, typography } from '../../theme/tokens'
-import { formatVnd } from '../../utils/format'
+﻿import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { RideOption } from '../../mock/data';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { formatVnd } from '../../utils/format';
 
 type Props = {
-  option: RideOption
-  selected?: boolean
-  onPress?: () => void
-}
+  option: RideOption;
+  selected?: boolean;
+  onPress?: () => void;
+};
 
 export const RideOptionCard: React.FC<Props> = ({ option, selected, onPress }) => {
   return (
@@ -17,11 +17,13 @@ export const RideOptionCard: React.FC<Props> = ({ option, selected, onPress }) =
         <Text style={styles.name}>{option.name}</Text>
         <Text style={styles.price}>{formatVnd(option.price)}</Text>
       </View>
-      <Text style={styles.meta}>Đến nơi dự kiến {option.etaMinutes} phút | {option.capacity} chỗ</Text>
+      <Text style={styles.meta}>
+        Đến nơi dự kiến {option.etaMinutes} phút | {option.capacity} chỗ
+      </Text>
       {option.surgeLabel ? <Text style={styles.surge}>{option.surgeLabel}</Text> : null}
     </Pressable>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   card: {
@@ -56,4 +58,4 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontWeight: '600'
   }
-})
+});

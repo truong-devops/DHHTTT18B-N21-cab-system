@@ -1,4 +1,4 @@
-const request = require("supertest");
+const request = require('supertest');
 
 const mockCreateBooking = jest.fn();
 const mockGetBookingById = jest.fn();
@@ -18,7 +18,7 @@ const mockCreatePayment = jest.fn();
 const mockSendNotification = jest.fn();
 const mockUpdateStatus = jest.fn();
 
-jest.mock("../src/repositories/bookingRepo", () => ({
+jest.mock('../src/repositories/bookingRepo', () => ({
   create: (...args) => mockCreateBooking(...args),
   getById: (...args) => mockGetBookingById(...args),
   list: (...args) => mockListBookings(...args),
@@ -27,89 +27,89 @@ jest.mock("../src/repositories/bookingRepo", () => ({
   updateStatus: (...args) => mockUpdateStatus(...args)
 }));
 
-jest.mock("../src/repositories/outboxRepo", () => ({
+jest.mock('../src/repositories/outboxRepo', () => ({
   insertOutboxEvent: (...args) => mockInsertOutboxEvent(...args)
 }));
 
-jest.mock("../src/repositories/idempotencyRepo", () => ({
+jest.mock('../src/repositories/idempotencyRepo', () => ({
   reserveIdempotencyKey: (...args) => mockReserveIdempotencyKey(...args),
   completeIdempotencyKey: (...args) => mockCompleteIdempotencyKey(...args)
 }));
 
-jest.mock("../src/db/pool", () => ({
+jest.mock('../src/db/pool', () => ({
   withTransaction: (...args) => mockWithTransaction(...args)
 }));
 
-jest.mock("../src/clients/pricingClient", () => ({
+jest.mock('../src/clients/pricingClient', () => ({
   getQuote: (...args) => mockGetQuote(...args),
   PricingServiceError: class PricingServiceError extends Error {
     constructor(message) {
       super(message);
-      this.code = "PRICING_UNAVAILABLE";
+      this.code = 'PRICING_UNAVAILABLE';
       this.statusCode = 502;
     }
   }
 }));
 
-jest.mock("../src/clients/etaClient", () => ({
+jest.mock('../src/clients/etaClient', () => ({
   estimateEta: (...args) => mockEstimateEta(...args),
   EtaServiceError: class EtaServiceError extends Error {
     constructor(message) {
       super(message);
-      this.code = "ETA_UNAVAILABLE";
+      this.code = 'ETA_UNAVAILABLE';
       this.statusCode = 502;
     }
   }
 }));
 
-jest.mock("../src/clients/driverClient", () => ({
+jest.mock('../src/clients/driverClient', () => ({
   getDriverAvailability: (...args) => mockGetDriverAvailability(...args),
   listAvailableDrivers: (...args) => mockListAvailableDrivers(...args),
   selectBestDriver: (...args) => mockSelectBestDriver(...args)
 }));
 
-jest.mock("../src/clients/paymentClient", () => ({
+jest.mock('../src/clients/paymentClient', () => ({
   createPayment: (...args) => mockCreatePayment(...args)
 }));
 
-jest.mock("../src/clients/notificationClient", () => ({
+jest.mock('../src/clients/notificationClient', () => ({
   sendNotification: (...args) => mockSendNotification(...args)
 }));
 
-const app = require("../src/app");
+const app = require('../src/app');
 
 function buildBooking(overrides = {}) {
   return {
-    bookingId: "bk_1",
-    rideId: "ride_1",
-    userId: "user_1",
+    bookingId: 'bk_1',
+    rideId: 'ride_1',
+    userId: 'user_1',
     pickup: { lat: 10.76, lng: 106.66 },
     dropoff: { lat: 10.77, lng: 106.7 },
-    vehicleType: "CAR",
+    vehicleType: 'CAR',
     distanceKm: 5,
     etaMinutes: 14,
     priceSnapshot: {
-      quoteId: "q_1",
+      quoteId: 'q_1',
       estimatedFare: 100000,
-      currency: "VND",
+      currency: 'VND',
       distanceKm: 5,
       durationMin: 14
     },
-    status: "REQUESTED",
-    createdAt: "2026-04-04T08:00:00.000Z",
+    status: 'REQUESTED',
+    createdAt: '2026-04-04T08:00:00.000Z',
     canceledAt: null,
     ...overrides
   };
 }
 
-describe("booking-service P0 integration", () => {
+describe('booking-service P0 integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockWithTransaction.mockImplementation((work) => work({}));
     mockGetQuote.mockResolvedValue({
-      quoteId: "q_1",
+      quoteId: 'q_1',
       estimatedFare: 100000,
-      currency: "VND",
+      currency: 'VND',
       distanceKm: 5,
       durationMin: 14
     });
@@ -118,7 +118,7 @@ describe("booking-service P0 integration", () => {
       distanceKm: 5
     });
     mockReserveIdempotencyKey.mockResolvedValue({
-      state: "reserved",
+      state: 'reserved',
       record: null
     });
     mockGetDriverAvailability.mockResolvedValue({
@@ -131,12 +131,12 @@ describe("booking-service P0 integration", () => {
     mockCreatePayment.mockResolvedValue({
       ok: true,
       statusCode: 201,
-      data: { data: { id: "pay_1", status: "INITIATED" } }
+      data: { data: { id: 'pay_1', status: 'INITIATED' } }
     });
     mockSendNotification.mockResolvedValue({
       ok: true,
       statusCode: 200,
-      data: { id: "n_1", status: "PENDING" }
+      data: { id: 'n_1', status: 'PENDING' }
     });
     mockCreateBooking.mockResolvedValue(buildBooking());
     mockInsertOutboxEvent.mockResolvedValue(undefined);
@@ -144,68 +144,68 @@ describe("booking-service P0 integration", () => {
     mockListBookings.mockResolvedValue([]);
     mockGetBookingById.mockResolvedValue(null);
     mockGetByIdForUpdate.mockResolvedValue(buildBooking());
-    mockUpdateStatus.mockResolvedValue(buildBooking({ status: "ACCEPTED" }));
-    mockCancelBooking.mockResolvedValue(buildBooking({ status: "CANCELLED" }));
+    mockUpdateStatus.mockResolvedValue(buildBooking({ status: 'ACCEPTED' }));
+    mockCancelBooking.mockResolvedValue(buildBooking({ status: 'CANCELLED' }));
   });
 
-  test("rejects when pickup is missing", async () => {
+  test('rejects when pickup is missing', async () => {
     const response = await request(app)
-      .post("/v1/bookings")
+      .post('/v1/bookings')
       .send({
         drop: { lat: 10.77, lng: 106.7 },
         distance_km: 5
       });
 
     expect(response.status).toBe(400);
-    expect(response.body.error).toBe("pickup is required");
+    expect(response.body.error).toBe('pickup is required');
   });
 
-  test("returns 422 when lat/lng types are invalid", async () => {
+  test('returns 422 when lat/lng types are invalid', async () => {
     const response = await request(app)
-      .post("/v1/bookings")
+      .post('/v1/bookings')
       .send({
-        pickup: { lat: "abc", lng: 106.66 },
+        pickup: { lat: 'abc', lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 }
       });
 
     expect(response.status).toBe(422);
-    expect(response.body.error).toBe("Validation error from schema");
+    expect(response.body.error).toBe('Validation error from schema');
   });
 
-  test("rejects invalid payment method", async () => {
+  test('rejects invalid payment method', async () => {
     const response = await request(app)
-      .post("/v1/bookings")
+      .post('/v1/bookings')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
-        payment_method: "invalid_card"
+        payment_method: 'invalid_card'
       });
 
     expect(response.status).toBe(400);
-    expect(response.body.error).toBe("Invalid payment method");
+    expect(response.body.error).toBe('Invalid payment method');
   });
 
-  test("creates booking and calls ETA + pricing with normalized payload", async () => {
-    const createdBooking = buildBooking({ bookingId: "bk_2", rideId: "ride_2" });
+  test('creates booking and calls ETA + pricing with normalized payload', async () => {
+    const createdBooking = buildBooking({ bookingId: 'bk_2', rideId: 'ride_2' });
     mockCreateBooking.mockResolvedValue(createdBooking);
 
     const response = await request(app)
-      .post("/v1/bookings")
-      .set("x-user-id", "user_abc")
+      .post('/v1/bookings')
+      .set('x-user-id', 'user_abc')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
         distance_km: 5,
         traffic_level: 0.5,
-        vehicleType: "CAR"
+        vehicleType: 'CAR'
       });
 
     expect(response.status).toBe(201);
-    expect(response.body.booking.status).toBe("REQUESTED");
+    expect(response.body.booking.status).toBe('REQUESTED');
     expect(mockGetQuote).toHaveBeenCalledWith({
       pickup: { lat: 10.76, lng: 106.66 },
       dropoff: { lat: 10.77, lng: 106.7 },
-      vehicleType: "CAR",
+      vehicleType: 'CAR',
       simulateTimeout: false
     });
     expect(mockEstimateEta).toHaveBeenCalledWith({
@@ -217,17 +217,17 @@ describe("booking-service P0 integration", () => {
     expect(mockInsertOutboxEvent).toHaveBeenCalledTimes(2);
   });
 
-  test("replays response when idempotency key already completed", async () => {
+  test('replays response when idempotency key already completed', async () => {
     const replayBody = {
-      booking: buildBooking({ bookingId: "bk_replay", rideId: "ride_replay" }),
+      booking: buildBooking({ bookingId: 'bk_replay', rideId: 'ride_replay' }),
       publishedEvent: {
-        topic: "ride.created",
-        eventId: "evt_replay",
+        topic: 'ride.created',
+        eventId: 'evt_replay',
         queued: true
       }
     };
     mockReserveIdempotencyKey.mockResolvedValue({
-      state: "replay",
+      state: 'replay',
       record: {
         responseCode: 201,
         responseBody: replayBody
@@ -235,102 +235,95 @@ describe("booking-service P0 integration", () => {
     });
 
     const response = await request(app)
-      .post("/v1/bookings")
-      .set("x-user-id", "user_replay")
-      .set("idempotency-key", "idem_1")
+      .post('/v1/bookings')
+      .set('x-user-id', 'user_replay')
+      .set('idempotency-key', 'idem_1')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
         distance_km: 5,
-        vehicleType: "CAR"
+        vehicleType: 'CAR'
       });
 
     expect(response.status).toBe(201);
-    expect(response.body.booking.bookingId).toBe("bk_replay");
+    expect(response.body.booking.bookingId).toBe('bk_replay');
     expect(mockCreateBooking).not.toHaveBeenCalled();
     expect(mockInsertOutboxEvent).not.toHaveBeenCalled();
   });
 
-  test("creates booking with payment_method and triggers payment + notification flow", async () => {
+  test('creates booking with payment_method and triggers payment + notification flow', async () => {
     const response = await request(app)
-      .post("/v1/bookings")
-      .set("authorization", "Bearer test-token")
-      .set("x-user-id", "user_pay")
+      .post('/v1/bookings')
+      .set('authorization', 'Bearer test-token')
+      .set('x-user-id', 'user_pay')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
-        vehicleType: "CAR",
-        payment_method: "CASH"
+        vehicleType: 'CAR',
+        payment_method: 'CASH'
       });
 
     expect(response.status).toBe(201);
     expect(mockCreatePayment).toHaveBeenCalledTimes(1);
     expect(mockSendNotification).toHaveBeenCalledTimes(1);
-    expect(response.body.integration_flow.flow).toBe("success");
+    expect(response.body.integration_flow.flow).toBe('success');
   });
 
-  test("AI select driver returns selected candidate", async () => {
+  test('AI select driver returns selected candidate', async () => {
     const drivers = [
-      { driverId: "d2", distanceMeters: 1200 },
-      { driverId: "d1", distanceMeters: 300 }
+      { driverId: 'd2', distanceMeters: 1200 },
+      { driverId: 'd1', distanceMeters: 300 }
     ];
     mockListAvailableDrivers.mockResolvedValue(drivers);
     mockSelectBestDriver.mockReturnValue(drivers[1]);
 
     const response = await request(app)
-      .post("/v1/bookings/ai/select-driver")
-      .set("authorization", "Bearer test-token")
+      .post('/v1/bookings/ai/select-driver')
+      .set('authorization', 'Bearer test-token')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
-        vehicleType: "CAR"
+        vehicleType: 'CAR'
       });
 
     expect(response.status).toBe(200);
     expect(response.body.data.decision_valid).toBe(true);
-    expect(response.body.data.selected_driver.driverId).toBe("d1");
+    expect(response.body.data.selected_driver.driverId).toBe('d1');
   });
 
-  test("updates booking status REQUESTED -> ACCEPTED and queues ride_accepted event", async () => {
-    mockGetByIdForUpdate.mockResolvedValueOnce(buildBooking({ status: "REQUESTED" }));
-    mockUpdateStatus.mockResolvedValueOnce(buildBooking({ status: "ACCEPTED" }));
+  test('updates booking status REQUESTED -> ACCEPTED and queues ride_accepted event', async () => {
+    mockGetByIdForUpdate.mockResolvedValueOnce(buildBooking({ status: 'REQUESTED' }));
+    mockUpdateStatus.mockResolvedValueOnce(buildBooking({ status: 'ACCEPTED' }));
 
-    const response = await request(app)
-      .patch("/v1/bookings/bk_1/status")
-      .set("authorization", "Bearer test-token")
-      .send({
-        status: "ACCEPTED",
-        driver_id: "driver_1"
-      });
+    const response = await request(app).patch('/v1/bookings/bk_1/status').set('authorization', 'Bearer test-token').send({
+      status: 'ACCEPTED',
+      driver_id: 'driver_1'
+    });
 
     expect(response.status).toBe(200);
-    expect(response.body.booking.status).toBe("ACCEPTED");
-    expect(response.body.publishedEvent.eventType).toBe("ride_accepted");
+    expect(response.body.booking.status).toBe('ACCEPTED');
+    expect(response.body.publishedEvent.eventType).toBe('ride_accepted');
     expect(mockInsertOutboxEvent).toHaveBeenCalled();
   });
 
-  test("returns MCP context with eta/pricing/driver fields", async () => {
+  test('returns MCP context with eta/pricing/driver fields', async () => {
     mockGetBookingById.mockResolvedValueOnce(
       buildBooking({
-        bookingId: "bk_ctx",
-        status: "REQUESTED"
+        bookingId: 'bk_ctx',
+        status: 'REQUESTED'
       })
     );
-    mockListAvailableDrivers.mockResolvedValueOnce([
-      { driverId: "d1", distanceMeters: 200 }
-    ]);
+    mockListAvailableDrivers.mockResolvedValueOnce([{ driverId: 'd1', distanceMeters: 200 }]);
     mockSelectBestDriver.mockReturnValueOnce({
-      driverId: "d1",
+      driverId: 'd1',
       distanceMeters: 200
     });
 
-    const response = await request(app)
-      .get("/v1/bookings/bk_ctx/mcp-context")
-      .set("authorization", "Bearer test-token");
+    const response = await request(app).get('/v1/bookings/bk_ctx/mcp-context').set('authorization', 'Bearer test-token');
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual(
       expect.objectContaining({
-        ride_id: "bk_ctx",
+        ride_id: 'bk_ctx',
         permission_ok: true
       })
     );
@@ -338,14 +331,14 @@ describe("booking-service P0 integration", () => {
     expect(response.body.data.eta_minutes).toBeGreaterThanOrEqual(0);
   });
 
-  test("passes simulate pricing timeout flag for retry/fallback flow", async () => {
+  test('passes simulate pricing timeout flag for retry/fallback flow', async () => {
     const response = await request(app)
-      .post("/v1/bookings")
-      .set("x-user-id", "user_timeout")
+      .post('/v1/bookings')
+      .set('x-user-id', 'user_timeout')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
-        vehicleType: "CAR",
+        vehicleType: 'CAR',
         simulate_pricing_timeout: true
       });
 
@@ -353,7 +346,7 @@ describe("booking-service P0 integration", () => {
     expect(mockGetQuote).toHaveBeenCalledWith({
       pickup: { lat: 10.76, lng: 106.66 },
       dropoff: { lat: 10.77, lng: 106.7 },
-      vehicleType: "CAR",
+      vehicleType: 'CAR',
       simulateTimeout: true
     });
   });

@@ -29,106 +29,106 @@ components:
               type: array
               items: {}
           required: [code, message]
-        traceId: { type: [string, "null"] }
+        traceId: { type: [string, 'null'] }
       required: [error]
   responses:
     Error400:
       description: Bad Request
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             badRequest:
               value:
-                error: { code: BAD_REQUEST, message: "Invalid request", details: [] }
+                error: { code: BAD_REQUEST, message: 'Invalid request', details: [] }
     Error401:
       description: Unauthorized
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             unauthorized:
               value:
-                error: { code: UNAUTHORIZED, message: "Missing authorization token", details: [] }
+                error: { code: UNAUTHORIZED, message: 'Missing authorization token', details: [] }
     Error403:
       description: Forbidden
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             forbidden:
               value:
-                error: { code: FORBIDDEN, message: "Forbidden", details: [] }
+                error: { code: FORBIDDEN, message: 'Forbidden', details: [] }
     Error404:
       description: Not Found
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             notFound:
               value:
-                error: { code: NOT_FOUND, message: "Route not found", details: [] }
+                error: { code: NOT_FOUND, message: 'Route not found', details: [] }
     Error409:
       description: Conflict
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             conflict:
               value:
-                error: { code: CONFLICT, message: "Resource conflict", details: [] }
+                error: { code: CONFLICT, message: 'Resource conflict', details: [] }
     Error422:
       description: Unprocessable Entity
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             unprocessable:
               value:
-                error: { code: VALIDATION_ERROR, message: "Validation failed", details: [] }
+                error: { code: VALIDATION_ERROR, message: 'Validation failed', details: [] }
     Error429:
       description: Too Many Requests
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             throttled:
               value:
-                error: { code: RATE_LIMITED, message: "Too many requests", details: [] }
+                error: { code: RATE_LIMITED, message: 'Too many requests', details: [] }
     Error500:
       description: Internal Server Error
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             internal:
               value:
-                error: { code: INTERNAL, message: "Internal server error", details: [] }
+                error: { code: INTERNAL, message: 'Internal server error', details: [] }
     Error502:
       description: Upstream Unavailable
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             upstreamUnavailable:
               value:
-                error: { code: UPSTREAM_UNAVAILABLE, message: "Upstream unavailable", details: [] }
+                error: { code: UPSTREAM_UNAVAILABLE, message: 'Upstream unavailable', details: [] }
     Error504:
       description: Upstream Timeout
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorResponse" }
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             upstreamTimeout:
               value:
-                error: { code: UPSTREAM_TIMEOUT, message: "Upstream request timed out", details: [] }
+                error: { code: UPSTREAM_TIMEOUT, message: 'Upstream request timed out', details: [] }
 paths:
   /health:
     get:
       summary: Health check
       description: Returns gateway health status.
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
@@ -136,13 +136,13 @@ paths:
               examples:
                 ok:
                   value: { ok: true }
-        "500": { $ref: "#/components/responses/Error500" }
+        '500': { $ref: '#/components/responses/Error500' }
   /healthz:
     get:
       summary: Health check (alias)
       description: Returns gateway health status.
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
@@ -150,13 +150,13 @@ paths:
               examples:
                 ok:
                   value: { ok: true }
-        "500": { $ref: "#/components/responses/Error500" }
+        '500': { $ref: '#/components/responses/Error500' }
   /readyz:
     get:
       summary: Readiness check
       description: Returns gateway readiness status.
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
@@ -164,7 +164,7 @@ paths:
               examples:
                 ok:
                   value: { ok: true }
-        "500": { $ref: "#/components/responses/Error500" }
+        '500': { $ref: '#/components/responses/Error500' }
   /v1/{domain}:
     parameters:
       - name: domain
@@ -192,7 +192,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Upstream response (pass-through)
           content:
             application/json:
@@ -200,16 +200,16 @@ paths:
               examples:
                 success:
                   value: { data: {} }
-        "400": { $ref: "#/components/responses/Error400" }
-        "401": { $ref: "#/components/responses/Error401" }
-        "403": { $ref: "#/components/responses/Error403" }
-        "404": { $ref: "#/components/responses/Error404" }
-        "409": { $ref: "#/components/responses/Error409" }
-        "422": { $ref: "#/components/responses/Error422" }
-        "429": { $ref: "#/components/responses/Error429" }
-        "500": { $ref: "#/components/responses/Error500" }
-        "502": { $ref: "#/components/responses/Error502" }
-        "504": { $ref: "#/components/responses/Error504" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+        '502': { $ref: '#/components/responses/Error502' }
+        '504': { $ref: '#/components/responses/Error504' }
     post:
       summary: Proxy POST to service root
       description: Proxies POST /v1/{domain} to the corresponding service.
@@ -224,7 +224,7 @@ paths:
               payload:
                 value: {}
       responses:
-        "201":
+        '201':
           description: Upstream created (pass-through)
           content:
             application/json:
@@ -232,7 +232,7 @@ paths:
               examples:
                 created:
                   value: { data: {} }
-        "200":
+        '200':
           description: Upstream OK (pass-through)
           content:
             application/json:
@@ -240,16 +240,16 @@ paths:
               examples:
                 ok:
                   value: { data: {} }
-        "400": { $ref: "#/components/responses/Error400" }
-        "401": { $ref: "#/components/responses/Error401" }
-        "403": { $ref: "#/components/responses/Error403" }
-        "404": { $ref: "#/components/responses/Error404" }
-        "409": { $ref: "#/components/responses/Error409" }
-        "422": { $ref: "#/components/responses/Error422" }
-        "429": { $ref: "#/components/responses/Error429" }
-        "500": { $ref: "#/components/responses/Error500" }
-        "502": { $ref: "#/components/responses/Error502" }
-        "504": { $ref: "#/components/responses/Error504" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+        '502': { $ref: '#/components/responses/Error502' }
+        '504': { $ref: '#/components/responses/Error504' }
     put:
       summary: Proxy PUT to service root
       description: Proxies PUT /v1/{domain} to the corresponding service.
@@ -264,7 +264,7 @@ paths:
               payload:
                 value: {}
       responses:
-        "200":
+        '200':
           description: Upstream OK (pass-through)
           content:
             application/json:
@@ -272,18 +272,18 @@ paths:
               examples:
                 ok:
                   value: { data: {} }
-        "204":
+        '204':
           description: Upstream No Content (pass-through)
-        "400": { $ref: "#/components/responses/Error400" }
-        "401": { $ref: "#/components/responses/Error401" }
-        "403": { $ref: "#/components/responses/Error403" }
-        "404": { $ref: "#/components/responses/Error404" }
-        "409": { $ref: "#/components/responses/Error409" }
-        "422": { $ref: "#/components/responses/Error422" }
-        "429": { $ref: "#/components/responses/Error429" }
-        "500": { $ref: "#/components/responses/Error500" }
-        "502": { $ref: "#/components/responses/Error502" }
-        "504": { $ref: "#/components/responses/Error504" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+        '502': { $ref: '#/components/responses/Error502' }
+        '504': { $ref: '#/components/responses/Error504' }
     patch:
       summary: Proxy PATCH to service root
       description: Proxies PATCH /v1/{domain} to the corresponding service.
@@ -298,7 +298,7 @@ paths:
               payload:
                 value: {}
       responses:
-        "200":
+        '200':
           description: Upstream OK (pass-through)
           content:
             application/json:
@@ -306,23 +306,23 @@ paths:
               examples:
                 ok:
                   value: { data: {} }
-        "400": { $ref: "#/components/responses/Error400" }
-        "401": { $ref: "#/components/responses/Error401" }
-        "403": { $ref: "#/components/responses/Error403" }
-        "404": { $ref: "#/components/responses/Error404" }
-        "409": { $ref: "#/components/responses/Error409" }
-        "422": { $ref: "#/components/responses/Error422" }
-        "429": { $ref: "#/components/responses/Error429" }
-        "500": { $ref: "#/components/responses/Error500" }
-        "502": { $ref: "#/components/responses/Error502" }
-        "504": { $ref: "#/components/responses/Error504" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+        '502': { $ref: '#/components/responses/Error502' }
+        '504': { $ref: '#/components/responses/Error504' }
     delete:
       summary: Proxy DELETE to service root
       description: Proxies DELETE /v1/{domain} to the corresponding service.
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Upstream OK (pass-through)
           content:
             application/json:
@@ -330,18 +330,18 @@ paths:
               examples:
                 ok:
                   value: { data: {} }
-        "204":
+        '204':
           description: Upstream No Content (pass-through)
-        "400": { $ref: "#/components/responses/Error400" }
-        "401": { $ref: "#/components/responses/Error401" }
-        "403": { $ref: "#/components/responses/Error403" }
-        "404": { $ref: "#/components/responses/Error404" }
-        "409": { $ref: "#/components/responses/Error409" }
-        "422": { $ref: "#/components/responses/Error422" }
-        "429": { $ref: "#/components/responses/Error429" }
-        "500": { $ref: "#/components/responses/Error500" }
-        "502": { $ref: "#/components/responses/Error502" }
-        "504": { $ref: "#/components/responses/Error504" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+        '502': { $ref: '#/components/responses/Error502' }
+        '504': { $ref: '#/components/responses/Error504' }
   /v1/{domain}/{path}:
     parameters:
       - name: domain
@@ -374,7 +374,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Upstream response (pass-through)
           content:
             application/json:
@@ -382,16 +382,16 @@ paths:
               examples:
                 success:
                   value: { data: {} }
-        "400": { $ref: "#/components/responses/Error400" }
-        "401": { $ref: "#/components/responses/Error401" }
-        "403": { $ref: "#/components/responses/Error403" }
-        "404": { $ref: "#/components/responses/Error404" }
-        "409": { $ref: "#/components/responses/Error409" }
-        "422": { $ref: "#/components/responses/Error422" }
-        "429": { $ref: "#/components/responses/Error429" }
-        "500": { $ref: "#/components/responses/Error500" }
-        "502": { $ref: "#/components/responses/Error502" }
-        "504": { $ref: "#/components/responses/Error504" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+        '502': { $ref: '#/components/responses/Error502' }
+        '504': { $ref: '#/components/responses/Error504' }
     post:
       summary: Proxy POST to service path
       description: Proxies POST /v1/{domain}/{path} to the corresponding service.
@@ -406,7 +406,7 @@ paths:
               payload:
                 value: {}
       responses:
-        "201":
+        '201':
           description: Upstream created (pass-through)
           content:
             application/json:
@@ -414,7 +414,7 @@ paths:
               examples:
                 created:
                   value: { data: {} }
-        "200":
+        '200':
           description: Upstream OK (pass-through)
           content:
             application/json:
@@ -422,16 +422,16 @@ paths:
               examples:
                 ok:
                   value: { data: {} }
-        "400": { $ref: "#/components/responses/Error400" }
-        "401": { $ref: "#/components/responses/Error401" }
-        "403": { $ref: "#/components/responses/Error403" }
-        "404": { $ref: "#/components/responses/Error404" }
-        "409": { $ref: "#/components/responses/Error409" }
-        "422": { $ref: "#/components/responses/Error422" }
-        "429": { $ref: "#/components/responses/Error429" }
-        "500": { $ref: "#/components/responses/Error500" }
-        "502": { $ref: "#/components/responses/Error502" }
-        "504": { $ref: "#/components/responses/Error504" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+        '502': { $ref: '#/components/responses/Error502' }
+        '504': { $ref: '#/components/responses/Error504' }
     put:
       summary: Proxy PUT to service path
       description: Proxies PUT /v1/{domain}/{path} to the corresponding service.
@@ -446,7 +446,7 @@ paths:
               payload:
                 value: {}
       responses:
-        "200":
+        '200':
           description: Upstream OK (pass-through)
           content:
             application/json:
@@ -454,18 +454,18 @@ paths:
               examples:
                 ok:
                   value: { data: {} }
-        "204":
+        '204':
           description: Upstream No Content (pass-through)
-        "400": { $ref: "#/components/responses/Error400" }
-        "401": { $ref: "#/components/responses/Error401" }
-        "403": { $ref: "#/components/responses/Error403" }
-        "404": { $ref: "#/components/responses/Error404" }
-        "409": { $ref: "#/components/responses/Error409" }
-        "422": { $ref: "#/components/responses/Error422" }
-        "429": { $ref: "#/components/responses/Error429" }
-        "500": { $ref: "#/components/responses/Error500" }
-        "502": { $ref: "#/components/responses/Error502" }
-        "504": { $ref: "#/components/responses/Error504" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+        '502': { $ref: '#/components/responses/Error502' }
+        '504': { $ref: '#/components/responses/Error504' }
     patch:
       summary: Proxy PATCH to service path
       description: Proxies PATCH /v1/{domain}/{path} to the corresponding service.
@@ -480,7 +480,7 @@ paths:
               payload:
                 value: {}
       responses:
-        "200":
+        '200':
           description: Upstream OK (pass-through)
           content:
             application/json:
@@ -488,23 +488,23 @@ paths:
               examples:
                 ok:
                   value: { data: {} }
-        "400": { $ref: "#/components/responses/Error400" }
-        "401": { $ref: "#/components/responses/Error401" }
-        "403": { $ref: "#/components/responses/Error403" }
-        "404": { $ref: "#/components/responses/Error404" }
-        "409": { $ref: "#/components/responses/Error409" }
-        "422": { $ref: "#/components/responses/Error422" }
-        "429": { $ref: "#/components/responses/Error429" }
-        "500": { $ref: "#/components/responses/Error500" }
-        "502": { $ref: "#/components/responses/Error502" }
-        "504": { $ref: "#/components/responses/Error504" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+        '502': { $ref: '#/components/responses/Error502' }
+        '504': { $ref: '#/components/responses/Error504' }
     delete:
       summary: Proxy DELETE to service path
       description: Proxies DELETE /v1/{domain}/{path} to the corresponding service.
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Upstream OK (pass-through)
           content:
             application/json:
@@ -512,15 +512,15 @@ paths:
               examples:
                 ok:
                   value: { data: {} }
-        "204":
+        '204':
           description: Upstream No Content (pass-through)
-        "400": { $ref: "#/components/responses/Error400" }
-        "401": { $ref: "#/components/responses/Error401" }
-        "403": { $ref: "#/components/responses/Error403" }
-        "404": { $ref: "#/components/responses/Error404" }
-        "409": { $ref: "#/components/responses/Error409" }
-        "422": { $ref: "#/components/responses/Error422" }
-        "429": { $ref: "#/components/responses/Error429" }
-        "500": { $ref: "#/components/responses/Error500" }
-        "502": { $ref: "#/components/responses/Error502" }
-        "504": { $ref: "#/components/responses/Error504" }
+        '400': { $ref: '#/components/responses/Error400' }
+        '401': { $ref: '#/components/responses/Error401' }
+        '403': { $ref: '#/components/responses/Error403' }
+        '404': { $ref: '#/components/responses/Error404' }
+        '409': { $ref: '#/components/responses/Error409' }
+        '422': { $ref: '#/components/responses/Error422' }
+        '429': { $ref: '#/components/responses/Error429' }
+        '500': { $ref: '#/components/responses/Error500' }
+        '502': { $ref: '#/components/responses/Error502' }
+        '504': { $ref: '#/components/responses/Error504' }

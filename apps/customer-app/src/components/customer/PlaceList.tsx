@@ -1,18 +1,18 @@
-import React from 'react'
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
-import { colors, spacing, typography } from '../../theme/tokens'
+import React from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { colors, spacing, typography } from '../../theme/tokens';
 
 type Place = {
-  id?: string
-  label: string
-  subtitle?: string
-  icon?: string
-}
+  id?: string;
+  label: string;
+  subtitle?: string;
+  icon?: string;
+};
 
 type Props = {
-  data: Place[]
-  onSelect: (label: string) => void
-}
+  data: Place[];
+  onSelect: (label: string) => void;
+};
 
 export const PlaceList: React.FC<Props> = ({ data, onSelect }) => {
   return (
@@ -32,8 +32,8 @@ export const PlaceList: React.FC<Props> = ({ data, onSelect }) => {
         </Pressable>
       )}
     />
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, gap: spacing.md },
@@ -48,4 +48,4 @@ const styles = StyleSheet.create({
   iconText: { ...typography.body, color: colors.brand700 },
   title: { ...typography.body, color: colors.text },
   subtitle: { ...typography.caption, color: colors.muted }
-})
+});

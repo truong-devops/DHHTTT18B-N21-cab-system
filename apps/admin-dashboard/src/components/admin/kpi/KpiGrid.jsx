@@ -1,4 +1,4 @@
-import KpiCard from './KpiCard.jsx'
+import KpiCard from './KpiCard.jsx';
 
 function KpiGrid({ items = [] }) {
   return (
@@ -7,7 +7,7 @@ function KpiGrid({ items = [] }) {
         <KpiCard key={item.label} {...item} />
       ))}
     </div>
-  )
+  );
 }
 
-export default KpiGrid
+export default KpiGrid;

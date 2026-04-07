@@ -12,5 +12,5 @@ export const palette = {
   background: '#FFFFFF',
   success: '#0E9F6E',
   warning: '#F59E0B',
-  shadow: 'rgba(0, 0, 0, 0.08)',
+  shadow: 'rgba(0, 0, 0, 0.08)'
 };

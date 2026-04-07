@@ -1,14 +1,10 @@
-const crypto = require("crypto");
-const { getDb } = require("../db/mongo");
+const crypto = require('crypto');
+const { getDb } = require('../db/mongo');
 
-const PROCESSING_TIMEOUT_MS = Number(
-  process.env.INBOX_PROCESSING_TIMEOUT_MS || 5 * 60 * 1000
-);
+const PROCESSING_TIMEOUT_MS = Number(process.env.INBOX_PROCESSING_TIMEOUT_MS || 5 * 60 * 1000);
 const RETRY_BASE_MS = Number(process.env.INBOX_RETRY_BASE_MS || 1000);
 const RETRY_MAX_MS = Number(process.env.INBOX_RETRY_MAX_MS || 60000);
-const DEFAULT_MAX_ATTEMPTS = Number(
-  process.env.INBOX_MAX_ATTEMPTS || 10
-);
+const DEFAULT_MAX_ATTEMPTS = Number(process.env.INBOX_MAX_ATTEMPTS || 10);
 
 function computeBackoffMs(attemptCount) {
   const attempt = Math.max(1, Number(attemptCount || 1));
@@ -16,19 +12,12 @@ function computeBackoffMs(attemptCount) {
   return Math.min(RETRY_MAX_MS, Math.max(RETRY_BASE_MS, raw));
 }
 
-async function insertInboxEvent({
-  eventId,
-  consumer,
-  topic,
-  eventType,
-  payload,
-  traceId = null
-}) {
+async function insertInboxEvent({ eventId, consumer, topic, eventType, payload, traceId = null }) {
   const db = await getDb();
   const now = new Date();
 
   try {
-    const result = await db.collection("inbox_events").insertOne({
+    const result = await db.collection('inbox_events').insertOne({
       _id: crypto.randomUUID(),
       event_id: eventId,
       consumer,
@@ -36,7 +25,7 @@ async function insertInboxEvent({
       event_type: eventType,
       trace_id: traceId,
       payload,
-      state: "pending",
+      state: 'pending',
       attempt_count: 0,
       max_attempts: DEFAULT_MAX_ATTEMPTS,
       next_retry_at: now,
@@ -57,9 +46,9 @@ async function insertInboxEvent({
   }
 }
 
-async function claimPendingEvents(limit = 50, workerId = "ride-inbox-worker") {
+async function claimPendingEvents(limit = 50, workerId = 'ride-inbox-worker') {
   const db = await getDb();
-  const collection = db.collection("inbox_events");
+  const collection = db.collection('inbox_events');
   const claimed = [];
 
   for (let i = 0; i < limit; i += 1) {
@@ -69,21 +58,18 @@ async function claimPendingEvents(limit = 50, workerId = "ride-inbox-worker") {
       {
         $or: [
           {
-            state: { $in: ["pending", "retry"] },
-            $or: [
-              { next_retry_at: { $exists: false } },
-              { next_retry_at: { $lte: now } }
-            ]
+            state: { $in: ['pending', 'retry'] },
+            $or: [{ next_retry_at: { $exists: false } }, { next_retry_at: { $lte: now } }]
           },
           {
-            state: "processing",
+            state: 'processing',
             processing_started_at: { $lt: timeoutBefore }
           }
         ]
       },
       {
         $set: {
-          state: "processing",
+          state: 'processing',
           processing_started_at: now,
           processing_owner: workerId,
           updated_at: now
@@ -91,14 +77,11 @@ async function claimPendingEvents(limit = 50, workerId = "ride-inbox-worker") {
       },
       {
         sort: { next_retry_at: 1, received_at: 1, _id: 1 },
-        returnDocument: "after"
+        returnDocument: 'after'
       }
     );
 
-    const doc =
-      result && Object.prototype.hasOwnProperty.call(result, "value")
-        ? result.value
-        : result;
+    const doc = result && Object.prototype.hasOwnProperty.call(result, 'value') ? result.value : result;
     if (!doc) {
       break;
     }
@@ -110,8 +93,8 @@ async function claimPendingEvents(limit = 50, workerId = "ride-inbox-worker") {
 
 async function countInboxBacklog() {
   const db = await getDb();
-  const result = await db.collection("inbox_events").countDocuments({
-    state: { $in: ["pending", "retry"] }
+  const result = await db.collection('inbox_events').countDocuments({
+    state: { $in: ['pending', 'retry'] }
   });
   return Number(result || 0);
 }
@@ -119,11 +102,11 @@ async function countInboxBacklog() {
 async function markProcessed(id) {
   const db = await getDb();
   const now = new Date();
-  await db.collection("inbox_events").updateOne(
+  await db.collection('inbox_events').updateOne(
     { _id: id },
     {
       $set: {
-        state: "processed",
+        state: 'processed',
         processed_at: now,
         processing_started_at: null,
         processing_owner: null,
@@ -137,24 +120,21 @@ async function markProcessed(id) {
 async function markFailed(id, errorMessage) {
   const db = await getDb();
   const now = new Date();
-  const increment = await db.collection("inbox_events").findOneAndUpdate(
+  const increment = await db.collection('inbox_events').findOneAndUpdate(
     { _id: id },
     {
       $inc: { attempt_count: 1 },
       $set: {
-        error_message: errorMessage || "failed",
+        error_message: errorMessage || 'failed',
         processing_started_at: null,
         processing_owner: null,
         updated_at: now
       }
     },
-    { returnDocument: "after" }
+    { returnDocument: 'after' }
   );
 
-  const doc =
-    increment && Object.prototype.hasOwnProperty.call(increment, "value")
-      ? increment.value
-      : increment;
+  const doc = increment && Object.prototype.hasOwnProperty.call(increment, 'value') ? increment.value : increment;
   if (!doc) {
     return null;
   }
@@ -162,18 +142,18 @@ async function markFailed(id, errorMessage) {
   const attemptCount = Number(doc.attempt_count || 0);
   const maxAttempts = Number(doc.max_attempts || DEFAULT_MAX_ATTEMPTS);
   if (attemptCount >= maxAttempts) {
-    await db.collection("inbox_events").updateOne(
+    await db.collection('inbox_events').updateOne(
       { _id: id },
       {
         $set: {
-          state: "dead",
+          state: 'dead',
           processed_at: now,
           updated_at: now
         }
       }
     );
     return {
-      status: "dead",
+      status: 'dead',
       attemptCount,
       maxAttempts,
       eventId: doc.event_id,
@@ -183,11 +163,11 @@ async function markFailed(id, errorMessage) {
 
   const delayMs = computeBackoffMs(attemptCount);
   const nextRetryAt = new Date(Date.now() + delayMs);
-  await db.collection("inbox_events").updateOne(
+  await db.collection('inbox_events').updateOne(
     { _id: id },
     {
       $set: {
-        state: "retry",
+        state: 'retry',
         next_retry_at: nextRetryAt,
         updated_at: now
       }
@@ -195,7 +175,7 @@ async function markFailed(id, errorMessage) {
   );
 
   return {
-    status: "retry",
+    status: 'retry',
     retryInMs: delayMs,
     attemptCount,
     maxAttempts,

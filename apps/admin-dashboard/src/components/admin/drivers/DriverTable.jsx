@@ -1,34 +1,28 @@
-import Button from '../../common/Button.jsx'
-import Table from '../../common/Table.jsx'
-import DriverStatusBadge from './DriverStatusBadge.jsx'
-import Badge from '../../common/Badge.jsx'
-import {
-  labelFrom,
-  onlineStatusLabels,
-  vehicleTypeLabels,
-} from '../../../utils/labels.js'
-
-function DriverTable({ drivers = [], onSelect, onApprove, onSuspend }) {
-  const columns = [
+import Button from '../../common/Button.jsx';
+import Table from '../../common/Table.jsx';
+import DriverStatusBadge from './DriverStatusBadge.jsx';
+import Badge from '../../common/Badge.jsx';
+import { labelFrom, onlineStatusLabels, vehicleTypeLabels } from '../../../utils/labels.js';
+
+function DriverTable({ drivers = [], onSelect, onApprove, onSuspend }) {
+  const columns = [
     { key: 'fullName', header: 'Tài xế' },
     {
       key: 'vehicleType',
       header: 'Phương tiện',
-      render: (row) => labelFrom(vehicleTypeLabels, row.vehicleType),
+      render: (row) => labelFrom(vehicleTypeLabels, row.vehicleType)
     },
     {
       key: 'onlineStatus',
       header: 'Trực tuyến',
       render: (row) => (
-        <Badge variant={row.onlineStatus === 'ONLINE' ? 'success' : 'warning'}>
-          {labelFrom(onlineStatusLabels, row.onlineStatus)}
-        </Badge>
-      ),
+        <Badge variant={row.onlineStatus === 'ONLINE' ? 'success' : 'warning'}>{labelFrom(onlineStatusLabels, row.onlineStatus)}</Badge>
+      )
     },
     {
       key: 'status',
       header: 'Trạng thái',
-      render: (row) => <DriverStatusBadge status={row.status} />,
+      render: (row) => <DriverStatusBadge status={row.status} />
     },
     {
       key: 'action',
@@ -45,11 +39,11 @@ function DriverTable({ drivers = [], onSelect, onApprove, onSuspend }) {
             Tạm khóa
           </Button>
         </div>
-      ),
-    },
-  ]
-
-  return <Table columns={columns} data={drivers} total={drivers.length} />
-}
-
-export default DriverTable
+      )
+    }
+  ];
+
+  return <Table columns={columns} data={drivers} total={drivers.length} />;
+}
+
+export default DriverTable;

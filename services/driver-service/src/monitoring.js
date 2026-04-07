@@ -1,8 +1,5 @@
 function loadObservabilityModule() {
-  const candidates = [
-    "../../../libs/observability/src",
-    "../../libs/observability/src"
-  ];
+  const candidates = ['../../../libs/observability/src', '../../libs/observability/src'];
 
   for (const candidate of candidates) {
     try {
@@ -12,17 +9,13 @@ function loadObservabilityModule() {
     }
   }
 
-  throw new Error("Unable to load @libs/observability module");
+  throw new Error('Unable to load @libs/observability module');
 }
 
 const { createServiceMetrics } = loadObservabilityModule();
 
 const metrics = createServiceMetrics({
-  serviceName:
-    process.env.OTEL_SERVICE_NAME ||
-    process.env.SERVICE_NAME ||
-    "driver-service"
+  serviceName: process.env.OTEL_SERVICE_NAME || process.env.SERVICE_NAME || 'driver-service'
 });
 
 module.exports = metrics;
-

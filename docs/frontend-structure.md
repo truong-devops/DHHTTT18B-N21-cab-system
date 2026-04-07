@@ -1,6 +1,7 @@
 # Frontend React structure proposal (monorepo)
 
 This repo already has `apps/` in workspaces and two frontends:
+
 - `apps/driver-app`
 - `apps/admin-dashboard`
 

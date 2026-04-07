@@ -1,1 +1,1 @@
-export { customerApi as customerMockApi } from './customerApi'
+export { customerApi as customerMockApi } from './customerApi';

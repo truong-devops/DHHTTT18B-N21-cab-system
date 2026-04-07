@@ -1,4 +1,4 @@
-const { getDb } = require("../db/mongo");
+const { getDb } = require('../db/mongo');
 
 function mapPreference(doc) {
   if (!doc) {
@@ -14,31 +14,27 @@ function mapPreference(doc) {
 
 async function getPreferences(userId) {
   const db = await getDb();
-  const doc = await db
-    .collection("notification_preferences")
-    .findOne({ userId });
+  const doc = await db.collection('notification_preferences').findOne({ userId });
   return mapPreference(doc);
 }
 
 async function upsertPreferences(userId, channels) {
   const db = await getDb();
   const now = new Date();
-  const result = await db
-    .collection("notification_preferences")
-    .findOneAndUpdate(
-      { userId },
-      {
-        $set: {
-          userId,
-          channels,
-          updatedAt: now
-        },
-        $setOnInsert: {
-          createdAt: now
-        }
+  const result = await db.collection('notification_preferences').findOneAndUpdate(
+    { userId },
+    {
+      $set: {
+        userId,
+        channels,
+        updatedAt: now
       },
-      { upsert: true, returnDocument: "after" }
-    );
+      $setOnInsert: {
+        createdAt: now
+      }
+    },
+    { upsert: true, returnDocument: 'after' }
+  );
   return mapPreference(result.value);
 }
 

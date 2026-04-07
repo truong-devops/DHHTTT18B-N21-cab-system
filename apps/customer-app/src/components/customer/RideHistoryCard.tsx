@@ -1,11 +1,11 @@
-﻿import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import type { RideHistoryItem } from '../../mock/data'
-import { colors, spacing, typography } from '../../theme/tokens'
-import { formatVnd } from '../../utils/format'
+﻿import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import type { RideHistoryItem } from '../../mock/data';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { formatVnd } from '../../utils/format';
 
 export const RideHistoryCard: React.FC<{ item: RideHistoryItem }> = ({ item }) => {
-  const statusLabel = item.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'
+  const statusLabel = item.status === 'completed' ? 'Hoàn thành' : 'Đã hủy';
 
   return (
     <View style={styles.card}>
@@ -20,8 +20,8 @@ export const RideHistoryCard: React.FC<{ item: RideHistoryItem }> = ({ item }) =
       </Text>
       <Text style={[styles.status, item.status === 'completed' ? styles.done : styles.cancel]}>{statusLabel}</Text>
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   card: {
@@ -38,4 +38,4 @@ const styles = StyleSheet.create({
   status: { ...typography.caption, textTransform: 'uppercase' },
   done: { color: colors.success },
   cancel: { color: colors.danger }
-})
+});

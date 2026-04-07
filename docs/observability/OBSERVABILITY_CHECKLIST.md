@@ -7,6 +7,7 @@ Scope: cab-booking-system repo (static audit).
 > See `docs/observability/ELK_MIGRATION_NOTES.md` for the current logging setup.
 
 ## A) Logging
+
 - **Structured logging (JSON/fields)** — **PARTIAL**  
   Evidence: Pino loggers in ride/driver/payment/user/review services; Morgan "dev" in booking/notification.
 - **Log level + sampling** — **PARTIAL**  
@@ -17,6 +18,7 @@ Scope: cab-booking-system repo (static audit).
   Evidence: no ELK/Loki/Cloud logging in `infra/docker-compose.dev.yml` or repo.
 
 ## B) Metrics
+
 - **Metrics endpoint (/metrics)** — **FAIL**  
   Evidence: no prom-client / metrics endpoints found.
 - **RED metrics (Rate/Errors/Duration)** — **FAIL**
@@ -24,6 +26,7 @@ Scope: cab-booking-system repo (static audit).
 - **Alert rules / SLOs** — **FAIL**
 
 ## C) Distributed Tracing
+
 - **Tracing instrumentation (OTel/Jaeger/Zipkin)** — **FAIL**
 - **Context propagation (traceparent/b3)** — **PARTIAL**  
   Evidence: custom `x-trace-id` headers via gateway + http client.
@@ -32,6 +35,7 @@ Scope: cab-booking-system repo (static audit).
   Evidence: Pino loggers include traceId in some services.
 
 ## D) Health / Runtime Signals
+
 - **Readiness/liveness endpoints** — **PARTIAL**  
   Evidence: `/health`, `/healthz`, `/readyz` in multiple services (ride/driver/auth/payment/etc).
 - **Circuit breaker / retry w/ visibility** — **FAIL**  
@@ -39,9 +43,11 @@ Scope: cab-booking-system repo (static audit).
 - **DLQ/retry queue observability** — **FAIL**
 
 ## E) Dashboards / Runbooks
+
 - **Dashboards (Grafana/JSON)** — **FAIL**
 - **Runbooks / oncall guides** — **FAIL**  
   Evidence: `docs/runbooks/README.md` empty.
 
 ## Overall
+
 **Verdict: FAIL** (needs metrics + tracing + centralized logging + dashboards).

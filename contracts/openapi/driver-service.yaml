@@ -7,7 +7,7 @@ paths:
     get:
       summary: Health check
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
@@ -20,9 +20,9 @@ paths:
     get:
       summary: Readiness check
       responses:
-        "200":
+        '200':
           description: OK
-        "503":
+        '503':
           description: Not ready
   /v1/driver/me:
     get:
@@ -30,14 +30,14 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
     put:
       summary: Update driver profile
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/driver/me/vehicle:
     put:
@@ -45,7 +45,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/driver/me/online:
     post:
@@ -53,7 +53,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/driver/me/offline:
     post:
@@ -61,7 +61,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/driver/me/location:
     post:
@@ -69,7 +69,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "202":
+        '202':
           description: Accepted
   /v1/driver/me/heartbeat:
     post:
@@ -77,7 +77,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/drivers/{driverId}/profile:
     get:
@@ -91,11 +91,11 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: OK
-        "401":
+        '401':
           description: Unauthorized
-        "404":
+        '404':
           description: Driver not found
   /v1/internal/drivers/available:
     get:
@@ -103,7 +103,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/internal/drivers/{driverId}:
     get:
@@ -117,7 +117,7 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: OK
   /v1/internal/drivers/{driverId}/location:
     get:
@@ -131,7 +131,7 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: OK
   /v1/internal/drivers/{driverId}/mark-busy:
     post:
@@ -139,7 +139,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/internal/drivers/{driverId}/mark-available:
     post:
@@ -147,7 +147,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/internal/drivers/bulk:
     post:
@@ -155,7 +155,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/admin/drivers:
     post:
@@ -163,14 +163,14 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "201":
+        '201':
           description: Created
     get:
       summary: List drivers
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/admin/drivers/{driverId}/approve:
     patch:
@@ -178,7 +178,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
   /v1/admin/drivers/{driverId}/suspend:
     patch:
@@ -186,7 +186,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
 components:
   securitySchemes:

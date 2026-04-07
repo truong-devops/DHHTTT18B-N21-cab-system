@@ -1,13 +1,13 @@
-import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { Card } from '../../components/common/Card'
-import { colors, spacing, typography } from '../../theme/tokens'
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { Card } from '../../components/common/Card';
+import { colors, spacing, typography } from '../../theme/tokens';
 
 const promos = [
   { id: 'p1', title: 'Giảm 20% chuyến tiếp theo', desc: 'Áp dụng mọi khung giờ', color: '#FFF4F1', icon: '🔥' },
   { id: 'p2', title: 'Miễn phí 1km đầu', desc: 'Xe máy giờ thấp điểm', color: '#F4F7FF', icon: '🛵' },
   { id: 'p3', title: 'Tặng 50K cho bạn mới', desc: 'Nhập mã WELCOME50', color: '#FFF8E6', icon: '🎁' }
-]
+];
 
 const PromoScreen = () => {
   return (
@@ -25,8 +25,8 @@ const PromoScreen = () => {
         </Card>
       ))}
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.xl, gap: spacing.md },
@@ -36,6 +36,6 @@ const styles = StyleSheet.create({
   icon: { fontSize: 22 },
   cardTitle: { ...typography.h2, color: colors.text },
   desc: { ...typography.body, color: colors.muted }
-})
+});
 
-export default PromoScreen
+export default PromoScreen;

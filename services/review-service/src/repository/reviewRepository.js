@@ -1,22 +1,20 @@
-const { applyCursorQuery } = require("@libs/http");
-const pool = require("../db/pool");
+const { applyCursorQuery } = require('@libs/http');
+const pool = require('../db/pool');
 
 const COLUMN_TYPE_CACHE = new Map();
 
 function isUuidLike(value) {
-  if (typeof value !== "string") return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
-  );
+  if (typeof value !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function isEightDigitId(value) {
-  if (typeof value !== "string") return false;
+  if (typeof value !== 'string') return false;
   return /^\d{8}$/.test(value);
 }
 
 function mapEightDigitIdToUuid(value) {
-  return `00000000-0000-0000-0000-${value.padStart(12, "0")}`;
+  return `00000000-0000-0000-0000-${value.padStart(12, '0')}`;
 }
 
 async function getColumnType(tableName, columnName) {
@@ -53,7 +51,7 @@ async function normalizeIdForColumn(tableName, columnName, value) {
   }
 
   const columnType = await getColumnType(tableName, columnName);
-  if (columnType === "uuid") {
+  if (columnType === 'uuid') {
     if (isUuidLike(normalized)) {
       return normalized;
     }
@@ -65,20 +63,13 @@ async function normalizeIdForColumn(tableName, columnName, value) {
   return normalized;
 }
 
-async function createReview({
-  rideId,
-  riderId,
-  driverId,
-  rating,
-  comment = null,
-  status
-}) {
-  const normalizedRideId = await normalizeIdForColumn("reviews", "ride_id", rideId);
-  const normalizedRiderId = await normalizeIdForColumn("reviews", "rider_id", riderId);
-  const normalizedDriverId = await normalizeIdForColumn("reviews", "driver_id", driverId);
+async function createReview({ rideId, riderId, driverId, rating, comment = null, status }) {
+  const normalizedRideId = await normalizeIdForColumn('reviews', 'ride_id', rideId);
+  const normalizedRiderId = await normalizeIdForColumn('reviews', 'rider_id', riderId);
+  const normalizedDriverId = await normalizeIdForColumn('reviews', 'driver_id', driverId);
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
 
     const result = await client.query(
       `
@@ -94,26 +85,19 @@ async function createReview({
         VALUES ($1, $2, $3, $4, $5, $6, now())
         RETURNING *
       `,
-      [
-        normalizedRideId,
-        normalizedRiderId,
-        normalizedDriverId,
-        rating,
-        comment,
-        status
-      ]
+      [normalizedRideId, normalizedRiderId, normalizedDriverId, rating, comment, status]
     );
 
     const review = result.rows[0];
     if (!review) {
-      await client.query("ROLLBACK");
+      await client.query('ROLLBACK');
       return null;
     }
 
-    await client.query("COMMIT");
+    await client.query('COMMIT');
     return review;
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();
@@ -121,19 +105,13 @@ async function createReview({
 }
 
 async function getReviewById(id) {
-  const result = await pool.query(
-    "SELECT * FROM reviews WHERE id = $1",
-    [id]
-  );
+  const result = await pool.query('SELECT * FROM reviews WHERE id = $1', [id]);
   return result.rows[0] || null;
 }
 
-async function getReviewByRideAndRider({
-  rideId,
-  riderId
-}) {
-  const normalizedRideId = await normalizeIdForColumn("reviews", "ride_id", rideId);
-  const normalizedRiderId = await normalizeIdForColumn("reviews", "rider_id", riderId);
+async function getReviewByRideAndRider({ rideId, riderId }) {
+  const normalizedRideId = await normalizeIdForColumn('reviews', 'ride_id', rideId);
+  const normalizedRiderId = await normalizeIdForColumn('reviews', 'rider_id', riderId);
   const result = await pool.query(
     `
       SELECT *
@@ -171,7 +149,7 @@ async function updateReviewFields(id, fields) {
   const result = await pool.query(
     `
       UPDATE reviews
-      SET ${columns.join(", ")}
+      SET ${columns.join(', ')}
       WHERE id = $${index}
       RETURNING *
     `,
@@ -181,29 +159,16 @@ async function updateReviewFields(id, fields) {
   return result.rows[0] || null;
 }
 
-async function updateReviewStatus({
-  id,
-  status,
-  reason = null,
-  actorId = null,
-  traceId = null
-}) {
-  const normalizedActorId = await normalizeIdForColumn(
-    "reviews_status_history",
-    "actor_id",
-    actorId
-  );
+async function updateReviewStatus({ id, status, reason = null, actorId = null, traceId = null }) {
+  const normalizedActorId = await normalizeIdForColumn('reviews_status_history', 'actor_id', actorId);
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
 
-    const currentResult = await client.query(
-      "SELECT status FROM reviews WHERE id = $1 FOR UPDATE",
-      [id]
-    );
+    const currentResult = await client.query('SELECT status FROM reviews WHERE id = $1 FOR UPDATE', [id]);
     const current = currentResult.rows[0];
     if (!current) {
-      await client.query("ROLLBACK");
+      await client.query('ROLLBACK');
       return null;
     }
 
@@ -220,7 +185,7 @@ async function updateReviewStatus({
 
     const review = reviewResult.rows[0];
     if (!review) {
-      await client.query("ROLLBACK");
+      await client.query('ROLLBACK');
       return null;
     }
 
@@ -240,29 +205,18 @@ async function updateReviewStatus({
       [id, current.status, status, reason, normalizedActorId, traceId]
     );
 
-    await client.query("COMMIT");
+    await client.query('COMMIT');
     return review;
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();
   }
 }
 
-async function addStatusHistory({
-  reviewId,
-  status,
-  reason = null,
-  actorId = null,
-  traceId = null,
-  fromStatus = null
-}) {
-  const normalizedActorId = await normalizeIdForColumn(
-    "reviews_status_history",
-    "actor_id",
-    actorId
-  );
+async function addStatusHistory({ reviewId, status, reason = null, actorId = null, traceId = null, fromStatus = null }) {
+  const normalizedActorId = await normalizeIdForColumn('reviews_status_history', 'actor_id', actorId);
   await pool.query(
     `
       INSERT INTO reviews_status_history (
@@ -280,22 +234,12 @@ async function addStatusHistory({
   );
 }
 
-async function listReviews({
-  limit = 20,
-  cursor = null,
-  status = null,
-  riderId = null,
-  sort = "-created_at"
-} = {}) {
-  const normalizedRiderId = await normalizeIdForColumn(
-    "reviews",
-    "rider_id",
-    riderId
-  );
+async function listReviews({ limit = 20, cursor = null, status = null, riderId = null, sort = '-created_at' } = {}) {
+  const normalizedRiderId = await normalizeIdForColumn('reviews', 'rider_id', riderId);
   const builder = {
     values: [],
     where: [],
-    orderBy: "",
+    orderBy: '',
     limit
   };
 
@@ -314,7 +258,7 @@ async function listReviews({
 
   const query = `
     SELECT * FROM reviews
-    ${builder.where.length ? `WHERE ${builder.where.join(" AND ")}` : ""}
+    ${builder.where.length ? `WHERE ${builder.where.join(' AND ')}` : ''}
     ORDER BY ${builder.orderBy}
     LIMIT $${builder.values.length}
   `;

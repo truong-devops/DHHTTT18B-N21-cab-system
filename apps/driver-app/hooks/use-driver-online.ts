@@ -22,17 +22,14 @@ type LocationSnapshot = {
 const DEFAULT_INTERVAL_MS = 5000;
 const MAX_RECONNECT_DELAY = 10000;
 
-function mapLocation(
-  coords: Location.LocationObject['coords'],
-  timestamp?: number,
-): LocationSnapshot {
+function mapLocation(coords: Location.LocationObject['coords'], timestamp?: number): LocationSnapshot {
   return {
     lat: coords.latitude,
     lng: coords.longitude,
     heading: Number.isFinite(coords.heading) ? coords.heading : null,
     speed: Number.isFinite(coords.speed) ? coords.speed : null,
     accuracy: Number.isFinite(coords.accuracy) ? coords.accuracy : null,
-    recordedAt: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
+    recordedAt: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
   };
 }
 
@@ -129,8 +126,8 @@ export function useDriverOnline({ intervalMs = DEFAULT_INTERVAL_MS }: Options = 
       wsRef.current.send(
         JSON.stringify({
           topic: 'driver.location.updated',
-          payload,
-        }),
+          payload
+        })
       );
       if (__DEV__) console.info('[GPS] WS -> driver.location.updated');
       return true;
@@ -152,7 +149,7 @@ export function useDriverOnline({ intervalMs = DEFAULT_INTERVAL_MS }: Options = 
         throw new Error('Vui lòng bật GPS để gửi vị trí.');
       }
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.Balanced
       });
       const payload = mapLocation(location.coords, location.timestamp);
       const sentViaWs = emitLocationWs(payload);
@@ -188,7 +185,7 @@ export function useDriverOnline({ intervalMs = DEFAULT_INTERVAL_MS }: Options = 
         throw new Error('Vui lòng bật GPS để bật nhận chuyến.');
       }
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.Balanced
       });
       const snapshot = mapLocation(location.coords, location.timestamp);
       await setOnline(snapshot.lat, snapshot.lng);
@@ -267,7 +264,7 @@ export function useDriverOnline({ intervalMs = DEFAULT_INTERVAL_MS }: Options = 
       stopInterval();
       cleanupWs();
     },
-    [cleanupWs, stopInterval],
+    [cleanupWs, stopInterval]
   );
 
   // Trạng thái hiển thị: tránh nhấp nháy "đang cập nhật" mỗi lần gửi GPS.
@@ -285,6 +282,6 @@ export function useDriverOnline({ intervalMs = DEFAULT_INTERVAL_MS }: Options = 
     sending: isSending || isSwitching,
     startOnline,
     stopOnline,
-    sendLocationOnce,
+    sendLocationOnce
   };
 }

@@ -3,22 +3,22 @@ name: Integration Level 2 + 3
 on:
   pull_request:
     paths:
-      - "services/**"
-      - "contracts/**"
-      - "scripts/test-level2-11-20cases.sh"
-      - "scripts/test-level3-21-30cases.sh"
-      - "infra/docker-compose.dev.yml"
-      - ".github/workflows/integration-level2-level3.yml"
+      - 'services/**'
+      - 'contracts/**'
+      - 'scripts/test-level2-11-20cases.sh'
+      - 'scripts/test-level3-21-30cases.sh'
+      - 'infra/docker-compose.dev.yml'
+      - '.github/workflows/integration-level2-level3.yml'
   push:
     branches:
       - main
     paths:
-      - "services/**"
-      - "contracts/**"
-      - "scripts/test-level2-11-20cases.sh"
-      - "scripts/test-level3-21-30cases.sh"
-      - "infra/docker-compose.dev.yml"
-      - ".github/workflows/integration-level2-level3.yml"
+      - 'services/**'
+      - 'contracts/**'
+      - 'scripts/test-level2-11-20cases.sh'
+      - 'scripts/test-level3-21-30cases.sh'
+      - 'infra/docker-compose.dev.yml'
+      - '.github/workflows/integration-level2-level3.yml'
 
 jobs:
   unit-tests:
@@ -31,8 +31,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: '20'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci

@@ -1,6 +1,6 @@
 class Publisher {
   async publish() {
-    throw new Error("Not implemented");
+    throw new Error('Not implemented');
   }
 }
 

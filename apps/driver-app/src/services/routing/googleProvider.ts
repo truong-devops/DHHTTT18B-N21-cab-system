@@ -31,12 +31,12 @@ export const googleProvider: RoutingProvider = {
     const decoded = polyline.decode(points);
     const coords = decoded.map(([lat, lng]) => ({
       latitude: lat,
-      longitude: lng,
+      longitude: lng
     }));
     return {
       coords,
       distanceMeters: leg?.distance?.value,
-      durationSeconds: leg?.duration?.value,
+      durationSeconds: leg?.duration?.value
     };
-  },
+  }
 };

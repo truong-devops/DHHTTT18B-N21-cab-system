@@ -21,6 +21,6 @@ export async function listPayments(limit = 5) {
   return apiRequest<PaymentListResponse>({
     method: 'GET',
     path: endpoints.payment.list,
-    params: { limit },
+    params: { limit }
   });
 }

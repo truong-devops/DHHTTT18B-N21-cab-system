@@ -1,17 +1,11 @@
-const logger = require("../utils/logger");
-const monitoring = require("../monitoring");
+const logger = require('../utils/logger');
+const monitoring = require('../monitoring');
 
-const fetchFn = global.fetch || require("node-fetch");
+const fetchFn = global.fetch || require('node-fetch');
 
-const CACHE_TTL_MS = Number(
-  process.env.USER_CACHE_TTL_MS || 5 * 60 * 1000
-);
-const DEFAULT_TIMEOUT_MS = Number(
-  process.env.USER_SERVICE_TIMEOUT_MS || 2000
-);
-const DEFAULT_RETRY_COUNT = Number(
-  process.env.USER_SERVICE_RETRY || 1
-);
+const CACHE_TTL_MS = Number(process.env.USER_CACHE_TTL_MS || 5 * 60 * 1000);
+const DEFAULT_TIMEOUT_MS = Number(process.env.USER_SERVICE_TIMEOUT_MS || 2000);
+const DEFAULT_RETRY_COUNT = Number(process.env.USER_SERVICE_RETRY || 1);
 
 const cache = new Map();
 
@@ -40,24 +34,24 @@ function buildHeaders(context) {
     headers.authorization = context.authorization;
   }
   if (context?.traceId) {
-    headers["x-trace-id"] = context.traceId;
+    headers['x-trace-id'] = context.traceId;
   }
   if (context?.requestId) {
-    headers["x-request-id"] = context.requestId;
+    headers['x-request-id'] = context.requestId;
   }
   if (context?.correlationId) {
-    headers["x-correlation-id"] = context.correlationId;
+    headers['x-correlation-id'] = context.correlationId;
   }
   if (context?.forwardedFor) {
-    headers["x-forwarded-for"] = context.forwardedFor;
+    headers['x-forwarded-for'] = context.forwardedFor;
   }
   if (context?.realIp) {
-    headers["x-real-ip"] = context.realIp;
+    headers['x-real-ip'] = context.realIp;
   }
 
   const internalKey = process.env.INTERNAL_API_KEY;
   if (internalKey) {
-    headers["x-internal-key"] = internalKey;
+    headers['x-internal-key'] = internalKey;
   }
   return headers;
 }
@@ -68,12 +62,7 @@ function normalizeUser(payload) {
   }
 
   const contacts = payload.contacts || {};
-  const roles =
-    Array.isArray(payload.roles) && payload.roles.length
-      ? payload.roles
-      : payload.role
-      ? [payload.role]
-      : [];
+  const roles = Array.isArray(payload.roles) && payload.roles.length ? payload.roles : payload.role ? [payload.role] : [];
   let pushTokens = [];
   if (Array.isArray(contacts.pushTokens)) {
     pushTokens = contacts.pushTokens;
@@ -100,10 +89,7 @@ async function requestWithRetry(url, options, retryCount) {
   let lastError;
   for (let attempt = 0; attempt <= retryCount; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      DEFAULT_TIMEOUT_MS
-    );
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
     const startedAt = Date.now();
     try {
       const response = await fetchFn(url, {
@@ -111,9 +97,9 @@ async function requestWithRetry(url, options, retryCount) {
         signal: controller.signal
       });
       monitoring.recordDependencyRequest({
-        dependencyType: "http",
-        dependencyName: "user-service",
-        operation: "get_user",
+        dependencyType: 'http',
+        dependencyName: 'user-service',
+        operation: 'get_user',
         outcome: monitoring.toOutcomeFromStatus(response.status),
         durationMs: Date.now() - startedAt,
         attributes: {
@@ -125,13 +111,13 @@ async function requestWithRetry(url, options, retryCount) {
     } catch (error) {
       lastError = error;
       monitoring.recordDependencyRequest({
-        dependencyType: "http",
-        dependencyName: "user-service",
-        operation: "get_user",
-        outcome: "error",
+        dependencyType: 'http',
+        dependencyName: 'user-service',
+        operation: 'get_user',
+        outcome: 'error',
         durationMs: Date.now() - startedAt,
         attributes: {
-          error_type: String(error && error.name ? error.name : "request_failed"),
+          error_type: String(error && error.name ? error.name : 'request_failed'),
           attempt: String(attempt + 1)
         }
       });
@@ -151,37 +137,26 @@ async function getUserById(userId, context = {}) {
     return cached;
   }
 
-  const baseUrl =
-    process.env.USER_SERVICE_BASE_URL ||
-    process.env.USER_SERVICE_URL ||
-    "http://localhost:4004";
+  const baseUrl = process.env.USER_SERVICE_BASE_URL || process.env.USER_SERVICE_URL || 'http://localhost:4004';
 
   const internalKey = process.env.INTERNAL_API_KEY;
-  const path = internalKey
-    ? `/internal/users/${userId}`
-    : `/v1/users/${userId}`;
+  const path = internalKey ? `/internal/users/${userId}` : `/v1/users/${userId}`;
 
   const url = new URL(path, baseUrl).toString();
   const headers = buildHeaders(context);
 
-  const response = await requestWithRetry(
-    url,
-    { method: "GET", headers },
-    DEFAULT_RETRY_COUNT
-  );
+  const response = await requestWithRetry(url, { method: 'GET', headers }, DEFAULT_RETRY_COUNT);
 
   if (response.status === 404) {
     return null;
   }
 
-  const contentType = response.headers.get("content-type") || "";
+  const contentType = response.headers.get('content-type') || '';
   const rawBody = await response.text();
-  const body = contentType.includes("application/json")
-    ? JSON.parse(rawBody || "{}")
-    : null;
+  const body = contentType.includes('application/json') ? JSON.parse(rawBody || '{}') : null;
 
   if (!response.ok) {
-    const error = new Error("User service request failed");
+    const error = new Error('User service request failed');
     error.status = response.status;
     error.body = body;
     throw error;

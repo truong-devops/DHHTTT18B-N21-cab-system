@@ -33,13 +33,13 @@ export const orsProvider: RoutingProvider = {
     const decoded = polyline.decode(points);
     const coords = decoded.map(([lat, lng]) => ({
       latitude: lat,
-      longitude: lng,
+      longitude: lng
     }));
 
     return {
       coords,
       distanceMeters: route?.summary?.distance,
-      durationSeconds: route?.summary?.duration,
+      durationSeconds: route?.summary?.duration
     };
-  },
+  }
 };

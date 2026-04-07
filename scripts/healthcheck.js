@@ -1,16 +1,17 @@
-const http = require("http");
+const http = require('http');
 
-const services = [
-  { name: "api-gateway", port: 3000 }
-];
+const services = [{ name: 'api-gateway', port: 3000 }];
 
 function check({ name, port }) {
   return new Promise((resolve) => {
     const req = http.get(`http://localhost:${port}/health`, (res) => {
       resolve({ name, ok: res.statusCode === 200, status: res.statusCode });
     });
-    req.on("error", (e) => resolve({ name, ok: false, error: e.message }));
-    req.setTimeout(1500, () => { req.destroy(); resolve({ name, ok: false, error: "timeout" }); });
+    req.on('error', (e) => resolve({ name, ok: false, error: e.message }));
+    req.setTimeout(1500, () => {
+      req.destroy();
+      resolve({ name, ok: false, error: 'timeout' });
+    });
   });
 }
 

@@ -35,7 +35,7 @@ ride.created
 ride.cancelled
 
 3. Kiến trúc & Luồng xử lý
-3.1 Create Booking Flow
+   3.1 Create Booking Flow
 
 Client gọi POST /v1/bookings
 
@@ -74,24 +74,24 @@ HTTP Client: Axios
 Architecture: Microservices + Event-driven
 
 5. Cấu trúc thư mục
-booking-service/
-├── src/
-│   ├── app.js                # Express app
-│   ├── server.js             # Start server
-│   ├── routes/
-│   │   └── bookings.js       # Booking APIs
-│   ├── clients/
-│   │   └── pricingClient.js  # Call pricing-service
-│   ├── repositories/
-│   │   └── bookingRepo.js    # Booking storage (MVP)
-│   ├── schemas/
-│   │   └── bookingSchemas.js # Request validation
-│   └── messaging/
-│       ├── producer.js       # Kafka producer
-│       └── topics.js         # Kafka topics
-├── Dockerfile
-├── package.json
-└── README.md
+   booking-service/
+   ├── src/
+   │ ├── app.js # Express app
+   │ ├── server.js # Start server
+   │ ├── routes/
+   │ │ └── bookings.js # Booking APIs
+   │ ├── clients/
+   │ │ └── pricingClient.js # Call pricing-service
+   │ ├── repositories/
+   │ │ └── bookingRepo.js # Booking storage (MVP)
+   │ ├── schemas/
+   │ │ └── bookingSchemas.js # Request validation
+   │ └── messaging/
+   │ ├── producer.js # Kafka producer
+   │ └── topics.js # Kafka topics
+   ├── Dockerfile
+   ├── package.json
+   └── README.md
 
 6. Cấu hình môi trường
 
@@ -103,9 +103,8 @@ KAFKA_BROKERS=localhost:29092
 PRICING_BASE_URL=http://localhost:3006
 
 7. Chạy service (Local)
-7.1 Chạy hạ tầng Kafka
-docker compose -f infra/docker-compose.dev.yml up -d
-
+   7.1 Chạy hạ tầng Kafka
+   docker compose -f infra/docker-compose.dev.yml up -d
 
 Kafka UI:
 
@@ -118,21 +117,20 @@ npm install
 7.3 Chạy service
 node src/server.js
 
-
 Service chạy tại:
 
 http://localhost:3003
 
 8. API Documentation
-8.1 Health Check
+   8.1 Health Check
 
 GET /health
 
 Response:
 
 {
-  "status": "ok",
-  "service": "booking-service"
+"status": "ok",
+"service": "booking-service"
 }
 
 8.2 Create Booking
@@ -142,26 +140,24 @@ POST /v1/bookings
 Request body:
 
 {
-  "pickup": { "lat": 10.76, "lng": 106.66 },
-  "dropoff": { "lat": 10.78, "lng": 106.68 },
-  "vehicleType": "CAR"
+"pickup": { "lat": 10.76, "lng": 106.66 },
+"dropoff": { "lat": 10.78, "lng": 106.68 },
+"vehicleType": "CAR"
 }
-
 
 Response:
 
 {
-  "booking": {
-    "bookingId": "bk_1710000000000",
-    "rideId": "ride_1710000000001",
-    "status": "CREATED",
-    "priceSnapshot": {
-      "total": 15000,
-      "currency": "VND"
-    }
-  }
+"booking": {
+"bookingId": "bk_1710000000000",
+"rideId": "ride_1710000000001",
+"status": "CREATED",
+"priceSnapshot": {
+"total": 15000,
+"currency": "VND"
 }
-
+}
+}
 
 Side effect:
 
@@ -174,26 +170,25 @@ POST /v1/bookings/{bookingId}/cancel
 Response:
 
 {
-  "booking": {
-    "bookingId": "bk_1710000000000",
-    "rideId": "ride_1710000000001",
-    "status": "CANCELED"
-  }
+"booking": {
+"bookingId": "bk_1710000000000",
+"rideId": "ride_1710000000001",
+"status": "CANCELED"
 }
-
+}
 
 Side effect:
 
 Publish Kafka event ride.cancelled
 
 9. Kafka Topics
-Topic	Description
-ride.created	Booking created, start ride lifecycle
-ride.cancelled	Booking canceled by customer
+   Topic Description
+   ride.created Booking created, start ride lifecycle
+   ride.cancelled Booking canceled by customer
 10. Trạng thái Booking
-Status	Ý nghĩa
-CREATED	Booking vừa được tạo
-CANCELED	Booking đã bị hủy
+    Status Ý nghĩa
+    CREATED Booking vừa được tạo
+    CANCELED Booking đã bị hủy
 11. Nguyên tắc thiết kế
 
 Booking Service không chứa business logic phức tạp

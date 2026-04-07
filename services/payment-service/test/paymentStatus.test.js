@@ -1,7 +1,7 @@
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
-const { STATUSES, canTransition, allowedTransitions } = require("../src/domain/paymentStatus");
+const { STATUSES, canTransition, allowedTransitions } = require('../src/domain/paymentStatus');
 
 function parseStateMachineTransitions(content) {
   const transitions = {};
@@ -13,7 +13,7 @@ function parseStateMachineTransitions(content) {
     }
     const from = match[1];
     const to = match[2];
-    if (from === "[*]") {
+    if (from === '[*]') {
       continue;
     }
     if (!transitions[from]) {
@@ -24,16 +24,10 @@ function parseStateMachineTransitions(content) {
   return transitions;
 }
 
-describe("payment status transitions", () => {
-  test("matches state machine contract", () => {
-    const filePath = path.resolve(
-      __dirname,
-      "../../..",
-      "contracts",
-      "state-machines",
-      "payment-state.mmd"
-    );
-    const content = fs.readFileSync(filePath, "utf8");
+describe('payment status transitions', () => {
+  test('matches state machine contract', () => {
+    const filePath = path.resolve(__dirname, '../../..', 'contracts', 'state-machines', 'payment-state.mmd');
+    const content = fs.readFileSync(filePath, 'utf8');
     const parsed = parseStateMachineTransitions(content);
 
     const allowedStates = Object.keys(allowedTransitions).sort();
@@ -46,19 +40,19 @@ describe("payment status transitions", () => {
     }
   });
 
-  test("allows valid transitions", () => {
+  test('allows valid transitions', () => {
     expect(canTransition(STATUSES.INITIATED, STATUSES.PROCESSING)).toBe(true);
     expect(canTransition(STATUSES.PROCESSING, STATUSES.PAID)).toBe(true);
     expect(canTransition(STATUSES.PROCESSING, STATUSES.FAILED)).toBe(true);
     expect(canTransition(STATUSES.FAILED, STATUSES.REFUNDED)).toBe(true);
   });
 
-  test("rejects invalid transitions", () => {
+  test('rejects invalid transitions', () => {
     expect(canTransition(STATUSES.INITIATED, STATUSES.PAID)).toBe(false);
     expect(canTransition(STATUSES.PAID, STATUSES.REFUNDED)).toBe(false);
   });
 
-  test("allows idempotent transitions", () => {
+  test('allows idempotent transitions', () => {
     expect(canTransition(STATUSES.PAID, STATUSES.PAID)).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken');
 
 function buildReq(headers = {}, params = {}) {
   const normalized = {};
@@ -18,8 +18,8 @@ function runMiddleware(middleware, req) {
   });
 }
 
-describe("auth middleware", () => {
-  const secret = "test_secret";
+describe('auth middleware', () => {
+  const secret = 'test_secret';
   let requireAuth;
   let requireRole;
   let requireSelf;
@@ -27,56 +27,53 @@ describe("auth middleware", () => {
   beforeEach(() => {
     process.env.JWT_ACCESS_SECRET = secret;
     jest.resetModules();
-    ({ requireAuth, requireRole, requireSelf } = require("../src/middleware/auth"));
+    ({ requireAuth, requireRole, requireSelf } = require('../src/middleware/auth'));
   });
 
-  test("requireAuth rejects missing token", async () => {
+  test('requireAuth rejects missing token', async () => {
     const req = buildReq();
     const err = await runMiddleware(requireAuth, req);
-    expect(err).toMatchObject({ status: 401, code: "UNAUTHORIZED" });
+    expect(err).toMatchObject({ status: 401, code: 'UNAUTHORIZED' });
   });
 
-  test("requireAuth attaches user from JWT", async () => {
-    const token = jwt.sign(
-      { sub: "user_1", roles: ["driver"], scopes: ["payments:read"] },
-      secret
-    );
+  test('requireAuth attaches user from JWT', async () => {
+    const token = jwt.sign({ sub: 'user_1', roles: ['driver'], scopes: ['payments:read'] }, secret);
     const req = buildReq({ authorization: `Bearer ${token}` });
     const err = await runMiddleware(requireAuth, req);
     expect(err).toBeUndefined();
     expect(req.user).toEqual({
-      id: "user_1",
-      roles: ["driver"],
-      scopes: ["payments:read"]
+      id: 'user_1',
+      roles: ['driver'],
+      scopes: ['payments:read']
     });
   });
 
-  test("requireRole rejects when role missing", async () => {
+  test('requireRole rejects when role missing', async () => {
     const req = buildReq();
-    req.user = { id: "user_1", roles: ["user"], scopes: [] };
-    const err = await runMiddleware(requireRole("admin"), req);
-    expect(err).toMatchObject({ status: 403, code: "FORBIDDEN" });
+    req.user = { id: 'user_1', roles: ['user'], scopes: [] };
+    const err = await runMiddleware(requireRole('admin'), req);
+    expect(err).toMatchObject({ status: 403, code: 'FORBIDDEN' });
   });
 
-  test("requireRole allows matching role", async () => {
+  test('requireRole allows matching role', async () => {
     const req = buildReq();
-    req.user = { id: "user_1", roles: ["admin"], scopes: [] };
-    const err = await runMiddleware(requireRole("admin"), req);
+    req.user = { id: 'user_1', roles: ['admin'], scopes: [] };
+    const err = await runMiddleware(requireRole('admin'), req);
     expect(err).toBeUndefined();
   });
 
-  test("requireSelf maps me to user id", async () => {
-    const req = buildReq({}, { id: "me" });
-    req.user = { id: "user_1", roles: [], scopes: [] };
+  test('requireSelf maps me to user id', async () => {
+    const req = buildReq({}, { id: 'me' });
+    req.user = { id: 'user_1', roles: [], scopes: [] };
     const err = await runMiddleware(requireSelf, req);
     expect(err).toBeUndefined();
-    expect(req.params.id).toBe("user_1");
+    expect(req.params.id).toBe('user_1');
   });
 
-  test("requireSelf rejects different user", async () => {
-    const req = buildReq({}, { id: "user_2" });
-    req.user = { id: "user_1", roles: [], scopes: [] };
+  test('requireSelf rejects different user', async () => {
+    const req = buildReq({}, { id: 'user_2' });
+    req.user = { id: 'user_1', roles: [], scopes: [] };
     const err = await runMiddleware(requireSelf, req);
-    expect(err).toMatchObject({ status: 403, code: "FORBIDDEN" });
+    expect(err).toMatchObject({ status: 403, code: 'FORBIDDEN' });
   });
 });

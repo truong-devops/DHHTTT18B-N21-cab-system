@@ -144,7 +144,7 @@ components:
           examples:
             validation:
               value:
-                error: { code: VALIDATION_ERROR, message: "templateKey or title/body is required", details: [] }
+                error: { code: VALIDATION_ERROR, message: 'templateKey or title/body is required', details: [] }
     Error401:
       description: Unauthorized
       content:
@@ -153,7 +153,7 @@ components:
           examples:
             unauthorized:
               value:
-                error: { code: UNAUTHORIZED, message: "Missing authorization token", details: [] }
+                error: { code: UNAUTHORIZED, message: 'Missing authorization token', details: [] }
     Error403:
       description: Forbidden
       content:
@@ -162,7 +162,7 @@ components:
           examples:
             forbidden:
               value:
-                error: { code: FORBIDDEN, message: "Forbidden", details: [] }
+                error: { code: FORBIDDEN, message: 'Forbidden', details: [] }
     Error404:
       description: Not Found
       content:
@@ -171,7 +171,7 @@ components:
           examples:
             notFound:
               value:
-                error: { code: NOT_FOUND, message: "Notification not found", details: [] }
+                error: { code: NOT_FOUND, message: 'Notification not found', details: [] }
     Error409:
       description: Conflict
       content:
@@ -180,7 +180,7 @@ components:
           examples:
             conflict:
               value:
-                error: { code: CONFLICT, message: "Conflict", details: [] }
+                error: { code: CONFLICT, message: 'Conflict', details: [] }
     Error422:
       description: Unprocessable Entity
       content:
@@ -189,7 +189,7 @@ components:
           examples:
             unprocessable:
               value:
-                error: { code: VALIDATION_ERROR, message: "Invalid payload", details: [] }
+                error: { code: VALIDATION_ERROR, message: 'Invalid payload', details: [] }
     Error429:
       description: Too Many Requests
       content:
@@ -198,7 +198,7 @@ components:
           examples:
             rateLimit:
               value:
-                error: { code: RATE_LIMITED, message: "Too many requests", details: [] }
+                error: { code: RATE_LIMITED, message: 'Too many requests', details: [] }
     Error500:
       description: Internal Server Error
       content:
@@ -207,7 +207,7 @@ components:
           examples:
             internal:
               value:
-                error: { code: INTERNAL, message: "Unexpected error", details: [] }
+                error: { code: INTERNAL, message: 'Unexpected error', details: [] }
 paths:
   /healthz:
     get:
@@ -249,7 +249,7 @@ paths:
                 ready:
                   value:
                     ok: true
-                    dispatcher: { running: true, lastTickAt: "2026-02-05T16:46:29.855Z", lastError: false }
+                    dispatcher: { running: true, lastTickAt: '2026-02-05T16:46:29.855Z', lastError: false }
         '500': { $ref: '#/components/responses/Error500' }
   /v1/notifications:
     post:
@@ -264,13 +264,13 @@ paths:
             examples:
               create:
                 value:
-                  userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
-                  channels: ["IN_APP"]
-                  sourceService: "booking-service"
-                  sourceAction: "BOOKING_CREATED"
-                  title: "Test notification"
+                  userId: 'bbf64026-adff-4d9e-a1fd-cea042744dd1'
+                  channels: ['IN_APP']
+                  sourceService: 'booking-service'
+                  sourceAction: 'BOOKING_CREATED'
+                  title: 'Test notification'
                   sourceRef: {}
-                  dedupeKey: "test-1770310464"
+                  dedupeKey: 'test-1770310464'
       responses:
         '201':
           description: Created
@@ -280,13 +280,13 @@ paths:
               examples:
                 created:
                   value:
-                    id: "6984cb40477b432033c4c005"
-                    status: "PENDING"
+                    id: '6984cb40477b432033c4c005'
+                    status: 'PENDING'
                     perChannelStatus:
                       IN_APP:
-                        status: "PENDING"
+                        status: 'PENDING'
                         attempts: 0
-                    requestId: "492e429e-da89-49f4-8f9c-4ae1b31752e5"
+                    requestId: '492e429e-da89-49f4-8f9c-4ae1b31752e5'
                     created: true
         '200':
           description: Existing (dedupe)
@@ -296,10 +296,10 @@ paths:
               examples:
                 existing:
                   value:
-                    id: "6984cb40477b432033c4c005"
-                    status: "PENDING"
-                    perChannelStatus: { IN_APP: { status: "PENDING", attempts: 0 } }
-                    requestId: "492e429e-da89-49f4-8f9c-4ae1b31752e5"
+                    id: '6984cb40477b432033c4c005'
+                    status: 'PENDING'
+                    perChannelStatus: { IN_APP: { status: 'PENDING', attempts: 0 } }
+                    requestId: '492e429e-da89-49f4-8f9c-4ae1b31752e5'
                     created: false
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
@@ -323,16 +323,16 @@ paths:
               batch:
                 value:
                   items:
-                    - userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
-                      channels: ["IN_APP"]
-                      sourceService: "booking-service"
-                      sourceAction: "BOOKING_CREATED"
-                      title: "Batch 1"
-                    - userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
-                      channels: ["IN_APP"]
-                      sourceService: "booking-service"
-                      sourceAction: "BOOKING_CREATED"
-                      title: "Batch 2"
+                    - userId: 'bbf64026-adff-4d9e-a1fd-cea042744dd1'
+                      channels: ['IN_APP']
+                      sourceService: 'booking-service'
+                      sourceAction: 'BOOKING_CREATED'
+                      title: 'Batch 1'
+                    - userId: 'bbf64026-adff-4d9e-a1fd-cea042744dd1'
+                      channels: ['IN_APP']
+                      sourceService: 'booking-service'
+                      sourceAction: 'BOOKING_CREATED'
+                      title: 'Batch 2'
       responses:
         '207':
           description: Multi-Status
@@ -360,12 +360,12 @@ paths:
                   value:
                     results:
                       - index: 0
-                        id: "6984cb41477b432033c4c006"
+                        id: '6984cb41477b432033c4c006'
                         created: true
                       - index: 1
-                        id: "6984cb41477b432033c4c007"
+                        id: '6984cb41477b432033c4c007'
                         created: true
-                    requestId: "0aa59173-f7f8-4176-926e-25ce9fcd4774"
+                    requestId: '0aa59173-f7f8-4176-926e-25ce9fcd4774'
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
         '403': { $ref: '#/components/responses/Error403' }
@@ -394,12 +394,12 @@ paths:
                 success:
                   value:
                     data:
-                      id: "6984cb40477b432033c4c005"
-                      userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
-                      channels: ["IN_APP"]
-                      title: "Test notification"
-                      status: "PENDING"
-                    requestId: "b96c0457-18d7-4da7-b408-2347486fcd7a"
+                      id: '6984cb40477b432033c4c005'
+                      userId: 'bbf64026-adff-4d9e-a1fd-cea042744dd1'
+                      channels: ['IN_APP']
+                      title: 'Test notification'
+                      status: 'PENDING'
+                    requestId: 'b96c0457-18d7-4da7-b408-2347486fcd7a'
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
         '403': { $ref: '#/components/responses/Error403' }
@@ -428,9 +428,9 @@ paths:
                 success:
                   value:
                     data:
-                      id: "6984cb40477b432033c4c005"
-                      status: "PENDING"
-                    requestId: "a89d10f7-648e-4a51-af8b-79c2c0c38270"
+                      id: '6984cb40477b432033c4c005'
+                      status: 'PENDING'
+                    requestId: 'a89d10f7-648e-4a51-af8b-79c2c0c38270'
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
         '403': { $ref: '#/components/responses/Error403' }
@@ -459,9 +459,9 @@ paths:
                 success:
                   value:
                     data:
-                      id: "6984cb40477b432033c4c005"
-                      status: "CANCELED"
-                    requestId: "c982335c-e880-4f02-9bc2-c507998b9f52"
+                      id: '6984cb40477b432033c4c005'
+                      status: 'CANCELED'
+                    requestId: 'c982335c-e880-4f02-9bc2-c507998b9f52'
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
         '403': { $ref: '#/components/responses/Error403' }
@@ -509,14 +509,14 @@ paths:
                   value:
                     data:
                       items:
-                        - id: "6984cb40477b432033c4c005"
-                          userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
-                          channels: ["IN_APP"]
-                          status: "CANCELED"
+                        - id: '6984cb40477b432033c4c005'
+                          userId: 'bbf64026-adff-4d9e-a1fd-cea042744dd1'
+                          channels: ['IN_APP']
+                          status: 'CANCELED'
                       total: 1
                       page: 1
                       limit: 20
-                    requestId: "1954a8fe-fa89-4718-ab71-26491f36b94b"
+                    requestId: '1954a8fe-fa89-4718-ab71-26491f36b94b'
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
         '403': { $ref: '#/components/responses/Error403' }
@@ -545,9 +545,9 @@ paths:
                 success:
                   value:
                     data:
-                      userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
+                      userId: 'bbf64026-adff-4d9e-a1fd-cea042744dd1'
                       channels: { IN_APP: true, EMAIL: false, SMS: false, PUSH: false }
-                    requestId: "f3ecf8fb-2980-4f9e-933f-ce869922b1ba"
+                    requestId: 'f3ecf8fb-2980-4f9e-933f-ce869922b1ba'
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
         '403': { $ref: '#/components/responses/Error403' }
@@ -589,9 +589,9 @@ paths:
                 success:
                   value:
                     data:
-                      userId: "bbf64026-adff-4d9e-a1fd-cea042744dd1"
+                      userId: 'bbf64026-adff-4d9e-a1fd-cea042744dd1'
                       channels: { IN_APP: true, EMAIL: false, SMS: false, PUSH: false }
-                    requestId: "f3ecf8fb-2980-4f9e-933f-ce869922b1ba"
+                    requestId: 'f3ecf8fb-2980-4f9e-933f-ce869922b1ba'
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
         '403': { $ref: '#/components/responses/Error403' }

@@ -1,19 +1,16 @@
 #!/usr/bin/env node
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
-const repoRoot = path.resolve(__dirname, "../../..");
-const { createEventContractRegistry } = require(path.join(
-  repoRoot,
-  "contracts/events/registry"
-));
+const repoRoot = path.resolve(__dirname, '../../..');
+const { createEventContractRegistry } = require(path.join(repoRoot, 'contracts/events/registry'));
 
 function readJson(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
 function isStrictObjectSchema(schema) {
-  return schema && schema.type === "object" && schema.additionalProperties === false;
+  return schema && schema.type === 'object' && schema.additionalProperties === false;
 }
 
 function validateCatalogAndSchemas(registry) {
@@ -21,7 +18,7 @@ function validateCatalogAndSchemas(registry) {
   const topicPattern = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$/;
   const typePattern = /^[A-Z][A-Za-z0-9]*$/;
 
-  const schemaRoot = path.join(repoRoot, "contracts/events/schema-registry");
+  const schemaRoot = path.join(repoRoot, 'contracts/events/schema-registry');
 
   for (const event of registry.catalog.events) {
     if (!topicPattern.test(event.topic)) {
@@ -47,9 +44,7 @@ function validateCatalogAndSchemas(registry) {
     const envelopeSchema = readJson(envelopePath);
 
     if (!isStrictObjectSchema(payloadSchema)) {
-      errors.push(
-        `Payload schema must be strict object (additionalProperties=false): ${event.payloadSchema}`
-      );
+      errors.push(`Payload schema must be strict object (additionalProperties=false): ${event.payloadSchema}`);
     }
 
     const envelopeHasAllOf = Array.isArray(envelopeSchema.allOf) && envelopeSchema.allOf.length >= 2;
@@ -58,18 +53,16 @@ function validateCatalogAndSchemas(registry) {
     }
 
     const envelopeValidation = registry.validateEnvelopeByTopic(event.topic, {
-      eventId: "evt_test",
-      traceId: "trace_test",
-      occurredAt: "2026-01-01T00:00:00.000Z",
+      eventId: 'evt_test',
+      traceId: 'trace_test',
+      occurredAt: '2026-01-01T00:00:00.000Z',
       type: event.type,
       version: 1,
       payload: {}
     });
 
     if (envelopeValidation.valid) {
-      errors.push(
-        `Envelope schema too permissive (empty payload accepted): ${event.envelopeSchema}`
-      );
+      errors.push(`Envelope schema too permissive (empty payload accepted): ${event.envelopeSchema}`);
     }
   }
 
@@ -78,11 +71,11 @@ function validateCatalogAndSchemas(registry) {
 
 function validateTopicsConsistency(registry) {
   const errors = [];
-  const servicesDir = path.join(repoRoot, "services");
+  const servicesDir = path.join(repoRoot, 'services');
   const serviceNames = fs.readdirSync(servicesDir);
 
   for (const serviceName of serviceNames) {
-    const topicFile = path.join(servicesDir, serviceName, "src/messaging/topics.js");
+    const topicFile = path.join(servicesDir, serviceName, 'src/messaging/topics.js');
     if (!fs.existsSync(topicFile)) {
       continue;
     }
@@ -97,8 +90,7 @@ function validateTopicsConsistency(registry) {
 
       if (topicConstants[event.key] !== event.topic) {
         errors.push(
-          `Topic constant mismatch in ${path.relative(repoRoot, topicFile)}: ` +
-            `${event.key}=${topicConstants[event.key]} (expected ${event.topic})`
+          `Topic constant mismatch in ${path.relative(repoRoot, topicFile)}: ` + `${event.key}=${topicConstants[event.key]} (expected ${event.topic})`
         );
       }
     }
@@ -109,15 +101,15 @@ function validateTopicsConsistency(registry) {
 
 function validateExamples(registry) {
   const errors = [];
-  const exampleDir = path.join(repoRoot, "contracts/events/examples");
+  const exampleDir = path.join(repoRoot, 'contracts/events/examples');
 
   if (!fs.existsSync(exampleDir)) {
     return errors;
   }
 
-  const files = fs.readdirSync(exampleDir).filter((name) => name.endsWith(".json"));
+  const files = fs.readdirSync(exampleDir).filter((name) => name.endsWith('.json'));
   for (const fileName of files) {
-    const topic = fileName.replace(/\.example\.json$/i, "");
+    const topic = fileName.replace(/\.example\.json$/i, '');
     const event = registry.getEntryByTopic(topic);
     if (!event) {
       errors.push(`Example has unknown topic: ${fileName}`);
@@ -127,11 +119,7 @@ function validateExamples(registry) {
     const example = readJson(path.join(exampleDir, fileName));
     const result = registry.validateEnvelopeByTopic(topic, example);
     if (!result.valid) {
-      errors.push(
-        `Invalid example ${fileName}: ${result.errors
-          .map((item) => `${item.instancePath || "<root>"} ${item.message}`)
-          .join("; ")}`
-      );
+      errors.push(`Invalid example ${fileName}: ${result.errors.map((item) => `${item.instancePath || '<root>'} ${item.message}`).join('; ')}`);
     }
   }
 
@@ -141,21 +129,17 @@ function validateExamples(registry) {
 function main() {
   const registry = createEventContractRegistry({ strict: true });
 
-  const errors = [
-    ...validateCatalogAndSchemas(registry),
-    ...validateTopicsConsistency(registry),
-    ...validateExamples(registry)
-  ];
+  const errors = [...validateCatalogAndSchemas(registry), ...validateTopicsConsistency(registry), ...validateExamples(registry)];
 
   if (errors.length) {
-    console.error("Event contract validation failed:\n");
+    console.error('Event contract validation failed:\n');
     for (const error of errors) {
       console.error(`- ${error}`);
     }
     process.exit(1);
   }
 
-  console.log("Event contract validation passed.");
+  console.log('Event contract validation passed.');
 }
 
 main();
