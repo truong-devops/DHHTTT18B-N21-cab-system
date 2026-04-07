@@ -3,14 +3,7 @@
   "$id": "https://cab-booking.local/schemas/events/payloads/ride.accepted",
   "title": "ride.accepted.payload",
   "type": "object",
-  "required": [
-    "event_type",
-    "booking_id",
-    "ride_id",
-    "driver_id",
-    "status",
-    "timestamp"
-  ],
+  "required": ["event_type", "booking_id", "ride_id", "driver_id", "status", "timestamp"],
   "properties": {
     "event_type": { "const": "ride_accepted" },
     "booking_id": { "type": "string", "minLength": 1 },
@@ -21,4 +14,3 @@
   },
   "additionalProperties": false
 }
-

@@ -1,4 +1,4 @@
-const { pool } = require("../db/pool");
+const { pool } = require('../db/pool');
 
 async function insertInboxEvent(client, event) {
   const db = client || pool;
@@ -13,13 +13,7 @@ async function insertInboxEvent(client, event) {
     VALUES ($1, $2, $3, $4, $5)
     ON CONFLICT (event_id) DO NOTHING
     RETURNING id`,
-    [
-      event.eventId,
-      event.traceId || null,
-      event.topic,
-      event.eventType,
-      event.payload
-    ]
+    [event.eventId, event.traceId || null, event.topic, event.eventType, event.payload]
   );
   return result.rows.length > 0;
 }

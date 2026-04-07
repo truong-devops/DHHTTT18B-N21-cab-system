@@ -1,5 +1,5 @@
-const { pool } = require("./pool");
-const config = require("../config");
+const { pool } = require('./pool');
+const config = require('../config');
 
 function computeRetryDelayMs(attemptCount, baseMs, maxMs) {
   const normalizedAttempt = Math.max(1, Number(attemptCount || 1));
@@ -10,12 +10,7 @@ function computeRetryDelayMs(attemptCount, baseMs, maxMs) {
 
 function resolvePartitionKey(event) {
   const payload = event.payload || {};
-  return (
-    event.partitionKey ||
-    payload.rideId ||
-    payload.paymentId ||
-    event.eventId
-  );
+  return event.partitionKey || payload.rideId || payload.paymentId || event.eventId;
 }
 
 async function insertOutboxEvent(client, event) {
@@ -104,12 +99,7 @@ async function markOutboxPublished(id) {
   );
 }
 
-async function markOutboxDead({
-  id,
-  error,
-  dlqTopic = null,
-  dlqPayload = null
-}) {
+async function markOutboxDead({ id, error, dlqTopic = null, dlqPayload = null }) {
   await pool.query(
     `UPDATE outbox_events
      SET status = 'DEAD',
@@ -120,16 +110,11 @@ async function markOutboxDead({
          dlq_topic = $3,
          dlq_payload = $4
      WHERE id = $1`,
-    [id, error || "max_retries_exceeded", dlqTopic, dlqPayload]
+    [id, error || 'max_retries_exceeded', dlqTopic, dlqPayload]
   );
 }
 
-async function markOutboxForRetry({
-  id,
-  error,
-  retryBaseMs = config.outbox.retryBaseMs,
-  retryMaxMs = config.outbox.retryMaxMs
-}) {
+async function markOutboxForRetry({ id, error, retryBaseMs = config.outbox.retryBaseMs, retryMaxMs = config.outbox.retryMaxMs }) {
   const increment = await pool.query(
     `UPDATE outbox_events
      SET attempt_count = attempt_count + 1,
@@ -139,7 +124,7 @@ async function markOutboxForRetry({
          processing_started_at = NULL
      WHERE id = $1
      RETURNING id, event_id, topic, payload, attempt_count, max_attempts`,
-    [id, error || "publish_failed"]
+    [id, error || 'publish_failed']
   );
 
   const row = increment.rows[0];
@@ -153,7 +138,7 @@ async function markOutboxForRetry({
       error
     });
     return {
-      status: "DEAD",
+      status: 'DEAD',
       attemptCount: row.attempt_count,
       maxAttempts: row.max_attempts,
       eventId: row.event_id,
@@ -162,11 +147,7 @@ async function markOutboxForRetry({
     };
   }
 
-  const delayMs = computeRetryDelayMs(
-    row.attempt_count,
-    retryBaseMs,
-    retryMaxMs
-  );
+  const delayMs = computeRetryDelayMs(row.attempt_count, retryBaseMs, retryMaxMs);
   await pool.query(
     `UPDATE outbox_events
      SET status = 'RETRY',
@@ -175,7 +156,7 @@ async function markOutboxForRetry({
     [id, delayMs]
   );
   return {
-    status: "RETRY",
+    status: 'RETRY',
     retryInMs: delayMs,
     attemptCount: row.attempt_count,
     maxAttempts: row.max_attempts,

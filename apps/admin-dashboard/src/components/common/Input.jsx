@@ -5,7 +5,7 @@ function Input({ label, helper, className = '', ...props }) {
       <input className={`input ${className}`.trim()} {...props} />
       {helper && <div className="input-helper">{helper}</div>}
     </div>
-  )
+  );
 }
 
-export default Input
+export default Input;

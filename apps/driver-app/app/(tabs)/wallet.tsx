@@ -10,18 +10,14 @@ export default function WalletScreen() {
     () => [
       {
         label: 'Đã thanh toán',
-        value: payments
-          .filter((item) => item.status?.toUpperCase() === 'PAID')
-          .reduce((sum, item) => sum + Number(item.amount || 0), 0),
+        value: payments.filter((item) => item.status?.toUpperCase() === 'PAID').reduce((sum, item) => sum + Number(item.amount || 0), 0)
       },
       {
         label: 'Chờ xử lý',
-        value: payments
-          .filter((item) => item.status?.toUpperCase() !== 'PAID')
-          .reduce((sum, item) => sum + Number(item.amount || 0), 0),
-      },
+        value: payments.filter((item) => item.status?.toUpperCase() !== 'PAID').reduce((sum, item) => sum + Number(item.amount || 0), 0)
+      }
     ],
-    [payments],
+    [payments]
   );
 
   return (
@@ -34,9 +30,7 @@ export default function WalletScreen() {
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
-        {loading && payments.length === 0 ? (
-          <Text style={styles.emptyText}>Đang tải thu nhập...</Text>
-        ) : null}
+        {loading && payments.length === 0 ? <Text style={styles.emptyText}>Đang tải thu nhập...</Text> : null}
 
         <View style={styles.balanceCard}>
           <View style={styles.balanceHeader}>
@@ -85,9 +79,7 @@ export default function WalletScreen() {
             payments.map((item) => (
               <View key={item.id} style={styles.payoutRow}>
                 <View>
-                  <Text style={styles.payoutDate}>
-                    {item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '--'}
-                  </Text>
+                  <Text style={styles.payoutDate}>{item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '--'}</Text>
                   <Text style={styles.payoutStatus}>{item.status}</Text>
                 </View>
                 <Text style={styles.payoutAmount}>{Number(item.amount || 0).toLocaleString('vi-VN')} đ</Text>
@@ -103,119 +95,119 @@ export default function WalletScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: palette.background,
+    backgroundColor: palette.background
   },
   container: {
     padding: 20,
     paddingBottom: 32,
-    gap: 16,
+    gap: 16
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: palette.text,
+    color: palette.text
   },
   errorCard: {
     backgroundColor: '#FFF1F1',
     borderColor: '#FECACA',
     borderWidth: 1,
     borderRadius: 12,
-    padding: 12,
+    padding: 12
   },
   errorText: {
     color: '#B91C1C',
-    fontSize: 12,
+    fontSize: 12
   },
   balanceCard: {
     backgroundColor: palette.red,
     borderRadius: 22,
     padding: 18,
-    overflow: 'hidden',
+    overflow: 'hidden'
   },
   balanceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   balanceLabel: {
     color: '#FFE7DE',
-    fontSize: 12,
+    fontSize: 12
   },
   balancePill: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: 999
   },
   balancePillText: {
     color: '#fff',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   balanceValue: {
     color: '#fff',
     fontSize: 30,
     fontWeight: '700',
-    marginVertical: 10,
+    marginVertical: 10
   },
   balanceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: 4
   },
   smallLabel: {
     color: '#FFE7DE',
-    fontSize: 12,
+    fontSize: 12
   },
   smallValue: {
     color: '#fff',
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: 4
   },
   payoutText: {
     color: '#FFE7DE',
     marginTop: 12,
-    fontSize: 12,
+    fontSize: 12
   },
   actionRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 16,
+    marginTop: 16
   },
   lightButton: {
     flex: 1,
     backgroundColor: '#fff',
     paddingVertical: 10,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   lightButtonText: {
     color: palette.redDark,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   card: {
     backgroundColor: palette.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   sectionTitle: {
     fontWeight: '700',
     color: palette.text,
-    marginBottom: 12,
+    marginBottom: 12
   },
   breakRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 8
   },
   breakLabel: {
-    color: palette.muted,
+    color: palette.muted
   },
   breakValue: {
     color: palette.text,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   payoutRow: {
     flexDirection: 'row',
@@ -223,21 +215,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: palette.border,
+    borderTopColor: palette.border
   },
   payoutDate: {
     color: palette.text,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   payoutStatus: {
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   payoutAmount: {
     color: palette.redDark,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   emptyText: {
-    color: palette.muted,
-  },
+    color: palette.muted
+  }
 });

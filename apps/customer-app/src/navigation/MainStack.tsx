@@ -1,25 +1,25 @@
-import React from 'react'
-import type { NavigatorScreenParams } from '@react-navigation/native'
-import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import Tabs, { type TabParamList } from './Tabs'
-import DestinationScreen from '../screens/customer/DestinationScreen'
-import RideOptionsScreen from '../screens/customer/RideOptionsScreen'
-import SearchingDriverScreen from '../screens/customer/SearchingDriverScreen'
-import RideTrackingScreen from '../screens/customer/RideTrackingScreen'
-import PaymentScreen from '../screens/customer/PaymentScreen'
-import RatingScreen from '../screens/customer/RatingScreen'
+import React from 'react';
+import type { NavigatorScreenParams } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import Tabs, { type TabParamList } from './Tabs';
+import DestinationScreen from '../screens/customer/DestinationScreen';
+import RideOptionsScreen from '../screens/customer/RideOptionsScreen';
+import SearchingDriverScreen from '../screens/customer/SearchingDriverScreen';
+import RideTrackingScreen from '../screens/customer/RideTrackingScreen';
+import PaymentScreen from '../screens/customer/PaymentScreen';
+import RatingScreen from '../screens/customer/RatingScreen';
 
 export type MainStackParamList = {
-  Tabs: NavigatorScreenParams<TabParamList> | undefined
-  Destination: undefined
-  RideOptions: { pickup: string; destination: string }
-  SearchingDriver: { pickup: string; destination: string }
-  RideTracking: undefined
-  Payment: undefined
-  Rating: undefined
-}
+  Tabs: NavigatorScreenParams<TabParamList> | undefined;
+  Destination: undefined;
+  RideOptions: { pickup: string; destination: string };
+  SearchingDriver: { pickup: string; destination: string };
+  RideTracking: undefined;
+  Payment: undefined;
+  Rating: undefined;
+};
 
-const Stack = createNativeStackNavigator<MainStackParamList>()
+const Stack = createNativeStackNavigator<MainStackParamList>();
 
 const MainStack = () => {
   return (
@@ -32,7 +32,7 @@ const MainStack = () => {
       <Stack.Screen name="Payment" component={PaymentScreen} />
       <Stack.Screen name="Rating" component={RatingScreen} />
     </Stack.Navigator>
-  )
-}
+  );
+};
 
-export default MainStack
+export default MainStack;

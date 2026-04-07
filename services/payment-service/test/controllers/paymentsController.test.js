@@ -1,4 +1,4 @@
-jest.mock("../../src/services/paymentService", () => ({
+jest.mock('../../src/services/paymentService', () => ({
   createPayment: jest.fn(),
   fetchPayment: jest.fn(),
   fetchPayments: jest.fn(),
@@ -6,20 +6,20 @@ jest.mock("../../src/services/paymentService", () => ({
   fetchVietQr: jest.fn()
 }));
 
-jest.mock("../../src/services/idempotencyService", () => ({
+jest.mock('../../src/services/idempotencyService', () => ({
   withIdempotency: jest.fn(),
   pickIdempotencyHeaders: jest.fn()
 }));
 
-const paymentService = require("../../src/services/paymentService");
-const idempotencyService = require("../../src/services/idempotencyService");
+const paymentService = require('../../src/services/paymentService');
+const idempotencyService = require('../../src/services/idempotencyService');
 const {
   listPaymentsController,
   createPaymentController,
   getPaymentController,
   updatePaymentStatusController,
   getVietQrController
-} = require("../../src/controllers/paymentsController");
+} = require('../../src/controllers/paymentsController');
 
 function buildReq(overrides = {}) {
   const headers = {};
@@ -48,7 +48,7 @@ function buildRes() {
   return res;
 }
 
-describe("payments controllers", () => {
+describe('payments controllers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     idempotencyService.pickIdempotencyHeaders.mockReturnValue({});
@@ -63,7 +63,7 @@ describe("payments controllers", () => {
     });
   });
 
-  test("listPaymentsController returns payments", async () => {
+  test('listPaymentsController returns payments', async () => {
     const payload = { data: [] };
     paymentService.fetchPayments.mockResolvedValueOnce(payload);
     const req = buildReq({ validatedQuery: { limit: 10 } });
@@ -75,32 +75,32 @@ describe("payments controllers", () => {
     expect(res.json).toHaveBeenCalledWith(payload);
   });
 
-  test("createPaymentController rejects missing idempotency key", async () => {
-    const req = buildReq({ validatedBody: { rideId: "ride_1" } });
+  test('createPaymentController rejects missing idempotency key', async () => {
+    const req = buildReq({ validatedBody: { rideId: 'ride_1' } });
     const res = buildRes();
 
     await expect(createPaymentController(req, res)).rejects.toMatchObject({
       status: 400,
-      code: "IDEMPOTENCY_KEY_REQUIRED"
+      code: 'IDEMPOTENCY_KEY_REQUIRED'
     });
   });
 
-  test("createPaymentController executes with idempotency", async () => {
+  test('createPaymentController executes with idempotency', async () => {
     paymentService.createPayment.mockResolvedValueOnce({
       responseCode: 201,
-      responseBody: { data: { id: "pay_1" } }
+      responseBody: { data: { id: 'pay_1' } }
     });
 
     const req = buildReq({
-      method: "POST",
-      originalUrl: "/v1/payments",
-      validatedBody: { rideId: "ride_1", amount: "100.00", currency: "VND" },
-      traceId: "trace_1",
-      requestId: "req_1",
-      authorization: "Bearer test",
-      user: { id: "user_1" }
+      method: 'POST',
+      originalUrl: '/v1/payments',
+      validatedBody: { rideId: 'ride_1', amount: '100.00', currency: 'VND' },
+      traceId: 'trace_1',
+      requestId: 'req_1',
+      authorization: 'Bearer test',
+      user: { id: 'user_1' }
     });
-    req.headers["idempotency-key"] = "idem_1";
+    req.headers['idempotency-key'] = 'idem_1';
 
     const res = buildRes();
 
@@ -108,74 +108,74 @@ describe("payments controllers", () => {
 
     expect(idempotencyService.withIdempotency).toHaveBeenCalledWith(
       expect.objectContaining({
-        routeKey: "payments:create",
-        userId: "user_1",
-        idemKey: "idem_1"
+        routeKey: 'payments:create',
+        userId: 'user_1',
+        idemKey: 'idem_1'
       })
     );
     expect(paymentService.createPayment).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: {
-          rideId: "ride_1",
-          amount: "100.00",
-          currency: "VND",
-          userId: "user_1"
+          rideId: 'ride_1',
+          amount: '100.00',
+          currency: 'VND',
+          userId: 'user_1'
         },
-        traceId: "trace_1",
-        requestId: "req_1",
-        method: "POST",
-        path: "/v1/payments",
-        authorization: "Bearer test"
+        traceId: 'trace_1',
+        requestId: 'req_1',
+        method: 'POST',
+        path: '/v1/payments',
+        authorization: 'Bearer test'
       })
     );
     expect(res.status).toHaveBeenCalledWith(201);
-    expect(res.headers["content-type"]).toBe("application/json; charset=utf-8");
-    expect(res.json).toHaveBeenCalledWith({ data: { id: "pay_1" } });
+    expect(res.headers['content-type']).toBe('application/json; charset=utf-8');
+    expect(res.json).toHaveBeenCalledWith({ data: { id: 'pay_1' } });
   });
 
-  test("getPaymentController returns payment by id", async () => {
-    paymentService.fetchPayment.mockResolvedValueOnce({ id: "pay_1" });
-    const req = buildReq({ validatedParams: { id: "pay_1" } });
+  test('getPaymentController returns payment by id', async () => {
+    paymentService.fetchPayment.mockResolvedValueOnce({ id: 'pay_1' });
+    const req = buildReq({ validatedParams: { id: 'pay_1' } });
     const res = buildRes();
 
     await getPaymentController(req, res);
 
-    expect(paymentService.fetchPayment).toHaveBeenCalledWith("pay_1");
-    expect(res.json).toHaveBeenCalledWith({ data: { id: "pay_1" } });
+    expect(paymentService.fetchPayment).toHaveBeenCalledWith('pay_1');
+    expect(res.json).toHaveBeenCalledWith({ data: { id: 'pay_1' } });
   });
 
-  test("updatePaymentStatusController forwards actor and status", async () => {
-    paymentService.changePaymentStatus.mockResolvedValueOnce({ id: "pay_1", status: "PAID" });
+  test('updatePaymentStatusController forwards actor and status', async () => {
+    paymentService.changePaymentStatus.mockResolvedValueOnce({ id: 'pay_1', status: 'PAID' });
     const req = buildReq({
-      validatedParams: { id: "pay_1" },
-      validatedBody: { status: "PAID" },
-      traceId: "trace_2",
-      requestId: "req_2",
-      user: { id: "user_1" }
+      validatedParams: { id: 'pay_1' },
+      validatedBody: { status: 'PAID' },
+      traceId: 'trace_2',
+      requestId: 'req_2',
+      user: { id: 'user_1' }
     });
-    req.headers["x-actor"] = "driver_9";
+    req.headers['x-actor'] = 'driver_9';
     const res = buildRes();
 
     await updatePaymentStatusController(req, res);
 
     expect(paymentService.changePaymentStatus).toHaveBeenCalledWith({
-      paymentId: "pay_1",
-      statusUpdate: { status: "PAID" },
-      traceId: "trace_2",
-      requestId: "req_2",
-      actor: "driver_9"
+      paymentId: 'pay_1',
+      statusUpdate: { status: 'PAID' },
+      traceId: 'trace_2',
+      requestId: 'req_2',
+      actor: 'driver_9'
     });
-    expect(res.json).toHaveBeenCalledWith({ data: { id: "pay_1", status: "PAID" } });
+    expect(res.json).toHaveBeenCalledWith({ data: { id: 'pay_1', status: 'PAID' } });
   });
 
-  test("getVietQrController returns vietqr data", async () => {
-    paymentService.fetchVietQr.mockResolvedValueOnce({ paymentId: "pay_1" });
-    const req = buildReq({ validatedParams: { id: "pay_1" } });
+  test('getVietQrController returns vietqr data', async () => {
+    paymentService.fetchVietQr.mockResolvedValueOnce({ paymentId: 'pay_1' });
+    const req = buildReq({ validatedParams: { id: 'pay_1' } });
     const res = buildRes();
 
     await getVietQrController(req, res);
 
-    expect(paymentService.fetchVietQr).toHaveBeenCalledWith("pay_1");
-    expect(res.json).toHaveBeenCalledWith({ data: { paymentId: "pay_1" } });
+    expect(paymentService.fetchVietQr).toHaveBeenCalledWith('pay_1');
+    expect(res.json).toHaveBeenCalledWith({ data: { paymentId: 'pay_1' } });
   });
 });

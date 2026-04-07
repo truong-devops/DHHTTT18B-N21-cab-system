@@ -5,11 +5,11 @@ const mockMarkOutboxPublished = jest.fn();
 const mockMarkOutboxForRetry = jest.fn();
 const mockMarkOutboxDead = jest.fn();
 
-jest.mock("../src/messaging/producer", () => ({
+jest.mock('../src/messaging/producer', () => ({
   publish: (...args) => mockPublish(...args)
 }));
 
-jest.mock("../src/repositories/outboxRepo", () => ({
+jest.mock('../src/repositories/outboxRepo', () => ({
   claimOutboxEvents: (...args) => mockClaimOutboxEvents(...args),
   countOutboxBacklog: (...args) => mockCountOutboxBacklog(...args),
   markOutboxPublished: (...args) => mockMarkOutboxPublished(...args),
@@ -17,31 +17,31 @@ jest.mock("../src/repositories/outboxRepo", () => ({
   markOutboxDead: (...args) => mockMarkOutboxDead(...args)
 }));
 
-const { publishOutboxBatch } = require("../src/messaging/outboxPublisher");
+const { publishOutboxBatch } = require('../src/messaging/outboxPublisher');
 
-describe("booking outbox ordering key", () => {
+describe('booking outbox ordering key', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test("publishes with aggregate partition key (rideId)", async () => {
+  test('publishes with aggregate partition key (rideId)', async () => {
     mockCountOutboxBacklog.mockResolvedValue(0);
     mockClaimOutboxEvents.mockResolvedValueOnce([
       {
-        id: "1",
-        event_id: "evt_1",
-        topic: "ride.created",
+        id: '1',
+        event_id: 'evt_1',
+        topic: 'ride.created',
         payload: {
-          eventId: "evt_1",
-          type: "RideCreated",
+          eventId: 'evt_1',
+          type: 'RideCreated',
           version: 1,
-          occurredAt: "2026-01-01T00:00:00.000Z",
-          traceId: "trace_1",
+          occurredAt: '2026-01-01T00:00:00.000Z',
+          traceId: 'trace_1',
           payload: {
-            rideId: "ride_1",
-            bookingId: "bk_1",
+            rideId: 'ride_1',
+            bookingId: 'bk_1',
             pickup: { lat: 10.7, lng: 106.6 },
-            timestamp: "2026-01-01T00:00:00.000Z"
+            timestamp: '2026-01-01T00:00:00.000Z'
           }
         }
       }
@@ -53,8 +53,8 @@ describe("booking outbox ordering key", () => {
 
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(mockPublish.mock.calls[0][2]).toMatchObject({
-      key: "ride_1"
+      key: 'ride_1'
     });
-    expect(mockMarkOutboxPublished).toHaveBeenCalledWith("1");
+    expect(mockMarkOutboxPublished).toHaveBeenCalledWith('1');
   });
 });

@@ -49,9 +49,7 @@ export function useEarnings({ limit = 20 }: Options = {}) {
 
   const summary = useMemo(() => {
     const total = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const pending = payments
-      .filter((item) => item.status?.toUpperCase() !== 'PAID')
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const pending = payments.filter((item) => item.status?.toUpperCase() !== 'PAID').reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const today = payments
       .filter((item) => {
         if (!item.createdAt) return false;

@@ -65,11 +65,7 @@ function resolveModule(baseDir, spec) {
 }
 
 function collectMountPrefixes(serviceDir) {
-  const candidates = [
-    path.join(serviceDir, 'src', 'server.js'),
-    path.join(serviceDir, 'src', 'app.js'),
-    path.join(serviceDir, 'src', 'index.js'),
-  ];
+  const candidates = [path.join(serviceDir, 'src', 'server.js'), path.join(serviceDir, 'src', 'app.js'), path.join(serviceDir, 'src', 'index.js')];
   const entry = candidates.find((p) => exists(p));
   if (!entry) return new Map();
 
@@ -229,15 +225,11 @@ function main() {
     specEndpointsByService.set(serviceName, endpoints);
   }
 
-  const serviceNames = new Set([
-    ...Array.from(codeEndpointsByService.keys()),
-    ...Array.from(specEndpointsByService.keys()),
-  ]);
+  const serviceNames = new Set([...Array.from(codeEndpointsByService.keys()), ...Array.from(specEndpointsByService.keys())]);
 
   let report = '# OpenAPI Sync Report\n\n';
   report += `Generated: ${new Date().toISOString()}\n\n`;
-  report +=
-    'This report compares endpoints discovered from route files under `services/*/src/routes/` with OpenAPI files in `docs/openapi/`.\n\n';
+  report += 'This report compares endpoints discovered from route files under `services/*/src/routes/` with OpenAPI files in `docs/openapi/`.\n\n';
   report +=
     '**Note:** mount prefixes are best-effort (parsed from `app.use(...)` in `src/server.js` / `src/app.js`). If a service mounts routes dynamically, expect false positives.\n\n';
 
@@ -248,8 +240,12 @@ function main() {
     const codeSet = new Set(codeEndpoints.map((e) => uniqueKey(e.method, e.path)));
     const specSet = new Set(specEndpoints.map((e) => uniqueKey(e.method, e.path)));
 
-    const missingInSpec = Array.from(codeSet).filter((k) => !specSet.has(k)).sort();
-    const extraInSpec = Array.from(specSet).filter((k) => !codeSet.has(k)).sort();
+    const missingInSpec = Array.from(codeSet)
+      .filter((k) => !specSet.has(k))
+      .sort();
+    const extraInSpec = Array.from(specSet)
+      .filter((k) => !codeSet.has(k))
+      .sort();
 
     report += `## ${serviceName}\n\n`;
     report += `- Code endpoints: ${codeSet.size}\n`;

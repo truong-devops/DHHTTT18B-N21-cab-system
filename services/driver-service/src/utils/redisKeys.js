@@ -11,7 +11,7 @@ function driverBusyKey(driverId) {
 }
 
 function geoKey(vehicleType) {
-  return `geo:drivers:${vehicleType || "all"}`;
+  return `geo:drivers:${vehicleType || 'all'}`;
 }
 
 function locationRateKey(driverId) {

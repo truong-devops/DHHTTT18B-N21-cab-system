@@ -1,20 +1,20 @@
-const ROLE_VALUES = ["admin", "customer", "driver", "user"];
-const STATUS_VALUES = ["ACTIVE", "SUSPENDED", "DELETED"];
+const ROLE_VALUES = ['admin', 'customer', 'driver', 'user'];
+const STATUS_VALUES = ['ACTIVE', 'SUSPENDED', 'DELETED'];
 
 function isEmail(value) {
-  if (!value || typeof value !== "string") {
+  if (!value || typeof value !== 'string') {
     return false;
   }
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function isUserId(value) {
-  if (!value || typeof value !== "string") return false;
+  if (!value || typeof value !== 'string') return false;
   return /^\d{8}$/.test(value);
 }
 
 function isNonEmptyString(value) {
-  if (typeof value !== "string") {
+  if (typeof value !== 'string') {
     return false;
   }
   return value.trim().length > 0;

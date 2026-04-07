@@ -9,7 +9,7 @@ import { API_BASE_URL } from '@/lib/config';
 import { MissingConfig } from '@/components/missing-config';
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  anchor: '(tabs)'
 };
 
 export default function RootLayout() {

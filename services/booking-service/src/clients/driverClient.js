@@ -1,10 +1,7 @@
-const axios = require("axios");
-const logger = require("../utils/logger");
+const axios = require('axios');
+const logger = require('../utils/logger');
 
-const baseURL =
-  process.env.DRIVER_BASE_URL ||
-  process.env.DRIVER_SERVICE_URL ||
-  "http://driver-service:3011";
+const baseURL = process.env.DRIVER_BASE_URL || process.env.DRIVER_SERVICE_URL || 'http://driver-service:3011';
 
 const http = axios.create({
   baseURL,
@@ -12,15 +9,10 @@ const http = axios.create({
 });
 
 function isAvailabilityCheckEnabled() {
-  return process.env.ENABLE_DRIVER_AVAILABILITY_CHECK !== "false";
+  return process.env.ENABLE_DRIVER_AVAILABILITY_CHECK !== 'false';
 }
 
-async function getDriverAvailability({
-  pickup,
-  vehicleType,
-  authorization,
-  traceId
-}) {
+async function getDriverAvailability({ pickup, vehicleType, authorization, traceId }) {
   if (!isAvailabilityCheckEnabled()) {
     return { checked: false, available: true, count: null };
   }
@@ -29,10 +21,10 @@ async function getDriverAvailability({
   }
 
   try {
-    const res = await http.get("/v1/driver/availability", {
+    const res = await http.get('/v1/driver/availability', {
       headers: {
         authorization,
-        "x-trace-id": traceId || ""
+        'x-trace-id': traceId || ''
       },
       params: {
         lat: pickup.lat,
@@ -53,23 +45,17 @@ async function getDriverAvailability({
   } catch (error) {
     logger.warn(
       {
-        dependency: "driver-service",
-        operation: "driver_availability",
+        dependency: 'driver-service',
+        operation: 'driver_availability',
         reason: error?.code || error?.message
       },
-      "driver availability check failed, continue booking flow"
+      'driver availability check failed, continue booking flow'
     );
     return { checked: false, available: true, count: null };
   }
 }
 
-async function listAvailableDrivers({
-  pickup,
-  vehicleType,
-  authorization,
-  traceId,
-  limit = 5
-}) {
+async function listAvailableDrivers({ pickup, vehicleType, authorization, traceId, limit = 5 }) {
   if (!isAvailabilityCheckEnabled()) {
     return [];
   }
@@ -78,10 +64,10 @@ async function listAvailableDrivers({
   }
 
   try {
-    const res = await http.get("/v1/driver/availability", {
+    const res = await http.get('/v1/driver/availability', {
       headers: {
         authorization,
-        "x-trace-id": traceId || ""
+        'x-trace-id': traceId || ''
       },
       params: {
         lat: pickup.lat,
@@ -90,18 +76,16 @@ async function listAvailableDrivers({
         limit
       }
     });
-    const items = Array.isArray(res.data?.data?.items)
-      ? res.data.data.items
-      : [];
+    const items = Array.isArray(res.data?.data?.items) ? res.data.data.items : [];
     return items.filter((item) => item && item.driverId);
   } catch (error) {
     logger.warn(
       {
-        dependency: "driver-service",
-        operation: "list_available_drivers",
+        dependency: 'driver-service',
+        operation: 'list_available_drivers',
         reason: error?.code || error?.message
       },
-      "driver list availability failed"
+      'driver list availability failed'
     );
     return [];
   }

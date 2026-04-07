@@ -12,9 +12,11 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 15
 
 ### Missing in spec
+
 - (none)
 
 ### Extra in spec
+
 - `DELETE /v1/{domain}`
 - `DELETE /v1/{domain}/{path}`
 - `GET /health`
@@ -37,6 +39,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 8
 
 ### Missing in spec
+
 - `GET /verify`
 - `POST /login`
 - `POST /logout`
@@ -44,6 +47,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - `POST /register`
 
 ### Extra in spec
+
 - `GET /auth/verify`
 - `GET /health`
 - `GET /healthz`
@@ -59,12 +63,14 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 5
 
 ### Missing in spec
+
 - `GET /`
 - `GET /:id`
 - `POST /`
 - `POST /:id/cancel`
 
 ### Extra in spec
+
 - `GET /health`
 - `GET /v1/bookings`
 - `GET /v1/bookings/{id}`
@@ -77,6 +83,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 19
 
 ### Missing in spec
+
 - `GET /v1/internal/drivers/:driverId`
 - `GET /v1/internal/drivers/:driverId/location`
 - `PATCH /v1/admin/drivers/:driverId/approve`
@@ -85,6 +92,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - `POST /v1/internal/drivers/:driverId/mark-busy`
 
 ### Extra in spec
+
 - `GET /healthz`
 - `GET /readyz`
 - `GET /v1/internal/drivers/{driverId}`
@@ -100,9 +108,11 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 4
 
 ### Missing in spec
+
 - (none)
 
 ### Extra in spec
+
 - `GET /health`
 - `GET /healthz`
 - `GET /readyz`
@@ -114,6 +124,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 10
 
 ### Missing in spec
+
 - `GET /v1/notifications/:id`
 - `GET /v1/users/:userId/notifications`
 - `GET /v1/users/:userId/preferences`
@@ -122,6 +133,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - `PUT /v1/users/:userId/preferences`
 
 ### Extra in spec
+
 - `GET /healthz`
 - `GET /readyz`
 - `GET /v1/notifications/{id}`
@@ -137,6 +149,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 8
 
 ### Missing in spec
+
 - `GET /`
 - `GET /:id`
 - `GET /:id/vietqr-codes`
@@ -146,6 +159,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - `POST /payos`
 
 ### Extra in spec
+
 - `GET /health`
 - `GET /healthz`
 - `GET /readyz`
@@ -161,6 +175,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 5
 
 ### Missing in spec
+
 - `GET /quotes/:quoteId`
 - `GET /surge-rules`
 - `PATCH /surge-rules/:id`
@@ -170,6 +185,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - `POST /surge-rules`
 
 ### Extra in spec
+
 - `GET /health`
 - `GET /ready`
 - `GET /v1/pricing/quotes/{quoteId}`
@@ -182,6 +198,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 8
 
 ### Missing in spec
+
 - `DELETE /:id`
 - `GET /`
 - `GET /:id`
@@ -189,6 +206,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - `POST /`
 
 ### Extra in spec
+
 - `DELETE /v1/reviews/{id}`
 - `GET /health`
 - `GET /healthz`
@@ -204,6 +222,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 9
 
 ### Missing in spec
+
 - `DELETE /:id`
 - `GET /`
 - `GET /:id`
@@ -212,6 +231,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - `POST /`
 
 ### Extra in spec
+
 - `DELETE /v1/rides/{id}`
 - `GET /health`
 - `GET /healthz`
@@ -228,6 +248,7 @@ This report compares endpoints discovered from route files under `services/*/src
 - Spec endpoints: 8
 
 ### Missing in spec
+
 - `DELETE /v1/users/:id`
 - `GET /internal/users/:id`
 - `GET /internal/users/by-email/:email`
@@ -235,10 +256,10 @@ This report compares endpoints discovered from route files under `services/*/src
 - `PATCH /v1/users/:id`
 
 ### Extra in spec
+
 - `DELETE /v1/users/{id}`
 - `GET /healthz`
 - `GET /internal/users/by-email/{email}`
 - `GET /internal/users/{id}`
 - `GET /v1/users/{id}`
 - `PATCH /v1/users/{id}`
-

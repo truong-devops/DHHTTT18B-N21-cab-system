@@ -1,20 +1,20 @@
-﻿import React from 'react'
-import { Pressable, StyleSheet, Text } from 'react-native'
-import { colors, radius, spacing, typography } from '../../theme/tokens'
+﻿import React from 'react';
+import { Pressable, StyleSheet, Text } from 'react-native';
+import { colors, radius, spacing, typography } from '../../theme/tokens';
 
 type Props = {
-  title: string
-  onPress?: () => void
-  disabled?: boolean
-}
+  title: string;
+  onPress?: () => void;
+  disabled?: boolean;
+};
 
 export const PrimaryButton: React.FC<Props> = ({ title, onPress, disabled }) => {
   return (
     <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled ? styles.disabled : null]}>
       <Text style={styles.text}>{title}</Text>
     </Pressable>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   btn: {
@@ -33,4 +33,4 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '600'
   }
-})
+});

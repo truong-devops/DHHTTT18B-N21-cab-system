@@ -22,7 +22,7 @@ export async function acceptRide(rideId: string, driverId?: string) {
   if (!driverId) {
     const error: ApiError = {
       status: 400,
-      message: 'Thiếu driverId để nhận chuyến.',
+      message: 'Thiếu driverId để nhận chuyến.'
     };
     throw error;
   }
@@ -40,7 +40,7 @@ export async function acceptRide(rideId: string, driverId?: string) {
           status: 409,
           message: 'Chuyến đã được tài xế khác nhận.',
           code: err?.code,
-          details: err?.details,
+          details: err?.details
         };
         throw conflict;
       } catch (fetchErr) {

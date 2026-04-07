@@ -1,89 +1,89 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import type { MainStackParamList } from '../../navigation/MainStack'
-import { LiveRouteMap } from '../../components/map/LiveRouteMap'
-import { DriverInfoCard } from '../../components/customer/DriverInfoCard'
-import { PrimaryButton } from '../../components/common/PrimaryButton'
-import { OutlineButton } from '../../components/common/OutlineButton'
-import { colors, spacing, typography } from '../../theme/tokens'
-import { useCustomerStore } from '../../store/customerStore'
-import { customerApi } from '../../services/customerApi'
-import { useRealtimeStream } from '../../hooks/useRealtimeStream'
+import React, { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MainStackParamList } from '../../navigation/MainStack';
+import { LiveRouteMap } from '../../components/map/LiveRouteMap';
+import { DriverInfoCard } from '../../components/customer/DriverInfoCard';
+import { PrimaryButton } from '../../components/common/PrimaryButton';
+import { OutlineButton } from '../../components/common/OutlineButton';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { useCustomerStore } from '../../store/customerStore';
+import { customerApi } from '../../services/customerApi';
+import { useRealtimeStream } from '../../hooks/useRealtimeStream';
 
 const RideTrackingScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
-  const { activeRide, decreaseEta, refreshActiveRide } = useCustomerStore()
-  const { latestEvent } = useRealtimeStream()
-  const [eta, setEta] = useState(activeRide?.etaMinutes || 5)
-  const [driverInfoTimeout, setDriverInfoTimeout] = useState(false)
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const { activeRide, decreaseEta, refreshActiveRide } = useCustomerStore();
+  const { latestEvent } = useRealtimeStream();
+  const [eta, setEta] = useState(activeRide?.etaMinutes || 5);
+  const [driverInfoTimeout, setDriverInfoTimeout] = useState(false);
 
   const destinationCoordinate = useMemo(() => {
-    if (!activeRide) return null
+    if (!activeRide) return null;
     return {
       label: activeRide.destination,
       lat: activeRide.dropoffLat,
       lng: activeRide.dropoffLng
-    }
-  }, [activeRide])
+    };
+  }, [activeRide]);
 
   useEffect(() => {
-    if (!activeRide) return
-    setEta(activeRide.etaMinutes)
+    if (!activeRide) return;
+    setEta(activeRide.etaMinutes);
     const id = setInterval(() => {
-      decreaseEta()
-      setEta((prev) => Math.max(prev - 1, 1))
-    }, 3000)
-    return () => clearInterval(id)
-  }, [activeRide, decreaseEta])
+      decreaseEta();
+      setEta((prev) => Math.max(prev - 1, 1));
+    }, 3000);
+    return () => clearInterval(id);
+  }, [activeRide, decreaseEta]);
 
   useEffect(() => {
     if (latestEvent?.type === 'driver_location' && latestEvent.etaMinutes) {
-      setEta(latestEvent.etaMinutes)
+      setEta(latestEvent.etaMinutes);
     }
-  }, [latestEvent])
+  }, [latestEvent]);
 
   useEffect(() => {
-    if (!activeRide?.id || activeRide.driver) return
+    if (!activeRide?.id || activeRide.driver) return;
 
-    let disposed = false
+    let disposed = false;
     const poll = async () => {
-      const updated = await refreshActiveRide()
-      if (disposed || !updated) return
+      const updated = await refreshActiveRide();
+      if (disposed || !updated) return;
       if (updated.driver && updated.etaMinutes) {
-        setEta(updated.etaMinutes)
+        setEta(updated.etaMinutes);
       }
-    }
+    };
 
-    void poll()
+    void poll();
     const intervalId = setInterval(() => {
-      void poll()
-    }, 4000)
+      void poll();
+    }, 4000);
 
     return () => {
-      disposed = true
-      clearInterval(intervalId)
-    }
-  }, [activeRide?.driver, activeRide?.id, refreshActiveRide])
+      disposed = true;
+      clearInterval(intervalId);
+    };
+  }, [activeRide?.driver, activeRide?.id, refreshActiveRide]);
 
   useEffect(() => {
     if (!activeRide?.driverId || activeRide.driver) {
-      setDriverInfoTimeout(false)
-      return
+      setDriverInfoTimeout(false);
+      return;
     }
     const timeoutId = setTimeout(() => {
-      setDriverInfoTimeout(true)
-    }, 15000)
-    return () => clearTimeout(timeoutId)
-  }, [activeRide?.driver, activeRide?.driverId])
+      setDriverInfoTimeout(true);
+    }, 15000);
+    return () => clearTimeout(timeoutId);
+  }, [activeRide?.driver, activeRide?.driverId]);
 
   if (!activeRide) {
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyText}>Khong tim thay trang thai chuyen di</Text>
       </View>
-    )
+    );
   }
 
   if (!activeRide.driverId) {
@@ -91,7 +91,7 @@ const RideTrackingScreen = () => {
       <View style={styles.empty}>
         <Text style={styles.emptyText}>Dang tim tai xe phu hop...</Text>
       </View>
-    )
+    );
   }
 
   if (!activeRide.driver) {
@@ -104,13 +104,13 @@ const RideTrackingScreen = () => {
           <OutlineButton
             title="Thu lai"
             onPress={() => {
-              setDriverInfoTimeout(false)
-              void refreshActiveRide()
+              setDriverInfoTimeout(false);
+              void refreshActiveRide();
             }}
           />
         ) : null}
       </View>
-    )
+    );
   }
 
   return (
@@ -125,14 +125,14 @@ const RideTrackingScreen = () => {
       <DriverInfoCard driver={activeRide.driver} etaMinutes={eta} />
       <PrimaryButton title="Hoan tat chuyen di" onPress={() => navigation.replace('Payment')} />
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg, gap: spacing.md },
   mapArea: { flex: 1 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   emptyText: { ...typography.body, color: colors.muted }
-})
+});
 
-export default RideTrackingScreen
+export default RideTrackingScreen;

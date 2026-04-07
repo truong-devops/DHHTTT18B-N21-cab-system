@@ -58,15 +58,15 @@ components:
       properties:
         bookingId: { type: string }
         rideId: { type: string }
-        userId: { type: [string, "null"] }
-        pickup: { $ref: "#/components/schemas/LatLng" }
-        dropoff: { $ref: "#/components/schemas/LatLng" }
+        userId: { type: [string, 'null'] }
+        pickup: { $ref: '#/components/schemas/LatLng' }
+        dropoff: { $ref: '#/components/schemas/LatLng' }
         vehicleType:
           type: string
           enum: [BIKE, CAR, SUV]
-        distanceKm: { type: [number, "null"] }
-        etaMinutes: { type: [integer, "null"] }
-        priceSnapshot: { $ref: "#/components/schemas/PriceSnapshot" }
+        distanceKm: { type: [number, 'null'] }
+        etaMinutes: { type: [integer, 'null'] }
+        priceSnapshot: { $ref: '#/components/schemas/PriceSnapshot' }
         status:
           type: string
           enum: [REQUESTED, CANCELLED]
@@ -74,7 +74,7 @@ components:
           type: string
           format: date-time
         canceledAt:
-          type: [string, "null"]
+          type: [string, 'null']
           format: date-time
     PublishedEvent:
       type: object
@@ -97,11 +97,11 @@ components:
           type: string
           description: optional override user id
         pickup:
-          $ref: "#/components/schemas/LatLng"
+          $ref: '#/components/schemas/LatLng'
         drop:
-          $ref: "#/components/schemas/LatLng"
+          $ref: '#/components/schemas/LatLng'
         dropoff:
-          $ref: "#/components/schemas/LatLng"
+          $ref: '#/components/schemas/LatLng'
         distance_km:
           type: number
           minimum: 0
@@ -127,7 +127,7 @@ paths:
     get:
       summary: Health check
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
@@ -139,9 +139,9 @@ paths:
     get:
       summary: List bookings
       parameters:
-        - $ref: "#/components/parameters/UserIdQuery"
+        - $ref: '#/components/parameters/UserIdQuery'
       responses:
-        "200":
+        '200':
           description: List bookings
           content:
             application/json:
@@ -151,17 +151,17 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Booking"
+                      $ref: '#/components/schemas/Booking'
     post:
       summary: Create booking
       parameters:
-        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateBookingRequest"
+              $ref: '#/components/schemas/CreateBookingRequest'
             examples:
               rubricStyle:
                 value:
@@ -171,7 +171,7 @@ paths:
                   traffic_level: 0.5
                   vehicleType: CAR
       responses:
-        "201":
+        '201':
           description: Created
           content:
             application/json:
@@ -179,42 +179,42 @@ paths:
                 type: object
                 properties:
                   booking:
-                    $ref: "#/components/schemas/Booking"
+                    $ref: '#/components/schemas/Booking'
                   publishedEvent:
-                    $ref: "#/components/schemas/PublishedEvent"
+                    $ref: '#/components/schemas/PublishedEvent'
                   additionalEvents:
                     type: array
                     items:
-                      $ref: "#/components/schemas/AdditionalEvent"
-        "400":
+                      $ref: '#/components/schemas/AdditionalEvent'
+        '400':
           description: Validation error
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorPayload" }
+              schema: { $ref: '#/components/schemas/ErrorPayload' }
               examples:
                 missingPickup:
-                  value: { error: "pickup is required" }
+                  value: { error: 'pickup is required' }
                 invalidPayment:
-                  value: { error: "Invalid payment method" }
-        "409":
+                  value: { error: 'Invalid payment method' }
+        '409':
           description: Idempotency conflict / in-progress
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorPayload" }
+              schema: { $ref: '#/components/schemas/ErrorPayload' }
               examples:
                 conflict:
                   value:
-                    error: "Idempotency-Key payload mismatch"
-                    code: "IDEMPOTENCY_KEY_CONFLICT"
-        "422":
+                    error: 'Idempotency-Key payload mismatch'
+                    code: 'IDEMPOTENCY_KEY_CONFLICT'
+        '422':
           description: Schema type validation error
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorPayload" }
+              schema: { $ref: '#/components/schemas/ErrorPayload' }
               examples:
                 invalidLatLng:
                   value:
-                    error: "Validation error from schema"
+                    error: 'Validation error from schema'
   /v1/bookings/{id}:
     get:
       summary: Get booking by id
@@ -224,7 +224,7 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        "200":
+        '200':
           description: Booking detail
           content:
             application/json:
@@ -232,12 +232,12 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: "#/components/schemas/Booking"
-        "404":
+                    $ref: '#/components/schemas/Booking'
+        '404':
           description: Not found
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorPayload" }
+              schema: { $ref: '#/components/schemas/ErrorPayload' }
   /v1/bookings/{id}/cancel:
     post:
       summary: Cancel booking
@@ -247,7 +247,7 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        "200":
+        '200':
           description: Booking cancelled
           content:
             application/json:
@@ -255,11 +255,11 @@ paths:
                 type: object
                 properties:
                   booking:
-                    $ref: "#/components/schemas/Booking"
+                    $ref: '#/components/schemas/Booking'
                   publishedEvent:
-                    $ref: "#/components/schemas/PublishedEvent"
-        "404":
+                    $ref: '#/components/schemas/PublishedEvent'
+        '404':
           description: Not found
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorPayload" }
+              schema: { $ref: '#/components/schemas/ErrorPayload' }

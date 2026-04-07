@@ -45,9 +45,7 @@ export function useTrips({ limit = 20 }: Options = {}) {
 
     const primaryDriverId = toNormalizedId(driver?.id);
     const userDriverId = toNormalizedId(driver?.userId);
-    const driverIds = Array.from(
-      new Set([primaryDriverId, userDriverId].filter((value): value is string => Boolean(value))),
-    );
+    const driverIds = Array.from(new Set([primaryDriverId, userDriverId].filter((value): value is string => Boolean(value))));
 
     if (!driverIds.length) {
       setItems([]);
@@ -61,10 +59,7 @@ export function useTrips({ limit = 20 }: Options = {}) {
     setLoading(true);
     setError(null);
 
-    Promise.all([
-      Promise.all(driverIds.map((driverId) => rideApi.listHistory({ limit, driverId }))),
-      paymentApi.listPayments(limit),
-    ])
+    Promise.all([Promise.all(driverIds.map((driverId) => rideApi.listHistory({ limit, driverId }))), paymentApi.listPayments(limit)])
       .then(([rideResponses, paymentsRes]) => {
         if (!mounted) return;
 
@@ -113,10 +108,7 @@ export function useTrips({ limit = 20 }: Options = {}) {
   const summary = useMemo(() => {
     const completed = items.filter((item) => item.status?.toUpperCase() === 'COMPLETED');
     const cancelled = items.filter((item) => item.status?.toUpperCase() === 'CANCELLED');
-    const totalAmount = completed.reduce(
-      (sum, ride) => sum + (paymentsByRide[ride.id] ?? 0),
-      0,
-    );
+    const totalAmount = completed.reduce((sum, ride) => sum + (paymentsByRide[ride.id] ?? 0), 0);
     return { completed: completed.length, cancelled: cancelled.length, totalAmount } as TripSummary;
   }, [items, paymentsByRide]);
 

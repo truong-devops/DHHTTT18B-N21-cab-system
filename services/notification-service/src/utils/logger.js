@@ -1,8 +1,8 @@
-const pino = require("pino");
+const pino = require('pino');
 
 const logger = pino({
   base: {
-    serviceName: process.env.SERVICE_NAME || "notification-service"
+    serviceName: process.env.SERVICE_NAME || 'notification-service'
   }
 });
 
@@ -10,7 +10,7 @@ function withTrace(traceOrReq) {
   if (!traceOrReq) {
     return logger;
   }
-  if (typeof traceOrReq === "string") {
+  if (typeof traceOrReq === 'string') {
     return logger.child({ traceId: traceOrReq });
   }
   return logger.child({

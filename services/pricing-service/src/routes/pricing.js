@@ -1,71 +1,56 @@
-const express = require("express");
-const crypto = require("crypto");
-const { asyncHandler } = require("../utils/asyncHandler");
-const { ApiError } = require("../utils/errors");
-const { sendSuccess } = require("../utils/response");
-const { validateRequest } = require("../middleware/validateRequest");
-const {
-  haversineKm,
-  estimateDurationMin,
-  calculateFare,
-  round
-} = require("../domain/pricingEngine");
-const { getRateCard, getCouponDiscount } = require("../repository/rateRepository");
-const { saveQuote, getQuote } = require("../repository/quoteRepository");
-const {
-  listRules,
-  createRule,
-  toggleRule
-} = require("../repository/surgeRuleRepository");
-const { requireAuthOrInternal } = require("../middleware/auth");
-const monitoring = require("../monitoring");
+const express = require('express');
+const crypto = require('crypto');
+const { asyncHandler } = require('../utils/asyncHandler');
+const { ApiError } = require('../utils/errors');
+const { sendSuccess } = require('../utils/response');
+const { validateRequest } = require('../middleware/validateRequest');
+const { haversineKm, estimateDurationMin, calculateFare, round } = require('../domain/pricingEngine');
+const { getRateCard, getCouponDiscount } = require('../repository/rateRepository');
+const { saveQuote, getQuote } = require('../repository/quoteRepository');
+const { listRules, createRule, toggleRule } = require('../repository/surgeRuleRepository');
+const { requireAuthOrInternal } = require('../middleware/auth');
+const monitoring = require('../monitoring');
 
 const router = express.Router();
 
-const QUOTE_TTL_SEC = Math.max(
-  1,
-  Number(process.env.QUOTE_TTL_SEC || 300)
-);
+const QUOTE_TTL_SEC = Math.max(1, Number(process.env.QUOTE_TTL_SEC || 300));
 
 function isFiniteNumber(value) {
   return Number.isFinite(value);
 }
 
 function validateLocation(location, field, errors) {
-  if (!location || typeof location !== "object") {
-    errors.push({ path: `body.${field}`, message: "is required" });
+  if (!location || typeof location !== 'object') {
+    errors.push({ path: `body.${field}`, message: 'is required' });
     return;
   }
 
   const { lat, lng } = location;
   if (!isFiniteNumber(lat)) {
-    errors.push({ path: `body.${field}.lat`, message: "must be a number" });
+    errors.push({ path: `body.${field}.lat`, message: 'must be a number' });
   } else if (lat < -90 || lat > 90) {
     errors.push({
       path: `body.${field}.lat`,
-      message: "must be between -90 and 90"
+      message: 'must be between -90 and 90'
     });
   }
 
   if (!isFiniteNumber(lng)) {
-    errors.push({ path: `body.${field}.lng`, message: "must be a number" });
+    errors.push({ path: `body.${field}.lng`, message: 'must be a number' });
   } else if (lng < -180 || lng > 180) {
     errors.push({
       path: `body.${field}.lng`,
-      message: "must be between -180 and 180"
+      message: 'must be between -180 and 180'
     });
   }
 }
 
 function ensurePickupDiffers(pickup, dropoff, errors) {
   if (!pickup || !dropoff) return;
-  if (
-    pickup.lat === dropoff.lat &&
-    pickup.lng === dropoff.lng
-  ) {
+  if (pickup.lat === dropoff.lat && pickup.lng === dropoff.lng) {
     errors.push({
-      path: "body.dropoff",
-      message: "must be different from pickup"
+      path: 'body.dropoff',
+      message: 'must be different from pickup'
     });
   }
 }
@@ -81,22 +66,22 @@ function normalizeDemandIndex(value) {
 router.use(requireAuthOrInternal);
 
 router.get(
-  "/surge-rules",
+  '/surge-rules',
   asyncHandler(async (req, res) => {
     return sendSuccess(res, req, { items: listRules() });
   })
 );
 
 router.post(
-  "/surge-rules",
+  '/surge-rules',
   validateRequest({
     bodySchema: {
-      required: ["name", "multiplier"],
+      required: ['name', 'multiplier'],
       properties: {
-        name: { type: "string" },
-        multiplier: { type: "number" },
-        status: { type: "string" },
-        zone: { type: "string" }
+        name: { type: 'string' },
+        multiplier: { type: 'number' },
+        status: { type: 'string' },
+        zone: { type: 'string' }
       }
     }
   }),
@@ -108,37 +93,37 @@ router.post(
       zone: req.body.zone
     });
     monitoring.recordBusinessEvent({
-      domain: "pricing",
-      event: "surge_rule_created",
-      outcome: "success"
+      domain: 'pricing',
+      event: 'surge_rule_created',
+      outcome: 'success'
     });
     return sendSuccess(res, req, rule, 201);
   })
 );
 
 router.patch(
-  "/surge-rules/:id",
+  '/surge-rules/:id',
   validateRequest({
     paramsSchema: {
-      required: ["id"],
-      properties: { id: { type: "string" } }
+      required: ['id'],
+      properties: { id: { type: 'string' } }
     },
     bodySchema: {
-      required: ["enabled"],
-      properties: { enabled: { type: "boolean" } }
+      required: ['enabled'],
+      properties: { enabled: { type: 'boolean' } }
     }
   }),
   asyncHandler(async (req, res) => {
     const rule = toggleRule(req.params.id, Boolean(req.body.enabled));
     if (!rule) {
-      throw new ApiError(404, "NOT_FOUND", "Rule not found");
+      throw new ApiError(404, 'NOT_FOUND', 'Rule not found');
     }
     monitoring.recordBusinessEvent({
-      domain: "pricing",
-      event: "surge_rule_toggled",
-      outcome: "success",
+      domain: 'pricing',
+      event: 'surge_rule_toggled',
+      outcome: 'success',
       attributes: {
-        status: String(rule.status || "unknown").toLowerCase()
+        status: String(rule.status || 'unknown').toLowerCase()
       }
     });
     return sendSuccess(res, req, rule);
@@ -146,37 +131,27 @@ router.patch(
 );
 
 router.post(
-  "/estimate",
+  '/estimate',
   validateRequest({
     bodySchema: {
-      required: ["distance_km"],
+      required: ['distance_km'],
       properties: {
-        distance_km: { type: "number", minimum: 0 },
-        demand_index: { type: "number", minimum: 0 }
+        distance_km: { type: 'number', minimum: 0 },
+        demand_index: { type: 'number', minimum: 0 }
       }
     }
   }),
   asyncHandler(async (req, res) => {
     const distanceKm = Number(req.body.distance_km);
     const demandIndex = normalizeDemandIndex(req.body.demand_index);
-    const rateCard = await getRateCard("STANDARD");
+    const rateCard = await getRateCard('STANDARD');
 
     if (!rateCard) {
-      throw new ApiError(
-        500,
-        "INTERNAL",
-        "Rate card unavailable"
-      );
+      throw new ApiError(500, 'INTERNAL', 'Rate card unavailable');
     }
 
     const safeDistanceKm = Math.max(0, round(distanceKm, 3));
-    const durationMin = round(
-      estimateDurationMin(
-        safeDistanceKm,
-        Number(rateCard.averageSpeedKmh || 25)
-      ),
-      2
-    );
+    const durationMin = round(estimateDurationMin(safeDistanceKm, Number(rateCard.averageSpeedKmh || 25)), 2);
 
     const fare = calculateFare({
       distanceKm: safeDistanceKm,
@@ -195,29 +170,29 @@ router.post(
       base_fare: Number(rateCard.baseFare || 0),
       surge: demandIndex,
       breakdown: fare.breakdown,
-      currency: rateCard.currency || "VND"
+      currency: rateCard.currency || 'VND'
     });
   })
 );
 
 router.post(
-  "/quotes",
+  '/quotes',
   validateRequest({
     bodySchema: {
-      required: ["pickup", "dropoff", "serviceType"],
+      required: ['pickup', 'dropoff', 'serviceType'],
       properties: {
-        pickup: { type: "object" },
-        dropoff: { type: "object" },
+        pickup: { type: 'object' },
+        dropoff: { type: 'object' },
         serviceType: {
-          type: "string",
-          enum: ["STANDARD", "PREMIUM"]
+          type: 'string',
+          enum: ['STANDARD', 'PREMIUM']
         },
-        couponCode: { type: "string" }
+        couponCode: { type: 'string' }
       }
     },
     custom: (req, errors) => {
-      validateLocation(req.body?.pickup, "pickup", errors);
-      validateLocation(req.body?.dropoff, "dropoff", errors);
+      validateLocation(req.body?.pickup, 'pickup', errors);
+      validateLocation(req.body?.dropoff, 'dropoff', errors);
       ensurePickupDiffers(req.body?.pickup, req.body?.dropoff, errors);
     }
   }),
@@ -226,18 +201,11 @@ router.post(
 
     const rateCard = await getRateCard(serviceType);
     if (!rateCard) {
-      throw new ApiError(
-        400,
-        "VALIDATION_ERROR",
-        "Unsupported service type"
-      );
+      throw new ApiError(400, 'VALIDATION_ERROR', 'Unsupported service type');
     }
 
     const distanceKm = round(haversineKm(pickup, dropoff), 3);
-    const durationMin = round(
-      estimateDurationMin(distanceKm, rateCard.averageSpeedKmh),
-      2
-    );
+    const durationMin = round(estimateDurationMin(distanceKm, rateCard.averageSpeedKmh), 2);
     const discount = getCouponDiscount(couponCode);
     const { estimatedFare, breakdown } = calculateFare({
       distanceKm,
@@ -247,9 +215,7 @@ router.post(
     });
 
     const quoteId = crypto.randomUUID();
-    const expiresAt = new Date(
-      Date.now() + QUOTE_TTL_SEC * 1000
-    ).toISOString();
+    const expiresAt = new Date(Date.now() + QUOTE_TTL_SEC * 1000).toISOString();
 
     const record = {
       quoteId,
@@ -260,7 +226,7 @@ router.post(
       durationMin,
       estimatedFare,
       surge: Number(rateCard.surgeMultiplier || 1),
-      currency: rateCard.currency || "VND",
+      currency: rateCard.currency || 'VND',
       breakdown,
       expiresAt,
       createdAt: new Date().toISOString(),
@@ -270,18 +236,18 @@ router.post(
         perMinRate: rateCard.perMinRate,
         surgeMultiplier: rateCard.surgeMultiplier,
         averageSpeedKmh: rateCard.averageSpeedKmh,
-        currency: rateCard.currency || "VND"
+        currency: rateCard.currency || 'VND'
       },
       discountApplied: discount
     };
 
     await saveQuote(quoteId, record, QUOTE_TTL_SEC);
     monitoring.recordBusinessEvent({
-      domain: "pricing",
-      event: "quote_created",
-      outcome: "success",
+      domain: 'pricing',
+      event: 'quote_created',
+      outcome: 'success',
       attributes: {
-        service_type: String(serviceType || "unknown").toLowerCase()
+        service_type: String(serviceType || 'unknown').toLowerCase()
       }
     });
 
@@ -304,13 +270,13 @@ router.post(
 );
 
 router.post(
-  "/simulate",
+  '/simulate',
   asyncHandler(async (req, res) => {
     const payload = req.body || {};
-    const serviceType = payload.serviceType || "STANDARD";
+    const serviceType = payload.serviceType || 'STANDARD';
     const rateCard = await getRateCard(serviceType);
     if (!rateCard) {
-      throw new ApiError(400, "VALIDATION_ERROR", "Unsupported service type");
+      throw new ApiError(400, 'VALIDATION_ERROR', 'Unsupported service type');
     }
 
     const basePickup = { lat: 10.776, lng: 106.701 };
@@ -319,17 +285,13 @@ router.post(
     const pickup = payload.pickup || basePickup;
     const dropoff = payload.dropoff || baseDropoff;
 
-    const distanceKm = Number.isFinite(payload.distanceKm)
-      ? payload.distanceKm
-      : round(haversineKm(pickup, dropoff), 3);
+    const distanceKm = Number.isFinite(payload.distanceKm) ? payload.distanceKm : round(haversineKm(pickup, dropoff), 3);
     const durationMin = Number.isFinite(payload.durationMin)
       ? payload.durationMin
       : round(estimateDurationMin(distanceKm, rateCard.averageSpeedKmh), 2);
 
     const discount = getCouponDiscount(payload.couponCode);
-    const surgeMultiplier = Number.isFinite(payload.surgeMultiplier)
-      ? payload.surgeMultiplier
-      : rateCard.surgeMultiplier;
+    const surgeMultiplier = Number.isFinite(payload.surgeMultiplier) ? payload.surgeMultiplier : rateCard.surgeMultiplier;
     const { estimatedFare, breakdown } = calculateFare({
       distanceKm,
       durationMin,
@@ -340,7 +302,7 @@ router.post(
     return sendSuccess(res, req, {
       multiplier: surgeMultiplier || 1,
       estimatedFare,
-      currency: rateCard.currency || "VND",
+      currency: rateCard.currency || 'VND',
       distanceKm,
       durationMin,
       breakdown
@@ -349,12 +311,12 @@ router.post(
 );
 
 router.get(
-  "/quotes/:quoteId",
+  '/quotes/:quoteId',
   validateRequest({
     paramsSchema: {
-      required: ["quoteId"],
+      required: ['quoteId'],
       properties: {
-        quoteId: { type: "string" }
+        quoteId: { type: 'string' }
       }
     }
   }),
@@ -363,12 +325,12 @@ router.get(
     const quote = await getQuote(quoteId);
 
     if (!quote) {
-      throw new ApiError(410, "QUOTE_EXPIRED", "Quote expired");
+      throw new ApiError(410, 'QUOTE_EXPIRED', 'Quote expired');
     }
 
-    const expiresAtMs = Date.parse(quote.expiresAt || "");
+    const expiresAtMs = Date.parse(quote.expiresAt || '');
     if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
-      throw new ApiError(410, "QUOTE_EXPIRED", "Quote expired");
+      throw new ApiError(410, 'QUOTE_EXPIRED', 'Quote expired');
     }
 
     return sendSuccess(res, req, {
@@ -385,34 +347,28 @@ router.get(
 );
 
 router.post(
-  "/finalize",
+  '/finalize',
   validateRequest({
     bodySchema: {
-      required: ["quoteId"],
+      required: ['quoteId'],
       properties: {
-        quoteId: { type: "string" },
-        actualDistanceKm: { type: "number" },
-        actualDurationMin: { type: "number" }
+        quoteId: { type: 'string' },
+        actualDistanceKm: { type: 'number' },
+        actualDurationMin: { type: 'number' }
       }
     },
     custom: (req, errors) => {
       const { actualDistanceKm, actualDurationMin } = req.body || {};
-      if (
-        actualDistanceKm !== undefined &&
-        (!Number.isFinite(actualDistanceKm) || actualDistanceKm < 0)
-      ) {
+      if (actualDistanceKm !== undefined && (!Number.isFinite(actualDistanceKm) || actualDistanceKm < 0)) {
         errors.push({
-          path: "body.actualDistanceKm",
-          message: "must be a positive number"
+          path: 'body.actualDistanceKm',
+          message: 'must be a positive number'
         });
       }
-      if (
-        actualDurationMin !== undefined &&
-        (!Number.isFinite(actualDurationMin) || actualDurationMin < 0)
-      ) {
+      if (actualDurationMin !== undefined && (!Number.isFinite(actualDurationMin) || actualDurationMin < 0)) {
         errors.push({
-          path: "body.actualDurationMin",
-          message: "must be a positive number"
+          path: 'body.actualDurationMin',
+          message: 'must be a positive number'
         });
       }
     }
@@ -422,22 +378,16 @@ router.post(
     const quote = await getQuote(quoteId);
 
     if (!quote) {
-      throw new ApiError(410, "QUOTE_EXPIRED", "Quote expired");
+      throw new ApiError(410, 'QUOTE_EXPIRED', 'Quote expired');
     }
 
-    const expiresAtMs = Date.parse(quote.expiresAt || "");
+    const expiresAtMs = Date.parse(quote.expiresAt || '');
     if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
-      throw new ApiError(410, "QUOTE_EXPIRED", "Quote expired");
+      throw new ApiError(410, 'QUOTE_EXPIRED', 'Quote expired');
     }
 
-    const distanceKm =
-      actualDistanceKm !== undefined
-        ? actualDistanceKm
-        : quote.distanceKm;
-    const durationMin =
-      actualDurationMin !== undefined
-        ? actualDurationMin
-        : quote.durationMin;
+    const distanceKm = actualDistanceKm !== undefined ? actualDistanceKm : quote.distanceKm;
+    const durationMin = actualDurationMin !== undefined ? actualDurationMin : quote.durationMin;
 
     const { estimatedFare, breakdown } = calculateFare({
       distanceKm,
@@ -446,9 +396,9 @@ router.post(
       discount: quote.discountApplied
     });
     monitoring.recordBusinessEvent({
-      domain: "pricing",
-      event: "quote_finalized",
-      outcome: "success"
+      domain: 'pricing',
+      event: 'quote_finalized',
+      outcome: 'success'
     });
 
     return sendSuccess(res, req, {

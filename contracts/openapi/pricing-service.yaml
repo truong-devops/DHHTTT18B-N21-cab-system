@@ -7,7 +7,7 @@ paths:
     get:
       summary: Health check
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
@@ -20,7 +20,7 @@ paths:
     get:
       summary: Readiness check (Redis)
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
@@ -29,7 +29,7 @@ paths:
                 properties:
                   ok:
                     type: boolean
-        "503":
+        '503':
           description: Redis unavailable
           content:
             application/json:
@@ -49,26 +49,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/QuoteRequest"
+              $ref: '#/components/schemas/QuoteRequest'
       responses:
-        "201":
+        '201':
           description: Created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/QuoteResponse"
-        "400":
+                $ref: '#/components/schemas/QuoteResponse'
+        '400':
           description: Validation error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/pricing/quotes/{quoteId}:
     get:
       summary: Get quote by id
@@ -83,24 +83,24 @@ paths:
             type: string
             format: uuid
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/QuoteResponse"
-        "401":
+                $ref: '#/components/schemas/QuoteResponse'
+        '401':
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "410":
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
           description: Quote expired
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/pricing/finalize:
     post:
       summary: Finalize fare
@@ -112,26 +112,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/FinalizeRequest"
+              $ref: '#/components/schemas/FinalizeRequest'
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FinalizeResponse"
-        "401":
+                $ref: '#/components/schemas/FinalizeResponse'
+        '401':
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "410":
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
           description: Quote expired
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -148,9 +148,9 @@ components:
       required: [pickup, dropoff, serviceType]
       properties:
         pickup:
-          $ref: "#/components/schemas/LatLng"
+          $ref: '#/components/schemas/LatLng'
         dropoff:
-          $ref: "#/components/schemas/LatLng"
+          $ref: '#/components/schemas/LatLng'
         serviceType:
           type: string
           enum: [STANDARD, PREMIUM]
@@ -183,7 +183,7 @@ components:
         durationMin:
           type: number
         breakdown:
-          $ref: "#/components/schemas/FareBreakdown"
+          $ref: '#/components/schemas/FareBreakdown'
         expiresAt:
           type: string
           format: date-time
@@ -207,9 +207,9 @@ components:
           type: boolean
           example: true
         data:
-          $ref: "#/components/schemas/QuoteData"
+          $ref: '#/components/schemas/QuoteData'
         meta:
-          $ref: "#/components/schemas/ResponseMeta"
+          $ref: '#/components/schemas/ResponseMeta'
     FinalizeRequest:
       type: object
       required: [quoteId]
@@ -236,7 +236,7 @@ components:
         durationMin:
           type: number
         breakdown:
-          $ref: "#/components/schemas/FareBreakdown"
+          $ref: '#/components/schemas/FareBreakdown'
     FinalizeResponse:
       type: object
       properties:
@@ -244,9 +244,9 @@ components:
           type: boolean
           example: true
         data:
-          $ref: "#/components/schemas/FinalizeData"
+          $ref: '#/components/schemas/FinalizeData'
         meta:
-          $ref: "#/components/schemas/ResponseMeta"
+          $ref: '#/components/schemas/ResponseMeta'
     ResponseMeta:
       type: object
       properties:

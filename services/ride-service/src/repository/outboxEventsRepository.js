@@ -1,13 +1,9 @@
-const { getDb } = require("../db/mongo");
+const { getDb } = require('../db/mongo');
 
-const PROCESSING_TIMEOUT_MS = Number(
-  process.env.OUTBOX_PROCESSING_TIMEOUT_MS || 5 * 60 * 1000
-);
+const PROCESSING_TIMEOUT_MS = Number(process.env.OUTBOX_PROCESSING_TIMEOUT_MS || 5 * 60 * 1000);
 const RETRY_BASE_MS = Number(process.env.OUTBOX_RETRY_BASE_MS || 1000);
 const RETRY_MAX_MS = Number(process.env.OUTBOX_RETRY_MAX_MS || 60000);
-const DEFAULT_MAX_ATTEMPTS = Number(
-  process.env.OUTBOX_MAX_ATTEMPTS || 10
-);
+const DEFAULT_MAX_ATTEMPTS = Number(process.env.OUTBOX_MAX_ATTEMPTS || 10);
 
 function mapOutbox(doc) {
   if (!doc) {
@@ -45,9 +41,9 @@ function computeBackoffMs(attemptCount) {
   return Math.min(RETRY_MAX_MS, Math.max(RETRY_BASE_MS, raw));
 }
 
-async function claimPendingEvents(limit = 50, workerId = "ride-outbox-worker") {
+async function claimPendingEvents(limit = 50, workerId = 'ride-outbox-worker') {
   const db = await getDb();
-  const collection = db.collection("outbox_events");
+  const collection = db.collection('outbox_events');
   const claimed = [];
 
   for (let i = 0; i < limit; i += 1) {
@@ -58,21 +54,18 @@ async function claimPendingEvents(limit = 50, workerId = "ride-outbox-worker") {
       {
         $or: [
           {
-            status: { $in: ["pending", "retry", "failed"] },
-            $or: [
-              { next_retry_at: { $exists: false } },
-              { next_retry_at: { $lte: now } }
-            ]
+            status: { $in: ['pending', 'retry', 'failed'] },
+            $or: [{ next_retry_at: { $exists: false } }, { next_retry_at: { $lte: now } }]
           },
           {
-            status: "processing",
+            status: 'processing',
             processing_started_at: { $lt: timeoutBefore }
           }
         ]
       },
       {
         $set: {
-          status: "processing",
+          status: 'processing',
           processing_started_at: now,
           processing_owner: workerId,
           updated_at: now
@@ -84,14 +77,11 @@ async function claimPendingEvents(limit = 50, workerId = "ride-outbox-worker") {
           occurred_at: 1,
           _id: 1
         },
-        returnDocument: "after"
+        returnDocument: 'after'
       }
     );
 
-    const doc =
-      result && Object.prototype.hasOwnProperty.call(result, "value")
-        ? result.value
-        : result;
+    const doc = result && Object.prototype.hasOwnProperty.call(result, 'value') ? result.value : result;
 
     if (!doc) {
       break;
@@ -105,8 +95,8 @@ async function claimPendingEvents(limit = 50, workerId = "ride-outbox-worker") {
 
 async function countOutboxBacklog() {
   const db = await getDb();
-  const result = await db.collection("outbox_events").countDocuments({
-    status: { $in: ["pending", "retry", "failed"] }
+  const result = await db.collection('outbox_events').countDocuments({
+    status: { $in: ['pending', 'retry', 'failed'] }
   });
   return Number(result || 0);
 }
@@ -114,11 +104,11 @@ async function countOutboxBacklog() {
 async function markPublished(id) {
   const db = await getDb();
   const now = new Date();
-  await db.collection("outbox_events").updateOne(
+  await db.collection('outbox_events').updateOne(
     { _id: id },
     {
       $set: {
-        status: "published",
+        status: 'published',
         published_at: now,
         processing_started_at: null,
         processing_owner: null,
@@ -133,25 +123,22 @@ async function markPublished(id) {
 async function markRetry(id, errorMessage) {
   const db = await getDb();
   const now = new Date();
-  const increment = await db.collection("outbox_events").findOneAndUpdate(
+  const increment = await db.collection('outbox_events').findOneAndUpdate(
     { _id: id },
     {
       $inc: { attempt_count: 1 },
       $set: {
-        last_error: errorMessage || "publish_failed",
+        last_error: errorMessage || 'publish_failed',
         last_error_at: now,
         processing_started_at: null,
         processing_owner: null,
         updated_at: now
       }
     },
-    { returnDocument: "after" }
+    { returnDocument: 'after' }
   );
 
-  const doc =
-    increment && Object.prototype.hasOwnProperty.call(increment, "value")
-      ? increment.value
-      : increment;
+  const doc = increment && Object.prototype.hasOwnProperty.call(increment, 'value') ? increment.value : increment;
 
   if (!doc) {
     return null;
@@ -161,18 +148,18 @@ async function markRetry(id, errorMessage) {
   const maxAttempts = Number(doc.max_attempts || DEFAULT_MAX_ATTEMPTS);
 
   if (attemptCount >= maxAttempts) {
-    await db.collection("outbox_events").updateOne(
+    await db.collection('outbox_events').updateOne(
       { _id: id },
       {
         $set: {
-          status: "dead",
+          status: 'dead',
           updated_at: new Date()
         }
       }
     );
 
     return {
-      status: "dead",
+      status: 'dead',
       attemptCount,
       maxAttempts,
       eventId: doc.event_id
@@ -181,11 +168,11 @@ async function markRetry(id, errorMessage) {
 
   const delayMs = computeBackoffMs(attemptCount);
   const nextRetryAt = new Date(Date.now() + delayMs);
-  await db.collection("outbox_events").updateOne(
+  await db.collection('outbox_events').updateOne(
     { _id: id },
     {
       $set: {
-        status: "retry",
+        status: 'retry',
         next_retry_at: nextRetryAt,
         updated_at: new Date()
       }
@@ -193,7 +180,7 @@ async function markRetry(id, errorMessage) {
   );
 
   return {
-    status: "retry",
+    status: 'retry',
     attemptCount,
     maxAttempts,
     retryInMs: delayMs,
@@ -204,12 +191,12 @@ async function markRetry(id, errorMessage) {
 async function markDead(id, errorMessage, dlqTopic, dlqPayload) {
   const db = await getDb();
   const now = new Date();
-  await db.collection("outbox_events").updateOne(
+  await db.collection('outbox_events').updateOne(
     { _id: id },
     {
       $set: {
-        status: "dead",
-        last_error: errorMessage || "max_retries_exceeded",
+        status: 'dead',
+        last_error: errorMessage || 'max_retries_exceeded',
         last_error_at: now,
         dlq_topic: dlqTopic || null,
         dlq_payload: dlqPayload || null,

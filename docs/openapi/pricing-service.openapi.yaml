@@ -87,7 +87,7 @@ components:
             validation:
               value:
                 success: false
-                error: { code: VALIDATION_ERROR, message: "Validation failed", details: { "body.pickup.lat": "must be between -90 and 90" } }
+                error: { code: VALIDATION_ERROR, message: 'Validation failed', details: { 'body.pickup.lat': 'must be between -90 and 90' } }
     Error401:
       description: Unauthorized
       content:
@@ -97,7 +97,7 @@ components:
             unauthorized:
               value:
                 success: false
-                error: { code: UNAUTHORIZED, message: "Missing authorization token", details: {} }
+                error: { code: UNAUTHORIZED, message: 'Missing authorization token', details: {} }
     Error403:
       description: Forbidden
       content:
@@ -107,7 +107,7 @@ components:
             forbidden:
               value:
                 success: false
-                error: { code: FORBIDDEN, message: "Forbidden", details: {} }
+                error: { code: FORBIDDEN, message: 'Forbidden', details: {} }
     Error404:
       description: Not Found
       content:
@@ -117,7 +117,7 @@ components:
             notFound:
               value:
                 success: false
-                error: { code: NOT_FOUND, message: "Not found", details: {} }
+                error: { code: NOT_FOUND, message: 'Not found', details: {} }
     Error409:
       description: Conflict
       content:
@@ -127,7 +127,7 @@ components:
             conflict:
               value:
                 success: false
-                error: { code: CONFLICT, message: "Conflict", details: {} }
+                error: { code: CONFLICT, message: 'Conflict', details: {} }
     Error410:
       description: Gone (quote expired)
       content:
@@ -137,7 +137,7 @@ components:
             expired:
               value:
                 success: false
-                error: { code: QUOTE_EXPIRED, message: "Quote expired", details: {} }
+                error: { code: QUOTE_EXPIRED, message: 'Quote expired', details: {} }
     Error422:
       description: Unprocessable Entity
       content:
@@ -147,7 +147,7 @@ components:
             unprocessable:
               value:
                 success: false
-                error: { code: VALIDATION_ERROR, message: "Invalid payload", details: {} }
+                error: { code: VALIDATION_ERROR, message: 'Invalid payload', details: {} }
     Error429:
       description: Too Many Requests
       content:
@@ -157,7 +157,7 @@ components:
             rateLimit:
               value:
                 success: false
-                error: { code: RATE_LIMITED, message: "Too many requests", details: {} }
+                error: { code: RATE_LIMITED, message: 'Too many requests', details: {} }
     Error500:
       description: Internal Server Error
       content:
@@ -167,7 +167,7 @@ components:
             internal:
               value:
                 success: false
-                error: { code: INTERNAL, message: "Unexpected error", details: {} }
+                error: { code: INTERNAL, message: 'Unexpected error', details: {} }
 paths:
   /health:
     get:
@@ -250,14 +250,14 @@ paths:
                   value:
                     success: true
                     data:
-                      quoteId: "e80db0e0-53ab-4adb-8810-dc1e51cd05c7"
+                      quoteId: 'e80db0e0-53ab-4adb-8810-dc1e51cd05c7'
                       estimatedFare: 31325
                       currency: VND
                       distanceKm: 3.117
                       durationMin: 7.48
                       breakdown: { base: 12000, perKm: 15585, perMin: 3740, discount: 0, surge: 0 }
-                      expiresAt: "2026-02-05T16:59:22.761Z"
-                    meta: { requestId: "uuid", traceId: "uuid" }
+                      expiresAt: '2026-02-05T16:59:22.761Z'
+                    meta: { requestId: 'uuid', traceId: 'uuid' }
         '200':
           description: OK (non-standard)
           content:
@@ -307,14 +307,14 @@ paths:
                   value:
                     success: true
                     data:
-                      quoteId: "e80db0e0-53ab-4adb-8810-dc1e51cd05c7"
+                      quoteId: 'e80db0e0-53ab-4adb-8810-dc1e51cd05c7'
                       estimatedFare: 31325
                       currency: VND
                       distanceKm: 3.117
                       durationMin: 7.48
                       breakdown: { base: 12000, perKm: 15585, perMin: 3740, discount: 0, surge: 0 }
-                      expiresAt: "2026-02-05T16:59:22.761Z"
-                    meta: { requestId: "uuid", traceId: "uuid" }
+                      expiresAt: '2026-02-05T16:59:22.761Z'
+                    meta: { requestId: 'uuid', traceId: 'uuid' }
         '204':
           description: No Content (not used)
         '400': { $ref: '#/components/responses/Error400' }
@@ -347,7 +347,7 @@ paths:
             examples:
               finalize:
                 value:
-                  quoteId: "e80db0e0-53ab-4adb-8810-dc1e51cd05c7"
+                  quoteId: 'e80db0e0-53ab-4adb-8810-dc1e51cd05c7'
                   actualDistanceKm: 3.5
                   actualDurationMin: 9
       responses:
@@ -366,13 +366,13 @@ paths:
                   value:
                     success: true
                     data:
-                      quoteId: "e80db0e0-53ab-4adb-8810-dc1e51cd05c7"
+                      quoteId: 'e80db0e0-53ab-4adb-8810-dc1e51cd05c7'
                       finalFare: 34000
                       currency: VND
                       distanceKm: 3.5
                       durationMin: 9
                       breakdown: { base: 12000, perKm: 17500, perMin: 4500, discount: 0, surge: 0 }
-                    meta: { requestId: "uuid", traceId: "uuid" }
+                    meta: { requestId: 'uuid', traceId: 'uuid' }
         '201':
           description: Created (not used)
         '204':

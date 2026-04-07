@@ -1,13 +1,13 @@
-import React from 'react'
-import { StyleSheet, TextInput } from 'react-native'
-import { colors, spacing, typography } from '../../theme/tokens'
+import React from 'react';
+import { StyleSheet, TextInput } from 'react-native';
+import { colors, spacing, typography } from '../../theme/tokens';
 
 type Props = {
-  value: string
-  placeholder?: string
-  onChangeText: (text: string) => void
-  minHeight?: number
-}
+  value: string;
+  placeholder?: string;
+  onChangeText: (text: string) => void;
+  minHeight?: number;
+};
 
 export const TextArea: React.FC<Props> = ({ value, placeholder, onChangeText, minHeight = 120 }) => {
   return (
@@ -20,8 +20,8 @@ export const TextArea: React.FC<Props> = ({ value, placeholder, onChangeText, mi
       multiline
       textAlignVertical="top"
     />
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   input: {
@@ -32,4 +32,4 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text
   }
-})
+});

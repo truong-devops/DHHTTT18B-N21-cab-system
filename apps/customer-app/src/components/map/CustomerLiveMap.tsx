@@ -1,28 +1,28 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { colors, spacing, typography } from '../../theme/tokens'
+import React, { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { colors, spacing, typography } from '../../theme/tokens';
 
 type Coordinate = {
-  latitude: number
-  longitude: number
-  label?: string
-}
+  latitude: number;
+  longitude: number;
+  label?: string;
+};
 
 type Props = {
-  label?: string
-  destination?: Coordinate | null
-  showRoute?: boolean
-  onLocationChange?: (coords: Coordinate) => void
-}
+  label?: string;
+  destination?: Coordinate | null;
+  showRoute?: boolean;
+  onLocationChange?: (coords: Coordinate) => void;
+};
 
 export const CustomerLiveMap: React.FC<Props> = ({ label, destination, onLocationChange }) => {
-  const [current, setCurrent] = useState<Coordinate | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [current, setCurrent] = useState<Coordinate | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setError('Trinh duyet khong ho tro geolocation')
-      return
+      setError('Trinh duyet khong ho tro geolocation');
+      return;
     }
 
     const watchId = navigator.geolocation.watchPosition(
@@ -30,33 +30,33 @@ export const CustomerLiveMap: React.FC<Props> = ({ label, destination, onLocatio
         const next = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
-        }
-        setCurrent(next)
-        setError(null)
-        onLocationChange?.(next)
+        };
+        setCurrent(next);
+        setError(null);
+        onLocationChange?.(next);
       },
       (geoError) => {
-        setError(geoError.message || 'Khong lay duoc vi tri hien tai')
+        setError(geoError.message || 'Khong lay duoc vi tri hien tai');
       },
       {
         enableHighAccuracy: true,
         maximumAge: 4000,
         timeout: 10000
       }
-    )
+    );
 
-    return () => navigator.geolocation.clearWatch(watchId)
-  }, [onLocationChange])
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [onLocationChange]);
 
   const currentLabel = useMemo(() => {
-    if (!current) return 'Dang cho vi tri GPS...'
-    return `${current.latitude.toFixed(6)}, ${current.longitude.toFixed(6)}`
-  }, [current])
+    if (!current) return 'Dang cho vi tri GPS...';
+    return `${current.latitude.toFixed(6)}, ${current.longitude.toFixed(6)}`;
+  }, [current]);
 
   const destinationLabel = useMemo(() => {
-    if (!destination) return 'Chua chon diem den'
-    return destination.label || `${destination.latitude.toFixed(6)}, ${destination.longitude.toFixed(6)}`
-  }, [destination])
+    if (!destination) return 'Chua chon diem den';
+    return destination.label || `${destination.latitude.toFixed(6)}, ${destination.longitude.toFixed(6)}`;
+  }, [destination]);
 
   return (
     <View style={styles.map}>
@@ -69,13 +69,15 @@ export const CustomerLiveMap: React.FC<Props> = ({ label, destination, onLocatio
         <Text style={styles.kv}>Diem den:</Text>
         <Text style={styles.value}>{destinationLabel}</Text>
         {destination ? (
-          <Text style={styles.kv}>Toa do: {destination.latitude.toFixed(6)}, {destination.longitude.toFixed(6)}</Text>
+          <Text style={styles.kv}>
+            Toa do: {destination.latitude.toFixed(6)}, {destination.longitude.toFixed(6)}
+          </Text>
         ) : null}
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   map: {
@@ -107,4 +109,4 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: '#C53030'
   }
-})
+});

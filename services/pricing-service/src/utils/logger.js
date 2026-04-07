@@ -1,8 +1,8 @@
-const pino = require("pino");
+const pino = require('pino');
 
 const logger = pino({
   base: {
-    serviceName: process.env.SERVICE_NAME || "pricing-service"
+    serviceName: process.env.SERVICE_NAME || 'pricing-service'
   }
 });
 
@@ -10,7 +10,7 @@ function withContext(traceOrReq, requestId) {
   if (!traceOrReq) {
     return logger;
   }
-  if (typeof traceOrReq === "string") {
+  if (typeof traceOrReq === 'string') {
     return logger.child({ traceId: traceOrReq, requestId });
   }
   return logger.child({

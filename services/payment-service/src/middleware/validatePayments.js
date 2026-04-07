@@ -1,56 +1,56 @@
-const { createAjv, formatAjvErrors } = require("../../../../libs/validation");
-const { ApiError } = require("../utils/errors");
-const { STATUSES } = require("../domain/paymentStatus");
+const { createAjv, formatAjvErrors } = require('../../../../libs/validation');
+const { ApiError } = require('../utils/errors');
+const { STATUSES } = require('../domain/paymentStatus');
 
 const ajv = createAjv();
 
 const emptyObjectSchema = {
-  type: "object",
+  type: 'object',
   additionalProperties: false
 };
 
 const paymentIdParamsSchema = {
-  type: "object",
+  type: 'object',
   additionalProperties: false,
-  required: ["id"],
+  required: ['id'],
   properties: {
-    id: { type: "string", minLength: 1 }
+    id: { type: 'string', minLength: 1 }
   }
 };
 
 const listPaymentsQuerySchema = {
-  type: "object",
+  type: 'object',
   additionalProperties: false,
   properties: {
-    limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
-    cursor: { type: "string", minLength: 1 },
-    sort: { type: "string", enum: ["createdAt", "-createdAt"], default: "-createdAt" },
-    status: { type: "string", enum: Object.values(STATUSES) },
-    rideId: { type: "string", minLength: 1 }
+    limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+    cursor: { type: 'string', minLength: 1 },
+    sort: { type: 'string', enum: ['createdAt', '-createdAt'], default: '-createdAt' },
+    status: { type: 'string', enum: Object.values(STATUSES) },
+    rideId: { type: 'string', minLength: 1 }
   }
 };
 
 const createPaymentBodySchema = {
-  type: "object",
+  type: 'object',
   additionalProperties: false,
-  required: ["rideId", "amount", "currency"],
+  required: ['rideId', 'amount', 'currency'],
   properties: {
-    rideId: { type: "string", minLength: 1 },
-    amount: { type: "string", pattern: "^\\d+(\\.\\d{1,2})?$" },
-    currency: { type: "string", minLength: 3, maxLength: 3 },
-    method: { type: "string" },
-    userId: { type: "string" },
-    note: { type: "string" }
+    rideId: { type: 'string', minLength: 1 },
+    amount: { type: 'string', pattern: '^\\d+(\\.\\d{1,2})?$' },
+    currency: { type: 'string', minLength: 3, maxLength: 3 },
+    method: { type: 'string' },
+    userId: { type: 'string' },
+    note: { type: 'string' }
   }
 };
 
 const statusUpdateBodySchema = {
-  type: "object",
+  type: 'object',
   additionalProperties: false,
-  required: ["status"],
+  required: ['status'],
   properties: {
-    status: { type: "string", enum: Object.values(STATUSES) },
-    failureReason: { type: "string" }
+    status: { type: 'string', enum: Object.values(STATUSES) },
+    failureReason: { type: 'string' }
   }
 };
 
@@ -63,18 +63,18 @@ const validators = {
 };
 
 function normalizeParams(params) {
-  if (!params || typeof params !== "object" || Array.isArray(params)) {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
     return {};
   }
   const nextParams = { ...params };
-  if (typeof nextParams.id === "string") {
+  if (typeof nextParams.id === 'string') {
     nextParams.id = nextParams.id.trim();
   }
   return nextParams;
 }
 
 function normalizeListQuery(query) {
-  if (!query || typeof query !== "object" || Array.isArray(query)) {
+  if (!query || typeof query !== 'object' || Array.isArray(query)) {
     return {};
   }
   const nextQuery = { ...query };
@@ -83,7 +83,7 @@ function normalizeListQuery(query) {
   delete nextQuery._;
   delete nextQuery.cacheBust;
   delete nextQuery.cb;
-  if (typeof nextQuery.limit === "string") {
+  if (typeof nextQuery.limit === 'string') {
     const parsedLimit = Number(nextQuery.limit);
     if (Number.isFinite(parsedLimit)) {
       nextQuery.limit = parsedLimit;
@@ -91,59 +91,59 @@ function normalizeListQuery(query) {
       delete nextQuery.limit;
     }
   }
-  if (typeof nextQuery.status === "string") {
+  if (typeof nextQuery.status === 'string') {
     nextQuery.status = nextQuery.status.trim().toUpperCase();
   }
-  if (typeof nextQuery.rideId === "string") {
+  if (typeof nextQuery.rideId === 'string') {
     nextQuery.rideId = nextQuery.rideId.trim();
   }
-  if (typeof nextQuery.cursor === "string") {
+  if (typeof nextQuery.cursor === 'string') {
     nextQuery.cursor = nextQuery.cursor.trim();
   }
-  if (typeof nextQuery.sort === "string") {
+  if (typeof nextQuery.sort === 'string') {
     nextQuery.sort = nextQuery.sort.trim();
   }
   return nextQuery;
 }
 
 function normalizeCreatePayment(body) {
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return {};
   }
   const nextBody = { ...body };
-  if (typeof nextBody.rideId === "string") {
+  if (typeof nextBody.rideId === 'string') {
     nextBody.rideId = nextBody.rideId.trim();
   }
-  if (typeof nextBody.amount === "string") {
+  if (typeof nextBody.amount === 'string') {
     nextBody.amount = nextBody.amount.trim();
   }
-  if (typeof nextBody.currency === "string") {
+  if (typeof nextBody.currency === 'string') {
     nextBody.currency = nextBody.currency.trim().toUpperCase();
   }
-  if (typeof nextBody.method === "string") {
+  if (typeof nextBody.method === 'string') {
     nextBody.method = nextBody.method.trim().toUpperCase();
   }
-  if (typeof nextBody.userId === "string") {
+  if (typeof nextBody.userId === 'string') {
     nextBody.userId = nextBody.userId.trim();
   }
-  if (typeof nextBody.note === "string") {
+  if (typeof nextBody.note === 'string') {
     nextBody.note = nextBody.note.trim();
   }
-  if (typeof nextBody.amount === "number") {
+  if (typeof nextBody.amount === 'number') {
     nextBody.amount = nextBody.amount.toString();
   }
   return nextBody;
 }
 
 function normalizeStatusUpdate(body) {
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return {};
   }
   const nextBody = { ...body };
-  if (typeof nextBody.status === "string") {
+  if (typeof nextBody.status === 'string') {
     nextBody.status = nextBody.status.trim().toUpperCase();
   }
-  if (typeof nextBody.failureReason === "string") {
+  if (typeof nextBody.failureReason === 'string') {
     nextBody.failureReason = nextBody.failureReason.trim();
   }
   return nextBody;
@@ -174,22 +174,20 @@ function validateRequest({ paramsValidator, queryValidator, bodyValidator, norma
 
     const errors = [];
     if (paramsValidator) {
-      collectErrors(errors, paramsValidator, params, "params");
+      collectErrors(errors, paramsValidator, params, 'params');
     }
     if (queryValidator) {
-      collectErrors(errors, queryValidator, query, "query");
+      collectErrors(errors, queryValidator, query, 'query');
     }
     if (bodyValidator) {
-      collectErrors(errors, bodyValidator, body, "body");
+      collectErrors(errors, bodyValidator, body, 'body');
     }
     if (postValidate) {
       errors.push(...postValidate({ params, query, body }));
     }
 
     if (errors.length) {
-      return next(
-        new ApiError(400, "VALIDATION_ERROR", "Validation failed", buildDetails(errors))
-      );
+      return next(new ApiError(400, 'VALIDATION_ERROR', 'Validation failed', buildDetails(errors)));
     }
 
     req.validatedParams = params;
@@ -202,19 +200,19 @@ function validateRequest({ paramsValidator, queryValidator, bodyValidator, norma
 function validateCreatePaymentCustom(body) {
   const errors = [];
   const amount = body ? body.amount : null;
-  const numeric = typeof amount === "number" ? amount : Number(amount);
+  const numeric = typeof amount === 'number' ? amount : Number(amount);
   if (!Number.isFinite(numeric) || numeric <= 0) {
-    errors.push({ path: "body.amount", message: "must be greater than zero" });
+    errors.push({ path: 'body.amount', message: 'must be greater than zero' });
   }
-  if (body && body.method === "VIETQR" && body.currency !== "VND") {
-    errors.push({ path: "body.currency", message: "must be VND when method is VIETQR" });
+  if (body && body.method === 'VIETQR' && body.currency !== 'VND') {
+    errors.push({ path: 'body.currency', message: 'must be VND when method is VIETQR' });
   }
-  if (body && body.method === "PAYOS") {
-    if (body.currency !== "VND") {
-      errors.push({ path: "body.currency", message: "must be VND when method is PAYOS" });
+  if (body && body.method === 'PAYOS') {
+    if (body.currency !== 'VND') {
+      errors.push({ path: 'body.currency', message: 'must be VND when method is PAYOS' });
     }
     if (Number.isFinite(numeric) && !Number.isInteger(numeric)) {
-      errors.push({ path: "body.amount", message: "must be an integer when method is PAYOS" });
+      errors.push({ path: 'body.amount', message: 'must be an integer when method is PAYOS' });
     }
   }
   return errors;
@@ -223,7 +221,7 @@ function validateCreatePaymentCustom(body) {
 function validateStatusUpdateCustom(body) {
   const errors = [];
   if (body && body.status === STATUSES.FAILED && !body.failureReason) {
-    errors.push({ path: "body.failureReason", message: "is required for FAILED status" });
+    errors.push({ path: 'body.failureReason', message: 'is required for FAILED status' });
   }
   return errors;
 }

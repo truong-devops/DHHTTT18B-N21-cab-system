@@ -9,13 +9,7 @@ type ScreenHeaderProps = PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
 }>;
 
-export function ScreenHeader({
-  title,
-  subtitle,
-  variant = 'light',
-  style,
-  children,
-}: ScreenHeaderProps) {
+export function ScreenHeader({ title, subtitle, variant = 'light', style, children }: ScreenHeaderProps) {
   const isRed = variant === 'red';
 
   return (
@@ -36,33 +30,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
   },
   red: {
-    backgroundColor: palette.red,
+    backgroundColor: palette.red
   },
   light: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   textBlock: {
-    flex: 1,
+    flex: 1
   },
   title: {
     fontSize: 16,
     fontWeight: '700',
-    color: palette.text,
+    color: palette.text
   },
   subtitle: {
     marginTop: 4,
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   titleOnRed: {
-    color: '#fff',
+    color: '#fff'
   },
   subtitleOnRed: {
-    color: '#FFE7DE',
-  },
+    color: '#FFE7DE'
+  }
 });

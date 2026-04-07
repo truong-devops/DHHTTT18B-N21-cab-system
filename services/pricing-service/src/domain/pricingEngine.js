@@ -18,9 +18,7 @@ function haversineKm(pickup, dropoff) {
   const dLat = lat2 - lat1;
   const dLng = lng2 - lng1;
 
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return EARTH_RADIUS_KM * c;
 }
@@ -35,12 +33,7 @@ function estimateDurationMin(distanceKm, averageSpeedKmh) {
   return (distanceKm / averageSpeedKmh) * 60;
 }
 
-function calculateFare({
-  distanceKm,
-  durationMin,
-  rateCard,
-  discount = 0
-}) {
+function calculateFare({ distanceKm, durationMin, rateCard, discount = 0 }) {
   const safeDistance = Math.max(0, distanceKm || 0);
   const safeDuration = Math.max(0, durationMin || 0);
   const base = Number(rateCard.baseFare || 0);
@@ -48,10 +41,7 @@ function calculateFare({
   const perMin = Number(rateCard.perMinRate || 0) * safeDuration;
   const subtotal = base + perKm + perMin;
   const surgeMultiplier = Number(rateCard.surgeMultiplier || 1);
-  const surge =
-    surgeMultiplier > 1
-      ? subtotal * (surgeMultiplier - 1)
-      : 0;
+  const surge = surgeMultiplier > 1 ? subtotal * (surgeMultiplier - 1) : 0;
   const safeDiscount = Math.max(0, Number(discount || 0));
   const estimatedFare = Math.max(0, subtotal + surge - safeDiscount);
 

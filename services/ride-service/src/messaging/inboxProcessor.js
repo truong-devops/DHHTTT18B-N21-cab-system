@@ -1,30 +1,14 @@
-const topics = require("./topics");
-const { publishToDlq } = require("./producer");
-const logger = require("../utils/logger");
-const {
-  claimPendingEvents,
-  countInboxBacklog,
-  markProcessed,
-  markFailed
-} = require("../repository/inboxEventsRepository");
-const {
-  getRideById,
-  getRideByExternalId,
-  createRide,
-  addStatusHistory,
-  updateRideStatus
-} = require("../repository/rideRepository");
-const {
-  normalizeStatus,
-  isValidTransition
-} = require("../domain/rideStateMachine");
-const monitoring = require("../monitoring");
+const topics = require('./topics');
+const { publishToDlq } = require('./producer');
+const logger = require('../utils/logger');
+const { claimPendingEvents, countInboxBacklog, markProcessed, markFailed } = require('../repository/inboxEventsRepository');
+const { getRideById, getRideByExternalId, createRide, addStatusHistory, updateRideStatus } = require('../repository/rideRepository');
+const { normalizeStatus, isValidTransition } = require('../domain/rideStateMachine');
+const monitoring = require('../monitoring');
 
 const DEFAULT_INTERVAL_MS = 3000;
 const DEFAULT_BATCH_SIZE = 50;
-const WORKER_ID =
-  process.env.INBOX_WORKER_ID ||
-  `${process.env.HOSTNAME || "ride-service"}-${process.pid}`;
+const WORKER_ID = process.env.INBOX_WORKER_ID || `${process.env.HOSTNAME || 'ride-service'}-${process.pid}`;
 
 async function handleRideCreated(row) {
   const payload = row.payload || {};
@@ -32,7 +16,7 @@ async function handleRideCreated(row) {
   const pickup = payload.pickup || {};
 
   if (!externalRideId || pickup.lat == null || pickup.lng == null) {
-    throw new Error("ride.created missing rideId or pickup");
+    throw new Error('ride.created missing rideId or pickup');
   }
 
   const existing = await getRideByExternalId(externalRideId);
@@ -49,7 +33,7 @@ async function handleRideCreated(row) {
     pickupLng: pickup.lng,
     dropoffLat: payload.dropoff?.lat ?? null,
     dropoffLng: payload.dropoff?.lng ?? null,
-    status: "requested",
+    status: 'requested',
     traceId: row.trace_id || null,
     emitOutbox: false
   });
@@ -77,12 +61,7 @@ async function resolveRideByPaymentRideId(rideId) {
   return getRideByExternalId(rideId);
 }
 
-async function applyPaymentStatusToRide({
-  row,
-  payload,
-  targetStatus,
-  reason
-}) {
+async function applyPaymentStatusToRide({ row, payload, targetStatus, reason }) {
   const ride = await resolveRideByPaymentRideId(payload.rideId);
   if (!ride) {
     // Keep the event retriable for out-of-order delivery (payment before ride.created).
@@ -94,7 +73,7 @@ async function applyPaymentStatusToRide({
   if (fromStatus === toStatus) {
     return {
       skipped: true,
-      reason: "already_in_target_state",
+      reason: 'already_in_target_state',
       rideId: ride.id,
       status: ride.status
     };
@@ -103,7 +82,7 @@ async function applyPaymentStatusToRide({
   if (!isValidTransition(fromStatus, toStatus)) {
     return {
       skipped: true,
-      reason: "invalid_state_transition",
+      reason: 'invalid_state_transition',
       rideId: ride.id,
       fromStatus,
       toStatus
@@ -115,7 +94,7 @@ async function applyPaymentStatusToRide({
     status: String(targetStatus).toLowerCase(),
     fromStatus,
     reason: reason || null,
-    actorId: payload.paymentId || "payment-service",
+    actorId: payload.paymentId || 'payment-service',
     traceId: row.trace_id || null
   });
 
@@ -129,46 +108,46 @@ async function applyPaymentStatusToRide({
 async function handlePaymentCompleted(row) {
   const payload = row.payload || {};
   if (!payload.paymentId || !payload.rideId) {
-    throw new Error("payment.completed missing paymentId or rideId");
+    throw new Error('payment.completed missing paymentId or rideId');
   }
   return applyPaymentStatusToRide({
     row,
     payload,
-    targetStatus: "completed",
-    reason: "payment_completed"
+    targetStatus: 'completed',
+    reason: 'payment_completed'
   });
 }
 
 async function handlePaymentFailed(row) {
   const payload = row.payload || {};
   if (!payload.paymentId || !payload.rideId) {
-    throw new Error("payment.failed missing paymentId or rideId");
+    throw new Error('payment.failed missing paymentId or rideId');
   }
   return applyPaymentStatusToRide({
     row,
     payload,
-    targetStatus: "cancelled",
-    reason: payload.failureReason || "payment_failed"
+    targetStatus: 'cancelled',
+    reason: payload.failureReason || 'payment_failed'
   });
 }
 
 async function handleRideCancelled(row) {
   const payload = row.payload || {};
   if (!payload.rideId) {
-    throw new Error("ride.cancelled missing rideId");
+    throw new Error('ride.cancelled missing rideId');
   }
 
   const ride = await resolveRideByPaymentRideId(payload.rideId);
   if (!ride) {
-    return { skipped: true, reason: "ride_not_found", rideId: payload.rideId };
+    return { skipped: true, reason: 'ride_not_found', rideId: payload.rideId };
   }
 
   const fromStatus = normalizeStatus(ride.status);
-  const toStatus = "CANCELLED";
+  const toStatus = 'CANCELLED';
   if (fromStatus === toStatus) {
     return {
       skipped: true,
-      reason: "already_in_target_state",
+      reason: 'already_in_target_state',
       rideId: ride.id,
       status: ride.status
     };
@@ -177,7 +156,7 @@ async function handleRideCancelled(row) {
   if (!isValidTransition(fromStatus, toStatus)) {
     return {
       skipped: true,
-      reason: "invalid_state_transition",
+      reason: 'invalid_state_transition',
       rideId: ride.id,
       fromStatus,
       toStatus
@@ -186,10 +165,10 @@ async function handleRideCancelled(row) {
 
   const updated = await updateRideStatus({
     id: ride.id,
-    status: "cancelled",
+    status: 'cancelled',
     fromStatus,
-    reason: payload.reason || "cancelled_by_customer",
-    actorId: "booking-service",
+    reason: payload.reason || 'cancelled_by_customer',
+    actorId: 'booking-service',
     traceId: row.trace_id || null
   });
 
@@ -217,14 +196,11 @@ async function processRow(row) {
 
 async function tick() {
   const backlogBefore = await countInboxBacklog();
-  monitoring.setQueueBacklog("inbox.ride", backlogBefore);
+  monitoring.setQueueBacklog('inbox.ride', backlogBefore);
 
-  const rows = await claimPendingEvents(
-    DEFAULT_BATCH_SIZE,
-    WORKER_ID
-  );
+  const rows = await claimPendingEvents(DEFAULT_BATCH_SIZE, WORKER_ID);
   if (!rows.length) {
-    monitoring.setQueueBacklog("inbox.ride", backlogBefore);
+    monitoring.setQueueBacklog('inbox.ride', backlogBefore);
     return;
   }
 
@@ -234,51 +210,41 @@ async function tick() {
       const result = await processRow(row);
       await markProcessed(row._id);
       monitoring.recordKafkaProcessingLatency({
-        pipeline: "inbox_process",
+        pipeline: 'inbox_process',
         topic: row.topic,
-        outcome: "success",
+        outcome: 'success',
         durationMs: Date.now() - rowStartedAt
       });
-      logger
-        .withTrace(row.trace_id)
-        .info(
-          { topic: row.topic, eventId: row.event_id, result },
-          "[ride-service] inbox processed"
-        );
+      logger.withTrace(row.trace_id).info({ topic: row.topic, eventId: row.event_id, result }, '[ride-service] inbox processed');
     } catch (error) {
-      logger
-        .withTrace(row.trace_id)
-        .error(
-          { err: error, eventId: row.event_id, topic: row.topic },
-          "[ride-service] inbox process failed"
-        );
-      const retry = await markFailed(row._id, error?.message || "failed");
+      logger.withTrace(row.trace_id).error({ err: error, eventId: row.event_id, topic: row.topic }, '[ride-service] inbox process failed');
+      const retry = await markFailed(row._id, error?.message || 'failed');
       monitoring.recordKafkaRetry({
-        scope: "inbox",
+        scope: 'inbox',
         topic: row.topic,
-        status: String(retry?.status || "unknown").toLowerCase(),
-        reason: error?.message || "failed"
+        status: String(retry?.status || 'unknown').toLowerCase(),
+        reason: error?.message || 'failed'
       });
       monitoring.recordKafkaProcessingLatency({
-        pipeline: "inbox_process",
+        pipeline: 'inbox_process',
         topic: row.topic,
-        outcome: "error",
+        outcome: 'error',
         durationMs: Date.now() - rowStartedAt
       });
-      if (retry?.status === "dead") {
+      if (retry?.status === 'dead') {
         await publishToDlq({
           topic: row.topic,
           envelope: {
             eventId: row.event_id,
             traceId: row.trace_id || null,
             occurredAt: new Date().toISOString(),
-            type: row.event_type || "UnknownEvent",
+            type: row.event_type || 'UnknownEvent',
             version: 1,
             payload: row.payload
           },
-          errorMessage: error?.message || "failed",
+          errorMessage: error?.message || 'failed',
           metadata: {
-            source: "ride-service.inbox-processor",
+            source: 'ride-service.inbox-processor',
             attemptCount: retry.attemptCount,
             maxAttempts: retry.maxAttempts
           }
@@ -288,16 +254,13 @@ async function tick() {
   }
 
   const backlogAfter = await countInboxBacklog();
-  monitoring.setQueueBacklog("inbox.ride", backlogAfter);
+  monitoring.setQueueBacklog('inbox.ride', backlogAfter);
 }
 
 function startInboxProcessor(intervalMs = DEFAULT_INTERVAL_MS) {
   const timer = setInterval(() => {
     tick().catch((error) => {
-      logger.error(
-        { err: error },
-        "[ride-service] inbox tick error"
-      );
+      logger.error({ err: error }, '[ride-service] inbox tick error');
     });
   }, intervalMs);
 

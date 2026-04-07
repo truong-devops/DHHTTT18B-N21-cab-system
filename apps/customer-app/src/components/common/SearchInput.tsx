@@ -1,12 +1,12 @@
-import React from 'react'
-import { StyleSheet, TextInput, View } from 'react-native'
-import { colors, spacing, typography } from '../../theme/tokens'
+import React from 'react';
+import { StyleSheet, TextInput, View } from 'react-native';
+import { colors, spacing, typography } from '../../theme/tokens';
 
 type Props = {
-  value: string
-  onChangeText: (text: string) => void
-  placeholder?: string
-}
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+};
 
 export const SearchInput: React.FC<Props> = ({ value, onChangeText, placeholder }) => {
   return (
@@ -19,8 +19,8 @@ export const SearchInput: React.FC<Props> = ({ value, onChangeText, placeholder 
         style={styles.input}
       />
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -32,4 +32,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border
   },
   input: { ...typography.body, color: colors.text }
-})
+});

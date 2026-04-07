@@ -13,13 +13,11 @@ export function useRequests({ intervalMs = 2500, limit = 1 }: Options = {}) {
   const { activeRide } = useRide();
   const isOnline = driver?.onlineStatus === 'ONLINE' || driver?.onlineStatus === 'BUSY';
   const activeStatus = (activeRide?.status ?? '').toUpperCase();
-  const hasActiveRide =
-    Boolean(activeRide?.id) &&
-    !['COMPLETED', 'CANCELED', 'CANCELLED'].includes(activeStatus);
+  const hasActiveRide = Boolean(activeRide?.id) && !['COMPLETED', 'CANCELED', 'CANCELLED'].includes(activeStatus);
   const incoming = useIncomingRide({
     enabled: isOnline && !hasActiveRide,
     intervalMs,
-    limit,
+    limit
   });
 
   const state = useMemo(
@@ -28,9 +26,9 @@ export function useRequests({ intervalMs = 2500, limit = 1 }: Options = {}) {
       incomingRide: incoming.incomingRide,
       isSearching: incoming.isSearching,
       lastUpdateAt: incoming.lastUpdateAt,
-      error: incoming.error,
+      error: incoming.error
     }),
-    [incoming.error, incoming.incomingRide, incoming.isSearching, incoming.lastUpdateAt, isOnline],
+    [incoming.error, incoming.incomingRide, incoming.isSearching, incoming.lastUpdateAt, isOnline]
   );
 
   return state;

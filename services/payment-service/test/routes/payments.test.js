@@ -1,9 +1,9 @@
-process.env.JWT_ACCESS_SECRET = "test_secret";
+process.env.JWT_ACCESS_SECRET = 'test_secret';
 
-const request = require("supertest");
-const jwt = require("jsonwebtoken");
+const request = require('supertest');
+const jwt = require('jsonwebtoken');
 
-jest.mock("../../src/services/paymentService", () => ({
+jest.mock('../../src/services/paymentService', () => ({
   createPayment: jest.fn(),
   fetchPayment: jest.fn(),
   fetchPayments: jest.fn(),
@@ -11,24 +11,18 @@ jest.mock("../../src/services/paymentService", () => ({
   fetchVietQr: jest.fn()
 }));
 
-jest.mock("../../src/services/idempotencyService", () => ({
+jest.mock('../../src/services/idempotencyService', () => ({
   withIdempotency: jest.fn(),
   pickIdempotencyHeaders: jest.fn(() => ({}))
 }));
 
-const app = require("../../src/app");
-const paymentService = require("../../src/services/paymentService");
-const idempotencyService = require("../../src/services/idempotencyService");
+const app = require('../../src/app');
+const paymentService = require('../../src/services/paymentService');
+const idempotencyService = require('../../src/services/idempotencyService');
 
-describe("payment routes", () => {
-  const authHeader = `Bearer ${jwt.sign(
-    { sub: "user_1", roles: ["user"], scopes: ["payments:write"] },
-    process.env.JWT_ACCESS_SECRET
-  )}`;
-  const adminAuthHeader = `Bearer ${jwt.sign(
-    { sub: "admin_1", roles: ["admin"], scopes: ["payments:write"] },
-    process.env.JWT_ACCESS_SECRET
-  )}`;
+describe('payment routes', () => {
+  const authHeader = `Bearer ${jwt.sign({ sub: 'user_1', roles: ['user'], scopes: ['payments:write'] }, process.env.JWT_ACCESS_SECRET)}`;
+  const adminAuthHeader = `Bearer ${jwt.sign({ sub: 'admin_1', roles: ['admin'], scopes: ['payments:write'] }, process.env.JWT_ACCESS_SECRET)}`;
 
   afterEach(() => {
     jest.resetAllMocks();
@@ -47,105 +41,92 @@ describe("payment routes", () => {
     });
   });
 
-  test("rejects create payment without idempotency key", async () => {
-    const response = await request(app)
-      .post("/v1/payments")
-      .set("Authorization", authHeader)
-      .send({ rideId: "ride_1", amount: 10, currency: "VND" });
+  test('rejects create payment without idempotency key', async () => {
+    const response = await request(app).post('/v1/payments').set('Authorization', authHeader).send({ rideId: 'ride_1', amount: 10, currency: 'VND' });
 
     expect(response.status).toBe(400);
-    expect(response.headers["x-trace-id"]).toBeTruthy();
-    expect(response.body.error.code).toBe("IDEMPOTENCY_KEY_REQUIRED");
+    expect(response.headers['x-trace-id']).toBeTruthy();
+    expect(response.body.error.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
   });
 
-  test("creates payment with idempotency key", async () => {
+  test('creates payment with idempotency key', async () => {
     paymentService.createPayment.mockResolvedValueOnce({
       responseCode: 201,
-      responseBody: { data: { id: "pay_1" } }
+      responseBody: { data: { id: 'pay_1' } }
     });
 
     const response = await request(app)
-      .post("/v1/payments")
-      .set("Authorization", authHeader)
-      .set("Idempotency-Key", "idem_1")
-      .send({ rideId: "ride_1", amount: 10, currency: "VND", method: "CARD" });
+      .post('/v1/payments')
+      .set('Authorization', authHeader)
+      .set('Idempotency-Key', 'idem_1')
+      .send({ rideId: 'ride_1', amount: 10, currency: 'VND', method: 'CARD' });
 
     expect(response.status).toBe(201);
-    expect(response.body.data.id).toBe("pay_1");
+    expect(response.body.data.id).toBe('pay_1');
   });
 
-  test("returns cached response for idempotency key", async () => {
+  test('returns cached response for idempotency key', async () => {
     idempotencyService.withIdempotency.mockResolvedValueOnce({
       status: 201,
-      headers: { "x-trace-id": "trace_1" },
-      body: { data: { id: "pay_cached" } },
+      headers: { 'x-trace-id': 'trace_1' },
+      body: { data: { id: 'pay_cached' } },
       cached: true
     });
 
     const response = await request(app)
-      .post("/v1/payments")
-      .set("Authorization", authHeader)
-      .set("Idempotency-Key", "idem_2")
-      .send({ rideId: "ride_1", amount: 10, currency: "VND" });
+      .post('/v1/payments')
+      .set('Authorization', authHeader)
+      .set('Idempotency-Key', 'idem_2')
+      .send({ rideId: 'ride_1', amount: 10, currency: 'VND' });
 
     expect(response.status).toBe(201);
-    expect(response.body.data.id).toBe("pay_cached");
+    expect(response.body.data.id).toBe('pay_cached');
     expect(paymentService.createPayment).not.toHaveBeenCalled();
   });
 
-  test("lists payments", async () => {
+  test('lists payments', async () => {
     paymentService.fetchPayments.mockResolvedValueOnce({ data: [] });
-    const response = await request(app)
-      .get("/v1/payments")
-      .set("Authorization", authHeader);
+    const response = await request(app).get('/v1/payments').set('Authorization', authHeader);
     expect(response.status).toBe(200);
     expect(Array.isArray(response.body.data)).toBe(true);
   });
 
-  test("rejects update payment status for non-admin", async () => {
-    const response = await request(app)
-      .patch("/v1/payments/pay_1")
-      .set("Authorization", authHeader)
-      .send({ status: "PAID" });
+  test('rejects update payment status for non-admin', async () => {
+    const response = await request(app).patch('/v1/payments/pay_1').set('Authorization', authHeader).send({ status: 'PAID' });
 
     expect(response.status).toBe(403);
-    expect(response.body.error.code).toBe("FORBIDDEN");
+    expect(response.body.error.code).toBe('FORBIDDEN');
   });
 
-  test("updates payment status for admin", async () => {
+  test('updates payment status for admin', async () => {
     paymentService.changePaymentStatus.mockResolvedValueOnce({
-      id: "pay_1",
-      status: "PAID"
+      id: 'pay_1',
+      status: 'PAID'
     });
 
-    const response = await request(app)
-      .patch("/v1/payments/pay_1")
-      .set("Authorization", adminAuthHeader)
-      .send({ status: "PAID" });
+    const response = await request(app).patch('/v1/payments/pay_1').set('Authorization', adminAuthHeader).send({ status: 'PAID' });
 
     expect(response.status).toBe(200);
-    expect(response.body.data.id).toBe("pay_1");
+    expect(response.body.data.id).toBe('pay_1');
   });
 
-  test("gets vietqr codes", async () => {
+  test('gets vietqr codes', async () => {
     paymentService.fetchVietQr.mockResolvedValueOnce({
-      paymentId: "pay_1",
-      rideId: "ride_1",
-      amount: "100.00",
-      currency: "VND",
+      paymentId: 'pay_1',
+      rideId: 'ride_1',
+      amount: '100.00',
+      currency: 'VND',
       vietqr: {
-        payload: "payload",
-        qrUrl: "https://example.com/qr",
-        reference: "ref_1",
+        payload: 'payload',
+        qrUrl: 'https://example.com/qr',
+        reference: 'ref_1',
         expiresAt: new Date().toISOString()
       }
     });
 
-    const response = await request(app)
-      .get("/v1/payments/pay_1/vietqr-codes")
-      .set("Authorization", authHeader);
+    const response = await request(app).get('/v1/payments/pay_1/vietqr-codes').set('Authorization', authHeader);
 
     expect(response.status).toBe(200);
-    expect(response.body.data.paymentId).toBe("pay_1");
+    expect(response.body.data.paymentId).toBe('pay_1');
   });
 });

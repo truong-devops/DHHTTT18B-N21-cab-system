@@ -4,6 +4,7 @@ Driver service (PostgreSQL + Redis, no Kafka). Internal only (via api-gateway).
 Contract: /contracts/openapi/driver-service.yaml
 
 ## Environment
+
 - PORT (default: 3011)
 - DATABASE_URL (required)
 - REDIS_URL (default: redis://localhost:6379)
@@ -35,6 +36,7 @@ psql "$DATABASE_URL" -f services/driver-service/migrations/003_indexes.sql
 ```
 
 ## API (via api-gateway)
+
 - Driver app:
   - GET /v1/driver/me
   - PUT /v1/driver/me
@@ -59,6 +61,7 @@ psql "$DATABASE_URL" -f services/driver-service/migrations/003_indexes.sql
 ## Curl examples
 
 ### Driver online
+
 ```bash
 curl -s -X POST http://localhost:3000/v1/driver/me/online \
   -H "Authorization: Bearer $TOKEN" \
@@ -67,6 +70,7 @@ curl -s -X POST http://localhost:3000/v1/driver/me/online \
 ```
 
 ### Update location
+
 ```bash
 curl -s -X POST http://localhost:3000/v1/driver/me/location \
   -H "Authorization: Bearer $TOKEN" \
@@ -75,12 +79,14 @@ curl -s -X POST http://localhost:3000/v1/driver/me/location \
 ```
 
 ### Available drivers (internal)
+
 ```bash
 curl -s "http://localhost:3000/v1/internal/drivers/available?lat=10.76&lng=106.66&radiusMeters=3000&limit=10" \
   -H "Authorization: Bearer $SERVICE_TOKEN"
 ```
 
 ### Mark busy / available
+
 ```bash
 curl -s -X POST http://localhost:3000/v1/internal/drivers/{driverId}/mark-busy \
   -H "Authorization: Bearer $SERVICE_TOKEN" \

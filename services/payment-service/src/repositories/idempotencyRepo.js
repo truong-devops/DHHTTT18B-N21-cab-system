@@ -1,3 +1,3 @@
-const idempotencyDb = require("../db/idempotency");
+const idempotencyDb = require('../db/idempotency');
 
 module.exports = idempotencyDb;
