@@ -27,6 +27,34 @@ wait_for_gateway() {
   return 1
 }
 
+wait_for_bookings_upstream() {
+  local token="$1"
+  local max_wait="${2:-90}"
+  local i=0
+  while [[ "$i" -lt "$max_wait" ]]; do
+    local resp
+    if ! resp=$(curl -s -X POST "$BASE_URL/v1/bookings" \
+      --connect-timeout "$CURL_CONNECT_TIMEOUT" \
+      --max-time "$CURL_MAX_TIME" \
+      -H "Authorization: Bearer $token" \
+      -H "Content-Type: application/json" \
+      -d '{"drop":{"lat":10.77,"lng":106.70}}' \
+      -w "\nHTTP_STATUS:%{http_code}"); then
+      resp='{"error":"transport error"}'
+      resp="$resp"$'\nHTTP_STATUS:000'
+    fi
+
+    local status="${resp##*HTTP_STATUS:}"
+    if [[ "$status" != "502" ]] && [[ "$status" != "000" ]]; then
+      return 0
+    fi
+
+    i=$((i + 1))
+    sleep 1
+  done
+  return 1
+}
+
 json_get() {
   local path="$1"
   node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);let v=j;for(const k of '$path'.split('.')){if(!k)continue;v=v?.[k]}process.stdout.write(v==null?'':String(v))}catch(e){process.stdout.write('')}})"
@@ -133,6 +161,11 @@ if [[ -z "$USER_TOKEN" ]]; then USER_TOKEN=$(echo "$USER_LOGIN" | json_get "acce
 if [[ -z "$USER_TOKEN" ]]; then
   echo "STOP: cannot get user token"
   echo "$USER_LOGIN"
+  exit 1
+fi
+
+if ! wait_for_bookings_upstream "$USER_TOKEN" 120; then
+  echo "STOP: booking upstream is not ready behind gateway (still returning 502)"
   exit 1
 fi
 
