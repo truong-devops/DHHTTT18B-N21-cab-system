@@ -71,6 +71,20 @@ jobs:
           docker compose -f infra/docker-compose.dev.yml ps
           exit 1
 
+      - name: Wait for booking upstream
+        run: |
+          for i in $(seq 1 120); do
+            if docker compose -f infra/docker-compose.dev.yml exec -T api-gateway \
+              node -e "fetch('http://booking-service:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Booking upstream is not healthy in time"
+          docker compose -f infra/docker-compose.dev.yml ps
+          docker compose -f infra/docker-compose.dev.yml logs --no-color --tail=120 booking-service api-gateway
+          exit 1
+
       - name: Run Level 2 integration (11-20)
         run: BASE_URL=http://localhost:3000 ./scripts/test-level2-11-20cases.sh
 
