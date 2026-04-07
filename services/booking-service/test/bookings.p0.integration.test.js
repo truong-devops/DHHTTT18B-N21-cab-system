@@ -17,6 +17,8 @@ const mockSelectBestDriver = jest.fn();
 const mockCreatePayment = jest.fn();
 const mockSendNotification = jest.fn();
 const mockUpdateStatus = jest.fn();
+const mockRecommendDrivers = jest.fn();
+const mockForecastDemand = jest.fn();
 
 jest.mock('../src/repositories/bookingRepo', () => ({
   create: (...args) => mockCreateBooking(...args),
@@ -74,6 +76,12 @@ jest.mock('../src/clients/paymentClient', () => ({
 
 jest.mock('../src/clients/notificationClient', () => ({
   sendNotification: (...args) => mockSendNotification(...args)
+}));
+
+jest.mock('../src/clients/aiClient', () => ({
+  recommendDrivers: (...args) => mockRecommendDrivers(...args),
+  forecastDemand: (...args) => mockForecastDemand(...args),
+  logAiFallback: jest.fn()
 }));
 
 const app = require('../src/app');
@@ -146,6 +154,8 @@ describe('booking-service P0 integration', () => {
     mockGetByIdForUpdate.mockResolvedValue(buildBooking());
     mockUpdateStatus.mockResolvedValue(buildBooking({ status: 'ACCEPTED' }));
     mockCancelBooking.mockResolvedValue(buildBooking({ status: 'CANCELLED' }));
+    mockRecommendDrivers.mockRejectedValue(new Error('ai unavailable'));
+    mockForecastDemand.mockRejectedValue(new Error('ai unavailable'));
   });
 
   test('rejects when pickup is missing', async () => {
