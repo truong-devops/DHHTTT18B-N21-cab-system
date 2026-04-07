@@ -188,6 +188,55 @@ ensure_online_driver() {
   echo "$driver_id"
 }
 
+get_available_driver_count() {
+  local token="$1"
+  local payload
+  payload=$(curl -s -X GET "$BASE_URL/v1/driver/availability?lat=10.76&lng=106.66&limit=5" \
+    --connect-timeout "$CURL_CONNECT_TIMEOUT" \
+    --max-time "$CURL_MAX_TIME" \
+    -H "Authorization: Bearer $token" || true)
+  local count
+  count=$(echo "$payload" | json_get "data.count")
+  if [[ -z "$count" ]]; then
+    echo "0"
+    return
+  fi
+  echo "$count"
+}
+
+ensure_available_driver() {
+  local admin_token="$1"
+  local user_token="$2"
+  local driver_id="$3"
+  local attempts="${4:-8}"
+
+  local i=0
+  while [[ "$i" -lt "$attempts" ]]; do
+    local available_count
+    available_count=$(get_available_driver_count "$user_token")
+    if [[ -n "$available_count" ]] && node -e "process.exit(Number('$available_count')>0?0:1)"; then
+      return 0
+    fi
+
+    if [[ -n "$driver_id" ]]; then
+      curl -s -X POST "$BASE_URL/v1/driver/status" \
+        -H "Authorization: Bearer $admin_token" \
+        -H "Content-Type: application/json" \
+        -d "{\"driver_id\":\"$driver_id\",\"status\":\"OFFLINE\"}" >/dev/null || true
+
+      curl -s -X POST "$BASE_URL/v1/driver/status" \
+        -H "Authorization: Bearer $admin_token" \
+        -H "Content-Type: application/json" \
+        -d "{\"driver_id\":\"$driver_id\",\"status\":\"ONLINE\",\"initial_location\":{\"lat\":10.76,\"lng\":106.66}}" >/dev/null || true
+    fi
+
+    i=$((i + 1))
+    sleep 1
+  done
+
+  return 1
+}
+
 register_and_login_user() {
   local email="$1"
   local name="$2"
@@ -298,6 +347,9 @@ DRIVER_ID=$(ensure_online_driver "$ADMIN_TOKEN" "$USER_TOKEN")
 if [[ -z "$DRIVER_ID" ]]; then
   echo "WARN: Could not provision an online driver. Some cases may fail."
 fi
+if ! ensure_available_driver "$ADMIN_TOKEN" "$USER_TOKEN" "$DRIVER_ID" 10; then
+  echo "WARN: Could not ensure available driver inventory near pickup. AI selection cases may fail."
+fi
 
 ACTIVE_BOOKING_ID=""
 
@@ -346,8 +398,9 @@ C23_STATUS=$(echo "$C23" | sed -n '1p')
 C23_BODY=$(echo "$C23" | sed '1d')
 C23_SELECTED=$(echo "$C23_BODY" | json_get "data.selected_driver.driverId")
 if [[ -z "$C23_SELECTED" ]]; then C23_SELECTED=$(echo "$C23_BODY" | json_get "data.selected_driver.id"); fi
+if [[ -z "$C23_SELECTED" ]]; then C23_SELECTED=$(echo "$C23_BODY" | json_get "data.selected_driver.driver_id"); fi
 C23_DECISION_VALID=$(echo "$C23_BODY" | json_bool "data.decision_valid")
-C23_IN_LIST=$(echo "$C23_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);const selected=j?.data?.selected_driver?.driverId||j?.data?.selected_driver?.id||'';const list=Array.isArray(j?.data?.available_drivers)?j.data.available_drivers:[];const ok=!!selected && list.some(it=> (it?.driverId||it?.id||'')===selected);process.stdout.write(ok?'1':'0')}catch(e){process.stdout.write('0')}})")
+C23_IN_LIST=$(echo "$C23_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);const s=j?.data?.selected_driver||{};const selected=s.driverId||s.id||s.driver_id||'';const list=Array.isArray(j?.data?.available_drivers)?j.data.available_drivers:[];const ok=!!selected && list.some(it=> ((it?.driverId||it?.id||it?.driver_id||''))===selected);process.stdout.write(ok?'1':'0')}catch(e){process.stdout.write('0')}})")
 print_case "Case 23 - AI selects valid driver" "200 + selected_driver exists and in available list" "$C23_STATUS" "$C23_BODY"
 if [[ "$C23_STATUS" == "200" ]] && [[ "$C23_DECISION_VALID" == "1" ]] && [[ -n "$C23_SELECTED" ]] && [[ "$C23_IN_LIST" == "1" ]]; then
   mark_result 1 "23"
@@ -471,6 +524,7 @@ C28_PRICE=$(echo "$C28_BODY" | json_get "data.pricing.price")
 C28_SURGE=$(echo "$C28_BODY" | json_get "data.pricing.surge")
 C28_SELECTED=$(echo "$C28_BODY" | json_get "data.selected_driver.driverId")
 if [[ -z "$C28_SELECTED" ]]; then C28_SELECTED=$(echo "$C28_BODY" | json_get "data.selected_driver.id"); fi
+if [[ -z "$C28_SELECTED" ]]; then C28_SELECTED=$(echo "$C28_BODY" | json_get "data.selected_driver.driver_id"); fi
 print_case "Case 28 - MCP context fetch" "200 + context ETA/pricing/driver + permission_ok" "$C28_STATUS" "$C28_BODY"
 if [[ "$C28_STATUS" == "200" ]] && [[ "$C28_PERMISSION" == "1" ]] && [[ -n "$C28_SELECTED" ]] \
   && node -e "process.exit(Number('$C28_ETA')>=0 && Number('$C28_PRICE')>0 && Number('$C28_SURGE')>=1 ? 0:1)"; then

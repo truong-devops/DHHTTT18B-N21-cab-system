@@ -1,0 +1,27 @@
+{
+  "models": {
+    "forecast-v1": {
+      "threshold": 0.25,
+      "features": {
+        "hour": { "mean": 12, "std": 6 },
+        "rain": { "mean": 0.2, "std": 0.25 },
+        "demand_index": { "mean": 1.1, "std": 0.35 }
+      }
+    },
+    "recommendation-v1": {
+      "threshold": 0.3,
+      "features": {
+        "distance_m": { "mean": 1200, "std": 700 },
+        "eta_min": { "mean": 8, "std": 4 },
+        "rating": { "mean": 4.6, "std": 0.3 }
+      }
+    },
+    "fraud-v1": {
+      "threshold": 0.3,
+      "features": {
+        "amount": { "mean": 90000, "std": 50000 },
+        "route_risk": { "mean": 0.3, "std": 0.2 }
+      }
+    }
+  }
+}
