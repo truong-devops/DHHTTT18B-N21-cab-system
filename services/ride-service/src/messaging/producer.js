@@ -1,28 +1,22 @@
-const crypto = require("crypto");
-const { Kafka } = require("kafkajs");
-const { validateEnvelope } = require("./schemaRegistry");
-const logger = require("../utils/logger");
-const monitoring = require("../monitoring");
+const crypto = require('crypto');
+const { Kafka } = require('kafkajs');
+const { validateEnvelope } = require('./schemaRegistry');
+const logger = require('../utils/logger');
+const monitoring = require('../monitoring');
 
 const kafka = new Kafka({
-  clientId: "ride-service",
-  brokers: [process.env.KAFKA_BROKERS || "localhost:29092"],
+  clientId: 'ride-service',
+  brokers: [process.env.KAFKA_BROKERS || 'localhost:29092'],
   retry: {
     retries: Number(process.env.KAFKA_PRODUCER_RETRY_RETRIES || 8),
-    initialRetryTime: Number(
-      process.env.KAFKA_PRODUCER_RETRY_INITIAL_MS || 300
-    ),
+    initialRetryTime: Number(process.env.KAFKA_PRODUCER_RETRY_INITIAL_MS || 300),
     maxRetryTime: Number(process.env.KAFKA_PRODUCER_RETRY_MAX_MS || 30000)
   }
 });
 
 const PRODUCER_ACKS = Number(process.env.KAFKA_PRODUCER_ACKS || -1);
-const PRODUCER_TIMEOUT_MS = Number(
-  process.env.KAFKA_PRODUCER_REQUEST_TIMEOUT_MS || 30000
-);
-const PRODUCER_MAX_IN_FLIGHT = Number(
-  process.env.KAFKA_PRODUCER_MAX_IN_FLIGHT_REQUESTS || 5
-);
+const PRODUCER_TIMEOUT_MS = Number(process.env.KAFKA_PRODUCER_REQUEST_TIMEOUT_MS || 30000);
+const PRODUCER_MAX_IN_FLIGHT = Number(process.env.KAFKA_PRODUCER_MAX_IN_FLIGHT_REQUESTS || 5);
 
 let producerPromise;
 
@@ -33,12 +27,8 @@ async function getProducer() {
       maxInFlightRequests: PRODUCER_MAX_IN_FLIGHT,
       retry: {
         retries: Number(process.env.KAFKA_PRODUCER_RETRY_RETRIES || 8),
-        initialRetryTime: Number(
-          process.env.KAFKA_PRODUCER_RETRY_INITIAL_MS || 300
-        ),
-        maxRetryTime: Number(
-          process.env.KAFKA_PRODUCER_RETRY_MAX_MS || 30000
-        )
+        initialRetryTime: Number(process.env.KAFKA_PRODUCER_RETRY_INITIAL_MS || 300),
+        maxRetryTime: Number(process.env.KAFKA_PRODUCER_RETRY_MAX_MS || 30000)
       }
     });
     producerPromise = producer.connect().then(() => producer);
@@ -46,14 +36,7 @@ async function getProducer() {
   return producerPromise;
 }
 
-async function publishToDlq({
-  topic,
-  envelope,
-  validationErrors,
-  errorMessage = null,
-  metadata = null,
-  throwOnError = false
-}) {
+async function publishToDlq({ topic, envelope, validationErrors, errorMessage = null, metadata = null, throwOnError = false }) {
   const producer = await getProducer();
   const dlqTopic = `${topic}.dlq`;
   const dlqEnvelope = {
@@ -66,11 +49,7 @@ async function publishToDlq({
     }
   };
   const startedAt = Date.now();
-  const dlqKey =
-    envelope?.payload?.rideId ||
-    envelope?.payload?.paymentId ||
-    envelope?.payload?.bookingId ||
-    envelope?.eventId;
+  const dlqKey = envelope?.payload?.rideId || envelope?.payload?.paymentId || envelope?.payload?.bookingId || envelope?.eventId;
 
   try {
     await producer.send({
@@ -82,66 +61,60 @@ async function publishToDlq({
           key: dlqKey,
           value: JSON.stringify(dlqEnvelope),
           headers: {
-            "x-source-topic": topic,
-            "x-trace-id": envelope?.traceId || "",
-            "x-source-event-id": envelope?.eventId || ""
+            'x-source-topic': topic,
+            'x-trace-id': envelope?.traceId || '',
+            'x-source-event-id': envelope?.eventId || ''
           }
         }
       ]
     });
     monitoring.recordKafkaPublish({
       topic: dlqTopic,
-      outcome: "success",
-      operation: "publish_dlq"
+      outcome: 'success',
+      operation: 'publish_dlq'
     });
     monitoring.recordKafkaDlq({
       sourceTopic: topic,
       dlqTopic,
-      errorType: errorMessage || "validation_failed"
+      errorType: errorMessage || 'validation_failed'
     });
     monitoring.recordKafkaProcessingLatency({
-      pipeline: "publish_dlq",
+      pipeline: 'publish_dlq',
       topic: dlqTopic,
-      outcome: "success",
+      outcome: 'success',
       durationMs: Date.now() - startedAt
     });
     monitoring.recordDependencyRequest({
-      dependencyType: "kafka",
+      dependencyType: 'kafka',
       dependencyName: dlqTopic,
-      operation: "publish",
-      outcome: "success",
+      operation: 'publish',
+      outcome: 'success',
       durationMs: Date.now() - startedAt
     });
   } catch (error) {
     monitoring.recordKafkaPublish({
       topic: dlqTopic,
-      outcome: "error",
-      operation: "publish_dlq"
+      outcome: 'error',
+      operation: 'publish_dlq'
     });
     monitoring.recordKafkaProcessingLatency({
-      pipeline: "publish_dlq",
+      pipeline: 'publish_dlq',
       topic: dlqTopic,
-      outcome: "error",
+      outcome: 'error',
       durationMs: Date.now() - startedAt
     });
     monitoring.recordDependencyRequest({
-      dependencyType: "kafka",
+      dependencyType: 'kafka',
       dependencyName: dlqTopic,
-      operation: "publish",
-      outcome: "error",
+      operation: 'publish',
+      outcome: 'error',
       durationMs: Date.now() - startedAt,
       attributes: {
-        error_type: String(error && error.name ? error.name : "publish_error")
+        error_type: String(error && error.name ? error.name : 'publish_error')
       }
     });
-    logger.error(
-      { err: error, topic: dlqTopic },
-      "[ride-service] dlq publish failed"
-    );
-    logger.warn(
-      { topic: dlqTopic },
-      "[ride-service] TODO ensure DLQ topic exists"
-    );
+    logger.error({ err: error, topic: dlqTopic }, '[ride-service] dlq publish failed');
+    logger.warn({ topic: dlqTopic }, '[ride-service] TODO ensure DLQ topic exists');
     if (throwOnError) {
       throw error;
     }
@@ -174,7 +147,7 @@ async function publish({
       envelope,
       validationErrors: validation.errors
     });
-    return { published: false, reason: "validation_failed" };
+    return { published: false, reason: 'validation_failed' };
   }
 
   const producer = await getProducer();
@@ -189,48 +162,48 @@ async function publish({
           key,
           value: JSON.stringify(envelope),
           headers: {
-            "x-trace-id": traceId || "",
-            "x-event-id": eventId
+            'x-trace-id': traceId || '',
+            'x-event-id': eventId
           }
         }
       ]
     });
     monitoring.recordKafkaPublish({
       topic,
-      outcome: "success"
+      outcome: 'success'
     });
     monitoring.recordKafkaProcessingLatency({
-      pipeline: "publish_event",
+      pipeline: 'publish_event',
       topic,
-      outcome: "success",
+      outcome: 'success',
       durationMs: Date.now() - startedAt
     });
     monitoring.recordDependencyRequest({
-      dependencyType: "kafka",
+      dependencyType: 'kafka',
       dependencyName: topic,
-      operation: "publish",
-      outcome: "success",
+      operation: 'publish',
+      outcome: 'success',
       durationMs: Date.now() - startedAt
     });
   } catch (error) {
     monitoring.recordKafkaPublish({
       topic,
-      outcome: "error"
+      outcome: 'error'
     });
     monitoring.recordKafkaProcessingLatency({
-      pipeline: "publish_event",
+      pipeline: 'publish_event',
       topic,
-      outcome: "error",
+      outcome: 'error',
       durationMs: Date.now() - startedAt
     });
     monitoring.recordDependencyRequest({
-      dependencyType: "kafka",
+      dependencyType: 'kafka',
       dependencyName: topic,
-      operation: "publish",
-      outcome: "error",
+      operation: 'publish',
+      outcome: 'error',
       durationMs: Date.now() - startedAt,
       attributes: {
-        error_type: String(error && error.name ? error.name : "publish_error")
+        error_type: String(error && error.name ? error.name : 'publish_error')
       }
     });
     throw error;

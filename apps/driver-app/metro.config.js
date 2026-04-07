@@ -19,10 +19,7 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 const config = getDefaultConfig(projectRoot);
 
 config.watchFolders = [workspaceRoot];
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, 'node_modules'),
-  path.resolve(workspaceRoot, 'node_modules'),
-];
+config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules'), path.resolve(workspaceRoot, 'node_modules')];
 config.resolver.disableHierarchicalLookup = false;
 config.resolver.blockList = /.*[/\\]node_modules[/\\].*[/\\]\.resources-[^/\\]+[/\\].*/;
 
@@ -35,8 +32,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   const isExpoRouterCtxRequest =
     normalizedSlashes === 'expo-router/_ctx' ||
     normalizedSlashes === 'expo-router/_ctx.web' ||
-    (isExpoRouterOrigin &&
-      /(^|\/)\.\.?(?:\/\.\.)*\/?_ctx(?:\.web)?$/.test(normalizedSlashes));
+    (isExpoRouterOrigin && /(^|\/)\.\.?(?:\/\.\.)*\/?_ctx(?:\.web)?$/.test(normalizedSlashes));
   if (
     platform !== 'web' &&
     (normalizedName === 'expo-router/_ctx' ||
@@ -44,32 +40,28 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       normalizedName === 'expo-router/_ctx.ios' ||
       normalizedName === 'expo-router/_ctx.native')
   ) {
-    const ctxFile =
-      platform === 'ios' ? 'expo-router-ctx.ios.js' : 'expo-router-ctx.android.js';
+    const ctxFile = platform === 'ios' ? 'expo-router-ctx.ios.js' : 'expo-router-ctx.android.js';
     return {
       type: 'sourceFile',
-      filePath: path.resolve(projectRoot, 'lib', ctxFile),
+      filePath: path.resolve(projectRoot, 'lib', ctxFile)
     };
   }
-  if (
-    platform === 'web' &&
-    isExpoRouterCtxRequest
-  ) {
+  if (platform === 'web' && isExpoRouterCtxRequest) {
     return {
       type: 'sourceFile',
-      filePath: path.resolve(projectRoot, 'lib', 'expo-router-ctx.web.js'),
+      filePath: path.resolve(projectRoot, 'lib', 'expo-router-ctx.web.js')
     };
   }
   if (platform === 'web' && normalizedSlashes === 'expo-router/_ctx-html') {
     return {
       type: 'sourceFile',
-      filePath: path.resolve(projectRoot, 'lib', 'expo-router-ctx-html.web.js'),
+      filePath: path.resolve(projectRoot, 'lib', 'expo-router-ctx-html.web.js')
     };
   }
   if (platform === 'web' && moduleName === 'react-native-maps') {
     return {
       type: 'sourceFile',
-      filePath: path.resolve(projectRoot, 'lib/mocks/react-native-maps.web.js'),
+      filePath: path.resolve(projectRoot, 'lib/mocks/react-native-maps.web.js')
     };
   }
   return defaultResolveRequest(context, moduleName, platform);

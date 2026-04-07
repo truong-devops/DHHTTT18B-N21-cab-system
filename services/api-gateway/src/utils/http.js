@@ -1,11 +1,4 @@
-function sendError(
-  res,
-  status,
-  code,
-  message,
-  traceId,
-  details = []
-) {
+function sendError(res, status, code, message, traceId, details = []) {
   return res.status(status).json({
     error: {
       code,

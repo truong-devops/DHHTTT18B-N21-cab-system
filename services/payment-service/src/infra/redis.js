@@ -1,12 +1,12 @@
-const Redis = require("ioredis");
+const Redis = require('ioredis');
 
-const config = require("../config");
-const monitoring = require("../monitoring");
+const config = require('../config');
+const monitoring = require('../monitoring');
 
 let redisClient = null;
 
 function wrapCommand(redis, method, operation = method) {
-  if (typeof redis[method] !== "function") {
+  if (typeof redis[method] !== 'function') {
     return;
   }
 
@@ -16,22 +16,22 @@ function wrapCommand(redis, method, operation = method) {
     try {
       const result = await original(...args);
       monitoring.recordDependencyRequest({
-        dependencyType: "redis",
-        dependencyName: "redis",
+        dependencyType: 'redis',
+        dependencyName: 'redis',
         operation,
-        outcome: "success",
+        outcome: 'success',
         durationMs: Date.now() - startedAt
       });
       return result;
     } catch (error) {
       monitoring.recordDependencyRequest({
-        dependencyType: "redis",
-        dependencyName: "redis",
+        dependencyType: 'redis',
+        dependencyName: 'redis',
         operation,
-        outcome: "error",
+        outcome: 'error',
         durationMs: Date.now() - startedAt,
         attributes: {
-          error_type: String(error && error.code ? error.code : "redis_error")
+          error_type: String(error && error.code ? error.code : 'redis_error')
         }
       });
       throw error;
@@ -43,15 +43,9 @@ function getRedis() {
   if (!redisClient) {
     redisClient = new Redis(config.redis.url, {
       lazyConnect: true,
-      connectTimeout: Number(
-        process.env.REDIS_CONNECT_TIMEOUT_MS || 800
-      ),
-      commandTimeout: Number(
-        process.env.REDIS_COMMAND_TIMEOUT_MS || 800
-      ),
-      maxRetriesPerRequest: Number(
-        process.env.REDIS_MAX_RETRIES_PER_REQUEST || 1
-      ),
+      connectTimeout: Number(process.env.REDIS_CONNECT_TIMEOUT_MS || 800),
+      commandTimeout: Number(process.env.REDIS_COMMAND_TIMEOUT_MS || 800),
+      maxRetriesPerRequest: Number(process.env.REDIS_MAX_RETRIES_PER_REQUEST || 1),
       enableOfflineQueue: false,
       retryStrategy: (times) => {
         if (times >= 2) {
@@ -60,12 +54,10 @@ function getRedis() {
         return Math.min(times * 100, 300);
       }
     });
-    redisClient.on("error", () => {
+    redisClient.on('error', () => {
       // Best-effort Redis usage for idempotency cache.
     });
-    ["get", "set", "del", "ping"].forEach((command) =>
-      wrapCommand(redisClient, command)
-    );
+    ['get', 'set', 'del', 'ping'].forEach((command) => wrapCommand(redisClient, command));
   }
   return redisClient;
 }

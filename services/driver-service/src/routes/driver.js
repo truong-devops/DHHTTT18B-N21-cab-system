@@ -1,59 +1,56 @@
-const express = require("express");
-const { requireAuth, requireRole } = require("../middleware/auth");
-const { validateRequest } = require("../middleware/validateRequest");
-const { asyncHandler } = require("../utils/asyncHandler");
-const driverService = require("../services/driverService");
+const express = require('express');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const { validateRequest } = require('../middleware/validateRequest');
+const { asyncHandler } = require('../utils/asyncHandler');
+const driverService = require('../services/driverService');
 
 const router = express.Router();
 
 function validateLatLng(prefix, errors, value) {
-  if (!value || typeof value !== "object") {
-    errors.push({ path: prefix, message: "is required" });
+  if (!value || typeof value !== 'object') {
+    errors.push({ path: prefix, message: 'is required' });
     return;
   }
   if (!Number.isFinite(value.lat)) {
-    errors.push({ path: `${prefix}.lat`, message: "must be a number" });
+    errors.push({ path: `${prefix}.lat`, message: 'must be a number' });
   } else if (value.lat < -90 || value.lat > 90) {
-    errors.push({ path: `${prefix}.lat`, message: "must be between -90 and 90" });
+    errors.push({ path: `${prefix}.lat`, message: 'must be between -90 and 90' });
   }
   if (!Number.isFinite(value.lng)) {
-    errors.push({ path: `${prefix}.lng`, message: "must be a number" });
+    errors.push({ path: `${prefix}.lng`, message: 'must be a number' });
   } else if (value.lng < -180 || value.lng > 180) {
-    errors.push({ path: `${prefix}.lng`, message: "must be between -180 and 180" });
+    errors.push({ path: `${prefix}.lng`, message: 'must be between -180 and 180' });
   }
 }
 
 // Rubric compatibility endpoint:
 // Accepts { driver_id, status } for ONLINE/OFFLINE transition.
 router.post(
-  "/v1/driver/status",
+  '/v1/driver/status',
   requireAuth,
-  requireRole("admin", "service"),
+  requireRole('admin', 'service'),
   validateRequest({
     bodySchema: {
-      required: ["driver_id", "status"],
+      required: ['driver_id', 'status'],
       properties: {
-        driver_id: { type: "string" },
-        status: { type: "string", enum: ["ONLINE", "OFFLINE"] },
-        initial_location: { type: "object" }
+        driver_id: { type: 'string' },
+        status: { type: 'string', enum: ['ONLINE', 'OFFLINE'] },
+        initial_location: { type: 'object' }
       }
     },
     custom: (req, errors) => {
       if (req.body?.initial_location) {
-        validateLatLng("body.initial_location", errors, req.body.initial_location);
+        validateLatLng('body.initial_location', errors, req.body.initial_location);
       }
     }
   }),
   asyncHandler(async (req, res) => {
     const driverId = req.body.driver_id;
-    const status = String(req.body.status || "").toUpperCase();
+    const status = String(req.body.status || '').toUpperCase();
 
     const result =
-      status === "ONLINE"
-        ? await driverService.setOnlineByDriverId(
-            driverId,
-            req.body?.initial_location
-          )
+      status === 'ONLINE'
+        ? await driverService.setOnlineByDriverId(driverId, req.body?.initial_location)
         : await driverService.setOfflineByDriverId(driverId);
 
     return res.json({
@@ -66,31 +63,31 @@ router.post(
 );
 
 router.get(
-  "/v1/driver/availability",
+  '/v1/driver/availability',
   requireAuth,
   validateRequest({
     custom: (req, errors) => {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
       if (!Number.isFinite(lat)) {
-        errors.push({ path: "query.lat", message: "must be a number" });
+        errors.push({ path: 'query.lat', message: 'must be a number' });
       }
       if (!Number.isFinite(lng)) {
-        errors.push({ path: "query.lng", message: "must be a number" });
+        errors.push({ path: 'query.lng', message: 'must be a number' });
       }
       if (req.query.radiusMeters !== undefined) {
         const radius = Number(req.query.radiusMeters);
         if (!Number.isFinite(radius)) {
           errors.push({
-            path: "query.radiusMeters",
-            message: "must be a number"
+            path: 'query.radiusMeters',
+            message: 'must be a number'
           });
         }
       }
       if (req.query.limit !== undefined) {
         const limit = Number(req.query.limit);
         if (!Number.isFinite(limit)) {
-          errors.push({ path: "query.limit", message: "must be a number" });
+          errors.push({ path: 'query.limit', message: 'must be a number' });
         }
       }
     }
@@ -101,9 +98,7 @@ router.get(
       lng: Number(req.query.lng),
       radiusMeters: req.query.radiusMeters,
       limit: req.query.limit,
-      vehicleType: req.query.vehicleType
-        ? String(req.query.vehicleType).toUpperCase()
-        : null
+      vehicleType: req.query.vehicleType ? String(req.query.vehicleType).toUpperCase() : null
     });
 
     return res.json({
@@ -117,12 +112,12 @@ router.get(
 );
 
 router.get(
-  "/v1/drivers/:driverId/profile",
+  '/v1/drivers/:driverId/profile',
   requireAuth,
   validateRequest({
     paramsSchema: {
-      required: ["driverId"],
-      properties: { driverId: { type: "string" } }
+      required: ['driverId'],
+      properties: { driverId: { type: 'string' } }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -131,10 +126,10 @@ router.get(
   })
 );
 
-router.use("/v1/driver", requireAuth, requireRole("driver"));
+router.use('/v1/driver', requireAuth, requireRole('driver'));
 
 router.get(
-  "/v1/driver/me",
+  '/v1/driver/me',
   asyncHandler(async (req, res) => {
     const data = await driverService.getDriverMe(req.userId);
     return res.json({ data, requestId: req.requestId });
@@ -142,12 +137,12 @@ router.get(
 );
 
 router.put(
-  "/v1/driver/me",
+  '/v1/driver/me',
   validateRequest({
     bodySchema: {
       properties: {
-        fullName: { type: "string" },
-        phone: { type: "string" }
+        fullName: { type: 'string' },
+        phone: { type: 'string' }
       }
     }
   }),
@@ -161,17 +156,17 @@ router.put(
 );
 
 router.put(
-  "/v1/driver/me/vehicle",
+  '/v1/driver/me/vehicle',
   validateRequest({
     bodySchema: {
-      required: ["vehicleType", "plateNumber"],
+      required: ['vehicleType', 'plateNumber'],
       properties: {
-        vehicleType: { type: "string" },
-        plateNumber: { type: "string" },
-        brand: { type: "string" },
-        model: { type: "string" },
-        color: { type: "string" },
-        isActive: { type: "boolean" }
+        vehicleType: { type: 'string' },
+        plateNumber: { type: 'string' },
+        brand: { type: 'string' },
+        model: { type: 'string' },
+        color: { type: 'string' },
+        isActive: { type: 'boolean' }
       }
     }
   }),
@@ -189,31 +184,28 @@ router.put(
 );
 
 router.post(
-  "/v1/driver/me/online",
+  '/v1/driver/me/online',
   validateRequest({
     bodySchema: {
       properties: {
-        deviceId: { type: "string" },
-        initialLocation: { type: "object" }
+        deviceId: { type: 'string' },
+        initialLocation: { type: 'object' }
       }
     },
     custom: (req, errors) => {
       if (req.body?.initialLocation) {
-        validateLatLng("body.initialLocation", errors, req.body.initialLocation);
+        validateLatLng('body.initialLocation', errors, req.body.initialLocation);
       }
     }
   }),
   asyncHandler(async (req, res) => {
-    const data = await driverService.setOnline(
-      req.userId,
-      req.body?.initialLocation
-    );
+    const data = await driverService.setOnline(req.userId, req.body?.initialLocation);
     return res.json({ data, requestId: req.requestId });
   })
 );
 
 router.post(
-  "/v1/driver/me/offline",
+  '/v1/driver/me/offline',
   asyncHandler(async (req, res) => {
     const data = await driverService.setOffline(req.userId);
     return res.json({ data, requestId: req.requestId });
@@ -221,21 +213,21 @@ router.post(
 );
 
 router.post(
-  "/v1/driver/me/location",
+  '/v1/driver/me/location',
   validateRequest({
     bodySchema: {
-      required: ["lat", "lng"],
+      required: ['lat', 'lng'],
       properties: {
-        lat: { type: "number" },
-        lng: { type: "number" },
-        heading: { type: "number" },
-        speed: { type: "number" },
-        accuracy: { type: "number" },
-        recordedAt: { type: "string" }
+        lat: { type: 'number' },
+        lng: { type: 'number' },
+        heading: { type: 'number' },
+        speed: { type: 'number' },
+        accuracy: { type: 'number' },
+        recordedAt: { type: 'string' }
       }
     },
     custom: (req, errors) => {
-      validateLatLng("body", errors, req.body);
+      validateLatLng('body', errors, req.body);
     }
   }),
   asyncHandler(async (req, res) => {
@@ -253,11 +245,11 @@ router.post(
 );
 
 router.post(
-  "/v1/driver/me/heartbeat",
+  '/v1/driver/me/heartbeat',
   validateRequest({
     bodySchema: {
       properties: {
-        deviceId: { type: "string" }
+        deviceId: { type: 'string' }
       }
     }
   }),

@@ -1,64 +1,70 @@
-import { useEffect, useState } from 'react'
-import PageHeader from '../../components/common/PageHeader.jsx'
-import SurgeRuleForm from '../../components/admin/pricing/SurgeRuleForm.jsx'
-import SurgeRuleTable from '../../components/admin/pricing/SurgeRuleTable.jsx'
-import PricingSimulator from '../../components/admin/pricing/PricingSimulator.jsx'
-import { pricingService } from '../../services/pricing.service.js'
-import { useToast } from '../../hooks/useToast.js'
-
-function Pricing() {
-  const toast = useToast()
-  const [rules, setRules] = useState([])
-  const [simResult, setSimResult] = useState(null)
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const result = await pricingService.listRules()
-        setRules(result.items)
-      } catch (error) {
-        toast?.push(error.message || 'Không thể tải quy tắc', 'danger')
-      }
-    }
-
-    load()
-  }, [])
-
-  const handleToggle = async (rule) => {
-    const enabled = rule.status !== 'ACTIVE'
-    try {
-      const updated = await pricingService.toggleRule(rule.id, enabled)
-      setRules((prev) =>
-        prev.map((item) =>
-          item.id === rule.id ? { ...item, ...(updated || {}) } : item
-        )
-      )
-      toast?.push('Đã cập nhật quy tắc', 'success')
-    } catch (error) {
-      toast?.push(error.message || 'Không thể cập nhật quy tắc', 'danger')
+import { useEffect, useState } from 'react';
+
+import PageHeader from '../../components/common/PageHeader.jsx';
+
+import SurgeRuleForm from '../../components/admin/pricing/SurgeRuleForm.jsx';
+
+import SurgeRuleTable from '../../components/admin/pricing/SurgeRuleTable.jsx';
+
+import PricingSimulator from '../../components/admin/pricing/PricingSimulator.jsx';
+
+import { pricingService } from '../../services/pricing.service.js';
+
+import { useToast } from '../../hooks/useToast.js';
+
+function Pricing() {
+  const toast = useToast();
+
+  const [rules, setRules] = useState([]);
+
+  const [simResult, setSimResult] = useState(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const result = await pricingService.listRules();
+
+        setRules(result.items);
+      } catch (error) {
+        toast?.push(error.message || 'Không thể tải quy tắc', 'danger');
+      }
     }
-  }
-
-  const handleSimulate = async () => {
-    const result = await pricingService.simulate({})
-    setSimResult(result)
-  }
-
-  return (
-    <div>
-      <PageHeader
-        title="Giá cước"
-        subtitle="Quản lý chiến lược tăng giá và mô phỏng giá cước trước khi áp dụng."
-      />
+
+    load();
+  }, []);
+
+  const handleToggle = async (rule) => {
+    const enabled = rule.status !== 'ACTIVE';
+
+    try {
+      const updated = await pricingService.toggleRule(rule.id, enabled);
+
+      setRules((prev) => prev.map((item) => (item.id === rule.id ? { ...item, ...(updated || {}) } : item)));
+
+      toast?.push('Đã cập nhật quy tắc', 'success');
+    } catch (error) {
+      toast?.push(error.message || 'Không thể cập nhật quy tắc', 'danger');
+    }
+  };
+
+  const handleSimulate = async () => {
+    const result = await pricingService.simulate({});
+
+    setSimResult(result);
+  };
+
+  return (
+    <div>
+      <PageHeader title="Giá cước" subtitle="Quản lý chiến lược tăng giá và mô phỏng giá cước trước khi áp dụng." />
       <div className="grid grid-2">
         <SurgeRuleForm onSubmit={() => toast?.push('Đã lưu quy tắc', 'success')} />
         <PricingSimulator result={simResult} onSimulate={handleSimulate} />
       </div>
-      <div className="card">
-        <SurgeRuleTable rules={rules} onToggle={handleToggle} />
-      </div>
-    </div>
-  )
-}
-
-export default Pricing
+      <div className="card">
+        <SurgeRuleTable rules={rules} onToggle={handleToggle} />
+      </div>
+    </div>
+  );
+}
+
+export default Pricing;

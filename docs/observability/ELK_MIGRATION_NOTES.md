@@ -9,12 +9,15 @@ This migration switches the primary logging backend from Loki to ELK while keepi
 ## Old vs New
 
 Old logging path:
+
 - OTEL Collector logs -> Loki -> Grafana (logs view)
 
 New logging path:
+
 - Container stdout/stderr -> Docker syslog driver -> Logstash -> Elasticsearch -> Kibana
 
 Unchanged paths:
+
 - Traces: OTel -> Tempo -> Grafana
 - Metrics: OTel -> Prometheus -> Grafana
 
@@ -51,6 +54,7 @@ npm run dev:observability
 ```
 
 If Docker daemon cannot reach Logstash via localhost, set:
+
 - `LOGSTASH_SYSLOG_HOST=host.docker.internal` (Docker Desktop default)
 - `LOGSTASH_SYSLOG_PORT=5514`
 

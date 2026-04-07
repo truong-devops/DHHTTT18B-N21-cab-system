@@ -23,12 +23,15 @@
       }
       body {
         margin: 0;
-        font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+        font-family:
+          'Plus Jakarta Sans',
+          system-ui,
+          -apple-system,
+          sans-serif;
         color: var(--ink-900);
         background:
           radial-gradient(circle at 10% 10%, rgba(255, 122, 26, 0.08), transparent 40%),
-          radial-gradient(circle at 90% 0%, rgba(255, 77, 45, 0.12), transparent 45%),
-          #f6f7fb;
+          radial-gradient(circle at 90% 0%, rgba(255, 77, 45, 0.12), transparent 45%), #f6f7fb;
       }
       #fileNotice {
         display: none;
@@ -61,7 +64,7 @@
         gap: 6px;
       }
       .brand h1 {
-        font-family: "Space Grotesk", system-ui, sans-serif;
+        font-family: 'Space Grotesk', system-ui, sans-serif;
         font-size: 20px;
         margin: 0;
       }
@@ -95,7 +98,8 @@
         gap: 8px;
         margin-top: 10px;
       }
-      .actions button, .actions a {
+      .actions button,
+      .actions a {
         appearance: none;
         border: 1px solid var(--stroke);
         background: var(--surface);
@@ -124,7 +128,7 @@
       .meta h2 {
         margin: 0;
         font-size: 15px;
-        font-family: "Space Grotesk", system-ui, sans-serif;
+        font-family: 'Space Grotesk', system-ui, sans-serif;
       }
       .tag {
         display: inline-flex;
@@ -181,9 +185,7 @@
     <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
   </head>
   <body>
-    <div id="fileNotice">
-      You are opening this file with file://. Start a local server for Redoc to load specs.
-    </div>
+    <div id="fileNotice">You are opening this file with file://. Start a local server for Redoc to load specs.</div>
     <div class="app">
       <aside class="sidebar">
         <div class="brand">
@@ -222,132 +224,104 @@
     <script>
       const specs = [
         {
-          file: "api-gateway.openapi.yaml",
-          title: "API Gateway",
-          summary: "Single entry point that proxies /v1/* traffic to services.",
+          file: 'api-gateway.openapi.yaml',
+          title: 'API Gateway',
+          summary: 'Single entry point that proxies /v1/* traffic to services.',
           highlights: [
-            "Health endpoints for liveness checks.",
-            "Route mapping: /v1/{domain} -> downstream service.",
-            "Use for testing full request flow through gateway."
+            'Health endpoints for liveness checks.',
+            'Route mapping: /v1/{domain} -> downstream service.',
+            'Use for testing full request flow through gateway.'
           ]
         },
         {
-          file: "auth-service.openapi.yaml",
-          title: "Auth Service",
-          summary: "Login, register, refresh, and session lifecycle.",
+          file: 'auth-service.openapi.yaml',
+          title: 'Auth Service',
+          summary: 'Login, register, refresh, and session lifecycle.',
+          highlights: ['Issue access + refresh tokens.', 'Refresh flow for expired access tokens.', 'Role-based identities (user, driver, admin).']
+        },
+        {
+          file: 'booking-service.openapi.yaml',
+          title: 'Booking Service',
+          summary: 'Create/list/get/cancel bookings with idempotency support.',
           highlights: [
-            "Issue access + refresh tokens.",
-            "Refresh flow for expired access tokens.",
-            "Role-based identities (user, driver, admin)."
+            'Supports rubric payload: pickup + drop + distance_km.',
+            'Calls pricing + ETA and sets initial status REQUESTED.',
+            'Emits ride.created and ride_events (ride_requested).'
           ]
         },
         {
-          file: "booking-service.openapi.yaml",
-          title: "Booking Service",
-          summary: "Create/list/get/cancel bookings with idempotency support.",
+          file: 'eta-service.openapi.yaml',
+          title: 'ETA Service',
+          summary: 'Rule-based ETA estimation endpoint.',
           highlights: [
-            "Supports rubric payload: pickup + drop + distance_km.",
-            "Calls pricing + ETA and sets initial status REQUESTED.",
-            "Emits ride.created and ride_events (ride_requested)."
+            'Estimate ETA by distance_km or pickup/drop coordinates.',
+            'Traffic-aware ETA calculation for booking flow.',
+            'Health + readiness endpoints.'
           ]
         },
         {
-          file: "eta-service.openapi.yaml",
-          title: "ETA Service",
-          summary: "Rule-based ETA estimation endpoint.",
+          file: 'driver-service.openapi.yaml',
+          title: 'Driver Service',
+          summary: 'Driver profile, vehicle, online/offline, and location.',
+          highlights: ['Toggle online/offline state.', 'Update driver location.', 'Admin approval and vehicle update.']
+        },
+        {
+          file: 'notification-service.openapi.yaml',
+          title: 'Notification Service',
+          summary: 'Create, retry, cancel notifications + user preferences.',
           highlights: [
-            "Estimate ETA by distance_km or pickup/drop coordinates.",
-            "Traffic-aware ETA calculation for booking flow.",
-            "Health + readiness endpoints."
+            'Send in-app notifications (single or batch).',
+            'Retry or cancel pending notifications.',
+            'Manage per-user channel preferences.'
           ]
         },
         {
-          file: "driver-service.openapi.yaml",
-          title: "Driver Service",
-          summary: "Driver profile, vehicle, online/offline, and location.",
-          highlights: [
-            "Toggle online/offline state.",
-            "Update driver location.",
-            "Admin approval and vehicle update."
-          ]
+          file: 'payment-service.openapi.yaml',
+          title: 'Payment Service',
+          summary: 'Create payments, update status, list and fetch details.',
+          highlights: ['Support CASH and VIETQR flows.', 'Update payment status transitions.', 'List recent payments.']
         },
         {
-          file: "notification-service.openapi.yaml",
-          title: "Notification Service",
-          summary: "Create, retry, cancel notifications + user preferences.",
-          highlights: [
-            "Send in-app notifications (single or batch).",
-            "Retry or cancel pending notifications.",
-            "Manage per-user channel preferences."
-          ]
+          file: 'pricing-service.openapi.yaml',
+          title: 'Pricing Service',
+          summary: 'Quote estimation and fare finalization.',
+          highlights: ['Create quote for pickup/dropoff + vehicle.', 'Fetch quote details by id.', 'Finalize fare for completed trip.']
         },
         {
-          file: "payment-service.openapi.yaml",
-          title: "Payment Service",
-          summary: "Create payments, update status, list and fetch details.",
-          highlights: [
-            "Support CASH and VIETQR flows.",
-            "Update payment status transitions.",
-            "List recent payments."
-          ]
+          file: 'review-service.openapi.yaml',
+          title: 'Review Service',
+          summary: 'Create and manage ride reviews.',
+          highlights: ['Submit review for a ride.', 'Fetch reviews list.', 'Update or delete review.']
         },
         {
-          file: "pricing-service.openapi.yaml",
-          title: "Pricing Service",
-          summary: "Quote estimation and fare finalization.",
-          highlights: [
-            "Create quote for pickup/dropoff + vehicle.",
-            "Fetch quote details by id.",
-            "Finalize fare for completed trip."
-          ]
+          file: 'ride-service.openapi.yaml',
+          title: 'Ride Service',
+          summary: 'Ride lifecycle, assignments, and status transitions.',
+          highlights: ['Incoming assignments for drivers.', 'Accept/reject + status updates.', 'Ride history list.']
         },
         {
-          file: "review-service.openapi.yaml",
-          title: "Review Service",
-          summary: "Create and manage ride reviews.",
-          highlights: [
-            "Submit review for a ride.",
-            "Fetch reviews list.",
-            "Update or delete review."
-          ]
-        },
-        {
-          file: "ride-service.openapi.yaml",
-          title: "Ride Service",
-          summary: "Ride lifecycle, assignments, and status transitions.",
-          highlights: [
-            "Incoming assignments for drivers.",
-            "Accept/reject + status updates.",
-            "Ride history list."
-          ]
-        },
-        {
-          file: "user-service.openapi.yaml",
-          title: "User Service",
-          summary: "User CRUD + internal lookups.",
-          highlights: [
-            "List and update users.",
-            "Internal lookups by id or email.",
-            "Health endpoint."
-          ]
+          file: 'user-service.openapi.yaml',
+          title: 'User Service',
+          summary: 'User CRUD + internal lookups.',
+          highlights: ['List and update users.', 'Internal lookups by id or email.', 'Health endpoint.']
         }
       ];
 
       const params = new URLSearchParams(window.location.search);
-      const current = params.get("spec") || specs[0].file;
-      const select = document.getElementById("specSelect");
-      const container = document.getElementById("redoc-container");
-      const fileNotice = document.getElementById("fileNotice");
-      const metaNode = document.getElementById("specMeta");
-      const detailsNode = document.getElementById("specDetails");
-      const rawLink = document.getElementById("openRaw");
+      const current = params.get('spec') || specs[0].file;
+      const select = document.getElementById('specSelect');
+      const container = document.getElementById('redoc-container');
+      const fileNotice = document.getElementById('fileNotice');
+      const metaNode = document.getElementById('specMeta');
+      const detailsNode = document.getElementById('specDetails');
+      const rawLink = document.getElementById('openRaw');
 
-      if (window.location.protocol === "file:") {
-        fileNotice.style.display = "block";
+      if (window.location.protocol === 'file:') {
+        fileNotice.style.display = 'block';
       }
 
       specs.forEach((spec) => {
-        const opt = document.createElement("option");
+        const opt = document.createElement('option');
         opt.value = spec.file;
         opt.textContent = spec.title;
         select.appendChild(opt);
@@ -355,7 +329,7 @@
       select.value = current;
 
       function baseUrl() {
-        const path = window.location.pathname.replace(/index\.html$/, "");
+        const path = window.location.pathname.replace(/index\.html$/, '');
         return window.location.origin + path;
       }
 
@@ -368,7 +342,7 @@
         detailsNode.innerHTML = `
           <h2>API details</h2>
           <ul class="list">
-            ${spec.highlights.map((item) => `<li>${item}</li>`).join("")}
+            ${spec.highlights.map((item) => `<li>${item}</li>`).join('')}
           </ul>
           <div class="note">Open the spec for exact request/response schemas.</div>
         `;
@@ -381,17 +355,17 @@
         rawLink.href = specFile;
       }
 
-      select.addEventListener("change", () => {
+      select.addEventListener('change', () => {
         const next = select.value;
         const search = new URLSearchParams(window.location.search);
-        search.set("spec", next);
+        search.set('spec', next);
         window.location.search = search.toString();
       });
 
-      document.getElementById("openSwagger").addEventListener("click", () => {
+      document.getElementById('openSwagger').addEventListener('click', () => {
         const specUrl = baseUrl() + select.value;
-        const editorUrl = "https://editor.swagger.io/?url=" + encodeURIComponent(specUrl);
-        window.open(editorUrl, "_blank");
+        const editorUrl = 'https://editor.swagger.io/?url=' + encodeURIComponent(specUrl);
+        window.open(editorUrl, '_blank');
       });
 
       load(current);

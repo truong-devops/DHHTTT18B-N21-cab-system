@@ -3,22 +3,22 @@ name: Event Contracts Governance
 on:
   pull_request:
     paths:
-      - "contracts/events/**"
-      - "services/**/src/messaging/**"
-      - "services/**/test/contract.kafka*.test.js"
-      - "scripts/contracts/events/**"
-      - "package.json"
-      - ".github/workflows/events-contract-governance.yml"
+      - 'contracts/events/**'
+      - 'services/**/src/messaging/**'
+      - 'services/**/test/contract.kafka*.test.js'
+      - 'scripts/contracts/events/**'
+      - 'package.json'
+      - '.github/workflows/events-contract-governance.yml'
   push:
     branches:
       - main
     paths:
-      - "contracts/events/**"
-      - "services/**/src/messaging/**"
-      - "services/**/test/contract.kafka*.test.js"
-      - "scripts/contracts/events/**"
-      - "package.json"
-      - ".github/workflows/events-contract-governance.yml"
+      - 'contracts/events/**'
+      - 'services/**/src/messaging/**'
+      - 'services/**/test/contract.kafka*.test.js'
+      - 'scripts/contracts/events/**'
+      - 'package.json'
+      - '.github/workflows/events-contract-governance.yml'
 
 jobs:
   contracts:
@@ -32,8 +32,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: '20'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci

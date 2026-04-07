@@ -1,19 +1,13 @@
-const crypto = require("crypto");
-const pool = require("../db/pool");
-const userRepository = require("../repository/userRepository");
-const outboxRepository = require("../repository/outboxRepository");
-const { ApiError } = require("../utils/errors");
-const {
-  normalizeRole,
-  normalizeStatus
-} = require("../utils/validators");
-const {
-  encodeCursor,
-  decodeCursor
-} = require("../utils/pagination");
-const monitoring = require("../monitoring");
-const { OutboxPublisher } = require("../messaging/publisher");
-const { UserCreated, UserUpdated } = require("../messaging/topics");
+const crypto = require('crypto');
+const pool = require('../db/pool');
+const userRepository = require('../repository/userRepository');
+const outboxRepository = require('../repository/outboxRepository');
+const { ApiError } = require('../utils/errors');
+const { normalizeRole, normalizeStatus } = require('../utils/validators');
+const { encodeCursor, decodeCursor } = require('../utils/pagination');
+const monitoring = require('../monitoring');
+const { OutboxPublisher } = require('../messaging/publisher');
+const { UserCreated, UserUpdated } = require('../messaging/topics');
 
 const publisher = new OutboxPublisher(outboxRepository);
 
@@ -39,7 +33,7 @@ function buildOutboxEvent(type, user) {
 
   return {
     eventId,
-    aggregateType: "user",
+    aggregateType: 'user',
     aggregateId: user.id,
     eventType: type,
     payload
@@ -49,12 +43,12 @@ function buildOutboxEvent(type, user) {
 async function withTransaction(task) {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
     const result = await task(client);
-    await client.query("COMMIT");
+    await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();
@@ -67,7 +61,7 @@ async function createUser(req, res, next) {
     const fullName = req.body.fullName?.trim();
     const phone = req.body.phone ? String(req.body.phone).trim() : null;
     const role = normalizeRole(req.body.role);
-    const status = normalizeStatus(req.body.status) || "ACTIVE";
+    const status = normalizeStatus(req.body.status) || 'ACTIVE';
 
     const result = await withTransaction(async (client) => {
       const user = await userRepository.createUser(client, {
@@ -82,20 +76,20 @@ async function createUser(req, res, next) {
       return user;
     });
     monitoring.recordBusinessEvent({
-      domain: "user",
-      event: "created",
-      outcome: "success",
+      domain: 'user',
+      event: 'created',
+      outcome: 'success',
       attributes: {
-        role: String(result.role || "unknown").toLowerCase()
+        role: String(result.role || 'unknown').toLowerCase()
       }
     });
 
     return res.status(201).json({ data: result });
   } catch (error) {
     monitoring.recordBusinessEvent({
-      domain: "user",
-      event: "created",
-      outcome: "error"
+      domain: 'user',
+      event: 'created',
+      outcome: 'error'
     });
     return next(error);
   }
@@ -105,7 +99,7 @@ async function getUserById(req, res, next) {
   try {
     const user = await userRepository.getUserById(req.params.id);
     if (!user) {
-      throw new ApiError(404, "NOT_FOUND", "User not found");
+      throw new ApiError(404, 'NOT_FOUND', 'User not found');
     }
     return res.json({ data: user });
   } catch (error) {
@@ -115,15 +109,10 @@ async function getUserById(req, res, next) {
 
 async function listUsers(req, res, next) {
   try {
-    const email = req.query.email
-      ? String(req.query.email).trim().toLowerCase()
-      : null;
+    const email = req.query.email ? String(req.query.email).trim().toLowerCase() : null;
     const role = normalizeRole(req.query.role);
     const status = normalizeStatus(req.query.status);
-    const limit = Math.min(
-      Math.max(parseInt(req.query.limit || "20", 10), 1),
-      100
-    );
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
     const cursor = decodeCursor(req.query.cursor);
 
     const { users, nextCursor } = await userRepository.listUsers({
@@ -168,36 +157,36 @@ async function updateUser(req, res, next) {
     const update = buildUpdatePayload(req.body || {});
 
     if (!Object.keys(update).length) {
-      throw new ApiError(400, "VALIDATION_ERROR", "No fields to update");
+      throw new ApiError(400, 'VALIDATION_ERROR', 'No fields to update');
     }
 
-    if (req.user.role !== "admin") {
+    if (req.user.role !== 'admin') {
       if (update.role || update.status) {
-        throw new ApiError(403, "FORBIDDEN", "Cannot change role/status");
+        throw new ApiError(403, 'FORBIDDEN', 'Cannot change role/status');
       }
     }
 
     const result = await withTransaction(async (client) => {
       const user = await userRepository.updateUser(client, req.params.id, update);
       if (!user) {
-        throw new ApiError(404, "NOT_FOUND", "User not found");
+        throw new ApiError(404, 'NOT_FOUND', 'User not found');
       }
       const event = buildOutboxEvent(UserUpdated, user);
       await publisher.publish(event, client);
       return user;
     });
     monitoring.recordBusinessEvent({
-      domain: "user",
-      event: "updated",
-      outcome: "success"
+      domain: 'user',
+      event: 'updated',
+      outcome: 'success'
     });
 
     return res.json({ data: result });
   } catch (error) {
     monitoring.recordBusinessEvent({
-      domain: "user",
-      event: "updated",
-      outcome: "error"
+      domain: 'user',
+      event: 'updated',
+      outcome: 'error'
     });
     return next(error);
   }
@@ -208,24 +197,24 @@ async function deleteUser(req, res, next) {
     const result = await withTransaction(async (client) => {
       const user = await userRepository.softDeleteUser(client, req.params.id);
       if (!user) {
-        throw new ApiError(404, "NOT_FOUND", "User not found");
+        throw new ApiError(404, 'NOT_FOUND', 'User not found');
       }
       const event = buildOutboxEvent(UserUpdated, user);
       await publisher.publish(event, client);
       return user;
     });
     monitoring.recordBusinessEvent({
-      domain: "user",
-      event: "deleted",
-      outcome: "success"
+      domain: 'user',
+      event: 'deleted',
+      outcome: 'success'
     });
 
     return res.json({ data: result });
   } catch (error) {
     monitoring.recordBusinessEvent({
-      domain: "user",
-      event: "deleted",
-      outcome: "error"
+      domain: 'user',
+      event: 'deleted',
+      outcome: 'error'
     });
     return next(error);
   }
@@ -235,7 +224,7 @@ async function getInternalUserById(req, res, next) {
   try {
     const user = await userRepository.getUserById(req.params.id);
     if (!user) {
-      throw new ApiError(404, "NOT_FOUND", "User not found");
+      throw new ApiError(404, 'NOT_FOUND', 'User not found');
     }
     return res.json({ data: user });
   } catch (error) {
@@ -248,7 +237,7 @@ async function getInternalUserByEmail(req, res, next) {
     const email = String(req.params.email).trim().toLowerCase();
     const user = await userRepository.getUserByEmail(email);
     if (!user) {
-      throw new ApiError(404, "NOT_FOUND", "User not found");
+      throw new ApiError(404, 'NOT_FOUND', 'User not found');
     }
     return res.json({ data: user });
   } catch (error) {

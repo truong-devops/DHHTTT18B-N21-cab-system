@@ -12,11 +12,11 @@ services:
       - zookeeper
     environment:
       KAFKA_BROKER_ID: ${KAFKA_SINGLE_BROKER_ID:-1}
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT"
-      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_INTERNAL_TOPIC_RF:-1}
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${KAFKA_INTERNAL_TOPIC_MIN_ISR:-1}
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_INTERNAL_TOPIC_RF:-1}
@@ -39,7 +39,7 @@ services:
       context: ..
       dockerfile: services/api-gateway/Dockerfile
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       SERVICE_NAME: api-gateway
       OTEL_SERVICE_NAME: api-gateway
@@ -190,7 +190,7 @@ services:
       ETA_BASE_URL: http://eta-service:3012
       PRICING_BASE_URL: http://pricing-service:3006
       PAYMENT_BASE_URL: http://payment-service:3007
-      PAYMENT_FALLBACK_BASE_URLS: ""
+      PAYMENT_FALLBACK_BASE_URLS: ''
       PAYMENT_IP_FAMILY: 4
       PAYMENT_REQUEST_TIMEOUT_MS: 5000
       PAYMENT_HTTP_RETRY_MAX: 2
@@ -275,7 +275,7 @@ services:
       context: ..
       dockerfile: services/payment-service/Dockerfile
     ports:
-      - "3007:3007"
+      - '3007:3007'
     environment:
       SERVICE_NAME: payment-service
       OTEL_SERVICE_NAME: payment-service
@@ -318,8 +318,8 @@ services:
       VIETQR_API_URL: ${VIETQR_API_URL:-https://api.vietqr.io/v2/generate}
       VIETQR_BANK_BIN: ${VIETQR_BANK_BIN:-970418}
       VIETQR_ACCOUNT_NUMBER: ${VIETQR_ACCOUNT_NUMBER:-123456789}
-      VIETQR_ACCOUNT_NAME: "${VIETQR_ACCOUNT_NAME:-NGUYEN VAN A}"
-      VIETQR_MERCHANT_CITY: "${VIETQR_MERCHANT_CITY:-HO CHI MINH}"
+      VIETQR_ACCOUNT_NAME: '${VIETQR_ACCOUNT_NAME:-NGUYEN VAN A}'
+      VIETQR_MERCHANT_CITY: '${VIETQR_MERCHANT_CITY:-HO CHI MINH}'
       VIETQR_FORMAT: ${VIETQR_FORMAT:-text}
       VIETQR_CLIENT_ID: ${VIETQR_CLIENT_ID:-}
       VIETQR_API_KEY: ${VIETQR_API_KEY:-}
@@ -377,12 +377,12 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4:8
-    profiles: ["ops"]
+    profiles: ['ops']
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: admin123
     ports:
-      - "5050:80"
+      - '5050:80'
     volumes:
       - cab_pgadmin_data:/var/lib/pgadmin
     depends_on:

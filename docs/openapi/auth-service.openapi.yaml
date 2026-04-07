@@ -32,7 +32,7 @@ components:
       properties:
         accessToken: { type: string }
         refreshToken: { type: string }
-        expiresIn: { type: string, description: "Duration string, e.g. 15m" }
+        expiresIn: { type: string, description: 'Duration string, e.g. 15m' }
       required: [accessToken, refreshToken, expiresIn]
     ErrorResponse:
       type: object
@@ -56,7 +56,7 @@ components:
           examples:
             validation:
               value:
-                error: { code: VALIDATION_ERROR, message: "password must be at least 6 characters", details: [] }
+                error: { code: VALIDATION_ERROR, message: 'password must be at least 6 characters', details: [] }
     Error401:
       description: Unauthorized
       content:
@@ -65,7 +65,7 @@ components:
           examples:
             unauthorized:
               value:
-                error: { code: UNAUTHORIZED, message: "Invalid credentials", details: [] }
+                error: { code: UNAUTHORIZED, message: 'Invalid credentials', details: [] }
     Error403:
       description: Forbidden
       content:
@@ -74,7 +74,7 @@ components:
           examples:
             forbidden:
               value:
-                error: { code: FORBIDDEN, message: "User is not active", details: [] }
+                error: { code: FORBIDDEN, message: 'User is not active', details: [] }
     Error404:
       description: Not Found
       content:
@@ -83,7 +83,7 @@ components:
           examples:
             notFound:
               value:
-                error: { code: NOT_FOUND, message: "Route not found", details: [] }
+                error: { code: NOT_FOUND, message: 'Route not found', details: [] }
     Error409:
       description: Conflict
       content:
@@ -92,7 +92,7 @@ components:
           examples:
             conflict:
               value:
-                error: { code: CONFLICT, message: "User already exists", details: [] }
+                error: { code: CONFLICT, message: 'User already exists', details: [] }
     Error422:
       description: Unprocessable Entity
       content:
@@ -101,7 +101,7 @@ components:
           examples:
             unprocessable:
               value:
-                error: { code: VALIDATION_ERROR, message: "Validation failed", details: [] }
+                error: { code: VALIDATION_ERROR, message: 'Validation failed', details: [] }
     Error429:
       description: Too Many Requests
       content:
@@ -110,7 +110,7 @@ components:
           examples:
             throttled:
               value:
-                error: { code: RATE_LIMITED, message: "Too many requests", details: [] }
+                error: { code: RATE_LIMITED, message: 'Too many requests', details: [] }
     Error500:
       description: Internal Server Error
       content:
@@ -119,7 +119,7 @@ components:
           examples:
             internal:
               value:
-                error: { code: INTERNAL, message: "Internal server error", details: [] }
+                error: { code: INTERNAL, message: 'Internal server error', details: [] }
 paths:
   /health:
     get:
@@ -201,7 +201,7 @@ paths:
               required: [password]
             examples:
               email:
-                value: { email: "user@test.com", password: "secret123", role: "driver" }
+                value: { email: 'user@test.com', password: 'secret123', role: 'driver' }
       responses:
         '201':
           description: Created
@@ -216,16 +216,16 @@ paths:
                 success:
                   value:
                     data:
-                      id: "uuid"
-                      email: "user@test.com"
+                      id: 'uuid'
+                      email: 'user@test.com'
                       username: null
-                      role: "driver"
-                      status: "active"
-                      createdAt: "2026-02-05T16:59:38.132Z"
+                      role: 'driver'
+                      status: 'active'
+                      createdAt: '2026-02-05T16:59:38.132Z'
                     tokens:
-                      accessToken: "<jwt>"
-                      refreshToken: "<refresh>"
-                      expiresIn: "15m"
+                      accessToken: '<jwt>'
+                      refreshToken: '<refresh>'
+                      expiresIn: '15m'
         '200':
           description: OK
           content:
@@ -259,7 +259,7 @@ paths:
               required: [identifier, password]
             examples:
               login:
-                value: { identifier: "user@test.com", password: "secret123" }
+                value: { identifier: 'user@test.com', password: 'secret123' }
       responses:
         '200':
           description: OK
@@ -274,16 +274,16 @@ paths:
                 success:
                   value:
                     data:
-                      id: "uuid"
-                      email: "user@test.com"
+                      id: 'uuid'
+                      email: 'user@test.com'
                       username: null
-                      role: "driver"
-                      status: "active"
-                      createdAt: "2026-02-05T16:59:38.132Z"
+                      role: 'driver'
+                      status: 'active'
+                      createdAt: '2026-02-05T16:59:38.132Z'
                     tokens:
-                      accessToken: "<jwt>"
-                      refreshToken: "<refresh>"
-                      expiresIn: "15m"
+                      accessToken: '<jwt>'
+                      refreshToken: '<refresh>'
+                      expiresIn: '15m'
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
         '403': { $ref: '#/components/responses/Error403' }
@@ -307,7 +307,7 @@ paths:
               required: [refreshToken]
             examples:
               refresh:
-                value: { refreshToken: "<refresh>" }
+                value: { refreshToken: '<refresh>' }
       responses:
         '200':
           description: OK
@@ -322,16 +322,16 @@ paths:
                 success:
                   value:
                     data:
-                      id: "uuid"
-                      email: "user@test.com"
+                      id: 'uuid'
+                      email: 'user@test.com'
                       username: null
-                      role: "driver"
-                      status: "active"
-                      createdAt: "2026-02-05T16:59:38.132Z"
+                      role: 'driver'
+                      status: 'active'
+                      createdAt: '2026-02-05T16:59:38.132Z'
                     tokens:
-                      accessToken: "<jwt>"
-                      refreshToken: "<refresh>"
-                      expiresIn: "15m"
+                      accessToken: '<jwt>'
+                      refreshToken: '<refresh>'
+                      expiresIn: '15m'
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
         '403': { $ref: '#/components/responses/Error403' }
@@ -355,7 +355,7 @@ paths:
               required: [refreshToken]
             examples:
               logout:
-                value: { refreshToken: "<refresh>" }
+                value: { refreshToken: '<refresh>' }
       responses:
         '200':
           description: OK
@@ -400,7 +400,7 @@ paths:
                         items: { type: string }
               examples:
                 success:
-                  value: { data: { userId: "uuid", role: "driver", roles: ["driver"] } }
+                  value: { data: { userId: 'uuid', role: 'driver', roles: ['driver'] } }
         '400': { $ref: '#/components/responses/Error400' }
         '401': { $ref: '#/components/responses/Error401' }
         '403': { $ref: '#/components/responses/Error403' }

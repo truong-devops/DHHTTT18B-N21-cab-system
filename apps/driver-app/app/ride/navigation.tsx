@@ -17,10 +17,16 @@ export default function RideNavigationScreen() {
   const { activeRide, setActiveRide } = useRide();
   const { driver } = useDriver();
   const rideId = activeRide?.id ?? null;
-  const { ride: trackedRide, error, isOffline, updateStatus, isUpdating } = useRideState({
+  const {
+    ride: trackedRide,
+    error,
+    isOffline,
+    updateStatus,
+    isUpdating
+  } = useRideState({
     rideId,
     enabled: Boolean(rideId),
-    intervalMs: 2500,
+    intervalMs: 2500
   });
 
   useEffect(() => {
@@ -79,11 +85,11 @@ export default function RideNavigationScreen() {
   const {
     coords: routeCoords,
     isLoading: isRouteLoading,
-    error: routeError,
+    error: routeError
   } = useRoutePolyline({
     origin: routeOrigin,
     destination: routeDestination,
-    profile: routeProfile,
+    profile: routeProfile
   });
 
   const centerPoint = useMemo(() => {
@@ -91,7 +97,7 @@ export default function RideNavigationScreen() {
     if (isOnTrip && pickupPoint && dropoffPoint) {
       return {
         latitude: (pickupPoint.latitude + dropoffPoint.latitude) / 2,
-        longitude: (pickupPoint.longitude + dropoffPoint.longitude) / 2,
+        longitude: (pickupPoint.longitude + dropoffPoint.longitude) / 2
       };
     }
     return driverPoint ?? pickupPoint ?? dropoffPoint ?? null;
@@ -108,7 +114,7 @@ export default function RideNavigationScreen() {
 
   const [zoomDelta, setZoomDelta] = useState({
     latitudeDelta: 0.02,
-    longitudeDelta: 0.02,
+    longitudeDelta: 0.02
   });
   const [isMapOpen, setIsMapOpen] = useState(false);
 
@@ -118,9 +124,9 @@ export default function RideNavigationScreen() {
       {
         ...centerPoint,
         latitudeDelta: zoomDelta.latitudeDelta,
-        longitudeDelta: zoomDelta.longitudeDelta,
+        longitudeDelta: zoomDelta.longitudeDelta
       },
-      350,
+      350
     );
   }, [centerPoint, zoomDelta]);
 
@@ -129,7 +135,7 @@ export default function RideNavigationScreen() {
     if (polylineCoords.length < 2) return;
     mapRef.current.fitToCoordinates(polylineCoords, {
       edgePadding: { top: 80, bottom: 120, left: 60, right: 60 },
-      animated: true,
+      animated: true
     });
   }, [polylineCoords]);
 
@@ -184,11 +190,7 @@ export default function RideNavigationScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        <ScreenHeader
-          title="Đang thực hiện cuốc"
-          subtitle="Điều hướng đến điểm tiếp theo"
-          variant="red"
-          style={styles.header}>
+        <ScreenHeader title="Đang thực hiện cuốc" subtitle="Điều hướng đến điểm tiếp theo" variant="red" style={styles.header}>
           <View style={styles.headerMetrics}>
             <Text style={styles.metricValue}>--</Text>
             <Text style={styles.metricLabel}>Còn lại</Text>
@@ -199,21 +201,15 @@ export default function RideNavigationScreen() {
 
         {(error || isOffline) && (
           <Card style={styles.errorCard}>
-            <Text style={styles.errorText}>
-              {isOffline ? 'Mất kết nối, đang thử lại...' : error}
-            </Text>
+            <Text style={styles.errorText}>{isOffline ? 'Mất kết nối, đang thử lại...' : error}</Text>
           </Card>
         )}
         {routeError && (
           <Card style={styles.routeErrorCard}>
-            <Text style={styles.routeErrorText}>
-              Đang load dữ liệu....
-            </Text>
+            <Text style={styles.routeErrorText}>Đang load dữ liệu....</Text>
           </Card>
         )}
-        {isRouteLoading && (
-          <Text style={styles.routeLoadingText}>Đang lấy đường đi thật...</Text>
-        )}
+        {isRouteLoading && <Text style={styles.routeLoadingText}>Đang lấy đường đi thật...</Text>}
 
         <View style={styles.map}>
           <MapView
@@ -225,25 +221,14 @@ export default function RideNavigationScreen() {
               latitude: ride?.pickupLat ?? 10.76,
               longitude: ride?.pickupLng ?? 106.66,
               latitudeDelta: zoomDelta.latitudeDelta,
-              longitudeDelta: zoomDelta.longitudeDelta,
+              longitudeDelta: zoomDelta.longitudeDelta
             }}
-            provider={PROVIDER_GOOGLE}>
-            {driverPoint && !isOnTrip ? (
-              <Marker coordinate={driverPoint} title="Tài xế" pinColor={palette.redDark} />
-            ) : null}
-            {pickupPoint ? (
-              <Marker coordinate={pickupPoint} title="Điểm đón" pinColor={palette.red} />
-            ) : null}
-            {dropoffPoint ? (
-              <Marker coordinate={dropoffPoint} title="Điểm đến" pinColor={palette.redDark} />
-            ) : null}
-            {polylineCoords.length >= 2 ? (
-              <Polyline
-                coordinates={polylineCoords}
-                strokeColor={palette.red}
-                strokeWidth={4}
-              />
-            ) : null}
+            provider={PROVIDER_GOOGLE}
+          >
+            {driverPoint && !isOnTrip ? <Marker coordinate={driverPoint} title="Tài xế" pinColor={palette.redDark} /> : null}
+            {pickupPoint ? <Marker coordinate={pickupPoint} title="Điểm đón" pinColor={palette.red} /> : null}
+            {dropoffPoint ? <Marker coordinate={dropoffPoint} title="Điểm đến" pinColor={palette.redDark} /> : null}
+            {polylineCoords.length >= 2 ? <Polyline coordinates={polylineCoords} strokeColor={palette.red} strokeWidth={4} /> : null}
           </MapView>
           <View style={styles.mapBadge}>
             <Text style={styles.mapBadgeText}>Bản đồ</Text>
@@ -268,17 +253,11 @@ export default function RideNavigationScreen() {
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Điểm đón</Text>
-            <Text style={styles.value}>
-              {ride.pickupLabel ||
-                `${ride.pickupLat?.toFixed(5) ?? '--'},${ride.pickupLng?.toFixed(5) ?? '--'}`}
-            </Text>
+            <Text style={styles.value}>{ride.pickupLabel || `${ride.pickupLat?.toFixed(5) ?? '--'},${ride.pickupLng?.toFixed(5) ?? '--'}`}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Điểm đến</Text>
-            <Text style={styles.value}>
-              {ride.dropoffLabel ||
-                `${ride.dropoffLat?.toFixed(5) ?? '--'},${ride.dropoffLng?.toFixed(5) ?? '--'}`}
-            </Text>
+            <Text style={styles.value}>{ride.dropoffLabel || `${ride.dropoffLat?.toFixed(5) ?? '--'},${ride.dropoffLng?.toFixed(5) ?? '--'}`}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Thanh toán</Text>
@@ -334,7 +313,7 @@ function FullscreenMap({
   dropoffPoint,
   routePoints,
   routeCoords,
-  zoomDelta,
+  zoomDelta
 }: {
   visible: boolean;
   onClose: () => void;
@@ -363,25 +342,14 @@ function FullscreenMap({
               latitude: ride?.pickupLat ?? 10.76,
               longitude: ride?.pickupLng ?? 106.66,
               latitudeDelta: zoomDelta.latitudeDelta,
-              longitudeDelta: zoomDelta.longitudeDelta,
+              longitudeDelta: zoomDelta.longitudeDelta
             }}
-            provider={PROVIDER_GOOGLE}>
-            {driverPoint ? (
-              <Marker coordinate={driverPoint} title="Tài xế" pinColor={palette.redDark} />
-            ) : null}
-            {pickupPoint ? (
-              <Marker coordinate={pickupPoint} title="Điểm đón" pinColor={palette.red} />
-            ) : null}
-            {dropoffPoint ? (
-              <Marker coordinate={dropoffPoint} title="Điểm đến" pinColor={palette.redDark} />
-            ) : null}
-            {polylineCoords.length >= 2 ? (
-              <Polyline
-                coordinates={polylineCoords}
-                strokeColor={palette.red}
-                strokeWidth={4}
-              />
-            ) : null}
+            provider={PROVIDER_GOOGLE}
+          >
+            {driverPoint ? <Marker coordinate={driverPoint} title="Tài xế" pinColor={palette.redDark} /> : null}
+            {pickupPoint ? <Marker coordinate={pickupPoint} title="Điểm đón" pinColor={palette.red} /> : null}
+            {dropoffPoint ? <Marker coordinate={dropoffPoint} title="Điểm đến" pinColor={palette.redDark} /> : null}
+            {polylineCoords.length >= 2 ? <Polyline coordinates={polylineCoords} strokeColor={palette.red} strokeWidth={4} /> : null}
           </MapView>
         </View>
       </SafeAreaView>
@@ -392,68 +360,68 @@ function FullscreenMap({
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: palette.background,
+    backgroundColor: palette.background
   },
   emptyState: {
     flex: 1,
     padding: 24,
     justifyContent: 'center',
-    gap: 12,
+    gap: 12
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: palette.text,
+    color: palette.text
   },
   emptySubtitle: {
     color: palette.muted,
-    lineHeight: 20,
+    lineHeight: 20
   },
   emptyError: {
     color: palette.redDark,
-    fontSize: 12,
+    fontSize: 12
   },
   errorCard: {
     borderColor: palette.red,
-    backgroundColor: '#FFF2ED',
+    backgroundColor: '#FFF2ED'
   },
   errorText: {
     color: palette.redDark,
-    fontSize: 12,
+    fontSize: 12
   },
   routeErrorCard: {
     borderColor: palette.red,
-    backgroundColor: '#FFF2ED',
+    backgroundColor: '#FFF2ED'
   },
   routeErrorText: {
     color: palette.redDark,
-    fontSize: 12,
+    fontSize: 12
   },
   routeLoadingText: {
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   container: {
     flex: 1,
     padding: 20,
-    gap: 16,
+    gap: 16
   },
   header: {
-    gap: 12,
+    gap: 12
   },
   headerMetrics: {
     alignItems: 'flex-end',
-    gap: 2,
+    gap: 2
   },
   metricValue: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 14
   },
   metricLabel: {
     color: '#FFE7DE',
     fontSize: 10,
-    marginBottom: 6,
+    marginBottom: 6
   },
   map: {
     flex: 1,
@@ -462,7 +430,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'hidden'
   },
   mapBadge: {
     position: 'absolute',
@@ -473,18 +441,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   mapBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: palette.redDark,
+    color: palette.redDark
   },
   zoomControls: {
     position: 'absolute',
     right: 12,
     top: 12,
-    gap: 8,
+    gap: 8
   },
   zoomButton: {
     width: 36,
@@ -494,12 +462,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   zoomText: {
     fontSize: 18,
     fontWeight: '700',
-    color: palette.redDark,
+    color: palette.redDark
   },
   mapAction: {
     position: 'absolute',
@@ -512,11 +480,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   modalSafe: {
     flex: 1,
-    backgroundColor: palette.background,
+    backgroundColor: palette.background
   },
   modalHeader: {
     paddingHorizontal: 16,
@@ -525,39 +493,39 @@ const styles = StyleSheet.create({
     borderBottomColor: palette.border,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: palette.text,
+    color: palette.text
   },
   modalClose: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   modalCloseText: {
     fontSize: 12,
     fontWeight: '600',
-    color: palette.redDark,
+    color: palette.redDark
   },
   modalMap: {
     flex: 1,
-    backgroundColor: palette.surface,
+    backgroundColor: palette.surface
   },
   infoRow: {
-    marginBottom: 10,
+    marginBottom: 10
   },
   label: {
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   value: {
     color: palette.text,
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: 4
   },
   bottomBar: {
     backgroundColor: '#fff',
@@ -565,24 +533,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     padding: 12,
-    gap: 12,
+    gap: 12
   },
   quickAction: {
     borderWidth: 1,
     borderColor: palette.border,
     paddingVertical: 10,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   quickActionText: {
     color: palette.redDark,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   statusGroup: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 12
   },
   statusButton: {
-    flex: 1,
-  },
+    flex: 1
+  }
 });

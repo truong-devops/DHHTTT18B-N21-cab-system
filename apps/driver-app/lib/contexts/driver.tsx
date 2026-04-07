@@ -36,7 +36,7 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
       setDriver({
         ...result.data.driver,
         vehicle: result.data.vehicle,
-        location: result.data.location,
+        location: result.data.location
       });
     } catch (err: any) {
       setError(err?.message ?? 'Không thể tải thông tin tài xế');
@@ -50,7 +50,7 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
       await driverApi.setOnline(lat, lng);
       await refresh();
     },
-    [refresh],
+    [refresh]
   );
 
   const setOffline = useCallback(async () => {
@@ -73,9 +73,9 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
       error,
       refresh,
       setOnline,
-      setOffline,
+      setOffline
     }),
-    [driver, loading, error, refresh, setOnline, setOffline],
+    [driver, loading, error, refresh, setOnline, setOffline]
   );
 
   return <DriverContext.Provider value={value}>{children}</DriverContext.Provider>;

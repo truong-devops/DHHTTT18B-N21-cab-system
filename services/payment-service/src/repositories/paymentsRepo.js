@@ -1,3 +1,3 @@
-const paymentsDb = require("../db/payments");
+const paymentsDb = require('../db/payments');
 
 module.exports = paymentsDb;

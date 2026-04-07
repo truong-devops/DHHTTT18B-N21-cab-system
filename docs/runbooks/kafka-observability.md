@@ -72,18 +72,22 @@ curl -sG http://localhost:9090/api/v1/query \
 2. Kiểm tra service consumer tương ứng còn sống và không crash loop.
 3. Kiểm tra broker health, rebalance, network timeout, DB downstream.
 4. Giảm lag ngắn hạn:
+
 - tăng `KAFKA_CONSUMER_PARTITIONS_CONCURRENCY`
 - tăng số replica consumer group
 - giảm xử lý nặng trong path synchronous của consumer
+
 5. Sau ổn định: theo dõi `lag`, `retry`, `dlq` thêm 30 phút.
 
 #### 4.2 DLQ tăng (`KafkaDlqRateHigh`)
 
 1. Xác định `source_topic`, `error_type` cao nhất.
 2. Lấy mẫu message từ topic DLQ để phân loại:
+
 - lỗi contract/schema
 - lỗi business logic
 - poison message dữ liệu xấu
+
 3. Nếu lỗi schema mới: rollback producer hoặc release consumer tương thích.
 4. Nếu poison message: chặn nguồn phát + chuẩn bị re-drive có lọc.
 
@@ -98,9 +102,11 @@ curl -sG http://localhost:9090/api/v1/query \
 
 1. Xác nhận broker/container health và network.
 2. Kiểm tra đồng thời:
+
 - `KafkaPublishErrorRateHigh`
 - `KafkaOutboxBacklogHigh*`
 - `KafkaProcessingLatencyP95High`
+
 3. Khôi phục broker trước, sau đó theo dõi outbox drain rate.
 4. Chỉ scale worker sau khi broker ổn định để tránh retry storm.
 
@@ -120,6 +126,7 @@ curl -s http://localhost:9090/api/v1/rules | rg 'KafkaConsumerLagHigh|KafkaOutbo
 ```
 
 1. `KafkaOutboxBacklogHigh*` + `KafkaPublishErrorRateHigh` + `KafkaRetryRateHigh` + `KafkaProcessingLatencyP95High`
+
 - Test:
   1. Stop broker: `$COMPOSE stop kafka`
   2. Gọi API tạo booking liên tục (để outbox tăng).
@@ -127,6 +134,7 @@ curl -s http://localhost:9090/api/v1/rules | rg 'KafkaConsumerLagHigh|KafkaOutbo
 - Kỳ vọng: backlog tăng, publish error/retry tăng, latency outbox_publish tăng.
 
 2. `KafkaDlqRateHigh`
+
 - Test:
   1. Start lại broker: `$COMPOSE start kafka`
   2. Bơm 25 message JSON sai vào `ride.created`:
@@ -139,6 +147,7 @@ seq 1 25 | sed 's/.*/not-a-json-event/' | \
 - Kỳ vọng: consumer route sang `ride.created.dlq`, alert DLQ fire.
 
 3. `KafkaConsumerLagHigh*`
+
 - Test:
   1. Bơm burst lớn vào topic tiêu thụ:
 
@@ -147,7 +156,8 @@ seq 1 6000 | sed 's/.*/{"eventId":"evt-&","traceId":"t-&","occurredAt":"2026-01-
   $COMPOSE exec -T kafka kafka-console-producer --broker-list kafka:9092 --topic ride.created
 ```
 
-  2. Theo dõi lag query theo group/topic.
+2. Theo dõi lag query theo group/topic.
+
 - Kỳ vọng: lag tăng rõ rệt trước khi consumer bắt kịp.
 
 ### 6) Hậu kiểm sau sự cố

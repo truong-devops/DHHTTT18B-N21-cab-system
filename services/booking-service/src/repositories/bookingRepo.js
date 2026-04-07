@@ -1,4 +1,4 @@
-const { pool } = require("../db/pool");
+const { pool } = require('../db/pool');
 
 function executor(client) {
   return client || pool;
@@ -15,20 +15,12 @@ function mapRow(row) {
     pickup: row.pickup,
     dropoff: row.dropoff,
     vehicleType: row.vehicle_type,
-    distanceKm:
-      row.distance_km == null
-        ? null
-        : Number(row.distance_km),
-    etaMinutes:
-      row.eta_minutes == null
-        ? null
-        : Number(row.eta_minutes),
+    distanceKm: row.distance_km == null ? null : Number(row.distance_km),
+    etaMinutes: row.eta_minutes == null ? null : Number(row.eta_minutes),
     priceSnapshot: row.price_snapshot,
     status: row.status,
     createdAt: row.created_at.toISOString(),
-    canceledAt: row.cancelled_at
-      ? row.cancelled_at.toISOString()
-      : null
+    canceledAt: row.cancelled_at ? row.cancelled_at.toISOString() : null
   };
 }
 
@@ -46,12 +38,8 @@ async function create(client, booking) {
       booking.pickup,
       booking.dropoff,
       booking.vehicleType,
-      Number.isFinite(booking.distanceKm)
-        ? booking.distanceKm
-        : null,
-      Number.isFinite(booking.etaMinutes)
-        ? booking.etaMinutes
-        : null,
+      Number.isFinite(booking.distanceKm) ? booking.distanceKm : null,
+      Number.isFinite(booking.etaMinutes) ? booking.etaMinutes : null,
       booking.priceSnapshot,
       booking.status,
       booking.createdAt || new Date().toISOString()
@@ -62,37 +50,25 @@ async function create(client, booking) {
 
 async function getById(bookingId, client) {
   const db = executor(client);
-  const result = await db.query(
-    "SELECT * FROM bookings WHERE booking_id = $1 LIMIT 1",
-    [bookingId]
-  );
+  const result = await db.query('SELECT * FROM bookings WHERE booking_id = $1 LIMIT 1', [bookingId]);
   return mapRow(result.rows[0]);
 }
 
 async function getByRideId(rideId, client) {
   const db = executor(client);
-  const result = await db.query(
-    "SELECT * FROM bookings WHERE ride_id = $1 LIMIT 1",
-    [rideId]
-  );
+  const result = await db.query('SELECT * FROM bookings WHERE ride_id = $1 LIMIT 1', [rideId]);
   return mapRow(result.rows[0]);
 }
 
 async function getByIdForUpdate(client, bookingId) {
   const db = executor(client);
-  const result = await db.query(
-    "SELECT * FROM bookings WHERE booking_id = $1 LIMIT 1 FOR UPDATE",
-    [bookingId]
-  );
+  const result = await db.query('SELECT * FROM bookings WHERE booking_id = $1 LIMIT 1 FOR UPDATE', [bookingId]);
   return mapRow(result.rows[0]);
 }
 
 async function getByRideIdForUpdate(client, rideId) {
   const db = executor(client);
-  const result = await db.query(
-    "SELECT * FROM bookings WHERE ride_id = $1 LIMIT 1 FOR UPDATE",
-    [rideId]
-  );
+  const result = await db.query('SELECT * FROM bookings WHERE ride_id = $1 LIMIT 1 FOR UPDATE', [rideId]);
   return mapRow(result.rows[0]);
 }
 
@@ -141,10 +117,7 @@ async function list(optionsOrClient, maybeClient) {
   let options = {};
   let client = maybeClient || null;
 
-  if (
-    optionsOrClient &&
-    typeof optionsOrClient.query === "function"
-  ) {
+  if (optionsOrClient && typeof optionsOrClient.query === 'function') {
     client = optionsOrClient;
   } else {
     options = optionsOrClient || {};
@@ -153,13 +126,8 @@ async function list(optionsOrClient, maybeClient) {
   const db = executor(client);
   const userId = options.userId || null;
   const result = userId
-    ? await db.query(
-        "SELECT * FROM bookings WHERE user_id = $1 ORDER BY created_at DESC",
-        [userId]
-      )
-    : await db.query(
-        "SELECT * FROM bookings ORDER BY created_at DESC"
-      );
+    ? await db.query('SELECT * FROM bookings WHERE user_id = $1 ORDER BY created_at DESC', [userId])
+    : await db.query('SELECT * FROM bookings ORDER BY created_at DESC');
   return result.rows.map(mapRow);
 }
 

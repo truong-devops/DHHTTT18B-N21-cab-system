@@ -32,12 +32,12 @@ export const mapboxProvider: RoutingProvider = {
     const decoded = polyline.decode(points, 6);
     const coords = decoded.map(([lat, lng]) => ({
       latitude: lat,
-      longitude: lng,
+      longitude: lng
     }));
     return {
       coords,
       distanceMeters: route?.distance,
-      durationSeconds: route?.duration,
+      durationSeconds: route?.duration
     };
-  },
+  }
 };

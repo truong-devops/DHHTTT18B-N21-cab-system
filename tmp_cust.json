@@ -1,20 +1,20 @@
 {
-    "data":  {
-                 "id":  "10000003",
-                 "user_id":  "10000003",
-                 "email":  "customer@cab.local",
-                 "username":  "customer",
-                 "role":  "user",
-                 "status":  "active",
-                 "createdAt":  "2026-04-05T03:45:02.888Z"
-             },
-    "tokens":  {
-                   "accessToken":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAwMyIsInJvbGUiOiJ1c2VyIiwicm9sZXMiOlsidXNlciJdLCJpYXQiOjE3NzU0Mzc0NjMsImV4cCI6MTc3NTQzODM2M30.jsAq73UOIBM7GeZ4c1O60VhBEycw-Opp7SPLfh8agTk",
-                   "access_token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAwMyIsInJvbGUiOiJ1c2VyIiwicm9sZXMiOlsidXNlciJdLCJpYXQiOjE3NzU0Mzc0NjMsImV4cCI6MTc3NTQzODM2M30.jsAq73UOIBM7GeZ4c1O60VhBEycw-Opp7SPLfh8agTk",
-                   "refreshToken":  "b22963f3672134d1615dcd61391b5a01296843f4970082128452e49b53a9d3a7de3bc0f04db92ee743467e487c190a3a",
-                   "refresh_token":  "b22963f3672134d1615dcd61391b5a01296843f4970082128452e49b53a9d3a7de3bc0f04db92ee743467e487c190a3a",
-                   "expiresIn":  "15m"
-               },
-    "access_token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAwMyIsInJvbGUiOiJ1c2VyIiwicm9sZXMiOlsidXNlciJdLCJpYXQiOjE3NzU0Mzc0NjMsImV4cCI6MTc3NTQzODM2M30.jsAq73UOIBM7GeZ4c1O60VhBEycw-Opp7SPLfh8agTk",
-    "refresh_token":  "b22963f3672134d1615dcd61391b5a01296843f4970082128452e49b53a9d3a7de3bc0f04db92ee743467e487c190a3a"
+  "data": {
+    "id": "10000003",
+    "user_id": "10000003",
+    "email": "customer@cab.local",
+    "username": "customer",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-04-05T03:45:02.888Z"
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAwMyIsInJvbGUiOiJ1c2VyIiwicm9sZXMiOlsidXNlciJdLCJpYXQiOjE3NzU0Mzc0NjMsImV4cCI6MTc3NTQzODM2M30.jsAq73UOIBM7GeZ4c1O60VhBEycw-Opp7SPLfh8agTk",
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAwMyIsInJvbGUiOiJ1c2VyIiwicm9sZXMiOlsidXNlciJdLCJpYXQiOjE3NzU0Mzc0NjMsImV4cCI6MTc3NTQzODM2M30.jsAq73UOIBM7GeZ4c1O60VhBEycw-Opp7SPLfh8agTk",
+    "refreshToken": "b22963f3672134d1615dcd61391b5a01296843f4970082128452e49b53a9d3a7de3bc0f04db92ee743467e487c190a3a",
+    "refresh_token": "b22963f3672134d1615dcd61391b5a01296843f4970082128452e49b53a9d3a7de3bc0f04db92ee743467e487c190a3a",
+    "expiresIn": "15m"
+  },
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDAwMDAwMyIsInJvbGUiOiJ1c2VyIiwicm9sZXMiOlsidXNlciJdLCJpYXQiOjE3NzU0Mzc0NjMsImV4cCI6MTc3NTQzODM2M30.jsAq73UOIBM7GeZ4c1O60VhBEycw-Opp7SPLfh8agTk",
+  "refresh_token": "b22963f3672134d1615dcd61391b5a01296843f4970082128452e49b53a9d3a7de3bc0f04db92ee743467e487c190a3a"
 }

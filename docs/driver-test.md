@@ -3,10 +3,12 @@
 Use API Gateway base URL (not localhost on phone). Replace `BASE_URL` with your gateway IP.
 
 ## 1) Driver app
+
 - Login driver account in app
 - Tap **ONLINE**
 
 ## 2) Customer creates booking (curl)
+
 ```bash
 BASE_URL="http://<YOUR_GATEWAY_IP>:3000"
 
@@ -34,12 +36,15 @@ echo "RIDE_ID=$RIDE_ID"
 ```
 
 ## 3) Driver app flow
+
 - App should receive **incoming ride** (polling/WS)
 - Tap **Accept**
 - Update status: **Arrived -> Started -> Completed**
 
 ## (Optional) If incoming not showing
+
 Check requested rides (admin):
+
 ```bash
 ADMIN_TOKEN=$(curl -s -X POST "$BASE_URL/v1/auth/login" \
   -H "Content-Type: application/json" \

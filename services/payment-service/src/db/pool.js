@@ -1,9 +1,9 @@
-const fs = require("fs");
-const path = require("path");
-const { Pool } = require("pg");
+const fs = require('fs');
+const path = require('path');
+const { Pool } = require('pg');
 
-const config = require("../config");
-const monitoring = require("../monitoring");
+const config = require('../config');
+const monitoring = require('../monitoring');
 
 const poolConfig = config.db.connectionString
   ? { connectionString: config.db.connectionString, max: config.db.max }
@@ -19,14 +19,14 @@ const poolConfig = config.db.connectionString
 const pool = new Pool(poolConfig);
 
 function inferDbOperation(text) {
-  if (typeof text === "string") {
+  if (typeof text === 'string') {
     const [token] = text.trim().split(/\s+/);
-    return token ? token.toUpperCase() : "QUERY";
+    return token ? token.toUpperCase() : 'QUERY';
   }
-  if (text && typeof text === "object" && typeof text.name === "string") {
+  if (text && typeof text === 'object' && typeof text.name === 'string') {
     return text.name;
   }
-  return "QUERY";
+  return 'QUERY';
 }
 
 async function queryWithMetrics(queryFn, text, params) {
@@ -35,22 +35,22 @@ async function queryWithMetrics(queryFn, text, params) {
   try {
     const result = await queryFn(text, params);
     monitoring.recordDependencyRequest({
-      dependencyType: "db",
-      dependencyName: "postgres",
+      dependencyType: 'db',
+      dependencyName: 'postgres',
       operation,
-      outcome: "success",
+      outcome: 'success',
       durationMs: Date.now() - startedAt
     });
     return result;
   } catch (error) {
     monitoring.recordDependencyRequest({
-      dependencyType: "db",
-      dependencyName: "postgres",
+      dependencyType: 'db',
+      dependencyName: 'postgres',
       operation,
-      outcome: "error",
+      outcome: 'error',
       durationMs: Date.now() - startedAt,
       attributes: {
-        error_type: String(error && error.code ? error.code : "query_error")
+        error_type: String(error && error.code ? error.code : 'query_error')
       }
     });
     throw error;
@@ -58,8 +58,7 @@ async function queryWithMetrics(queryFn, text, params) {
 }
 
 const originalPoolQuery = pool.query.bind(pool);
-pool.query = (text, params) =>
-  queryWithMetrics(originalPoolQuery, text, params);
+pool.query = (text, params) => queryWithMetrics(originalPoolQuery, text, params);
 
 function extractUpSql(raw) {
   const lines = raw.split(/\r?\n/);
@@ -85,7 +84,7 @@ function extractUpSql(raw) {
     }
   }
 
-  return output.join("\n").trim();
+  return output.join('\n').trim();
 }
 
 function getMigrationVersion(filename) {
@@ -94,7 +93,7 @@ function getMigrationVersion(filename) {
 }
 
 async function runMigrations() {
-  const migrationsDir = path.resolve(__dirname, "..", "..", "migrations");
+  const migrationsDir = path.resolve(__dirname, '..', '..', 'migrations');
   if (!fs.existsSync(migrationsDir)) {
     return;
   }
@@ -110,7 +109,7 @@ async function runMigrations() {
     .filter((file) => /^\d+.*\.sql$/.test(file))
     .sort();
 
-  const appliedRows = await pool.query("SELECT version FROM schema_migrations");
+  const appliedRows = await pool.query('SELECT version FROM schema_migrations');
   const applied = new Set(appliedRows.rows.map((row) => row.version));
 
   for (const file of files) {
@@ -118,18 +117,18 @@ async function runMigrations() {
     if (!version || applied.has(version)) {
       continue;
     }
-    const raw = fs.readFileSync(path.join(migrationsDir, file), "utf8");
+    const raw = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
     const sql = extractUpSql(raw);
     if (!sql) {
       continue;
     }
-    await pool.query("BEGIN");
+    await pool.query('BEGIN');
     try {
       await pool.query(sql);
-      await pool.query("INSERT INTO schema_migrations (version) VALUES ($1)", [version]);
-      await pool.query("COMMIT");
+      await pool.query('INSERT INTO schema_migrations (version) VALUES ($1)', [version]);
+      await pool.query('COMMIT');
     } catch (err) {
-      await pool.query("ROLLBACK");
+      await pool.query('ROLLBACK');
       throw err;
     }
   }
@@ -142,15 +141,14 @@ async function initDb() {
 async function withTransaction(work) {
   const client = await pool.connect();
   const originalClientQuery = client.query.bind(client);
-  client.query = (text, params) =>
-    queryWithMetrics(originalClientQuery, text, params);
+  client.query = (text, params) => queryWithMetrics(originalClientQuery, text, params);
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
     const result = await work(client);
-    await client.query("COMMIT");
+    await client.query('COMMIT');
     return result;
   } catch (err) {
-    await client.query("ROLLBACK");
+    await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();

@@ -1,14 +1,6 @@
-const pool = require("../db/pool");
+const pool = require('../db/pool');
 
-async function upsertLastLocation({
-  driverId,
-  lat,
-  lng,
-  heading = null,
-  speed = null,
-  accuracyM = null,
-  recordedAt
-}) {
+async function upsertLastLocation({ driverId, lat, lng, heading = null, speed = null, accuracyM = null, recordedAt }) {
   const result = await pool.query(
     `
       INSERT INTO driver_last_locations
@@ -41,29 +33,13 @@ async function getLastLocationByDriverId(driverId) {
   return result.rows[0] || null;
 }
 
-async function listAvailableDriversFallback({
-  lat,
-  lng,
-  radiusMeters,
-  limit,
-  vehicleType
-}) {
+async function listAvailableDriversFallback({ lat, lng, radiusMeters, limit, vehicleType }) {
   const radiusKm = radiusMeters / 1000;
   const latDelta = radiusKm / 110.574;
   const lngDelta = radiusKm / (111.32 * Math.cos((lat * Math.PI) / 180));
 
-  const filters = [
-    "d.status = 'APPROVED'",
-    "d.online_status = 'ONLINE'",
-    "l.lat BETWEEN $1 AND $2",
-    "l.lng BETWEEN $3 AND $4"
-  ];
-  const values = [
-    lat - latDelta,
-    lat + latDelta,
-    lng - lngDelta,
-    lng + lngDelta
-  ];
+  const filters = ["d.status = 'APPROVED'", "d.online_status = 'ONLINE'", 'l.lat BETWEEN $1 AND $2', 'l.lng BETWEEN $3 AND $4'];
+  const values = [lat - latDelta, lat + latDelta, lng - lngDelta, lng + lngDelta];
   let idx = 5;
 
   if (vehicleType) {
@@ -86,7 +62,7 @@ async function listAvailableDriversFallback({
       FROM drivers d
       JOIN driver_last_locations l ON l.driver_id = d.id
       LEFT JOIN driver_vehicles v ON v.driver_id = d.id AND v.is_active = true
-      WHERE ${filters.join(" AND ")}
+      WHERE ${filters.join(' AND ')}
       ORDER BY l.recorded_at DESC
       LIMIT $${idx}
     `,

@@ -1,12 +1,6 @@
-const pool = require("../db/pool");
+const pool = require('../db/pool');
 
-async function createUser({
-  email = null,
-  username = null,
-  passwordHash,
-  role = "user",
-  status = "active"
-}) {
+async function createUser({ email = null, username = null, passwordHash, role = 'user', status = 'active' }) {
   const result = await pool.query(
     `
       INSERT INTO users (email, username, password_hash, role, status)

@@ -1,4 +1,4 @@
-const pool = require("../db/pool");
+const pool = require('../db/pool');
 
 async function getActiveVehicleByDriverId(driverId) {
   const result = await pool.query(
@@ -13,23 +13,12 @@ async function getActiveVehicleByDriverId(driverId) {
   return result.rows[0] || null;
 }
 
-async function upsertActiveVehicle({
-  driverId,
-  vehicleType,
-  plateNumber,
-  brand = null,
-  model = null,
-  color = null,
-  isActive = true
-}) {
+async function upsertActiveVehicle({ driverId, vehicleType, plateNumber, brand = null, model = null, color = null, isActive = true }) {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
     if (isActive) {
-      await client.query(
-        `UPDATE driver_vehicles SET is_active = false WHERE driver_id = $1`,
-        [driverId]
-      );
+      await client.query(`UPDATE driver_vehicles SET is_active = false WHERE driver_id = $1`, [driverId]);
     }
 
     const result = await client.query(
@@ -42,10 +31,10 @@ async function upsertActiveVehicle({
       [driverId, vehicleType, plateNumber, brand, model, color, isActive]
     );
 
-    await client.query("COMMIT");
+    await client.query('COMMIT');
     return result.rows[0] || null;
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();

@@ -52,9 +52,7 @@ export default function RideCompleteScreen() {
         <View style={styles.content}>
           <Card style={styles.summaryCard}>
             <Text style={styles.totalLabel}>Tổng tiền</Text>
-            <Text style={styles.totalValue}>
-              --
-            </Text>
+            <Text style={styles.totalValue}>--</Text>
             <View style={styles.metricsRow}>
               <View style={styles.metricItem}>
                 <Text style={styles.metricLabel}>Quãng đường</Text>
@@ -84,48 +82,48 @@ export default function RideCompleteScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: palette.background,
+    backgroundColor: palette.background
   },
   container: {
     flex: 1,
     padding: 20,
-    gap: 16,
+    gap: 16
   },
   content: {
     flex: 1,
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 16
   },
   summaryCard: {
     alignItems: 'center',
-    gap: 12,
+    gap: 12
   },
   totalLabel: {
     color: palette.muted,
     fontSize: 12,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1
   },
   totalValue: {
     color: palette.red,
     fontSize: 32,
-    fontWeight: '800',
+    fontWeight: '800'
   },
   metricsRow: {
     flexDirection: 'row',
     gap: 20,
-    marginTop: 10,
+    marginTop: 10
   },
   metricItem: {
-    alignItems: 'center',
+    alignItems: 'center'
   },
   metricLabel: {
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   metricValue: {
     color: palette.text,
     fontWeight: '700',
-    marginTop: 4,
-  },
+    marginTop: 4
+  }
 });

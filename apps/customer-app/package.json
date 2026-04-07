@@ -1,45 +1,45 @@
 {
-    "name": "customer-app",
-    "version": "0.0.0",
-    "private": true,
-    "main": "index.js",
-    "scripts": {
-        "start": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start",
-        "start:clear": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start -c",
-        "android": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --android",
-        "android:clear": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --android -c",
-        "ios": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --ios",
-        "ios:clear": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --ios -c",
-        "web": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --web",
-        "web:clear": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --web -c",
-        "lint": "echo \"no lint configured\"",
-        "build": "expo export --platform web"
-    },
-    "dependencies": {
-        "@expo/metro-runtime": "~6.1.2",
-        "@mapbox/polyline": "^1.2.1",
-        "@react-native-async-storage/async-storage": "2.2.0",
-        "@react-navigation/bottom-tabs": "^6.6.1",
-        "@react-navigation/core": "^7.16.1",
-        "@react-navigation/native": "^6.1.18",
-        "@react-navigation/native-stack": "^6.11.0",
+  "name": "customer-app",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start",
+    "start:clear": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start -c",
+    "android": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --android",
+    "android:clear": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --android -c",
+    "ios": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --ios",
+    "ios:clear": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --ios -c",
+    "web": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --web",
+    "web:clear": "cross-env EXPO_NO_METRO_WORKSPACE_ROOT=1 EXPO_NO_DOCTOR=1 EXPO_NO_DEPENDENCY_VALIDATION=1 EXPO_DEV_SERVER_PORT=8081 expo start --web -c",
+    "lint": "echo \"no lint configured\"",
+    "build": "expo export --platform web"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
+    "@mapbox/polyline": "^1.2.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/bottom-tabs": "^6.6.1",
+    "@react-navigation/core": "^7.16.1",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/native-stack": "^6.11.0",
     "expo": "^54.0.0",
     "expo-constants": "~18.0.13",
     "expo-linear-gradient": "~12.7.2",
     "expo-location": "~19.0.8",
     "expo-status-bar": "~3.0.9",
-        "react": "19.1.0",
-        "react-dom": "19.1.0",
-        "react-native": "0.81.5",
-        "react-native-gesture-handler": "~2.28.0",
-        "react-native-maps": "1.20.1",
-        "react-native-safe-area-context": "~5.6.0",
-        "react-native-screens": "~4.16.0",
-        "react-native-web": "^0.21.0"
-    },
-    "devDependencies": {
-        "@types/react": "~19.1.10",
-        "cross-env": "^7.0.3",
-        "typescript": "^5.5.4"
-    }
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-maps": "1.20.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.5.4"
+  }
 }

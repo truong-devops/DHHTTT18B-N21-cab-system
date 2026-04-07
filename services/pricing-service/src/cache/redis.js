@@ -1,12 +1,10 @@
-const Redis = require("ioredis");
-const monitoring = require("../monitoring");
+const Redis = require('ioredis');
+const monitoring = require('../monitoring');
 
-const redis = new Redis(
-  process.env.REDIS_URL || "redis://localhost:6379"
-);
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 function wrapCommand(method, operation = method) {
-  if (typeof redis[method] !== "function") {
+  if (typeof redis[method] !== 'function') {
     return;
   }
 
@@ -16,22 +14,22 @@ function wrapCommand(method, operation = method) {
     try {
       const result = await original(...args);
       monitoring.recordDependencyRequest({
-        dependencyType: "redis",
-        dependencyName: "redis",
+        dependencyType: 'redis',
+        dependencyName: 'redis',
         operation,
-        outcome: "success",
+        outcome: 'success',
         durationMs: Date.now() - startedAt
       });
       return result;
     } catch (error) {
       monitoring.recordDependencyRequest({
-        dependencyType: "redis",
-        dependencyName: "redis",
+        dependencyType: 'redis',
+        dependencyName: 'redis',
         operation,
-        outcome: "error",
+        outcome: 'error',
         durationMs: Date.now() - startedAt,
         attributes: {
-          error_type: String(error && error.code ? error.code : "redis_error")
+          error_type: String(error && error.code ? error.code : 'redis_error')
         }
       });
       throw error;
@@ -39,6 +37,6 @@ function wrapCommand(method, operation = method) {
   };
 }
 
-["ping", "get", "set", "del"].forEach((command) => wrapCommand(command));
+['ping', 'get', 'set', 'del'].forEach((command) => wrapCommand(command));
 
 module.exports = redis;

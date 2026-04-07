@@ -1,15 +1,15 @@
-import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { useCustomerStore } from '../../store/customerStore'
-import { Card } from '../../components/common/Card'
-import { PrimaryButton } from '../../components/common/PrimaryButton'
-import { colors, spacing, typography } from '../../theme/tokens'
-import { formatVnd } from '../../utils/format'
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { useCustomerStore } from '../../store/customerStore';
+import { Card } from '../../components/common/Card';
+import { PrimaryButton } from '../../components/common/PrimaryButton';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { formatVnd } from '../../utils/format';
 
-const accent = '#FFF4F1'
+const accent = '#FFF4F1';
 
 const WalletScreen = () => {
-  const { walletBalance } = useCustomerStore()
+  const { walletBalance } = useCustomerStore();
 
   return (
     <View style={styles.container}>
@@ -32,8 +32,8 @@ const WalletScreen = () => {
         <Text style={styles.desc}>Tiền mặt, Thẻ/Ví, VietQR</Text>
       </Card>
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.xl, gap: spacing.md },
@@ -45,6 +45,6 @@ const styles = StyleSheet.create({
   walletIcon: { fontSize: 32 },
   actions: { flexDirection: 'row', gap: spacing.md },
   desc: { ...typography.body, color: colors.text }
-})
+});
 
-export default WalletScreen
+export default WalletScreen;

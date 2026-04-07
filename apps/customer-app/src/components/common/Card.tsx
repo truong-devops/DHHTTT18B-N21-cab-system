@@ -1,12 +1,12 @@
-import React from 'react'
-import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native'
-import { colors, radius, spacing } from '../../theme/tokens'
+import React from 'react';
+import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { colors, radius, spacing } from '../../theme/tokens';
 
 type Props = {
-  children: React.ReactNode
-  style?: StyleProp<ViewStyle>
-  onPress?: () => void
-}
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  onPress?: () => void;
+};
 
 export const Card: React.FC<Props> = ({ children, style, onPress }) => {
   if (onPress) {
@@ -14,11 +14,11 @@ export const Card: React.FC<Props> = ({ children, style, onPress }) => {
       <Pressable onPress={onPress} style={[styles.card, style]}>
         {children}
       </Pressable>
-    )
+    );
   }
 
-  return <View style={[styles.card, style]}>{children}</View>
-}
+  return <View style={[styles.card, style]}>{children}</View>;
+};
 
 const styles = StyleSheet.create({
   card: {
@@ -29,4 +29,4 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.md
   }
-})
+});

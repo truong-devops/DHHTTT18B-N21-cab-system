@@ -1,4 +1,4 @@
-const { context, trace } = require("@opentelemetry/api");
+const { context, trace } = require('@opentelemetry/api');
 
 function getOtelTraceId() {
   const span = trace.getSpan(context.active());
@@ -9,7 +9,7 @@ function getOtelTraceId() {
 function requestLogger(req, res, next) {
   const start = process.hrtime.bigint();
 
-  res.on("finish", () => {
+  res.on('finish', () => {
     const end = process.hrtime.bigint();
     const durationMs = Number(end - start) / 1e6;
     const otelTraceId = getOtelTraceId();

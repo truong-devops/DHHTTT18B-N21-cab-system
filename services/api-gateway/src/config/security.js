@@ -3,28 +3,16 @@ function parseList(raw, fallback = []) {
     return fallback;
   }
   return raw
-    .split(",")
+    .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || "";
-const JWT_ALGORITHMS = parseList(
-  process.env.JWT_ALGORITHMS,
-  ["HS256"]
-);
+const JWT_SECRET = process.env.JWT_SECRET || '';
+const JWT_ALGORITHMS = parseList(process.env.JWT_ALGORITHMS, ['HS256']);
 
-const PUBLIC_DOMAINS = new Set(
-  parseList(process.env.AUTH_PUBLIC_DOMAINS, ["auth"])
-);
-const PUBLIC_PATHS = new Set(
-  parseList(process.env.AUTH_PUBLIC_PATHS, [
-    "/health",
-    "/healthz",
-    "/readyz",
-    "/webhooks/payos"
-  ])
-);
+const PUBLIC_DOMAINS = new Set(parseList(process.env.AUTH_PUBLIC_DOMAINS, ['auth']));
+const PUBLIC_PATHS = new Set(parseList(process.env.AUTH_PUBLIC_PATHS, ['/health', '/healthz', '/readyz', '/webhooks/payos']));
 
 module.exports = {
   JWT_SECRET,

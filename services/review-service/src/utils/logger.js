@@ -1,8 +1,8 @@
-const pino = require("pino");
+const pino = require('pino');
 
 const logger = pino({
   base: {
-    serviceName: process.env.SERVICE_NAME || "review-service"
+    serviceName: process.env.SERVICE_NAME || 'review-service'
   }
 });
 

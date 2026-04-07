@@ -1,5 +1,5 @@
-const crypto = require("crypto");
-const { getDb } = require("../db/mongo");
+const crypto = require('crypto');
+const { getDb } = require('../db/mongo');
 
 function mapIdempotency(doc) {
   if (!doc) {
@@ -25,7 +25,7 @@ function mapIdempotency(doc) {
 
 async function getByKey({ routeKey, userId, idempotencyKey }) {
   const db = await getDb();
-  const doc = await db.collection("idempotency_keys").findOne({
+  const doc = await db.collection('idempotency_keys').findOne({
     route_key: routeKey,
     user_id: userId,
     idem_key: idempotencyKey
@@ -33,57 +33,43 @@ async function getByKey({ routeKey, userId, idempotencyKey }) {
   return mapIdempotency(doc);
 }
 
-async function createKey({
-  routeKey,
-  userId,
-  idempotencyKey,
-  requestHash
-}) {
+async function createKey({ routeKey, userId, idempotencyKey, requestHash }) {
   const db = await getDb();
   const now = new Date();
 
-  const result = await db
-    .collection("idempotency_keys")
-    .findOneAndUpdate(
-      {
+  const result = await db.collection('idempotency_keys').findOneAndUpdate(
+    {
+      route_key: routeKey,
+      user_id: userId,
+      idem_key: idempotencyKey
+    },
+    {
+      $set: {
+        locked_at: now,
+        updated_at: now
+      },
+      $setOnInsert: {
+        _id: crypto.randomUUID(),
+        idempotency_key: idempotencyKey,
         route_key: routeKey,
         user_id: userId,
-        idem_key: idempotencyKey
-      },
-      {
-        $set: {
-          locked_at: now,
-          updated_at: now
-        },
-        $setOnInsert: {
-          _id: crypto.randomUUID(),
-          idempotency_key: idempotencyKey,
-          route_key: routeKey,
-          user_id: userId,
-          idem_key: idempotencyKey,
-          request_hash: requestHash,
-          response_status: null,
-          response_headers: null,
-          response_body: null,
-          created_at: now
-        }
-      },
-      { upsert: true, returnDocument: "after" }
-    );
+        idem_key: idempotencyKey,
+        request_hash: requestHash,
+        response_status: null,
+        response_headers: null,
+        response_body: null,
+        created_at: now
+      }
+    },
+    { upsert: true, returnDocument: 'after' }
+  );
 
   return mapIdempotency(result.value);
 }
 
-async function setResponse({
-  routeKey,
-  userId,
-  idempotencyKey,
-  responseStatus,
-  responseHeaders,
-  responseBody
-}) {
+async function setResponse({ routeKey, userId, idempotencyKey, responseStatus, responseHeaders, responseBody }) {
   const db = await getDb();
-  await db.collection("idempotency_keys").updateOne(
+  await db.collection('idempotency_keys').updateOne(
     {
       route_key: routeKey,
       user_id: userId,

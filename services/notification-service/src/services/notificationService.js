@@ -1,80 +1,72 @@
-const { ApiError } = require("../utils/errors");
-const logger = require("../utils/logger");
-const { buildDedupeKey } = require("../utils/dedupe");
-const {
-  CHANNEL_VALUES,
-  isNonEmptyString,
-  isObject,
-  normalizeChannels,
-  parseDate
-} = require("../utils/validation");
-const { getUserById } = require("../clients/userServiceClient");
-const notificationRepository = require("../repository/notificationRepository");
-const preferenceRepository = require("../repository/preferenceRepository");
-const monitoring = require("../monitoring");
+const { ApiError } = require('../utils/errors');
+const logger = require('../utils/logger');
+const { buildDedupeKey } = require('../utils/dedupe');
+const { CHANNEL_VALUES, isNonEmptyString, isObject, normalizeChannels, parseDate } = require('../utils/validation');
+const { getUserById } = require('../clients/userServiceClient');
+const notificationRepository = require('../repository/notificationRepository');
+const preferenceRepository = require('../repository/preferenceRepository');
+const monitoring = require('../monitoring');
 
-const MAX_ATTEMPTS = Number(
-  process.env.NOTIFICATION_MAX_ATTEMPTS || 5
-);
+const MAX_ATTEMPTS = Number(process.env.NOTIFICATION_MAX_ATTEMPTS || 5);
 
 function validatePayload(payload) {
   const errors = [];
   if (!isObject(payload)) {
-    errors.push({ field: "body", message: "must be an object" });
+    errors.push({ field: 'body', message: 'must be an object' });
     return errors;
   }
 
   if (!isNonEmptyString(payload.sourceService)) {
-    errors.push({ field: "sourceService", message: "is required" });
+    errors.push({ field: 'sourceService', message: 'is required' });
   }
   if (!isNonEmptyString(payload.sourceAction)) {
-    errors.push({ field: "sourceAction", message: "is required" });
+    errors.push({ field: 'sourceAction', message: 'is required' });
   }
   if (!isNonEmptyString(payload.userId)) {
-    errors.push({ field: "userId", message: "is required" });
+    errors.push({ field: 'userId', message: 'is required' });
   }
 
   const channelResult = normalizeChannels(payload.channels);
   if (!channelResult.ok) {
-    errors.push({ field: "channels", message: channelResult.error });
+    errors.push({ field: 'channels', message: channelResult.error });
   } else if (channelResult.value.length === 0) {
-    errors.push({ field: "channels", message: "must not be empty" });
+    errors.push({ field: 'channels', message: 'must not be empty' });
   }
 
   if (payload.recipient && !isObject(payload.recipient)) {
-    errors.push({ field: "recipient", message: "must be an object" });
+    errors.push({ field: 'recipient', message: 'must be an object' });
   }
 
   if (payload.sourceRef && !isObject(payload.sourceRef)) {
-    errors.push({ field: "sourceRef", message: "must be an object" });
+    errors.push({ field: 'sourceRef', message: 'must be an object' });
   }
 
   if (payload.templateKey && !isNonEmptyString(payload.templateKey)) {
-    errors.push({ field: "templateKey", message: "must be a string" });
+    errors.push({ field: 'templateKey', message: 'must be a string' });
   }
 
   if (payload.dedupeKey && !isNonEmptyString(payload.dedupeKey)) {
-    errors.push({ field: "dedupeKey", message: "must be a string" });
+    errors.push({ field: 'dedupeKey', message: 'must be a string' });
   }
 
   if (payload.title && !isNonEmptyString(payload.title)) {
-    errors.push({ field: "title", message: "must be a string" });
+    errors.push({ field: 'title', message: 'must be a string' });
   }
 
   if (payload.body && !isNonEmptyString(payload.body)) {
-    errors.push({ field: "body", message: "must be a string" });
+    errors.push({ field: 'body', message: 'must be a string' });
   }
 
   if (!payload.templateKey && !payload.title && !payload.body) {
     errors.push({
-      field: "templateKey|title|body",
-      message: "templateKey or title/body is required"
+      field: 'templateKey|title|body',
+      message: 'templateKey or title/body is required'
     });
   }
 
   const scheduleResult = parseDate(payload.scheduledAt);
   if (!scheduleResult.ok) {
-    errors.push({ field: "scheduledAt", message: scheduleResult.error });
+    errors.push({ field: 'scheduledAt', message: scheduleResult.error });
   }
 
   return errors;
@@ -125,20 +117,12 @@ function computeDedupeKey(payload, normalizedChannels) {
   return buildDedupeKey(hashPayload);
 }
 
-function buildPerChannelStatus({
-  channels,
-  recipient,
-  userStatus,
-  lookupFailed,
-  preferences,
-  scheduledAt,
-  now
-}) {
+function buildPerChannelStatus({ channels, recipient, userStatus, lookupFailed, preferences, scheduledAt, now }) {
   const perChannelStatus = {};
 
   channels.forEach((channel) => {
     const base = {
-      status: "PENDING",
+      status: 'PENDING',
       attempts: 0,
       lastError: null,
       lastAttemptAt: null,
@@ -148,18 +132,15 @@ function buildPerChannelStatus({
       blocked: false
     };
 
-    const isInApp = channel === "IN_APP";
-    const prefAllowed =
-      !preferences ||
-      preferences[channel] === undefined ||
-      preferences[channel] === true;
+    const isInApp = channel === 'IN_APP';
+    const prefAllowed = !preferences || preferences[channel] === undefined || preferences[channel] === true;
 
     if (!prefAllowed) {
       perChannelStatus[channel] = {
         ...base,
-        status: "FAILED",
+        status: 'FAILED',
         attempts: MAX_ATTEMPTS,
-        lastError: "OPTED_OUT",
+        lastError: 'OPTED_OUT',
         blocked: true
       };
       return;
@@ -168,20 +149,20 @@ function buildPerChannelStatus({
     if (!isInApp && lookupFailed) {
       perChannelStatus[channel] = {
         ...base,
-        status: "FAILED",
+        status: 'FAILED',
         attempts: MAX_ATTEMPTS,
-        lastError: "USER_LOOKUP_FAILED",
+        lastError: 'USER_LOOKUP_FAILED',
         blocked: true
       };
       return;
     }
 
-    if (!isInApp && userStatus && userStatus !== "ACTIVE") {
+    if (!isInApp && userStatus && userStatus !== 'ACTIVE') {
       perChannelStatus[channel] = {
         ...base,
-        status: "FAILED",
+        status: 'FAILED',
         attempts: MAX_ATTEMPTS,
-        lastError: "USER_INACTIVE",
+        lastError: 'USER_INACTIVE',
         blocked: true
       };
       return;
@@ -189,16 +170,14 @@ function buildPerChannelStatus({
 
     if (!isInApp) {
       const hasRecipient =
-        (channel === "EMAIL" && recipient.email) ||
-        (channel === "SMS" && recipient.phone) ||
-        (channel === "PUSH" && recipient.pushTokens.length);
+        (channel === 'EMAIL' && recipient.email) || (channel === 'SMS' && recipient.phone) || (channel === 'PUSH' && recipient.pushTokens.length);
 
       if (!hasRecipient) {
         perChannelStatus[channel] = {
           ...base,
-          status: "FAILED",
+          status: 'FAILED',
           attempts: MAX_ATTEMPTS,
-          lastError: "MISSING_RECIPIENT",
+          lastError: 'MISSING_RECIPIENT',
           blocked: true
         };
         return;
@@ -212,54 +191,48 @@ function buildPerChannelStatus({
 }
 
 function deriveOverallStatus(perChannelStatus, scheduledAt, now) {
-  const statuses = Object.values(perChannelStatus).map(
-    (entry) => entry.status
-  );
+  const statuses = Object.values(perChannelStatus).map((entry) => entry.status);
   if (!statuses.length) {
-    return "FAILED";
+    return 'FAILED';
   }
 
   const all = (value) => statuses.every((status) => status === value);
   const any = (value) => statuses.some((status) => status === value);
 
-  if (all("CANCELED")) {
-    return "CANCELED";
+  if (all('CANCELED')) {
+    return 'CANCELED';
   }
-  if (all("SENT")) {
-    return "SENT";
+  if (all('SENT')) {
+    return 'SENT';
   }
-  if (all("FAILED")) {
-    return "FAILED";
+  if (all('FAILED')) {
+    return 'FAILED';
   }
-  if (any("PROCESSING")) {
-    return "PROCESSING";
-  }
-
-  const scheduledInFuture =
-    scheduledAt && now && scheduledAt.getTime() > now.getTime();
-  if (scheduledInFuture && any("PENDING")) {
-    return "SCHEDULED";
+  if (any('PROCESSING')) {
+    return 'PROCESSING';
   }
 
-  if (any("PENDING")) {
-    return "PENDING";
+  const scheduledInFuture = scheduledAt && now && scheduledAt.getTime() > now.getTime();
+  if (scheduledInFuture && any('PENDING')) {
+    return 'SCHEDULED';
   }
 
-  if (any("FAILED") && any("SENT")) {
-    return "PARTIAL";
+  if (any('PENDING')) {
+    return 'PENDING';
   }
 
-  return "PENDING";
+  if (any('FAILED') && any('SENT')) {
+    return 'PARTIAL';
+  }
+
+  return 'PENDING';
 }
 
 async function resolveUserContacts(userId, context) {
   try {
     return await getUserById(userId, context);
   } catch (error) {
-    logger.withTrace(context).warn(
-      { err: error },
-      "[notification-service] user-service lookup failed"
-    );
+    logger.withTrace(context).warn({ err: error }, '[notification-service] user-service lookup failed');
     return { error: true };
   }
 }
@@ -268,48 +241,46 @@ async function createNotification(payload, context) {
   const errors = validatePayload(payload);
   if (errors.length) {
     monitoring.recordBusinessEvent({
-      domain: "notification",
-      event: "created",
-      outcome: "error",
-      attributes: { reason: "validation_error" }
+      domain: 'notification',
+      event: 'created',
+      outcome: 'error',
+      attributes: { reason: 'validation_error' }
     });
-    throw new ApiError(400, "VALIDATION_ERROR", "Invalid payload", errors);
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid payload', errors);
   }
 
   const channelResult = normalizeChannels(payload.channels);
   if (!channelResult.ok) {
     monitoring.recordBusinessEvent({
-      domain: "notification",
-      event: "created",
-      outcome: "error",
-      attributes: { reason: "invalid_channels" }
+      domain: 'notification',
+      event: 'created',
+      outcome: 'error',
+      attributes: { reason: 'invalid_channels' }
     });
-    throw new ApiError(400, "VALIDATION_ERROR", channelResult.error);
+    throw new ApiError(400, 'VALIDATION_ERROR', channelResult.error);
   }
   const channels = channelResult.value;
 
   const scheduleResult = parseDate(payload.scheduledAt);
   if (!scheduleResult.ok) {
     monitoring.recordBusinessEvent({
-      domain: "notification",
-      event: "created",
-      outcome: "error",
-      attributes: { reason: "invalid_schedule" }
+      domain: 'notification',
+      event: 'created',
+      outcome: 'error',
+      attributes: { reason: 'invalid_schedule' }
     });
-    throw new ApiError(400, "VALIDATION_ERROR", scheduleResult.error);
+    throw new ApiError(400, 'VALIDATION_ERROR', scheduleResult.error);
   }
 
   const dedupeKey = computeDedupeKey(payload, channels);
 
-  const existing = await notificationRepository.findByDedupeKey(
-    dedupeKey
-  );
+  const existing = await notificationRepository.findByDedupeKey(dedupeKey);
   if (existing) {
     monitoring.recordBusinessEvent({
-      domain: "notification",
-      event: "created",
-      outcome: "success",
-      attributes: { deduplicated: "true" }
+      domain: 'notification',
+      event: 'created',
+      outcome: 'success',
+      attributes: { deduplicated: 'true' }
     });
     return { notification: existing, created: false };
   }
@@ -321,22 +292,17 @@ async function createNotification(payload, context) {
   let lookupFailed = false;
   let userStatus = null;
 
-  if (channels.some((channel) => channel !== "IN_APP")) {
+  if (channels.some((channel) => channel !== 'IN_APP')) {
     const userProfile = await resolveUserContacts(payload.userId, context);
     if (userProfile && !userProfile.error) {
-      userStatus = userProfile.status
-        ? String(userProfile.status).toUpperCase()
-        : null;
+      userStatus = userProfile.status ? String(userProfile.status).toUpperCase() : null;
       if (!recipient.email && userProfile.contacts?.email) {
         recipient.email = userProfile.contacts.email;
       }
       if (!recipient.phone && userProfile.contacts?.phone) {
         recipient.phone = userProfile.contacts.phone;
       }
-      if (
-        recipient.pushTokens.length === 0 &&
-        Array.isArray(userProfile.contacts?.pushTokens)
-      ) {
+      if (recipient.pushTokens.length === 0 && Array.isArray(userProfile.contacts?.pushTokens)) {
         recipient.pushTokens = userProfile.contacts.pushTokens;
       }
     } else {
@@ -344,10 +310,7 @@ async function createNotification(payload, context) {
     }
   }
 
-  const preferencesDoc =
-    process.env.NOTIFICATION_RESPECT_PREFERENCES === "false"
-      ? null
-      : await preferenceRepository.getPreferences(payload.userId);
+  const preferencesDoc = process.env.NOTIFICATION_RESPECT_PREFERENCES === 'false' ? null : await preferenceRepository.getPreferences(payload.userId);
   const preferences = preferencesDoc?.channels || null;
 
   const perChannelStatus = buildPerChannelStatus({
@@ -390,36 +353,32 @@ async function createNotification(payload, context) {
   };
 
   try {
-    const created = await notificationRepository.insertNotification(
-      notification
-    );
+    const created = await notificationRepository.insertNotification(notification);
     monitoring.recordBusinessEvent({
-      domain: "notification",
-      event: "created",
-      outcome: "success",
-      attributes: { deduplicated: "false" }
+      domain: 'notification',
+      event: 'created',
+      outcome: 'success',
+      attributes: { deduplicated: 'false' }
     });
     return { notification: created, created: true };
   } catch (error) {
-    if (String(error?.code) === "11000") {
-      const existingDoc = await notificationRepository.findByDedupeKey(
-        dedupeKey
-      );
+    if (String(error?.code) === '11000') {
+      const existingDoc = await notificationRepository.findByDedupeKey(dedupeKey);
       if (existingDoc) {
         monitoring.recordBusinessEvent({
-          domain: "notification",
-          event: "created",
-          outcome: "success",
-          attributes: { deduplicated: "true" }
+          domain: 'notification',
+          event: 'created',
+          outcome: 'success',
+          attributes: { deduplicated: 'true' }
         });
         return { notification: existingDoc, created: false };
       }
     }
     monitoring.recordBusinessEvent({
-      domain: "notification",
-      event: "created",
-      outcome: "error",
-      attributes: { reason: "insert_failed" }
+      domain: 'notification',
+      event: 'created',
+      outcome: 'error',
+      attributes: { reason: 'insert_failed' }
     });
     throw error;
   }
@@ -427,22 +386,19 @@ async function createNotification(payload, context) {
 
 async function createBatch(payload, context) {
   if (!payload || !Array.isArray(payload.items)) {
-    throw new ApiError(400, "VALIDATION_ERROR", "items is required");
+    throw new ApiError(400, 'VALIDATION_ERROR', 'items is required');
   }
 
   const results = [];
   for (let i = 0; i < payload.items.length; i += 1) {
     try {
-      const { notification, created } = await createNotification(
-        payload.items[i],
-        context
-      );
+      const { notification, created } = await createNotification(payload.items[i], context);
       results.push({ index: i, id: notification.id, created });
     } catch (error) {
       results.push({
         index: i,
         error: {
-          code: error.code || "ERROR",
+          code: error.code || 'ERROR',
           message: error.message
         }
       });
@@ -455,7 +411,7 @@ async function createBatch(payload, context) {
 async function getNotificationById(id) {
   const notification = await notificationRepository.findById(id);
   if (!notification) {
-    throw new ApiError(404, "NOT_FOUND", "Notification not found");
+    throw new ApiError(404, 'NOT_FOUND', 'Notification not found');
   }
   return notification;
 }
@@ -467,32 +423,27 @@ async function listNotificationsByUser(userId, filters) {
 async function retryNotification(id) {
   const notification = await notificationRepository.findById(id);
   if (!notification) {
-    throw new ApiError(404, "NOT_FOUND", "Notification not found");
+    throw new ApiError(404, 'NOT_FOUND', 'Notification not found');
   }
 
   const updates = {};
   const now = new Date();
 
-  Object.entries(notification.perChannelStatus || {}).forEach(
-    ([channel, status]) => {
-      if (["FAILED", "PENDING"].includes(status.status)) {
-        updates[`perChannelStatus.${channel}.status`] = "PENDING";
-        updates[`perChannelStatus.${channel}.processing`] = false;
-        updates[`perChannelStatus.${channel}.lastError`] = null;
-        updates[`perChannelStatus.${channel}.nextAttemptAt`] = now;
-        updates[`perChannelStatus.${channel}.attempts`] = 0;
-        updates[`perChannelStatus.${channel}.blocked`] = false;
-      }
+  Object.entries(notification.perChannelStatus || {}).forEach(([channel, status]) => {
+    if (['FAILED', 'PENDING'].includes(status.status)) {
+      updates[`perChannelStatus.${channel}.status`] = 'PENDING';
+      updates[`perChannelStatus.${channel}.processing`] = false;
+      updates[`perChannelStatus.${channel}.lastError`] = null;
+      updates[`perChannelStatus.${channel}.nextAttemptAt`] = now;
+      updates[`perChannelStatus.${channel}.attempts`] = 0;
+      updates[`perChannelStatus.${channel}.blocked`] = false;
     }
-  );
+  });
 
-  updates.status = "PENDING";
+  updates.status = 'PENDING';
   updates.updatedAt = now;
 
-  const updated = await notificationRepository.updateNotificationById(
-    id,
-    { $set: updates }
-  );
+  const updated = await notificationRepository.updateNotificationById(id, { $set: updates });
   if (updated) {
     return updated;
   }
@@ -502,30 +453,23 @@ async function retryNotification(id) {
 async function cancelNotification(id) {
   const notification = await notificationRepository.findById(id);
   if (!notification) {
-    throw new ApiError(404, "NOT_FOUND", "Notification not found");
+    throw new ApiError(404, 'NOT_FOUND', 'Notification not found');
   }
-  const hasSentChannel = Object.values(
-    notification.perChannelStatus || {}
-  ).some((status) => status.status === "SENT");
-  if (notification.status === "SENT" || hasSentChannel) {
-    throw new ApiError(409, "CONFLICT", "Notification already sent");
+  const hasSentChannel = Object.values(notification.perChannelStatus || {}).some((status) => status.status === 'SENT');
+  if (notification.status === 'SENT' || hasSentChannel) {
+    throw new ApiError(409, 'CONFLICT', 'Notification already sent');
   }
 
-  const updates = { status: "CANCELED", updatedAt: new Date() };
+  const updates = { status: 'CANCELED', updatedAt: new Date() };
 
-  Object.entries(notification.perChannelStatus || {}).forEach(
-    ([channel, status]) => {
-      if (status.status !== "SENT") {
-        updates[`perChannelStatus.${channel}.status`] = "CANCELED";
-        updates[`perChannelStatus.${channel}.processing`] = false;
-      }
+  Object.entries(notification.perChannelStatus || {}).forEach(([channel, status]) => {
+    if (status.status !== 'SENT') {
+      updates[`perChannelStatus.${channel}.status`] = 'CANCELED';
+      updates[`perChannelStatus.${channel}.processing`] = false;
     }
-  );
+  });
 
-  const updated = await notificationRepository.updateNotificationById(
-    id,
-    { $set: updates }
-  );
+  const updated = await notificationRepository.updateNotificationById(id, { $set: updates });
   if (updated) {
     return updated;
   }
@@ -539,7 +483,7 @@ async function getPreferences(userId) {
 
 async function updatePreferences(userId, channels) {
   if (!isObject(channels)) {
-    throw new ApiError(400, "VALIDATION_ERROR", "channels must be object");
+    throw new ApiError(400, 'VALIDATION_ERROR', 'channels must be object');
   }
 
   const sanitized = {};

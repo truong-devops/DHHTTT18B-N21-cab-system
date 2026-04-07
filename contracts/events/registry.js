@@ -1,21 +1,21 @@
-const fs = require("fs");
-const path = require("path");
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
-const catalog = require("./catalog.json");
+const fs = require('fs');
+const path = require('path');
+const Ajv = require('ajv');
+const addFormats = require('ajv-formats');
+const catalog = require('./catalog.json');
 
-const SCHEMA_BASE_PATH = path.resolve(__dirname, "schema-registry");
+const SCHEMA_BASE_PATH = path.resolve(__dirname, 'schema-registry');
 
 function readJson(relativePath) {
   const absolutePath = path.join(SCHEMA_BASE_PATH, relativePath);
-  return JSON.parse(fs.readFileSync(absolutePath, "utf8"));
+  return JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
 }
 
 function normalizeAjvErrors(errors) {
   return (errors || []).map((error) => ({
     keyword: error.keyword,
-    instancePath: error.instancePath || "",
-    message: error.message || "invalid"
+    instancePath: error.instancePath || '',
+    message: error.message || 'invalid'
   }));
 }
 
@@ -49,7 +49,7 @@ function createEventContractRegistry(options = {}) {
   });
   addFormats(ajv);
 
-  const envelopeCommon = readJson("envelopes/envelope.common.schema.json");
+  const envelopeCommon = readJson('envelopes/envelope.common.schema.json');
   ajv.addSchema(envelopeCommon, envelopeCommon.$id);
 
   const payloadValidatorsByTopic = new Map();
@@ -77,7 +77,7 @@ function createEventContractRegistry(options = {}) {
     if (!validator) {
       return {
         valid: false,
-        errors: [{ keyword: "topic", instancePath: "", message: `unknown topic: ${topic}` }]
+        errors: [{ keyword: 'topic', instancePath: '', message: `unknown topic: ${topic}` }]
       };
     }
     const valid = validator(payload);
@@ -89,7 +89,7 @@ function createEventContractRegistry(options = {}) {
     if (!validator) {
       return {
         valid: false,
-        errors: [{ keyword: "type", instancePath: "", message: `unknown event type: ${type}` }]
+        errors: [{ keyword: 'type', instancePath: '', message: `unknown event type: ${type}` }]
       };
     }
     const valid = validator(payload);
@@ -103,7 +103,7 @@ function createEventContractRegistry(options = {}) {
     if (!validator || !entry) {
       return {
         valid: false,
-        errors: [{ keyword: "topic", instancePath: "", message: `unknown topic: ${topic}` }]
+        errors: [{ keyword: 'topic', instancePath: '', message: `unknown topic: ${topic}` }]
       };
     }
 
@@ -112,8 +112,8 @@ function createEventContractRegistry(options = {}) {
         valid: false,
         errors: [
           {
-            keyword: "type",
-            instancePath: "/type",
+            keyword: 'type',
+            instancePath: '/type',
             message: `type must be ${entry.type} for topic ${topic}`
           }
         ]

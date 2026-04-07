@@ -1,19 +1,19 @@
-import React from 'react'
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
-import { colors, spacing, typography } from '../../theme/tokens'
-import type { RideOption } from '../../mock/data'
-import { formatVnd } from '../../utils/format'
+import React from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { colors, spacing, typography } from '../../theme/tokens';
+import type { RideOption } from '../../mock/data';
+import { formatVnd } from '../../utils/format';
 
 type Props = {
-  option?: RideOption | null
-  visible: boolean
-  onClose: () => void
-}
+  option?: RideOption | null;
+  visible: boolean;
+  onClose: () => void;
+};
 
 export const PriceBreakdownModal: React.FC<Props> = ({ option, visible, onClose }) => {
-  if (!option) return null
-  const baseFare = option.price * 0.8
-  const surge = option.surgeLabel ? option.price * 0.2 : 0
+  if (!option) return null;
+  const baseFare = option.price * 0.8;
+  const surge = option.surgeLabel ? option.price * 0.2 : 0;
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -38,8 +38,8 @@ export const PriceBreakdownModal: React.FC<Props> = ({ option, visible, onClose 
         </View>
       </View>
     </Modal>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   backdrop: {
@@ -67,4 +67,4 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   buttonText: { ...typography.body, color: colors.white, fontWeight: '600' }
-})
+});

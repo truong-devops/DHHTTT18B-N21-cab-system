@@ -26,9 +26,9 @@ components:
       type: object
       properties:
         pickup:
-          $ref: "#/components/schemas/LatLng"
+          $ref: '#/components/schemas/LatLng'
         drop:
-          $ref: "#/components/schemas/LatLng"
+          $ref: '#/components/schemas/LatLng'
         distance_km:
           type: number
           minimum: 0
@@ -58,19 +58,19 @@ paths:
     get:
       summary: Health check
       responses:
-        "200":
+        '200':
           description: OK
   /healthz:
     get:
       summary: Liveness check
       responses:
-        "200":
+        '200':
           description: OK
   /readyz:
     get:
       summary: Readiness check
       responses:
-        "200":
+        '200':
           description: OK
   /v1/eta/estimate:
     post:
@@ -80,7 +80,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EstimateEtaRequest"
+              $ref: '#/components/schemas/EstimateEtaRequest'
             examples:
               byDistance:
                 value:
@@ -91,15 +91,15 @@ paths:
                   pickup: { lat: 10.76, lng: 106.66 }
                   drop: { lat: 10.77, lng: 106.70 }
       responses:
-        "200":
+        '200':
           description: ETA result
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EstimateEtaResponse"
-        "400":
+                $ref: '#/components/schemas/EstimateEtaResponse'
+        '400':
           description: Missing distance and coordinates
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorPayload"
+                $ref: '#/components/schemas/ErrorPayload'

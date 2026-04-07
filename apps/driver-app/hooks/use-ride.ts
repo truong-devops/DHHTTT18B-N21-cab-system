@@ -11,16 +11,13 @@ export function useRide({ rideId, enabled = true, intervalMs = 2500 }: Options) 
   const tracking = useRideTracking({
     rideId,
     enabled: Boolean(rideId) && enabled,
-    intervalMs,
+    intervalMs
   });
 
-  const status = useMemo(
-    () => (tracking.ride?.status ? String(tracking.ride.status).toUpperCase() : ''),
-    [tracking.ride?.status],
-  );
+  const status = useMemo(() => (tracking.ride?.status ? String(tracking.ride.status).toUpperCase() : ''), [tracking.ride?.status]);
 
   return {
     ...tracking,
-    status,
+    status
   };
 }

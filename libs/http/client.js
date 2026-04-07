@@ -1,4 +1,4 @@
-const axios = require("axios");
+const axios = require('axios');
 
 const DEFAULT_TIMEOUT_MS = 3000;
 const DEFAULT_RETRY_MAX = 1;
@@ -6,7 +6,7 @@ const DEFAULT_RETRY_BACKOFF_MS = 100;
 const DEFAULT_RETRY_BACKOFF_MULTIPLIER = 2;
 const DEFAULT_RETRY_MAX_BACKOFF_MS = 2000;
 const DEFAULT_RETRY_JITTER = 0.2;
-const DEFAULT_RETRY_METHODS = ["GET"];
+const DEFAULT_RETRY_METHODS = ['GET'];
 const DEFAULT_FAILURE_THRESHOLD = 5;
 const DEFAULT_RESET_TIMEOUT_MS = 10000;
 
@@ -22,7 +22,7 @@ function normalizeHeaderValue(value) {
 
 function normalizeHeaders(headers) {
   const result = {};
-  if (!headers || typeof headers !== "object") {
+  if (!headers || typeof headers !== 'object') {
     return result;
   }
   for (const [key, value] of Object.entries(headers)) {
@@ -37,27 +37,19 @@ function normalizeHeaders(headers) {
 
 function mergeHeaders(headers, context) {
   const base = normalizeHeaders(headers);
-  const auth =
-    context?.authorization ||
-    base.authorization;
+  const auth = context?.authorization || base.authorization;
   if (auth) {
     base.authorization = auth;
   }
 
-  const traceId =
-    context?.traceId ||
-    base["x-trace-id"] ||
-    base["x-traceid"];
+  const traceId = context?.traceId || base['x-trace-id'] || base['x-traceid'];
   if (traceId) {
-    base["x-trace-id"] = traceId;
+    base['x-trace-id'] = traceId;
   }
 
-  const requestId =
-    context?.requestId ||
-    base["x-request-id"] ||
-    base["x-requestid"];
+  const requestId = context?.requestId || base['x-request-id'] || base['x-requestid'];
   if (requestId) {
-    base["x-request-id"] = requestId;
+    base['x-request-id'] = requestId;
   }
 
   return base;
@@ -71,47 +63,34 @@ function isRetryableError(err) {
   if (!err) {
     return false;
   }
-  if (err.response && typeof err.response.status === "number") {
+  if (err.response && typeof err.response.status === 'number') {
     return isRetryableStatus(err.response.status);
   }
-  const code = err.code || "";
-  return [
-    "ECONNABORTED",
-    "ETIMEDOUT",
-    "ECONNREFUSED",
-    "ENOTFOUND",
-    "EAI_AGAIN",
-    "ECONNRESET"
-  ].includes(code);
+  const code = err.code || '';
+  return ['ECONNABORTED', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET'].includes(code);
 }
 
 function circuitOpenError() {
-  const err = new Error("Circuit breaker is open");
-  err.code = "CIRCUIT_OPEN";
+  const err = new Error('Circuit breaker is open');
+  err.code = 'CIRCUIT_OPEN';
   return err;
 }
 
 function createHttpClient(options = {}) {
-  const baseUrl = options.baseUrl || "";
+  const baseUrl = options.baseUrl || '';
   const timeoutMs = Number(options.timeoutMs || DEFAULT_TIMEOUT_MS);
 
   if (!baseUrl) {
-    throw new Error("baseUrl is required");
+    throw new Error('baseUrl is required');
   }
 
   const retry = {
     max: Number(options.retry?.max ?? DEFAULT_RETRY_MAX),
     backoffMs: Number(options.retry?.backoffMs ?? DEFAULT_RETRY_BACKOFF_MS),
-    backoffMultiplier: Number(
-      options.retry?.backoffMultiplier ?? DEFAULT_RETRY_BACKOFF_MULTIPLIER
-    ),
-    maxBackoffMs: Number(
-      options.retry?.maxBackoffMs ?? DEFAULT_RETRY_MAX_BACKOFF_MS
-    ),
+    backoffMultiplier: Number(options.retry?.backoffMultiplier ?? DEFAULT_RETRY_BACKOFF_MULTIPLIER),
+    maxBackoffMs: Number(options.retry?.maxBackoffMs ?? DEFAULT_RETRY_MAX_BACKOFF_MS),
     jitter: Number(options.retry?.jitter ?? DEFAULT_RETRY_JITTER),
-    methods: Array.isArray(options.retry?.methods)
-      ? options.retry.methods
-      : DEFAULT_RETRY_METHODS
+    methods: Array.isArray(options.retry?.methods) ? options.retry.methods : DEFAULT_RETRY_METHODS
   };
 
   const breaker = {
@@ -120,23 +99,23 @@ function createHttpClient(options = {}) {
   };
 
   const state = {
-    status: "CLOSED",
+    status: 'CLOSED',
     failures: 0,
     openedAt: 0,
     halfOpenInFlight: false
   };
 
   function canAttempt() {
-    if (state.status === "OPEN") {
+    if (state.status === 'OPEN') {
       const now = Date.now();
       if (now - state.openedAt >= breaker.resetTimeoutMs) {
-        state.status = "HALF_OPEN";
+        state.status = 'HALF_OPEN';
         state.halfOpenInFlight = false;
         return true;
       }
       throw circuitOpenError();
     }
-    if (state.status === "HALF_OPEN") {
+    if (state.status === 'HALF_OPEN') {
       if (state.halfOpenInFlight) {
         throw circuitOpenError();
       }
@@ -146,15 +125,15 @@ function createHttpClient(options = {}) {
   }
 
   function recordSuccess() {
-    state.status = "CLOSED";
+    state.status = 'CLOSED';
     state.failures = 0;
     state.openedAt = 0;
     state.halfOpenInFlight = false;
   }
 
   function recordFailure() {
-    if (state.status === "HALF_OPEN") {
-      state.status = "OPEN";
+    if (state.status === 'HALF_OPEN') {
+      state.status = 'OPEN';
       state.openedAt = Date.now();
       state.failures = 0;
       state.halfOpenInFlight = false;
@@ -162,7 +141,7 @@ function createHttpClient(options = {}) {
     }
     state.failures += 1;
     if (state.failures >= breaker.failureThreshold) {
-      state.status = "OPEN";
+      state.status = 'OPEN';
       state.openedAt = Date.now();
     }
   }
@@ -175,12 +154,8 @@ function createHttpClient(options = {}) {
   }
 
   function normalizeRetryMethods() {
-    const methods = Array.isArray(retry.methods)
-      ? retry.methods
-      : DEFAULT_RETRY_METHODS;
-    return new Set(
-      methods.map((method) => String(method).toUpperCase())
-    );
+    const methods = Array.isArray(retry.methods) ? retry.methods : DEFAULT_RETRY_METHODS;
+    return new Set(methods.map((method) => String(method).toUpperCase()));
   }
 
   const retryMethods = normalizeRetryMethods();
@@ -198,10 +173,10 @@ function createHttpClient(options = {}) {
   }
 
   async function request(params = {}) {
-    const method = String(params.method || "GET").toUpperCase();
-    const path = params.path || "";
+    const method = String(params.method || 'GET').toUpperCase();
+    const path = params.path || '';
     const headers = mergeHeaders(params.headers, params.context);
-    const responseType = params.responseType || "json";
+    const responseType = params.responseType || 'json';
 
     let attempt = 0;
     const maxRetries = shouldRetryMethod(method) ? retry.max : 0;
@@ -245,11 +220,11 @@ function createHttpClient(options = {}) {
 
   return {
     request,
-    get: (path, options) => request({ ...options, method: "GET", path }),
-    post: (path, data, options) => request({ ...options, method: "POST", path, data }),
-    put: (path, data, options) => request({ ...options, method: "PUT", path, data }),
-    patch: (path, data, options) => request({ ...options, method: "PATCH", path, data }),
-    delete: (path, options) => request({ ...options, method: "DELETE", path })
+    get: (path, options) => request({ ...options, method: 'GET', path }),
+    post: (path, data, options) => request({ ...options, method: 'POST', path, data }),
+    put: (path, data, options) => request({ ...options, method: 'PUT', path, data }),
+    patch: (path, data, options) => request({ ...options, method: 'PATCH', path, data }),
+    delete: (path, options) => request({ ...options, method: 'DELETE', path })
   };
 }
 

@@ -1,35 +1,35 @@
-import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
-import { useRoute, useNavigation } from '@react-navigation/native'
-import type { RouteProp } from '@react-navigation/native'
-import type { MainStackParamList } from '../../navigation/MainStack'
-import { customerApi } from '../../services/customerApi'
-import type { RideOption } from '../../mock/data'
-import { RideOptionCard } from '../../components/customer/RideOptionCard'
-import { PrimaryButton } from '../../components/common/PrimaryButton'
-import { OutlineButton } from '../../components/common/OutlineButton'
-import { colors, spacing, typography } from '../../theme/tokens'
-import { useCustomerStore } from '../../store/customerStore'
-import { useToast } from '../../hooks/useToast'
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { PriceBreakdownModal } from '../../components/customer/PriceBreakdownModal'
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
+import type { MainStackParamList } from '../../navigation/MainStack';
+import { customerApi } from '../../services/customerApi';
+import type { RideOption } from '../../mock/data';
+import { RideOptionCard } from '../../components/customer/RideOptionCard';
+import { PrimaryButton } from '../../components/common/PrimaryButton';
+import { OutlineButton } from '../../components/common/OutlineButton';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { useCustomerStore } from '../../store/customerStore';
+import { useToast } from '../../hooks/useToast';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { PriceBreakdownModal } from '../../components/customer/PriceBreakdownModal';
 
 const RideOptionsScreen = () => {
-  const route = useRoute<RouteProp<MainStackParamList, 'RideOptions'>>()
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
-  const { chooseOption, selectedOption } = useCustomerStore()
-  const [options, setOptions] = useState<RideOption[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showBreakdown, setShowBreakdown] = useState(false)
-  const { push } = useToast()
+  const route = useRoute<RouteProp<MainStackParamList, 'RideOptions'>>();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const { chooseOption, selectedOption } = useCustomerStore();
+  const [options, setOptions] = useState<RideOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const { push } = useToast();
 
   useEffect(() => {
     customerApi
       .getRideOptions(route.params.pickup, route.params.destination)
       .then((result) => setOptions(result))
       .catch((err) => push(err?.message || 'Không tải được lựa chọn xe', 'danger'))
-      .finally(() => setLoading(false))
-  }, [route.params.destination, route.params.pickup, push])
+      .finally(() => setLoading(false));
+  }, [route.params.destination, route.params.pickup, push]);
 
   return (
     <View style={styles.container}>
@@ -51,22 +51,22 @@ const RideOptionsScreen = () => {
         title="Tìm tài xế"
         onPress={() => {
           if (!selectedOption) {
-            push('Vui lòng chọn một loại xe', 'danger')
-            return
+            push('Vui lòng chọn một loại xe', 'danger');
+            return;
           }
-          navigation.navigate('SearchingDriver', route.params)
+          navigation.navigate('SearchingDriver', route.params);
         }}
       />
       <OutlineButton title="Chi tiết giá" onPress={() => setShowBreakdown(true)} disabled={!selectedOption} />
       <PriceBreakdownModal option={selectedOption} visible={showBreakdown} onClose={() => setShowBreakdown(false)} />
       {/* TODO: Use quote id snapshot from Pricing Service to giữ giá cố định khi đặt */}
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.xl, gap: spacing.md },
   title: { ...typography.title, color: colors.text }
-})
+});
 
-export default RideOptionsScreen
+export default RideOptionsScreen;

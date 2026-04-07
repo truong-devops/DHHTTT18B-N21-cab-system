@@ -23,14 +23,7 @@ type DashboardData = {
 export default function DashboardScreen() {
   const { isAuthenticated } = useAuth();
   const { driver, error: driverError } = useDriver();
-  const {
-    isOnline,
-    state: onlineState,
-    error: onlineError,
-    sending: onlineSending,
-    startOnline,
-    stopOnline,
-  } = useDriverOnline();
+  const { isOnline, state: onlineState, error: onlineError, sending: onlineSending, startOnline, stopOnline } = useDriverOnline();
   const earnings = useEarnings({ limit: 50 });
   const trips = useTrips({ limit: 50 });
   const error = earnings.error || trips.error;
@@ -51,7 +44,7 @@ export default function DashboardScreen() {
     if (!total) return { acceptanceRate: undefined, cancelRate: undefined };
     return {
       acceptanceRate: Math.round((completed / total) * 100),
-      cancelRate: Math.round((cancelled / total) * 100),
+      cancelRate: Math.round((cancelled / total) * 100)
     };
   }, [trips.summary.cancelled, trips.summary.completed]);
 
@@ -60,9 +53,9 @@ export default function DashboardScreen() {
       earningsToday: earnings.summary.today,
       tripsToday,
       acceptanceRate: acceptanceStats.acceptanceRate,
-      cancelRate: acceptanceStats.cancelRate,
+      cancelRate: acceptanceStats.cancelRate
     }),
-    [acceptanceStats.acceptanceRate, acceptanceStats.cancelRate, earnings.summary.today, tripsToday],
+    [acceptanceStats.acceptanceRate, acceptanceStats.cancelRate, earnings.summary.today, tripsToday]
   );
 
   const initials = useMemo(() => {
@@ -73,8 +66,7 @@ export default function DashboardScreen() {
     return `${first}${last}`.toUpperCase();
   }, [driver?.fullName]);
 
-  const onlineLabel =
-    onlineState === 'sending' ? 'ĐANG CẬP NHẬT' : isOnline ? 'ĐANG BẬT' : 'NGOẠI TUYẾN';
+  const onlineLabel = onlineState === 'sending' ? 'ĐANG CẬP NHẬT' : isOnline ? 'ĐANG BẬT' : 'NGOẠI TUYẾN';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -95,11 +87,7 @@ export default function DashboardScreen() {
           </View>
         ) : null}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.avatar}
-            activeOpacity={0.9}
-            onLongPress={() => router.push('/debug')}
-            delayLongPress={600}>
+          <TouchableOpacity style={styles.avatar} activeOpacity={0.9} onLongPress={() => router.push('/debug')} delayLongPress={600}>
             <Text style={styles.avatarText}>{initials}</Text>
           </TouchableOpacity>
           <View style={styles.headerInfo}>
@@ -113,18 +101,8 @@ export default function DashboardScreen() {
               <Text style={styles.vehicle}>{driver?.vehicle?.plateNumber ?? '--'}</Text>
             </View>
           </View>
-          <View
-            style={[
-              styles.statusPill,
-              onlineState === 'sending'
-                ? styles.statusPending
-                : isOnline
-                  ? styles.statusOnline
-                  : styles.statusOffline,
-            ]}>
-            <Text style={[styles.statusText, isOnline ? styles.statusOnlineText : styles.statusOfflineText]}>
-              {onlineLabel}
-            </Text>
+          <View style={[styles.statusPill, onlineState === 'sending' ? styles.statusPending : isOnline ? styles.statusOnline : styles.statusOffline]}>
+            <Text style={[styles.statusText, isOnline ? styles.statusOnlineText : styles.statusOfflineText]}>{onlineLabel}</Text>
           </View>
         </View>
 
@@ -136,9 +114,7 @@ export default function DashboardScreen() {
               <Text style={styles.heroChipText}>Ca sáng</Text>
             </View>
           </View>
-          <Text style={styles.heroValue}>
-            {data?.earningsToday !== undefined ? `${data.earningsToday.toLocaleString('vi-VN')} đ` : '--'}
-          </Text>
+          <Text style={styles.heroValue}>{data?.earningsToday !== undefined ? `${data.earningsToday.toLocaleString('vi-VN')} đ` : '--'}</Text>
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
               <Text style={styles.heroStatLabel}>Chuyến</Text>
@@ -203,8 +179,7 @@ export default function DashboardScreen() {
             <Text style={styles.sectionSub}>Tối ưu thu nhập</Text>
           </View>
           <Text style={styles.bodyText}>
-            Tập trung các tuyến trung tâm, ưu tiên đón khách tại tòa nhà văn phòng để tăng
-            số chuyến và thời gian chờ thấp.
+            Tập trung các tuyến trung tâm, ưu tiên đón khách tại tòa nhà văn phòng để tăng số chuyến và thời gian chờ thấp.
           </Text>
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.ghostButton}>
@@ -227,10 +202,9 @@ export default function DashboardScreen() {
                 } catch (err: any) {
                   Alert.alert('Không thể cập nhật trạng thái', err?.message ?? 'Đã có lỗi xảy ra');
                 }
-              }}>
-              <Text style={styles.primaryText}>
-                {onlineSending ? 'Đang cập nhật...' : isOnline ? 'Tắt nhận chuyến' : 'Bật nhận chuyến'}
-              </Text>
+              }}
+            >
+              <Text style={styles.primaryText}>{onlineSending ? 'Đang cập nhật...' : isOnline ? 'Tắt nhận chuyến' : 'Bật nhận chuyến'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -242,28 +216,28 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: palette.background,
+    backgroundColor: palette.background
   },
   container: {
     padding: 20,
     paddingBottom: 32,
-    gap: 16,
+    gap: 16
   },
   errorCard: {
     backgroundColor: '#FFF1F1',
     borderColor: '#FECACA',
     borderWidth: 1,
     borderRadius: 12,
-    padding: 12,
+    padding: 12
   },
   errorText: {
     color: '#B91C1C',
-    fontSize: 12,
+    fontSize: 12
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 12
   },
   avatar: {
     width: 52,
@@ -273,31 +247,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.border
   },
   avatarText: {
     fontWeight: '700',
     color: palette.redDark,
-    fontSize: 16,
+    fontSize: 16
   },
   headerInfo: {
-    flex: 1,
+    flex: 1
   },
   greeting: {
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   name: {
     fontSize: 20,
     fontWeight: '700',
     color: palette.text,
-    marginTop: 2,
+    marginTop: 2
   },
   headerMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 6,
+    marginTop: 6
   },
   ratingBadge: {
     flexDirection: 'row',
@@ -306,51 +280,51 @@ const styles = StyleSheet.create({
     backgroundColor: palette.redSoft,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: 999
   },
   ratingValue: {
     fontWeight: '700',
     color: palette.redDark,
-    fontSize: 12,
+    fontSize: 12
   },
   ratingLabel: {
     color: palette.redDark,
-    fontSize: 11,
+    fontSize: 11
   },
   vehicle: {
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   statusPill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 999,
+    borderRadius: 999
   },
   statusOnline: {
-    backgroundColor: palette.redSoft,
+    backgroundColor: palette.redSoft
   },
   statusOffline: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F5F5F5'
   },
   statusPending: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#FEF3C7'
   },
   statusText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.5
   },
   statusOnlineText: {
-    color: palette.redDark,
+    color: palette.redDark
   },
   statusOfflineText: {
-    color: palette.muted,
+    color: palette.muted
   },
   heroCard: {
     backgroundColor: palette.red,
     borderRadius: 24,
     padding: 18,
-    overflow: 'hidden',
+    overflow: 'hidden'
   },
   heroGlow: {
     position: 'absolute',
@@ -359,72 +333,72 @@ const styles = StyleSheet.create({
     borderRadius: 110,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
     top: -80,
-    right: -60,
+    right: -60
   },
   heroHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   heroTitle: {
     color: '#FFE7DE',
     fontSize: 12,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1
   },
   heroChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: 999
   },
   heroChipText: {
     color: '#fff',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   heroValue: {
     color: '#fff',
     fontSize: 30,
     fontWeight: '700',
-    marginTop: 10,
+    marginTop: 10
   },
   heroStats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 14,
+    marginTop: 14
   },
   heroStat: {
-    flex: 1,
+    flex: 1
   },
   heroStatLabel: {
     color: '#FFE7DE',
-    fontSize: 12,
+    fontSize: 12
   },
   heroStatValue: {
     color: '#fff',
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: 4
   },
   heroFooter: {
     marginTop: 16,
-    gap: 10,
+    gap: 10
   },
   heroHint: {
     color: '#FFE7DE',
-    fontSize: 12,
+    fontSize: 12
   },
   heroButton: {
     alignSelf: 'flex-start',
     backgroundColor: '#fff',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 999,
+    borderRadius: 999
   },
   heroButtonText: {
     color: palette.redDark,
     fontWeight: '700',
-    fontSize: 12,
+    fontSize: 12
   },
   sectionCard: {
     backgroundColor: palette.card,
@@ -436,49 +410,49 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
+    elevation: 2
   },
   sectionHeader: {
-    marginBottom: 12,
+    marginBottom: 12
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: palette.text,
+    color: palette.text
   },
   sectionSub: {
     color: palette.muted,
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 4
   },
   statsGrid: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 12
   },
   statItem: {
     flex: 1,
     backgroundColor: palette.redSoft,
     borderRadius: 14,
-    padding: 12,
+    padding: 12
   },
   statLabel: {
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   statValue: {
     color: palette.text,
     fontSize: 20,
     fontWeight: '700',
-    marginTop: 6,
+    marginTop: 6
   },
   statHint: {
     color: palette.muted,
     fontSize: 11,
-    marginTop: 6,
+    marginTop: 6
   },
   hotRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 12
   },
   hotBox: {
     flex: 1,
@@ -486,25 +460,25 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: palette.border,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff'
   },
   hotLabel: {
     color: palette.muted,
-    fontSize: 12,
+    fontSize: 12
   },
   hotValue: {
     color: palette.text,
     fontWeight: '600',
-    marginTop: 6,
+    marginTop: 6
   },
   bodyText: {
     color: palette.text,
-    lineHeight: 20,
+    lineHeight: 20
   },
   actionRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 16,
+    marginTop: 16
   },
   ghostButton: {
     flex: 1,
@@ -512,21 +486,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: palette.border,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   ghostText: {
     color: palette.redDark,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   primaryButton: {
     flex: 1,
     paddingVertical: 10,
     borderRadius: 12,
     backgroundColor: palette.red,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   primaryText: {
     color: '#fff',
-    fontWeight: '700',
-  },
+    fontWeight: '700'
+  }
 });

@@ -1,4 +1,4 @@
-const pool = require("../db/pool");
+const pool = require('../db/pool');
 
 async function getByKey({ routeKey, userId, idempotencyKey }) {
   const result = await pool.query(
@@ -14,12 +14,7 @@ async function getByKey({ routeKey, userId, idempotencyKey }) {
   return result.rows[0] || null;
 }
 
-async function createKey({
-  routeKey,
-  userId,
-  idempotencyKey,
-  requestHash
-}) {
+async function createKey({ routeKey, userId, idempotencyKey, requestHash }) {
   const result = await pool.query(
     `
       INSERT INTO idempotency_keys (
@@ -39,14 +34,7 @@ async function createKey({
   return result.rows[0];
 }
 
-async function setResponse({
-  routeKey,
-  userId,
-  idempotencyKey,
-  responseStatus,
-  responseHeaders,
-  responseBody
-}) {
+async function setResponse({ routeKey, userId, idempotencyKey, responseStatus, responseHeaders, responseBody }) {
   await pool.query(
     `
       UPDATE idempotency_keys
@@ -58,14 +46,7 @@ async function setResponse({
         AND user_id = $2
         AND idem_key = $3
     `,
-    [
-      routeKey,
-      userId,
-      idempotencyKey,
-      responseStatus,
-      responseHeaders,
-      responseBody
-    ]
+    [routeKey, userId, idempotencyKey, responseStatus, responseHeaders, responseBody]
   );
 }
 

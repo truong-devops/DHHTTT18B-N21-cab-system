@@ -63,9 +63,9 @@ async function refreshAccessToken() {
       const res = await fetch(`${API_BASE_URL}/v1/auth/refresh`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify({ refreshToken })
       });
       const json = await parseResponseBody(res);
       if (!res.ok) {
@@ -101,16 +101,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
 }
 
 export async function apiRequest<T>(options: RequestOptions): Promise<T> {
-  const {
-    method = 'GET',
-    path,
-    params,
-    body,
-    headers = {},
-    auth = true,
-    retryAuth = true,
-    timeoutMs = 30000,
-  } = options;
+  const { method = 'GET', path, params, body, headers = {}, auth = true, retryAuth = true, timeoutMs = 30000 } = options;
 
   const url = buildUrl(path, params);
   const start = Date.now();
@@ -118,7 +109,7 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache',
     Pragma: 'no-cache',
-    ...headers,
+    ...headers
   };
 
   if (auth) {
@@ -134,9 +125,9 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
       method,
       headers: requestHeaders,
       body: body ? JSON.stringify(body) : undefined,
-      cache: 'no-store',
+      cache: 'no-store'
     },
-    timeoutMs,
+    timeoutMs
   );
 
   const durationMs = Date.now() - start;
@@ -160,7 +151,7 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
       code: payload?.error?.code || payload?.code,
       message: payload?.error?.message || payload?.message || res.statusText,
       details: payload?.error?.details || payload?.details,
-      raw: payload,
+      raw: payload
     };
 
     addLog({
@@ -171,7 +162,7 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
       status: res.status,
       durationMs,
       requestId: requestId ?? undefined,
-      error: error.message,
+      error: error.message
     });
 
     if (__DEV__) {
@@ -189,7 +180,7 @@ export async function apiRequest<T>(options: RequestOptions): Promise<T> {
     url,
     status: res.status,
     durationMs,
-    requestId: requestId ?? undefined,
+    requestId: requestId ?? undefined
   });
 
   if (__DEV__) {

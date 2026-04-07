@@ -1,7 +1,7 @@
-const fs = require("fs");
-const path = require("path");
-const { Pool } = require("pg");
-const config = require("../config");
+const fs = require('fs');
+const path = require('path');
+const { Pool } = require('pg');
+const config = require('../config');
 
 const pool = new Pool({
   connectionString: config.db.connectionString,
@@ -32,16 +32,16 @@ function extractUpSql(raw) {
     }
   }
 
-  return out.join("\n").trim();
+  return out.join('\n').trim();
 }
 
 function migrationVersion(filename) {
-  const match = String(filename || "").match(/^(\d+)/);
+  const match = String(filename || '').match(/^(\d+)/);
   return match ? match[1] : null;
 }
 
 async function runMigrations() {
-  const migrationsDir = path.resolve(__dirname, "..", "..", "migrations");
+  const migrationsDir = path.resolve(__dirname, '..', '..', 'migrations');
   if (!fs.existsSync(migrationsDir)) {
     return;
   }
@@ -58,7 +58,7 @@ async function runMigrations() {
     .filter((file) => /^\d+.*\.sql$/.test(file))
     .sort();
 
-  const existing = await pool.query("SELECT version FROM schema_migrations");
+  const existing = await pool.query('SELECT version FROM schema_migrations');
   const applied = new Set(existing.rows.map((row) => row.version));
 
   for (const file of files) {
@@ -67,23 +67,18 @@ async function runMigrations() {
       continue;
     }
 
-    const sql = extractUpSql(
-      fs.readFileSync(path.join(migrationsDir, file), "utf8")
-    );
+    const sql = extractUpSql(fs.readFileSync(path.join(migrationsDir, file), 'utf8'));
     if (!sql) {
       continue;
     }
 
-    await pool.query("BEGIN");
+    await pool.query('BEGIN');
     try {
       await pool.query(sql);
-      await pool.query(
-        "INSERT INTO schema_migrations (version) VALUES ($1)",
-        [version]
-      );
-      await pool.query("COMMIT");
+      await pool.query('INSERT INTO schema_migrations (version) VALUES ($1)', [version]);
+      await pool.query('COMMIT');
     } catch (error) {
-      await pool.query("ROLLBACK");
+      await pool.query('ROLLBACK');
       throw error;
     }
   }
@@ -96,12 +91,12 @@ async function initDb() {
 async function withTransaction(work) {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
     const result = await work(client);
-    await client.query("COMMIT");
+    await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();

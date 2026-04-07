@@ -1,6 +1,6 @@
 function requestLogger(req, res, next) {
   const start = process.hrtime.bigint();
-  res.on("finish", () => {
+  res.on('finish', () => {
     const end = process.hrtime.bigint();
     const latencyMs = Number(end - start) / 1e6;
     const message = {

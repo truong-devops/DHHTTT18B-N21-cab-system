@@ -57,7 +57,7 @@ export interface ErrorResponse {
 }
 
 export interface paths {
-  "/v1/rides": {
+  '/v1/rides': {
     get: {
       parameters: {
         query?: {
@@ -65,13 +65,13 @@ export interface paths {
           riderId?: string;
           limit?: number;
           cursor?: string;
-          sort?: "-createdAt" | "createdAt";
+          sort?: '-createdAt' | 'createdAt';
         };
       };
       responses: {
         200: {
           content: {
-            "application/json": RideListResponse;
+            'application/json': RideListResponse;
           };
         };
       };
@@ -79,24 +79,24 @@ export interface paths {
     post: {
       parameters: {
         header?: {
-          "Idempotency-Key": string;
+          'Idempotency-Key': string;
         };
       };
       requestBody: {
         content: {
-          "application/json": CreateRideRequest;
+          'application/json': CreateRideRequest;
         };
       };
       responses: {
         201: {
           content: {
-            "application/json": RideResponse;
+            'application/json': RideResponse;
           };
         };
       };
     };
   };
-  "/v1/rides/{id}": {
+  '/v1/rides/{id}': {
     get: {
       parameters: {
         path: {
@@ -106,7 +106,7 @@ export interface paths {
       responses: {
         200: {
           content: {
-            "application/json": RideResponse;
+            'application/json': RideResponse;
           };
         };
       };
@@ -119,13 +119,13 @@ export interface paths {
       };
       requestBody: {
         content: {
-          "application/json": UpdateRideRequest;
+          'application/json': UpdateRideRequest;
         };
       };
       responses: {
         200: {
           content: {
-            "application/json": RideResponse;
+            'application/json': RideResponse;
           };
         };
       };
@@ -139,7 +139,7 @@ export interface paths {
       responses: {
         200: {
           content: {
-            "application/json": RideResponse;
+            'application/json': RideResponse;
           };
         };
       };

@@ -3,147 +3,161 @@
 This inventory is derived from code in the repository (routes/controllers/middleware) and the generated OpenAPI specs in `docs/openapi/*.openapi.yaml`. No endpoints were inferred from external docs.
 
 ## Services Discovered
-| Service | Location | Framework | Base Paths |
-|---|---|---|---|
-| api-gateway | `services/api-gateway` | Express | `/health`, `/healthz`, `/readyz`, `/v1/{domain}` |
-| auth-service | `services/auth-service` | Express | `/auth/*` |
-| booking-service | `services/booking-service` | Express | `/v1/bookings/*`, `/demo/ride-created` |
-| driver-service | `services/driver-service` | Express | `/v1/driver/*`, `/v1/admin/*`, `/v1/internal/*` |
-| eta-service | `services/eta-service` | Express | `/v1/eta/*` |
-| notification-service | `services/notification-service` | Express | `/v1/notifications/*`, `/v1/users/*` |
-| payment-service | `services/payment-service` | Express | `/v1/payments/*` |
-| pricing-service | `services/pricing-service` | Express | `/v1/pricing/*` |
-| review-service | `services/review-service` | Express | `/v1/reviews/*` |
-| ride-service | `services/ride-service` | Express | `/v1/rides/*` |
-| user-service | `services/user-service` | Express | `/v1/users/*`, `/internal/users/*` |
+
+| Service              | Location                        | Framework | Base Paths                                       |
+| -------------------- | ------------------------------- | --------- | ------------------------------------------------ |
+| api-gateway          | `services/api-gateway`          | Express   | `/health`, `/healthz`, `/readyz`, `/v1/{domain}` |
+| auth-service         | `services/auth-service`         | Express   | `/auth/*`                                        |
+| booking-service      | `services/booking-service`      | Express   | `/v1/bookings/*`, `/demo/ride-created`           |
+| driver-service       | `services/driver-service`       | Express   | `/v1/driver/*`, `/v1/admin/*`, `/v1/internal/*`  |
+| eta-service          | `services/eta-service`          | Express   | `/v1/eta/*`                                      |
+| notification-service | `services/notification-service` | Express   | `/v1/notifications/*`, `/v1/users/*`             |
+| payment-service      | `services/payment-service`      | Express   | `/v1/payments/*`                                 |
+| pricing-service      | `services/pricing-service`      | Express   | `/v1/pricing/*`                                  |
+| review-service       | `services/review-service`       | Express   | `/v1/reviews/*`                                  |
+| ride-service         | `services/ride-service`         | Express   | `/v1/rides/*`                                    |
+| user-service         | `services/user-service`         | Express   | `/v1/users/*`, `/internal/users/*`               |
 
 ## Gateway Domain Mapping
-| Gateway Domain | Upstream Service | Upstream Base | Notes |
-|---|---|---|---|
-| auth | auth-service | `http://localhost:4001/auth` | `DOMAIN_PREFIX_MAP` rewrites `/v1/auth/*` → `/auth/*` |
-| bookings | booking-service | `http://localhost:3003` | Pass-through |
-| driver / drivers / admin / internal | driver-service | `http://localhost:3003` | Pass-through |
-| eta | eta-service | `http://localhost:3012` | Pass-through |
-| notifications | notification-service | `http://localhost:3010` | `/v1/notifications/users/*` rewrites to `/v1/users/*` |
-| payments | payment-service | `http://localhost:3007` | Pass-through |
-| pricing | pricing-service | `http://localhost:3006` | Pass-through |
-| reviews | review-service | `http://localhost:3009` | Pass-through |
-| rides | ride-service | `http://localhost:3005` | Pass-through |
-| users | user-service | `http://localhost:4004` | Pass-through (internal endpoints not reachable via gateway) |
+
+| Gateway Domain                      | Upstream Service     | Upstream Base                | Notes                                                       |
+| ----------------------------------- | -------------------- | ---------------------------- | ----------------------------------------------------------- |
+| auth                                | auth-service         | `http://localhost:4001/auth` | `DOMAIN_PREFIX_MAP` rewrites `/v1/auth/*` → `/auth/*`       |
+| bookings                            | booking-service      | `http://localhost:3003`      | Pass-through                                                |
+| driver / drivers / admin / internal | driver-service       | `http://localhost:3003`      | Pass-through                                                |
+| eta                                 | eta-service          | `http://localhost:3012`      | Pass-through                                                |
+| notifications                       | notification-service | `http://localhost:3010`      | `/v1/notifications/users/*` rewrites to `/v1/users/*`       |
+| payments                            | payment-service      | `http://localhost:3007`      | Pass-through                                                |
+| pricing                             | pricing-service      | `http://localhost:3006`      | Pass-through                                                |
+| reviews                             | review-service       | `http://localhost:3009`      | Pass-through                                                |
+| rides                               | ride-service         | `http://localhost:3005`      | Pass-through                                                |
+| users                               | user-service         | `http://localhost:4004`      | Pass-through (internal endpoints not reachable via gateway) |
 
 ## Endpoint Inventory (Service → Endpoint → Auth → Models)
 
 ### api-gateway
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| GET | `/health` | Public | — | `{ ok: boolean }` |
-| GET | `/healthz` | Public | — | `{ ok: boolean }` |
-| GET | `/readyz` | Public | — | `{ ok: boolean }` |
-| GET/POST/PUT/PATCH/DELETE | `/v1/{domain}` | Bearer JWT (except public domains) | Pass-through | Pass-through (upstream) |
-| GET/POST/PUT/PATCH/DELETE | `/v1/{domain}/{path}` | Bearer JWT (except public domains) | Pass-through | Pass-through (upstream) |
+
+| Method                    | Path                  | Auth                               | Request Model | Response Model          |
+| ------------------------- | --------------------- | ---------------------------------- | ------------- | ----------------------- |
+| GET                       | `/health`             | Public                             | —             | `{ ok: boolean }`       |
+| GET                       | `/healthz`            | Public                             | —             | `{ ok: boolean }`       |
+| GET                       | `/readyz`             | Public                             | —             | `{ ok: boolean }`       |
+| GET/POST/PUT/PATCH/DELETE | `/v1/{domain}`        | Bearer JWT (except public domains) | Pass-through  | Pass-through (upstream) |
+| GET/POST/PUT/PATCH/DELETE | `/v1/{domain}/{path}` | Bearer JWT (except public domains) | Pass-through  | Pass-through (upstream) |
 
 ### auth-service
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| POST | `/auth/register` | Public | inline (email/password/role) | `{ data: AuthUser, tokens: AuthTokens }` |
-| POST | `/auth/login` | Public | inline (identifier/password) | `{ data: AuthUser, tokens: AuthTokens }` |
-| POST | `/auth/refresh` | Bearer or refresh token | inline (refreshToken) | `{ tokens: AuthTokens }` |
-| POST | `/auth/logout` | Bearer | inline (refreshToken) | `{ ok: true }` |
-| POST | `/auth/verify` | Bearer | — | `{ data: AuthUser }` |
+
+| Method | Path             | Auth                    | Request Model                | Response Model                           |
+| ------ | ---------------- | ----------------------- | ---------------------------- | ---------------------------------------- |
+| POST   | `/auth/register` | Public                  | inline (email/password/role) | `{ data: AuthUser, tokens: AuthTokens }` |
+| POST   | `/auth/login`    | Public                  | inline (identifier/password) | `{ data: AuthUser, tokens: AuthTokens }` |
+| POST   | `/auth/refresh`  | Bearer or refresh token | inline (refreshToken)        | `{ tokens: AuthTokens }`                 |
+| POST   | `/auth/logout`   | Bearer                  | inline (refreshToken)        | `{ ok: true }`                           |
+| POST   | `/auth/verify`   | Bearer                  | —                            | `{ data: AuthUser }`                     |
 
 ### booking-service
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| GET | `/v1/bookings` | Bearer | query `user_id` (optional) | `{ data: Booking[] }` |
-| POST | `/v1/bookings` | Bearer | inline `{ pickup, drop/dropoff, distance_km, traffic_level, vehicleType }` + optional `Idempotency-Key` | `{ booking: Booking, publishedEvent, additionalEvents[] }` |
-| GET | `/v1/bookings/{id}` | Bearer | — | `{ data: Booking }` |
-| POST | `/v1/bookings/{id}/cancel` | Bearer | — | `{ booking: Booking, publishedEvent: PublishedEvent }` |
-| POST | `/demo/ride-created` | Internal demo | — | `{ ok: true }` |
+
+| Method | Path                       | Auth          | Request Model                                                                                           | Response Model                                             |
+| ------ | -------------------------- | ------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| GET    | `/v1/bookings`             | Bearer        | query `user_id` (optional)                                                                              | `{ data: Booking[] }`                                      |
+| POST   | `/v1/bookings`             | Bearer        | inline `{ pickup, drop/dropoff, distance_km, traffic_level, vehicleType }` + optional `Idempotency-Key` | `{ booking: Booking, publishedEvent, additionalEvents[] }` |
+| GET    | `/v1/bookings/{id}`        | Bearer        | —                                                                                                       | `{ data: Booking }`                                        |
+| POST   | `/v1/bookings/{id}/cancel` | Bearer        | —                                                                                                       | `{ booking: Booking, publishedEvent: PublishedEvent }`     |
+| POST   | `/demo/ride-created`       | Internal demo | —                                                                                                       | `{ ok: true }`                                             |
 
 ### eta-service
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| POST | `/v1/eta/estimate` | Bearer (via gateway) / direct internal | `{ pickup/drop }` or `{ distance_km }` | `{ data: { distance_km, traffic_level, eta_minutes } }` |
+
+| Method | Path               | Auth                                   | Request Model                          | Response Model                                          |
+| ------ | ------------------ | -------------------------------------- | -------------------------------------- | ------------------------------------------------------- |
+| POST   | `/v1/eta/estimate` | Bearer (via gateway) / direct internal | `{ pickup/drop }` or `{ distance_km }` | `{ data: { distance_km, traffic_level, eta_minutes } }` |
 
 ### driver-service
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| GET | `/v1/driver/me` | Bearer | — | `{ data: DriverProfile }` |
-| PUT | `/v1/driver/me` | Bearer | DriverUpdateRequest | `{ data: DriverProfile }` |
-| PUT | `/v1/driver/me/vehicle` | Bearer | VehicleUpdateRequest | `{ data: VehicleResponse }` |
-| POST | `/v1/driver/me/online` | Bearer | — | `{ data: DriverProfile }` |
-| POST | `/v1/driver/me/offline` | Bearer | — | `{ data: DriverProfile }` |
-| POST | `/v1/driver/me/location` | Bearer | LocationUpdateRequest | `{ ok: true }` |
-| POST | `/v1/driver/me/heartbeat` | Bearer | — | `{ ok: true }` |
-| POST | `/v1/admin/drivers` | Bearer (admin) | AdminCreateDriverRequest | `{ data: { driver, created } }` |
-| GET | `/v1/admin/drivers` | Bearer (admin) | — | `{ data: { items, page, limit } }` |
-| PATCH | `/v1/admin/drivers/{driverId}/approve` | Bearer (admin) | — | `{ data: { driver } }` |
-| PATCH | `/v1/admin/drivers/{driverId}/suspend` | Bearer (admin) | — | `{ data: { driver } }` |
-| GET | `/v1/internal/drivers/available` | Internal | query: pickupLat/pickupLng/limit | `{ data: AvailableDriver[] }` |
-| GET | `/v1/internal/drivers/{driverId}` | Internal | — | `{ data: { driver, vehicle } }` |
-| GET | `/v1/internal/drivers/{driverId}/location` | Internal | — | `{ data: { location } }` |
-| POST | `/v1/internal/drivers/{driverId}/mark-busy` | Internal | `{ rideId }` | `{ data: { driver, rideId } }` |
-| POST | `/v1/internal/drivers/{driverId}/mark-available` | Internal | — | `{ data: { driver } }` |
-| POST | `/v1/internal/drivers/bulk` | Internal | `{ ids }` | `{ data: items[] }` |
+
+| Method | Path                                             | Auth           | Request Model                    | Response Model                     |
+| ------ | ------------------------------------------------ | -------------- | -------------------------------- | ---------------------------------- |
+| GET    | `/v1/driver/me`                                  | Bearer         | —                                | `{ data: DriverProfile }`          |
+| PUT    | `/v1/driver/me`                                  | Bearer         | DriverUpdateRequest              | `{ data: DriverProfile }`          |
+| PUT    | `/v1/driver/me/vehicle`                          | Bearer         | VehicleUpdateRequest             | `{ data: VehicleResponse }`        |
+| POST   | `/v1/driver/me/online`                           | Bearer         | —                                | `{ data: DriverProfile }`          |
+| POST   | `/v1/driver/me/offline`                          | Bearer         | —                                | `{ data: DriverProfile }`          |
+| POST   | `/v1/driver/me/location`                         | Bearer         | LocationUpdateRequest            | `{ ok: true }`                     |
+| POST   | `/v1/driver/me/heartbeat`                        | Bearer         | —                                | `{ ok: true }`                     |
+| POST   | `/v1/admin/drivers`                              | Bearer (admin) | AdminCreateDriverRequest         | `{ data: { driver, created } }`    |
+| GET    | `/v1/admin/drivers`                              | Bearer (admin) | —                                | `{ data: { items, page, limit } }` |
+| PATCH  | `/v1/admin/drivers/{driverId}/approve`           | Bearer (admin) | —                                | `{ data: { driver } }`             |
+| PATCH  | `/v1/admin/drivers/{driverId}/suspend`           | Bearer (admin) | —                                | `{ data: { driver } }`             |
+| GET    | `/v1/internal/drivers/available`                 | Internal       | query: pickupLat/pickupLng/limit | `{ data: AvailableDriver[] }`      |
+| GET    | `/v1/internal/drivers/{driverId}`                | Internal       | —                                | `{ data: { driver, vehicle } }`    |
+| GET    | `/v1/internal/drivers/{driverId}/location`       | Internal       | —                                | `{ data: { location } }`           |
+| POST   | `/v1/internal/drivers/{driverId}/mark-busy`      | Internal       | `{ rideId }`                     | `{ data: { driver, rideId } }`     |
+| POST   | `/v1/internal/drivers/{driverId}/mark-available` | Internal       | —                                | `{ data: { driver } }`             |
+| POST   | `/v1/internal/drivers/bulk`                      | Internal       | `{ ids }`                        | `{ data: items[] }`                |
 
 ### notification-service
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| POST | `/v1/notifications` | Bearer | NotificationCreateRequest | NotificationCreateResponse |
-| POST | `/v1/notifications/batch` | Bearer | NotificationBatchRequest | `{ results[] }` |
-| GET | `/v1/notifications/{id}` | Bearer | — | NotificationResponse |
-| POST | `/v1/notifications/{id}/retry` | Bearer | — | NotificationResponse |
-| PATCH | `/v1/notifications/{id}/cancel` | Bearer | — | NotificationResponse |
-| GET | `/v1/users/{userId}/notifications` | Bearer | query filters | NotificationListResponse |
-| GET | `/v1/users/{userId}/preferences` | Bearer | — | PreferencesResponse |
-| PUT | `/v1/users/{userId}/preferences` | Bearer | `{ channels }` | PreferencesResponse |
+
+| Method | Path                               | Auth   | Request Model             | Response Model             |
+| ------ | ---------------------------------- | ------ | ------------------------- | -------------------------- |
+| POST   | `/v1/notifications`                | Bearer | NotificationCreateRequest | NotificationCreateResponse |
+| POST   | `/v1/notifications/batch`          | Bearer | NotificationBatchRequest  | `{ results[] }`            |
+| GET    | `/v1/notifications/{id}`           | Bearer | —                         | NotificationResponse       |
+| POST   | `/v1/notifications/{id}/retry`     | Bearer | —                         | NotificationResponse       |
+| PATCH  | `/v1/notifications/{id}/cancel`    | Bearer | —                         | NotificationResponse       |
+| GET    | `/v1/users/{userId}/notifications` | Bearer | query filters             | NotificationListResponse   |
+| GET    | `/v1/users/{userId}/preferences`   | Bearer | —                         | PreferencesResponse        |
+| PUT    | `/v1/users/{userId}/preferences`   | Bearer | `{ channels }`            | PreferencesResponse        |
 
 ### payment-service
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| GET | `/v1/payments` | Bearer | query filters | `{ data[], nextCursor }` |
-| POST | `/v1/payments` | Bearer | PaymentCreateRequest | `{ data: Payment }` |
-| GET | `/v1/payments/{id}` | Bearer | — | `{ data: Payment }` |
-| PATCH | `/v1/payments/{id}` | Bearer | PaymentUpdateRequest | `{ data: Payment }` |
-| GET | `/v1/payments/{id}/vietqr-codes` | Bearer | — | VietQRResponse |
+
+| Method | Path                             | Auth   | Request Model        | Response Model           |
+| ------ | -------------------------------- | ------ | -------------------- | ------------------------ |
+| GET    | `/v1/payments`                   | Bearer | query filters        | `{ data[], nextCursor }` |
+| POST   | `/v1/payments`                   | Bearer | PaymentCreateRequest | `{ data: Payment }`      |
+| GET    | `/v1/payments/{id}`              | Bearer | —                    | `{ data: Payment }`      |
+| PATCH  | `/v1/payments/{id}`              | Bearer | PaymentUpdateRequest | `{ data: Payment }`      |
+| GET    | `/v1/payments/{id}/vietqr-codes` | Bearer | —                    | VietQRResponse           |
 
 ### pricing-service
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| POST | `/v1/pricing/quotes` | Bearer | QuoteRequest | QuoteResponse |
-| GET | `/v1/pricing/quotes/{quoteId}` | Bearer | — | QuoteResponse |
-| POST | `/v1/pricing/finalize` | Bearer | QuoteFinalizeRequest | QuoteFinalizeResponse |
+
+| Method | Path                           | Auth   | Request Model        | Response Model        |
+| ------ | ------------------------------ | ------ | -------------------- | --------------------- |
+| POST   | `/v1/pricing/quotes`           | Bearer | QuoteRequest         | QuoteResponse         |
+| GET    | `/v1/pricing/quotes/{quoteId}` | Bearer | —                    | QuoteResponse         |
+| POST   | `/v1/pricing/finalize`         | Bearer | QuoteFinalizeRequest | QuoteFinalizeResponse |
 
 ### review-service
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| GET | `/v1/reviews` | Bearer | query filters | `{ data[], nextCursor }` |
-| POST | `/v1/reviews` | Bearer | ReviewCreateRequest | `{ data: Review }` |
-| GET | `/v1/reviews/{id}` | Bearer | — | `{ data: Review }` |
-| PATCH | `/v1/reviews/{id}` | Bearer | ReviewUpdateRequest | `{ data: Review }` |
-| DELETE | `/v1/reviews/{id}` | Bearer | — | `{ data: Review }` |
+
+| Method | Path               | Auth   | Request Model       | Response Model           |
+| ------ | ------------------ | ------ | ------------------- | ------------------------ |
+| GET    | `/v1/reviews`      | Bearer | query filters       | `{ data[], nextCursor }` |
+| POST   | `/v1/reviews`      | Bearer | ReviewCreateRequest | `{ data: Review }`       |
+| GET    | `/v1/reviews/{id}` | Bearer | —                   | `{ data: Review }`       |
+| PATCH  | `/v1/reviews/{id}` | Bearer | ReviewUpdateRequest | `{ data: Review }`       |
+| DELETE | `/v1/reviews/{id}` | Bearer | —                   | `{ data: Review }`       |
 
 ### ride-service
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| GET | `/v1/rides` | Bearer | query filters | `{ data[], nextCursor }` |
-| POST | `/v1/rides` | Bearer | RideCreateRequest | `{ data: Ride }` |
-| GET | `/v1/rides/assignments` | Bearer | — | `{ data: Ride[] }` |
-| GET | `/v1/rides/{id}` | Bearer | — | `{ data: Ride }` |
-| PATCH | `/v1/rides/{id}` | Bearer | RideStatusUpdateRequest | `{ data: Ride }` |
+
+| Method | Path                    | Auth   | Request Model           | Response Model           |
+| ------ | ----------------------- | ------ | ----------------------- | ------------------------ |
+| GET    | `/v1/rides`             | Bearer | query filters           | `{ data[], nextCursor }` |
+| POST   | `/v1/rides`             | Bearer | RideCreateRequest       | `{ data: Ride }`         |
+| GET    | `/v1/rides/assignments` | Bearer | —                       | `{ data: Ride[] }`       |
+| GET    | `/v1/rides/{id}`        | Bearer | —                       | `{ data: Ride }`         |
+| PATCH  | `/v1/rides/{id}`        | Bearer | RideStatusUpdateRequest | `{ data: Ride }`         |
 
 ### user-service
-| Method | Path | Auth | Request Model | Response Model |
-|---|---|---|---|---|
-| POST | `/v1/users` | Bearer (gateway) or headers (direct) | UserCreateRequest | UserResponse |
-| GET | `/v1/users` | Bearer (gateway) or headers (direct) | query filters | UserListResponse |
-| GET | `/v1/users/{id}` | Bearer (gateway) or headers (direct) | — | UserResponse |
-| PATCH | `/v1/users/{id}` | Bearer (gateway) or headers (direct) | UserUpdateRequest | UserResponse |
-| DELETE | `/v1/users/{id}` | Bearer (gateway) or headers (direct) | — | UserResponse |
-| GET | `/internal/users/{id}` | x-internal-key | — | UserResponse |
-| GET | `/internal/users/by-email/{email}` | x-internal-key | — | UserResponse |
+
+| Method | Path                               | Auth                                 | Request Model     | Response Model   |
+| ------ | ---------------------------------- | ------------------------------------ | ----------------- | ---------------- |
+| POST   | `/v1/users`                        | Bearer (gateway) or headers (direct) | UserCreateRequest | UserResponse     |
+| GET    | `/v1/users`                        | Bearer (gateway) or headers (direct) | query filters     | UserListResponse |
+| GET    | `/v1/users/{id}`                   | Bearer (gateway) or headers (direct) | —                 | UserResponse     |
+| PATCH  | `/v1/users/{id}`                   | Bearer (gateway) or headers (direct) | UserUpdateRequest | UserResponse     |
+| DELETE | `/v1/users/{id}`                   | Bearer (gateway) or headers (direct) | —                 | UserResponse     |
+| GET    | `/internal/users/{id}`             | x-internal-key                       | —                 | UserResponse     |
+| GET    | `/internal/users/by-email/{email}` | x-internal-key                       | —                 | UserResponse     |
 
 ## Assumptions / Notes
+
 - `CAB-BOOKING-SYSTEM.docx` does not contain parseable endpoint definitions; all endpoints above are from code.
 - Gateway authentication uses JWT; user-service direct endpoints use `x-user-id`/`x-user-role` headers.
 - Internal endpoints are intended for service-to-service usage and not exposed through the gateway unless explicitly proxied.

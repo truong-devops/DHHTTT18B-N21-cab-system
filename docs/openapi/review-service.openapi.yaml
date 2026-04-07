@@ -54,7 +54,7 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             validation:
-              value: { error: { code: VALIDATION_ERROR, message: "Validation failed", details: ["headers.Idempotency-Key: is required"] } }
+              value: { error: { code: VALIDATION_ERROR, message: 'Validation failed', details: ['headers.Idempotency-Key: is required'] } }
     Error401:
       description: Unauthorized
       content:
@@ -62,7 +62,7 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             unauthorized:
-              value: { error: { code: UNAUTHORIZED, message: "Missing authorization token", details: [] } }
+              value: { error: { code: UNAUTHORIZED, message: 'Missing authorization token', details: [] } }
     Error403:
       description: Forbidden
       content:
@@ -70,7 +70,7 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             forbidden:
-              value: { error: { code: FORBIDDEN, message: "Forbidden", details: [] } }
+              value: { error: { code: FORBIDDEN, message: 'Forbidden', details: [] } }
     Error404:
       description: Not Found
       content:
@@ -78,7 +78,7 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             notFound:
-              value: { error: { code: NOT_FOUND, message: "Review not found", details: [] } }
+              value: { error: { code: NOT_FOUND, message: 'Review not found', details: [] } }
     Error409:
       description: Conflict
       content:
@@ -86,7 +86,7 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             conflict:
-              value: { error: { code: INVALID_STATE_TRANSITION, message: "Invalid transition from SUBMITTED to DELETED", details: [] } }
+              value: { error: { code: INVALID_STATE_TRANSITION, message: 'Invalid transition from SUBMITTED to DELETED', details: [] } }
     Error422:
       description: Unprocessable Entity
       content:
@@ -94,7 +94,7 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             unprocessable:
-              value: { error: { code: VALIDATION_ERROR, message: "Invalid payload", details: [] } }
+              value: { error: { code: VALIDATION_ERROR, message: 'Invalid payload', details: [] } }
     Error429:
       description: Too Many Requests
       content:
@@ -102,7 +102,7 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             rateLimit:
-              value: { error: { code: RATE_LIMITED, message: "Too many requests", details: [] } }
+              value: { error: { code: RATE_LIMITED, message: 'Too many requests', details: [] } }
     Error500:
       description: Internal Server Error
       content:
@@ -110,7 +110,7 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
           examples:
             internal:
-              value: { error: { code: INTERNAL, message: "Unexpected error", details: [] } }
+              value: { error: { code: INTERNAL, message: 'Unexpected error', details: [] } }
 paths:
   /health:
     get:
@@ -192,7 +192,7 @@ paths:
                 status: { type: string }
             examples:
               create:
-                value: { rideId: "ride_123", driverId: "driver_1", rating: 5, comment: "great" }
+                value: { rideId: 'ride_123', driverId: 'driver_1', rating: 5, comment: 'great' }
       responses:
         '201':
           description: Created
@@ -206,16 +206,16 @@ paths:
                 success:
                   value:
                     data:
-                      id: "b163986f-6cae-4fd5-a82e-ecce41039ba3"
-                      rideId: "ride_123"
-                      riderId: "user_1"
-                      driverId: "driver_1"
+                      id: 'b163986f-6cae-4fd5-a82e-ecce41039ba3'
+                      rideId: 'ride_123'
+                      riderId: 'user_1'
+                      driverId: 'driver_1'
                       rating: 5
-                      comment: "great"
-                      status: "submitted"
-                      statusUpdatedAt: "2026-01-29T20:55:26.358Z"
-                      createdAt: "2026-01-29T20:55:26.358Z"
-                      updatedAt: "2026-01-29T20:55:26.358Z"
+                      comment: 'great'
+                      status: 'submitted'
+                      statusUpdatedAt: '2026-01-29T20:55:26.358Z'
+                      createdAt: '2026-01-29T20:55:26.358Z'
+                      updatedAt: '2026-01-29T20:55:26.358Z'
         '200':
           description: OK (idempotent replay)
           content:
@@ -271,16 +271,16 @@ paths:
                 success:
                   value:
                     data:
-                      - id: "b163986f-6cae-4fd5-a82e-ecce41039ba3"
-                        rideId: "ride_123"
-                        riderId: "user_1"
-                        driverId: "driver_1"
+                      - id: 'b163986f-6cae-4fd5-a82e-ecce41039ba3'
+                        rideId: 'ride_123'
+                        riderId: 'user_1'
+                        driverId: 'driver_1'
                         rating: 5
-                        comment: "great"
-                        status: "submitted"
-                        statusUpdatedAt: "2026-01-29T20:55:26.358Z"
-                        createdAt: "2026-01-29T20:55:26.358Z"
-                        updatedAt: "2026-01-29T20:55:26.358Z"
+                        comment: 'great'
+                        status: 'submitted'
+                        statusUpdatedAt: '2026-01-29T20:55:26.358Z'
+                        createdAt: '2026-01-29T20:55:26.358Z'
+                        updatedAt: '2026-01-29T20:55:26.358Z'
                     nextCursor: null
         '201':
           description: Created (not used)
@@ -317,16 +317,16 @@ paths:
                 success:
                   value:
                     data:
-                      id: "b163986f-6cae-4fd5-a82e-ecce41039ba3"
-                      rideId: "ride_123"
-                      riderId: "user_1"
-                      driverId: "driver_1"
+                      id: 'b163986f-6cae-4fd5-a82e-ecce41039ba3'
+                      rideId: 'ride_123'
+                      riderId: 'user_1'
+                      driverId: 'driver_1'
                       rating: 5
-                      comment: "great"
-                      status: "submitted"
-                      statusUpdatedAt: "2026-01-29T20:55:26.358Z"
-                      createdAt: "2026-01-29T20:55:26.358Z"
-                      updatedAt: "2026-01-29T20:55:26.358Z"
+                      comment: 'great'
+                      status: 'submitted'
+                      statusUpdatedAt: '2026-01-29T20:55:26.358Z'
+                      createdAt: '2026-01-29T20:55:26.358Z'
+                      updatedAt: '2026-01-29T20:55:26.358Z'
         '204':
           description: No Content (not used)
         '400': { $ref: '#/components/responses/Error400' }
@@ -360,7 +360,7 @@ paths:
                 statusReason: { type: string }
             examples:
               update:
-                value: { rating: 4, comment: "updated", status: "submitted" }
+                value: { rating: 4, comment: 'updated', status: 'submitted' }
       responses:
         '200':
           description: OK
@@ -374,10 +374,10 @@ paths:
                 success:
                   value:
                     data:
-                      id: "b163986f-6cae-4fd5-a82e-ecce41039ba3"
+                      id: 'b163986f-6cae-4fd5-a82e-ecce41039ba3'
                       rating: 4
-                      comment: "updated"
-                      status: "submitted"
+                      comment: 'updated'
+                      status: 'submitted'
         '204':
           description: No Content (not used)
         '400': { $ref: '#/components/responses/Error400' }
@@ -411,8 +411,8 @@ paths:
                 success:
                   value:
                     data:
-                      id: "b163986f-6cae-4fd5-a82e-ecce41039ba3"
-                      status: "deleted"
+                      id: 'b163986f-6cae-4fd5-a82e-ecce41039ba3'
+                      status: 'deleted'
         '204':
           description: No Content (not used)
         '400': { $ref: '#/components/responses/Error400' }

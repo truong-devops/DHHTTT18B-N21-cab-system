@@ -1,4 +1,4 @@
-const { createServiceMetrics, toOutcomeFromStatus } = require("./metrics");
+const { createServiceMetrics, toOutcomeFromStatus } = require('./metrics');
 
 module.exports = {
   createServiceMetrics,

@@ -1,11 +1,13 @@
-import Button from '../../common/Button.jsx'
-import Input from '../../common/Input.jsx'
-import Select from '../../common/Select.jsx'
-
-function SurgeRuleForm({ onSubmit }) {
-  return (
-    <div className="card">
-      <div className="card-header">
+import Button from '../../common/Button.jsx';
+
+import Input from '../../common/Input.jsx';
+
+import Select from '../../common/Select.jsx';
+
+function SurgeRuleForm({ onSubmit }) {
+  return (
+    <div className="card">
+      <div className="card-header">
         <h3 className="card-title">Tạo quy tắc tăng giá</h3>
       </div>
       <div className="grid grid-2">
@@ -22,8 +24,8 @@ function SurgeRuleForm({ onSubmit }) {
           Lưu quy tắc
         </Button>
       </div>
-    </div>
-  )
-}
-
-export default SurgeRuleForm
+    </div>
+  );
+}
+
+export default SurgeRuleForm;

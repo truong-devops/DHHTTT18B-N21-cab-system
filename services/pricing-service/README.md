@@ -4,6 +4,7 @@ Internal pricing service for fare quotes.
 Contract: /contracts/openapi/pricing-service.yaml
 
 ## Routes (via API Gateway)
+
 - POST /v1/pricing/quotes
 - GET /v1/pricing/quotes/{quoteId}
 - POST /v1/pricing/finalize
@@ -11,6 +12,7 @@ Contract: /contracts/openapi/pricing-service.yaml
 Note: This service is internal. Do not expose a public port. Route traffic through api-gateway.
 
 ## Environment
+
 - PORT (default: 3006)
 - REDIS_URL (default: redis://localhost:6379)
 - JWT_SECRET (required if validating bearer tokens)
@@ -22,6 +24,7 @@ Note: This service is internal. Do not expose a public port. Route traffic throu
 - COUPON_DISCOUNTS_JSON (optional coupon map)
 
 Example overrides:
+
 - RATES_JSON='{"STANDARD":{"currency":"VND","baseFare":12000,"perKmRate":5000,"perMinRate":500,"surgeMultiplier":1.0,"averageSpeedKmh":25}}'
 - COUPON_DISCOUNTS_JSON='{"WELCOME10":10000}'
 
@@ -34,5 +37,6 @@ JWT_SECRET=dev-secret REDIS_URL=redis://localhost:6379 node src/server.js
 ```
 
 Health endpoints:
+
 - GET /health
 - GET /ready (checks Redis)

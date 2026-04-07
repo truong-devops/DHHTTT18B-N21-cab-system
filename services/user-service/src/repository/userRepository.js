@@ -1,4 +1,4 @@
-const pool = require("../db/pool");
+const pool = require('../db/pool');
 
 function mapUserRow(row) {
   if (!row) {
@@ -26,13 +26,7 @@ async function createUser(client, data) {
     `INSERT INTO users (email, full_name, phone, role, status)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING id, email, full_name, phone, role, status, created_at, updated_at`,
-    [
-      data.email,
-      data.fullName,
-      data.phone,
-      data.role,
-      data.status
-    ]
+    [data.email, data.fullName, data.phone, data.role, data.status]
   );
   return mapUserRow(rows[0]);
 }
@@ -76,22 +70,18 @@ async function listUsers({ email, role, status, limit, cursor }) {
     where.push(`status = $${values.length}`);
   }
 
-  const builder = { values, where, orderBy: "", limit };
+  const builder = { values, where, orderBy: '', limit };
   if (cursor?.createdAt && cursor?.id) {
     builder.values.push(cursor.createdAt, cursor.id);
     const createdAtIndex = builder.values.length - 1;
     const idIndex = builder.values.length;
-    builder.where.push(
-      `(created_at, id) < ($${createdAtIndex}, $${idIndex})`
-    );
+    builder.where.push(`(created_at, id) < ($${createdAtIndex}, $${idIndex})`);
   }
 
-  builder.orderBy = "created_at DESC, id DESC";
+  builder.orderBy = 'created_at DESC, id DESC';
   builder.limit = limit;
 
-  const whereSql = builder.where.length
-    ? `WHERE ${builder.where.join(" AND ")}`
-    : "";
+  const whereSql = builder.where.length ? `WHERE ${builder.where.join(' AND ')}` : '';
   builder.values.push(builder.limit);
   const limitIndex = builder.values.length;
 
@@ -106,9 +96,7 @@ async function listUsers({ email, role, status, limit, cursor }) {
 
   const users = rows.map(mapUserRow);
   const last = rows[rows.length - 1];
-  const nextCursor = rows.length === limit && last
-    ? { createdAt: last.created_at, id: last.id }
-    : null;
+  const nextCursor = rows.length === limit && last ? { createdAt: last.created_at, id: last.id } : null;
 
   return { users, nextCursor };
 }
@@ -124,19 +112,19 @@ async function updateUser(client, id, fields) {
   };
 
   if (fields.email !== undefined) {
-    pushUpdate("email", fields.email);
+    pushUpdate('email', fields.email);
   }
   if (fields.fullName !== undefined) {
-    pushUpdate("full_name", fields.fullName);
+    pushUpdate('full_name', fields.fullName);
   }
   if (fields.phone !== undefined) {
-    pushUpdate("phone", fields.phone);
+    pushUpdate('phone', fields.phone);
   }
   if (fields.role !== undefined) {
-    pushUpdate("role", fields.role);
+    pushUpdate('role', fields.role);
   }
   if (fields.status !== undefined) {
-    pushUpdate("status", fields.status);
+    pushUpdate('status', fields.status);
   }
 
   if (!updates.length) {
@@ -148,7 +136,7 @@ async function updateUser(client, id, fields) {
 
   const { rows } = await db.query(
     `UPDATE users
-     SET ${updates.join(", ")}
+     SET ${updates.join(', ')}
      WHERE id = $${idIndex}
      RETURNING id, email, full_name, phone, role, status, created_at, updated_at`,
     values

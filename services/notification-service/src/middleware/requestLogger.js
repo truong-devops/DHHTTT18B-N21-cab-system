@@ -1,9 +1,9 @@
-const logger = require("../utils/logger");
+const logger = require('../utils/logger');
 
 function requestLogger(req, res, next) {
   const start = process.hrtime.bigint();
 
-  res.on("finish", () => {
+  res.on('finish', () => {
     const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
     logger.withTrace(req).info(
       {
@@ -12,7 +12,7 @@ function requestLogger(req, res, next) {
         status: res.statusCode,
         durationMs: Number(durationMs.toFixed(2))
       },
-      "HTTP request"
+      'HTTP request'
     );
   });
 

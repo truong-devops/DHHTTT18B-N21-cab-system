@@ -1,60 +1,60 @@
-import { useMemo, useState } from 'react'
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import { router } from 'expo-router'
-import type { Href } from 'expo-router'
-import { Card } from '@/components/ui/card'
-import { PrimaryButton } from '@/components/ui/primary-button'
-import { useProfile } from '@/hooks/use-profile'
-import { palette } from '@/lib/theme'
+import { useMemo, useState } from 'react';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { router } from 'expo-router';
+import type { Href } from 'expo-router';
+import { Card } from '@/components/ui/card';
+import { PrimaryButton } from '@/components/ui/primary-button';
+import { useProfile } from '@/hooks/use-profile';
+import { palette } from '@/lib/theme';
 
 type MenuItem = {
-  id: string
-  label: string
-  route?: Href
-  danger?: boolean
-}
+  id: string;
+  label: string;
+  route?: Href;
+  danger?: boolean;
+};
 
 const menuItems: MenuItem[] = [
   { id: 'history', label: 'Lich su cuoc xe', route: '/(tabs)/history' },
   { id: 'wallet', label: 'Vi va doanh thu', route: '/(tabs)/wallet' },
   { id: 'settings', label: 'Cai dat' },
   { id: 'logout', label: 'Dang xuat', danger: true }
-]
+];
 
 export default function ProfileScreen() {
-  const { auth, driver: driverState, walletTotal, earnings } = useProfile()
-  const { isAuthenticated, login, logout } = auth
-  const { driver, refresh } = driverState
-  const [identifier, setIdentifier] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { auth, driver: driverState, walletTotal, earnings } = useProfile();
+  const { isAuthenticated, login, logout } = auth;
+  const { driver, refresh } = driverState;
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const initials = useMemo(() => {
-    if (!driver?.fullName) return 'TX'
-    const parts = driver.fullName.split(' ').filter(Boolean)
-    const first = parts[0]?.[0] ?? ''
-    const last = parts[parts.length - 1]?.[0] ?? ''
-    return `${first}${last}`.toUpperCase()
-  }, [driver?.fullName])
+    if (!driver?.fullName) return 'TX';
+    const parts = driver.fullName.split(' ').filter(Boolean);
+    const first = parts[0]?.[0] ?? '';
+    const last = parts[parts.length - 1]?.[0] ?? '';
+    return `${first}${last}`.toUpperCase();
+  }, [driver?.fullName]);
 
   const handleLogin = async () => {
     if (!identifier || !password) {
-      Alert.alert('Thieu thong tin', 'Vui long nhap email/SDT va mat khau.')
-      return
+      Alert.alert('Thieu thong tin', 'Vui long nhap email/SDT va mat khau.');
+      return;
     }
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      await login(identifier, password)
-      await refresh()
-      setPassword('')
+      await login(identifier, password);
+      await refresh();
+      setPassword('');
     } catch (err: any) {
-      setError(err?.message ?? 'Dang nhap that bai')
+      setError(err?.message ?? 'Dang nhap that bai');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -65,20 +65,8 @@ export default function ProfileScreen() {
           <Card style={styles.loginCard}>
             <Text style={styles.sectionTitle}>Dang nhap tai xe</Text>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <TextInput
-              placeholder="Email hoac SDT"
-              value={identifier}
-              onChangeText={setIdentifier}
-              autoCapitalize="none"
-              style={styles.input}
-            />
-            <TextInput
-              placeholder="Mat khau"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              style={styles.input}
-            />
+            <TextInput placeholder="Email hoac SDT" value={identifier} onChangeText={setIdentifier} autoCapitalize="none" style={styles.input} />
+            <TextInput placeholder="Mat khau" value={password} onChangeText={setPassword} secureTextEntry style={styles.input} />
             <PrimaryButton title={loading ? 'Dang dang nhap...' : 'Dang nhap'} onPress={handleLogin} />
           </Card>
         ) : (
@@ -91,21 +79,15 @@ export default function ProfileScreen() {
                 <View style={styles.profileInfo}>
                   <Text style={styles.name}>{driver?.fullName ?? '--'}</Text>
                   <Text style={styles.phone}>{driver?.phone ?? '--'}</Text>
-                  <Text style={styles.statusText}>
-                    {driver?.onlineStatus === 'ONLINE' ? 'Dang truc tuyen' : 'Ngoai tuyen'}
-                  </Text>
+                  <Text style={styles.statusText}>{driver?.onlineStatus === 'ONLINE' ? 'Dang truc tuyen' : 'Ngoai tuyen'}</Text>
                 </View>
               </View>
             </Card>
 
             <View style={styles.walletCard}>
               <Text style={styles.walletLabel}>So du vi hien tai</Text>
-              <Text style={styles.walletValue}>
-                {Number.isFinite(walletTotal) ? `${walletTotal.toLocaleString('vi-VN')} d` : '--'}
-              </Text>
-              <Text style={styles.walletHint}>
-                Hom nay: {earnings.summary.today ? `${earnings.summary.today.toLocaleString('vi-VN')} d` : '--'}
-              </Text>
+              <Text style={styles.walletValue}>{Number.isFinite(walletTotal) ? `${walletTotal.toLocaleString('vi-VN')} d` : '--'}</Text>
+              <Text style={styles.walletHint}>Hom nay: {earnings.summary.today ? `${earnings.summary.today.toLocaleString('vi-VN')} d` : '--'}</Text>
             </View>
 
             <Card>
@@ -116,11 +98,12 @@ export default function ProfileScreen() {
                   style={[styles.menuItem, item.danger && styles.menuItemDanger]}
                   onPress={() => {
                     if (item.id === 'logout') {
-                      void logout()
-                      return
+                      void logout();
+                      return;
                     }
-                    if (item.route) router.push(item.route)
-                  }}>
+                    if (item.route) router.push(item.route);
+                  }}
+                >
                   <Text style={[styles.menuText, item.danger && styles.menuTextDanger]}>{item.label}</Text>
                   <Text style={[styles.menuArrow, item.danger && styles.menuTextDanger]}>{'>'}</Text>
                 </TouchableOpacity>
@@ -130,7 +113,7 @@ export default function ProfileScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
@@ -248,4 +231,4 @@ const styles = StyleSheet.create({
     color: palette.muted,
     fontWeight: '700'
   }
-})
+});

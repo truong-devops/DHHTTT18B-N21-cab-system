@@ -1,6 +1,6 @@
-const { Kafka } = require("kafkajs");
-const config = require("../config");
-const monitoring = require("../monitoring");
+const { Kafka } = require('kafkajs');
+const config = require('../config');
+const monitoring = require('../monitoring');
 
 const kafka = new Kafka({
   clientId: config.kafka.clientId,
@@ -19,26 +19,26 @@ function wrapProducer(instance) {
   const originalSend = instance.send.bind(instance);
   instance.send = async (payload) => {
     const startedAt = Date.now();
-    const topic = payload && payload.topic ? String(payload.topic) : "unknown";
+    const topic = payload && payload.topic ? String(payload.topic) : 'unknown';
     try {
       const result = await originalSend(payload);
       monitoring.recordDependencyRequest({
-        dependencyType: "kafka",
+        dependencyType: 'kafka',
         dependencyName: topic,
-        operation: "publish",
-        outcome: "success",
+        operation: 'publish',
+        outcome: 'success',
         durationMs: Date.now() - startedAt
       });
       return result;
     } catch (error) {
       monitoring.recordDependencyRequest({
-        dependencyType: "kafka",
+        dependencyType: 'kafka',
         dependencyName: topic,
-        operation: "publish",
-        outcome: "error",
+        operation: 'publish',
+        outcome: 'error',
         durationMs: Date.now() - startedAt,
         attributes: {
-          error_type: String(error && error.name ? error.name : "publish_error")
+          error_type: String(error && error.name ? error.name : 'publish_error')
         }
       });
       throw error;
@@ -60,21 +60,21 @@ async function getProducer() {
     try {
       await producer.connect();
       monitoring.recordDependencyRequest({
-        dependencyType: "kafka",
-        dependencyName: "broker",
-        operation: "connect_producer",
-        outcome: "success",
+        dependencyType: 'kafka',
+        dependencyName: 'broker',
+        operation: 'connect_producer',
+        outcome: 'success',
         durationMs: Date.now() - startedAt
       });
     } catch (error) {
       monitoring.recordDependencyRequest({
-        dependencyType: "kafka",
-        dependencyName: "broker",
-        operation: "connect_producer",
-        outcome: "error",
+        dependencyType: 'kafka',
+        dependencyName: 'broker',
+        operation: 'connect_producer',
+        outcome: 'error',
         durationMs: Date.now() - startedAt,
         attributes: {
-          error_type: String(error && error.name ? error.name : "connect_error")
+          error_type: String(error && error.name ? error.name : 'connect_error')
         }
       });
       throw error;
@@ -101,21 +101,21 @@ async function getConsumer() {
     try {
       await consumer.connect();
       monitoring.recordDependencyRequest({
-        dependencyType: "kafka",
-        dependencyName: "broker",
-        operation: "connect_consumer",
-        outcome: "success",
+        dependencyType: 'kafka',
+        dependencyName: 'broker',
+        operation: 'connect_consumer',
+        outcome: 'success',
         durationMs: Date.now() - startedAt
       });
     } catch (error) {
       monitoring.recordDependencyRequest({
-        dependencyType: "kafka",
-        dependencyName: "broker",
-        operation: "connect_consumer",
-        outcome: "error",
+        dependencyType: 'kafka',
+        dependencyName: 'broker',
+        operation: 'connect_consumer',
+        outcome: 'error',
         durationMs: Date.now() - startedAt,
         attributes: {
-          error_type: String(error && error.name ? error.name : "connect_error")
+          error_type: String(error && error.name ? error.name : 'connect_error')
         }
       });
       throw error;

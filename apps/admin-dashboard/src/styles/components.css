@@ -4,7 +4,10 @@
   border-radius: var(--radius-lg);
   padding: 18px;
   box-shadow: var(--shadow-soft);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 @media (hover: hover) {
@@ -101,7 +104,9 @@
   background: var(--surface);
   color: var(--text);
   font-size: 13px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .input:focus,

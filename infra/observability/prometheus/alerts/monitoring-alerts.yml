@@ -7,8 +7,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "OTel Collector scrape is down"
-          description: "Prometheus cannot scrape otel-collector:8889 for at least 3 minutes."
+          summary: 'OTel Collector scrape is down'
+          description: 'Prometheus cannot scrape otel-collector:8889 for at least 3 minutes.'
 
       - alert: PrometheusScrapeMissing
         expr: up{job="prometheus"} == 0
@@ -16,8 +16,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Prometheus scrape target is down"
-          description: "Prometheus target is not healthy for at least 3 minutes."
+          summary: 'Prometheus scrape target is down'
+          description: 'Prometheus target is not healthy for at least 3 minutes.'
 
       - alert: ServiceDown
         expr: max_over_time(cab_service_up[2m]) == 0
@@ -25,8 +25,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Service {{ $labels.service_name }} is down"
-          description: "cab_service_up for {{ $labels.service_name }} has been 0 for at least 4 minutes."
+          summary: 'Service {{ $labels.service_name }} is down'
+          description: 'cab_service_up for {{ $labels.service_name }} has been 0 for at least 4 minutes.'
 
       - alert: ServiceMetricsMissing
         expr: |
@@ -44,8 +44,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Service metrics stream missing"
-          description: "At least one critical service has no cab_service_up sample in the last 5 minutes."
+          summary: 'Service metrics stream missing'
+          description: 'At least one critical service has no cab_service_up sample in the last 5 minutes.'
 
       - alert: HighHttpErrorRate
         expr: |
@@ -60,8 +60,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High 5xx error rate on {{ $labels.service_name }}"
-          description: "5xx ratio is above 15% with traffic > 0.1 rps for at least 15 minutes."
+          summary: 'High 5xx error rate on {{ $labels.service_name }}'
+          description: '5xx ratio is above 15% with traffic > 0.1 rps for at least 15 minutes.'
 
       - alert: HighHttpP95Latency
         expr: |
@@ -75,8 +75,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High p95 latency on {{ $labels.service_name }}"
-          description: "p95 HTTP latency is above 2000ms with traffic > 0.1 rps for at least 15 minutes."
+          summary: 'High p95 latency on {{ $labels.service_name }}'
+          description: 'p95 HTTP latency is above 2000ms with traffic > 0.1 rps for at least 15 minutes.'
 
       - alert: PaymentFailureSpike
         expr: |
@@ -91,8 +91,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Payment failures spiking on {{ $labels.service_name }}"
-          description: "Payment failed ratio is above 40% with at least 20 payment outcomes in 15 minutes."
+          summary: 'Payment failures spiking on {{ $labels.service_name }}'
+          description: 'Payment failed ratio is above 40% with at least 20 payment outcomes in 15 minutes.'
 
       - alert: QueueBacklogHighWarning
         expr: max_over_time(cab_queue_backlog[15m]) > 300
@@ -100,8 +100,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Queue backlog high on {{ $labels.service_name }}"
-          description: "Queue {{ $labels.queue_name }} backlog exceeded 300 for at least 15 minutes."
+          summary: 'Queue backlog high on {{ $labels.service_name }}'
+          description: 'Queue {{ $labels.queue_name }} backlog exceeded 300 for at least 15 minutes.'
 
       - alert: QueueBacklogHighCritical
         expr: max_over_time(cab_queue_backlog[10m]) > 600
@@ -109,8 +109,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Queue backlog critical on {{ $labels.service_name }}"
-          description: "Queue {{ $labels.queue_name }} backlog exceeded 600 for at least 10 minutes."
+          summary: 'Queue backlog critical on {{ $labels.service_name }}'
+          description: 'Queue {{ $labels.queue_name }} backlog exceeded 600 for at least 10 minutes.'
 
       - alert: KafkaConsumerLagHighWarning
         expr: |
@@ -119,8 +119,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Kafka consumer lag high on {{ $labels.service_name }}"
-          description: "Consumer group {{ $labels.consumer_group }} on topic {{ $labels.topic }} has lag above 500 for 10 minutes."
+          summary: 'Kafka consumer lag high on {{ $labels.service_name }}'
+          description: 'Consumer group {{ $labels.consumer_group }} on topic {{ $labels.topic }} has lag above 500 for 10 minutes.'
 
       - alert: KafkaConsumerLagHighCritical
         expr: |
@@ -129,8 +129,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Kafka consumer lag critical on {{ $labels.service_name }}"
-          description: "Consumer group {{ $labels.consumer_group }} on topic {{ $labels.topic }} has lag above 2000 for 10 minutes."
+          summary: 'Kafka consumer lag critical on {{ $labels.service_name }}'
+          description: 'Consumer group {{ $labels.consumer_group }} on topic {{ $labels.topic }} has lag above 2000 for 10 minutes.'
 
       - alert: KafkaOutboxBacklogHighWarning
         expr: |
@@ -139,8 +139,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Outbox backlog high on {{ $labels.service_name }}"
-          description: "Outbox {{ $labels.queue_name }} backlog exceeded 200 for at least 10 minutes."
+          summary: 'Outbox backlog high on {{ $labels.service_name }}'
+          description: 'Outbox {{ $labels.queue_name }} backlog exceeded 200 for at least 10 minutes.'
 
       - alert: KafkaOutboxBacklogHighCritical
         expr: |
@@ -149,8 +149,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Outbox backlog critical on {{ $labels.service_name }}"
-          description: "Outbox {{ $labels.queue_name }} backlog exceeded 1000 for at least 10 minutes."
+          summary: 'Outbox backlog critical on {{ $labels.service_name }}'
+          description: 'Outbox {{ $labels.queue_name }} backlog exceeded 1000 for at least 10 minutes.'
 
       - alert: KafkaPublishErrorRateHigh
         expr: |
@@ -165,8 +165,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Kafka publish error rate high on {{ $labels.service_name }}"
-          description: "Kafka publish error ratio on topic {{ $labels.topic }} exceeded 5% with active traffic for at least 10 minutes."
+          summary: 'Kafka publish error rate high on {{ $labels.service_name }}'
+          description: 'Kafka publish error ratio on topic {{ $labels.topic }} exceeded 5% with active traffic for at least 10 minutes.'
 
       - alert: KafkaDlqRateHigh
         expr: |
@@ -175,8 +175,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "DLQ rate high on {{ $labels.service_name }}"
-          description: "At least 20 events were routed to DLQ {{ $labels.dlq_topic }} from {{ $labels.source_topic }} in 10 minutes."
+          summary: 'DLQ rate high on {{ $labels.service_name }}'
+          description: 'At least 20 events were routed to DLQ {{ $labels.dlq_topic }} from {{ $labels.source_topic }} in 10 minutes.'
 
       - alert: KafkaRetryRateHigh
         expr: |
@@ -185,8 +185,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Kafka retry pressure high on {{ $labels.service_name }}"
-          description: "Retry decisions for {{ $labels.scope }} on topic {{ $labels.topic }} reached at least 30 in 10 minutes."
+          summary: 'Kafka retry pressure high on {{ $labels.service_name }}'
+          description: 'Retry decisions for {{ $labels.scope }} on topic {{ $labels.topic }} reached at least 30 in 10 minutes.'
 
       - alert: KafkaProcessingLatencyP95High
         expr: |
@@ -200,5 +200,5 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Kafka processing p95 latency high on {{ $labels.service_name }}"
-          description: "Pipeline {{ $labels.pipeline }} on topic {{ $labels.topic }} has p95 latency above 3000ms for at least 10 minutes."
+          summary: 'Kafka processing p95 latency high on {{ $labels.service_name }}'
+          description: 'Pipeline {{ $labels.pipeline }} on topic {{ $labels.topic }} has p95 latency above 3000ms for at least 10 minutes.'

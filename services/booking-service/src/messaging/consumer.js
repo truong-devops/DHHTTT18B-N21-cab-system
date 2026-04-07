@@ -1,16 +1,13 @@
-const crypto = require("crypto");
-const { Kafka } = require("kafkajs");
-const config = require("../config");
-const topics = require("./topics");
-const { validateEnvelope } = require("./schemaRegistry");
-const { withTransaction } = require("../db/pool");
-const bookingRepo = require("../repositories/bookingRepo");
-const outboxRepo = require("../repositories/outboxRepo");
-const {
-  insertInboxEvent,
-  markInboxProcessed
-} = require("../repositories/inboxRepo");
-const logger = require("../utils/logger");
+const crypto = require('crypto');
+const { Kafka } = require('kafkajs');
+const config = require('../config');
+const topics = require('./topics');
+const { validateEnvelope } = require('./schemaRegistry');
+const { withTransaction } = require('../db/pool');
+const bookingRepo = require('../repositories/bookingRepo');
+const outboxRepo = require('../repositories/outboxRepo');
+const { insertInboxEvent, markInboxProcessed } = require('../repositories/inboxRepo');
+const logger = require('../utils/logger');
 
 const kafka = new Kafka({
   clientId: config.kafka.clientId,
@@ -24,7 +21,7 @@ const consumer = kafka.consumer({
 
 function headerValueToString(value) {
   if (value == null) {
-    return "";
+    return '';
   }
   if (Buffer.isBuffer(value)) {
     return value.toString();
@@ -43,17 +40,10 @@ function buildEnvelope({ eventId, type, traceId, payload }) {
   };
 }
 
-function buildOutboxRecord({
-  eventId,
-  topic,
-  eventType,
-  aggregateId,
-  partitionKey,
-  envelope
-}) {
+function buildOutboxRecord({ eventId, topic, eventType, aggregateId, partitionKey, envelope }) {
   return {
     eventId,
-    aggregateType: "booking",
+    aggregateType: 'booking',
     aggregateId,
     eventType,
     topic,
@@ -65,34 +55,22 @@ function buildOutboxRecord({
 }
 
 async function applyPaymentCompleted(client, payload) {
-  const booking = await bookingRepo.getByRideIdForUpdate(
-    client,
-    payload.rideId
-  );
+  const booking = await bookingRepo.getByRideIdForUpdate(client, payload.rideId);
   if (!booking) {
     throw new Error(`booking_not_found:${payload.rideId}`);
   }
 
-  const status = String(booking.status || "").toUpperCase();
-  if (
-    status === "CANCELLED" ||
-    status === "FAILED" ||
-    status === "CONFIRMED" ||
-    status === "ACCEPTED"
-  ) {
+  const status = String(booking.status || '').toUpperCase();
+  if (status === 'CANCELLED' || status === 'FAILED' || status === 'CONFIRMED' || status === 'ACCEPTED') {
     return {
       skipped: true,
-      reason: "terminal_or_already_confirmed",
+      reason: 'terminal_or_already_confirmed',
       bookingId: booking.bookingId,
       status
     };
   }
 
-  const updated = await bookingRepo.updateStatus(
-    client,
-    booking.bookingId,
-    "CONFIRMED"
-  );
+  const updated = await bookingRepo.updateStatus(client, booking.bookingId, 'CONFIRMED');
   return {
     skipped: false,
     bookingId: updated.bookingId,
@@ -101,19 +79,16 @@ async function applyPaymentCompleted(client, payload) {
 }
 
 async function applyPaymentFailed(client, payload, traceId) {
-  const booking = await bookingRepo.getByRideIdForUpdate(
-    client,
-    payload.rideId
-  );
+  const booking = await bookingRepo.getByRideIdForUpdate(client, payload.rideId);
   if (!booking) {
     throw new Error(`booking_not_found:${payload.rideId}`);
   }
 
-  const status = String(booking.status || "").toUpperCase();
-  if (status === "CANCELLED") {
+  const status = String(booking.status || '').toUpperCase();
+  if (status === 'CANCELLED') {
     return {
       skipped: true,
-      reason: "already_cancelled",
+      reason: 'already_cancelled',
       bookingId: booking.bookingId
     };
   }
@@ -123,10 +98,10 @@ async function applyPaymentFailed(client, payload, traceId) {
   const envelope = buildEnvelope({
     eventId,
     traceId,
-    type: "RideCancelled",
+    type: 'RideCancelled',
     payload: {
       rideId: cancelled.rideId,
-      reason: payload.failureReason || "PAYMENT_FAILED",
+      reason: payload.failureReason || 'PAYMENT_FAILED',
       timestamp: new Date().toISOString()
     }
   });
@@ -136,7 +111,7 @@ async function applyPaymentFailed(client, payload, traceId) {
     buildOutboxRecord({
       eventId,
       topic: topics.RideCancelled,
-      eventType: "RideCancelled",
+      eventType: 'RideCancelled',
       aggregateId: cancelled.bookingId,
       partitionKey: cancelled.rideId,
       envelope
@@ -154,7 +129,7 @@ async function applyPaymentFailed(client, payload, traceId) {
 async function processEnvelope(topic, envelope) {
   const payload = envelope.payload || {};
   const traceId = envelope.traceId || null;
-  const eventType = envelope.type || "UnknownEvent";
+  const eventType = envelope.type || 'UnknownEvent';
 
   return withTransaction(async (client) => {
     const inserted = await insertInboxEvent(client, {
@@ -165,7 +140,7 @@ async function processEnvelope(topic, envelope) {
       payload
     });
     if (!inserted) {
-      return { handled: true, reason: "duplicate" };
+      return { handled: true, reason: 'duplicate' };
     }
 
     let result;
@@ -174,21 +149,21 @@ async function processEnvelope(topic, envelope) {
     } else if (topic === topics.PaymentFailed) {
       result = await applyPaymentFailed(client, payload, traceId);
     } else {
-      result = { skipped: true, reason: "unsupported_topic" };
+      result = { skipped: true, reason: 'unsupported_topic' };
     }
 
     await markInboxProcessed(client, envelope.eventId);
-    return { handled: true, reason: "processed", result };
+    return { handled: true, reason: 'processed', result };
   });
 }
 
 async function processConsumedMessage({ topic, message }) {
-  const rawValue = message.value ? message.value.toString() : "";
+  const rawValue = message.value ? message.value.toString() : '';
   let envelope;
   try {
     envelope = JSON.parse(rawValue);
   } catch (_error) {
-    return { handled: true, reason: "invalid_json" };
+    return { handled: true, reason: 'invalid_json' };
   }
 
   const validation = validateEnvelope(topic, envelope);
@@ -199,20 +174,17 @@ async function processConsumedMessage({ topic, message }) {
         eventId: envelope?.eventId || null,
         errors: validation.errors
       },
-      "[booking-service] invalid envelope in consumer"
+      '[booking-service] invalid envelope in consumer'
     );
-    return { handled: true, reason: "invalid_envelope" };
+    return { handled: true, reason: 'invalid_envelope' };
   }
 
   if (!envelope?.eventId) {
-    return { handled: true, reason: "missing_event_id" };
+    return { handled: true, reason: 'missing_event_id' };
   }
 
-  if (
-    topic !== topics.PaymentCompleted &&
-    topic !== topics.PaymentFailed
-  ) {
-    return { handled: true, reason: "unsupported_topic" };
+  if (topic !== topics.PaymentCompleted && topic !== topics.PaymentFailed) {
+    return { handled: true, reason: 'unsupported_topic' };
   }
 
   return processEnvelope(topic, envelope);
@@ -232,26 +204,13 @@ async function startConsumer() {
   }
 
   await consumer.run({
-    partitionsConsumedConcurrently:
-      config.kafka.partitionsConsumedConcurrently,
+    partitionsConsumedConcurrently: config.kafka.partitionsConsumedConcurrently,
     eachBatchAutoResolve: false,
     autoCommit: true,
     autoCommitInterval: config.kafka.autoCommitInterval,
     autoCommitThreshold: config.kafka.autoCommitThreshold,
-    eachBatch: async ({
-      batch,
-      resolveOffset,
-      heartbeat,
-      commitOffsetsIfNecessary,
-      isRunning,
-      isStale
-    }) => {
-      for (
-        let index = 0;
-        index < batch.messages.length &&
-        index < config.kafka.maxMessagesPerBatch;
-        index += 1
-      ) {
+    eachBatch: async ({ batch, resolveOffset, heartbeat, commitOffsetsIfNecessary, isRunning, isStale }) => {
+      for (let index = 0; index < batch.messages.length && index < config.kafka.maxMessagesPerBatch; index += 1) {
         const message = batch.messages[index];
         if (!isRunning() || isStale()) {
           break;
@@ -272,16 +231,13 @@ async function startConsumer() {
             {
               err: {
                 message: error.message,
-                code: error.code || "UNKNOWN"
+                code: error.code || 'UNKNOWN'
               },
               topic: batch.topic,
-              eventId:
-                headerValueToString(
-                  message.headers?.["x-event-id"]
-                ) || null,
+              eventId: headerValueToString(message.headers?.['x-event-id']) || null,
               offset: message.offset
             },
-            "[booking-service] consumer failed before offset commit"
+            '[booking-service] consumer failed before offset commit'
           );
           throw error;
         }

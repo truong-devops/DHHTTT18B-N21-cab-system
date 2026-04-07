@@ -11,7 +11,7 @@ const mockMarkInboxProcessed = jest.fn();
 const mockPublishToDlq = jest.fn();
 const mockConfig = {
   kafka: {
-    consumeTopics: ["ride.created"],
+    consumeTopics: ['ride.created'],
     partitionsConsumedConcurrently: 1,
     autoCommitInterval: 1000,
     autoCommitThreshold: 1,
@@ -19,41 +19,41 @@ const mockConfig = {
   }
 };
 
-jest.mock("../src/config", () => mockConfig);
+jest.mock('../src/config', () => mockConfig);
 
-jest.mock("../src/messaging/kafka", () => ({
+jest.mock('../src/messaging/kafka', () => ({
   getConsumer: (...args) => mockGetConsumer(...args)
 }));
 
-jest.mock("../src/repositories/inboxRepo", () => ({
+jest.mock('../src/repositories/inboxRepo', () => ({
   insertInboxEvent: (...args) => mockInsertInboxEvent(...args),
   markInboxProcessed: (...args) => mockMarkInboxProcessed(...args)
 }));
 
-jest.mock("../src/messaging/dlq", () => ({
+jest.mock('../src/messaging/dlq', () => ({
   publishToDlq: (...args) => mockPublishToDlq(...args)
 }));
 
-jest.mock("../src/messaging/schemaRegistry", () => ({
+jest.mock('../src/messaging/schemaRegistry', () => ({
   validateEnvelope: jest.fn(() => ({ valid: true, errors: [] }))
 }));
 
-const { startConsumer } = require("../src/messaging/consumer");
+const { startConsumer } = require('../src/messaging/consumer');
 
-function buildBatchMessage(envelope, offset = "0") {
+function buildBatchMessage(envelope, offset = '0') {
   return {
     offset,
-    key: Buffer.from(envelope.eventId || "no-key"),
+    key: Buffer.from(envelope.eventId || 'no-key'),
     value: Buffer.from(JSON.stringify(envelope))
   };
 }
 
-describe("payment consumer duplicate + commit semantics", () => {
+describe('payment consumer duplicate + commit semantics', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test("commits offset for duplicate event after idempotency check", async () => {
+  test('commits offset for duplicate event after idempotency check', async () => {
     mockInsertInboxEvent.mockResolvedValueOnce(false);
     mockRun.mockImplementationOnce(async ({ eachBatch }) => {
       const resolveOffset = jest.fn();
@@ -61,14 +61,14 @@ describe("payment consumer duplicate + commit semantics", () => {
       const heartbeat = jest.fn(async () => undefined);
       await eachBatch({
         batch: {
-          topic: "ride.created",
+          topic: 'ride.created',
           partition: 0,
           messages: [
             buildBatchMessage({
-              eventId: "evt_1",
-              traceId: "trace_1",
-              type: "RideCreated",
-              payload: { rideId: "ride_1" }
+              eventId: 'evt_1',
+              traceId: 'trace_1',
+              type: 'RideCreated',
+              payload: { rideId: 'ride_1' }
             })
           ]
         },
@@ -79,7 +79,7 @@ describe("payment consumer duplicate + commit semantics", () => {
         isStale: () => false
       });
 
-      expect(resolveOffset).toHaveBeenCalledWith("0");
+      expect(resolveOffset).toHaveBeenCalledWith('0');
       expect(commitOffsetsIfNecessary).toHaveBeenCalledTimes(1);
     });
 
@@ -89,8 +89,8 @@ describe("payment consumer duplicate + commit semantics", () => {
     expect(mockPublishToDlq).not.toHaveBeenCalled();
   });
 
-  test("does not resolve offset when processing throws before success", async () => {
-    mockInsertInboxEvent.mockRejectedValueOnce(new Error("db_unavailable"));
+  test('does not resolve offset when processing throws before success', async () => {
+    mockInsertInboxEvent.mockRejectedValueOnce(new Error('db_unavailable'));
     mockRun.mockImplementationOnce(async ({ eachBatch }) => {
       const resolveOffset = jest.fn();
       const commitOffsetsIfNecessary = jest.fn(async () => undefined);
@@ -99,14 +99,14 @@ describe("payment consumer duplicate + commit semantics", () => {
       await expect(
         eachBatch({
           batch: {
-            topic: "ride.created",
+            topic: 'ride.created',
             partition: 0,
             messages: [
               buildBatchMessage({
-                eventId: "evt_2",
-                traceId: "trace_2",
-                type: "RideCreated",
-                payload: { rideId: "ride_2" }
+                eventId: 'evt_2',
+                traceId: 'trace_2',
+                type: 'RideCreated',
+                payload: { rideId: 'ride_2' }
               })
             ]
           },
@@ -116,7 +116,7 @@ describe("payment consumer duplicate + commit semantics", () => {
           isRunning: () => true,
           isStale: () => false
         })
-      ).rejects.toThrow("db_unavailable");
+      ).rejects.toThrow('db_unavailable');
 
       expect(resolveOffset).not.toHaveBeenCalled();
       expect(commitOffsetsIfNecessary).not.toHaveBeenCalled();

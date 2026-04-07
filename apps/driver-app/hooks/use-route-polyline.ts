@@ -17,13 +17,13 @@ const roundCoord = (value: number) => value.toFixed(5);
 
 const makeKey = (origin: LatLng, destination: LatLng, profile: RouteProfile) =>
   `${roundCoord(origin.latitude)},${roundCoord(origin.longitude)}|${roundCoord(
-    destination.latitude,
+    destination.latitude
   )},${roundCoord(destination.longitude)}|${profile}`;
 
 export const useRoutePolyline = ({
   origin,
   destination,
-  profile,
+  profile
 }: {
   origin: LatLng | null;
   destination: LatLng | null;
@@ -32,7 +32,7 @@ export const useRoutePolyline = ({
   const [state, setState] = useState<RouteState>({
     coords: [],
     isLoading: false,
-    error: null,
+    error: null
   });
 
   const key = useMemo(() => {
@@ -58,7 +58,7 @@ export const useRoutePolyline = ({
         distanceMeters: cached.data.distanceMeters,
         durationSeconds: cached.data.durationSeconds,
         isLoading: false,
-        error: null,
+        error: null
       });
       return;
     }
@@ -78,7 +78,7 @@ export const useRoutePolyline = ({
           distanceMeters: data.distanceMeters,
           durationSeconds: data.durationSeconds,
           isLoading: false,
-          error: null,
+          error: null
         });
       })
       .catch((err: any) => {
@@ -86,7 +86,7 @@ export const useRoutePolyline = ({
         setState((prev) => ({
           ...prev,
           isLoading: false,
-          error: err?.message ?? 'Không lấy được đường đi thật',
+          error: err?.message ?? 'Không lấy được đường đi thật'
         }));
       });
 

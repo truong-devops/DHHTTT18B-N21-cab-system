@@ -7,12 +7,12 @@ paths:
     get:
       summary: List bookings
       responses:
-        "200":
+        '200':
           description: OK
     post:
       summary: Create booking
       responses:
-        "201":
+        '201':
           description: Created
   /v1/bookings/{id}:
     get:
@@ -24,9 +24,9 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: OK
-        "404":
+        '404':
           description: Not found
   /v1/bookings/{id}/cancel:
     post:
@@ -38,7 +38,7 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: OK
-        "404":
+        '404':
           description: Not found

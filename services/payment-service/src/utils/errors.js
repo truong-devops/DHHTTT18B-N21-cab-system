@@ -1,10 +1,10 @@
 const ERROR_CODE_BY_STATUS = {
-  400: "VALIDATION_ERROR",
-  401: "UNAUTHORIZED",
-  403: "FORBIDDEN",
-  404: "NOT_FOUND",
-  409: "CONFLICT",
-  429: "RATE_LIMITED"
+  400: 'VALIDATION_ERROR',
+  401: 'UNAUTHORIZED',
+  403: 'FORBIDDEN',
+  404: 'NOT_FOUND',
+  409: 'CONFLICT',
+  429: 'RATE_LIMITED'
 };
 
 function getStatus(err) {
@@ -12,7 +12,7 @@ function getStatus(err) {
 }
 
 function getCodeForStatus(status) {
-  return ERROR_CODE_BY_STATUS[status] || "INTERNAL";
+  return ERROR_CODE_BY_STATUS[status] || 'INTERNAL';
 }
 
 class ApiError extends Error {
@@ -27,9 +27,8 @@ class ApiError extends Error {
 function errorPayload(err, traceId) {
   const status = getStatus(err);
   const code = err && err.code ? err.code : getCodeForStatus(status);
-  const hasMessage = err && typeof err.message === "string" && err.message.trim().length > 0;
-  const message =
-    code === "INTERNAL" && status >= 500 ? "Internal server error" : (hasMessage ? err.message : "Internal server error");
+  const hasMessage = err && typeof err.message === 'string' && err.message.trim().length > 0;
+  const message = code === 'INTERNAL' && status >= 500 ? 'Internal server error' : hasMessage ? err.message : 'Internal server error';
   const details = Array.isArray(err && err.details) ? err.details : [];
   const payload = { error: { code, message }, traceId };
   if (details.length) {
