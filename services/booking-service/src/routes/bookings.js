@@ -9,6 +9,7 @@ const config = require('../config');
 const { getQuote, PricingServiceError } = require('../clients/pricingClient');
 const { estimateEta, EtaServiceError } = require('../clients/etaClient');
 const { getDriverAvailability, listAvailableDrivers, selectBestDriver } = require('../clients/driverClient');
+const { recommendDrivers, forecastDemand, logAiFallback } = require('../clients/aiClient');
 const { createPayment } = require('../clients/paymentClient');
 const { sendNotification } = require('../clients/notificationClient');
 const { hashRequest } = require('../utils/idempotency');
@@ -153,6 +154,33 @@ async function buildAiDriverDecision({ pickup, vehicleType, authorization, trace
     availableDrivers: drivers,
     selectedDriver: selected
   };
+}
+
+function mapDriversToAiCandidates(drivers) {
+  return (drivers || []).map((driver) => ({
+    driver_id: driver.driverId || driver.driver_id || null,
+    distance_m: Number(driver.distanceMeters ?? driver.distance_m ?? Number.MAX_SAFE_INTEGER),
+    rating: Number(driver.rating ?? 4.5),
+    eta_min: Number(driver.etaMinutes ?? driver.eta_min ?? 8),
+    price_score: Number(driver.priceScore ?? driver.price_score ?? 0.5),
+    online: true,
+    vehicle_type: driver.vehicle?.type || driver.vehicle_type || null
+  }));
+}
+
+function mapAiDriverToLegacy(driver) {
+  if (!driver || typeof driver !== 'object') {
+    return driver;
+  }
+  return {
+    ...driver,
+    driverId: driver.driverId || driver.driver_id || null,
+    distanceMeters: driver.distanceMeters != null ? driver.distanceMeters : driver.distance_m != null ? Number(driver.distance_m) : null
+  };
+}
+
+function mapAiDriversToLegacy(drivers) {
+  return (drivers || []).map(mapAiDriverToLegacy);
 }
 
 async function runBookingIntegrationFlow({ booking, quote, paymentMethod, authorization, traceId, simulatePaymentTimeout = false }) {
@@ -662,20 +690,39 @@ router.post('/ai/select-driver', async (req, res) => {
 
     const traceId = req.traceId || req.header('x-trace-id');
     const authorization = req.header('authorization') || '';
-    const decision = await buildAiDriverDecision({
+    const localDecision = await buildAiDriverDecision({
       pickup,
       vehicleType,
       authorization,
       traceId
     });
+    const aiCandidates = mapDriversToAiCandidates(localDecision.availableDrivers);
+    let aiDecision = null;
+    try {
+      aiDecision = await recommendDrivers({
+        pickup,
+        vehicleType,
+        candidates: aiCandidates,
+        authorization,
+        traceId
+      });
+    } catch (error) {
+      logAiFallback(req, error?.cause?.code || error?.code || error?.message);
+    }
+
+    const selectedDriver = aiDecision?.selected_driver ? mapAiDriverToLegacy(aiDecision.selected_driver) : localDecision.selectedDriver;
+    const availableDrivers = aiDecision?.top_3?.length ? mapAiDriversToLegacy(aiDecision.top_3) : localDecision.availableDrivers;
 
     return res.json({
       data: {
         pickup,
         vehicle_type: vehicleType,
-        available_drivers: decision.availableDrivers,
-        selected_driver: decision.selectedDriver,
-        decision_valid: Boolean(decision.selectedDriver)
+        available_drivers: availableDrivers,
+        selected_driver: selectedDriver,
+        decision_valid: Boolean(selectedDriver),
+        model_version: aiDecision?.model_version || 'local-rule',
+        latency_ms: Number(aiDecision?.latency_ms || 0),
+        fallback_used: Boolean(aiDecision?.fallback_used ?? true)
       }
     });
   } catch (error) {
@@ -717,13 +764,37 @@ router.get('/:id/mcp-context', async (req, res) => {
       })
     ]);
 
+    const aiCandidates = mapDriversToAiCandidates(driverDecision.availableDrivers);
+    let aiRecommendation = null;
+    let aiForecast = null;
+    try {
+      [aiRecommendation, aiForecast] = await Promise.all([
+        recommendDrivers({
+          pickup: booking.pickup,
+          vehicleType: booking.vehicleType,
+          candidates: aiCandidates,
+          authorization,
+          traceId
+        }),
+        forecastDemand({
+          zoneId: String(req.query.zone_id || 'HCM_DEFAULT'),
+          horizonMin: Number(req.query.horizon_min || 30),
+          timestamp: req.query.timestamp || new Date().toISOString(),
+          authorization,
+          traceId
+        })
+      ]);
+    } catch (error) {
+      logAiFallback(req, error?.cause?.code || error?.code || error?.message);
+    }
+
     return res.json({
       data: {
         ride_id: booking.bookingId,
         pickup: booking.pickup,
         drop: booking.dropoff,
-        available_drivers: driverDecision.availableDrivers,
-        selected_driver: driverDecision.selectedDriver,
+        available_drivers: aiRecommendation?.top_3?.length ? mapAiDriversToLegacy(aiRecommendation.top_3) : driverDecision.availableDrivers,
+        selected_driver: aiRecommendation?.selected_driver ? mapAiDriverToLegacy(aiRecommendation.selected_driver) : driverDecision.selectedDriver,
         traffic_level: trafficLevel,
         demand_index: demandIndex,
         supply_index: supplyIndex,
@@ -733,6 +804,18 @@ router.get('/:id/mcp-context', async (req, res) => {
           surge: Number(quote.surge || 1),
           currency: quote.currency || 'VND'
         },
+        forecast: aiForecast
+          ? {
+              zone_id: aiForecast.zone_id,
+              horizon_min: aiForecast.horizon_min,
+              predicted_demand_index: aiForecast.predicted_demand_index,
+              predicted_supply_index: aiForecast.predicted_supply_index,
+              confidence: aiForecast.confidence,
+              model_version: aiForecast.model_version,
+              fallback_used: Boolean(aiForecast.fallback_used),
+              latency_ms: Number(aiForecast.latency_ms || 0)
+            }
+          : null,
         permission_ok: true
       }
     });

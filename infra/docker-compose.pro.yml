@@ -52,6 +52,7 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification-service:3010
       PAYMENT_SERVICE_URL: http://payment-service:3007
       PRICING_SERVICE_URL: http://pricing-service:3006
+      AI_SERVICE_URL: http://ai-service:3013
       RIDE_SERVICE_URL: http://ride-service:3005
       REVIEW_SERVICE_URL: http://review-service:3009
       USER_SERVICE_URL: http://user-service:4004
@@ -65,6 +66,7 @@ services:
       - notification-service
       - payment-service
       - pricing-service
+      - ai-service
       - ride-service
       - review-service
       - user-service
@@ -189,6 +191,7 @@ services:
       OUTBOX_PROCESSING_TIMEOUT_MS: 300000
       ETA_BASE_URL: http://eta-service:3012
       PRICING_BASE_URL: http://pricing-service:3006
+      AI_BASE_URL: http://ai-service:3013
       PAYMENT_BASE_URL: http://payment-service:3007
       PAYMENT_FALLBACK_BASE_URLS: ''
       PAYMENT_IP_FAMILY: 4
@@ -200,6 +203,7 @@ services:
       - kafka
       - postgres
       - eta-service
+      - ai-service
     networks:
       - backend
 
@@ -207,10 +211,25 @@ services:
     build:
       context: ..
       dockerfile: services/eta-service/Dockerfile
+    ports:
+      - '3012:3012'
     environment:
       SERVICE_NAME: eta-service
       OTEL_SERVICE_NAME: eta-service
       PORT: 3012
+    networks:
+      - backend
+
+  ai-service:
+    build:
+      context: ..
+      dockerfile: services/ai-service/Dockerfile
+    ports:
+      - '3013:3013'
+    environment:
+      SERVICE_NAME: ai-service
+      OTEL_SERVICE_NAME: ai-service
+      PORT: 3013
     networks:
       - backend
 
@@ -255,6 +274,8 @@ services:
     build:
       context: ..
       dockerfile: services/pricing-service/Dockerfile
+    ports:
+      - '3006:3006'
     environment:
       SERVICE_NAME: pricing-service
       OTEL_SERVICE_NAME: pricing-service
