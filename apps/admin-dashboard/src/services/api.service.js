@@ -25,7 +25,14 @@ export async function apiRequest(path, options = {}) {
   }
 
   const text = await response.text()
-  const payload = text ? JSON.parse(text) : null
+  let payload = null
+  if (text) {
+    try {
+      payload = JSON.parse(text)
+    } catch {
+      payload = { message: text }
+    }
+  }
 
   if (!response.ok) {
     const message =

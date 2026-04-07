@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
 const api = axios.create({ baseURL, withCredentials: true });
 
@@ -27,8 +27,27 @@ api.interceptors.response.use(
 
       isRefreshing = true;
       try {
-        const refreshRes = await axios.post(`${baseURL}/auth/refresh`, {}, { withCredentials: true });
-        localStorage.setItem("accessToken", refreshRes.data.accessToken);
+        const refreshToken = localStorage.getItem("refreshToken");
+        if (!refreshToken) {
+          throw new Error("Missing refresh token");
+        }
+
+        const refreshRes = await axios.post(
+          `${baseURL}/v1/auth/refresh`,
+          { refreshToken },
+          { withCredentials: true }
+        );
+        const nextAccessToken =
+          refreshRes.data?.tokens?.accessToken || refreshRes.data?.accessToken;
+        const nextRefreshToken =
+          refreshRes.data?.tokens?.refreshToken || refreshRes.data?.refreshToken || refreshToken;
+
+        if (!nextAccessToken) {
+          throw new Error("Refresh response missing access token");
+        }
+
+        localStorage.setItem("accessToken", nextAccessToken);
+        localStorage.setItem("refreshToken", nextRefreshToken);
 
         queue.forEach((p) => p.resolve(api(p.original)));
         queue = [];
@@ -38,7 +57,8 @@ api.interceptors.response.use(
         queue.forEach((p) => p.reject(e));
         queue = [];
         localStorage.removeItem("accessToken");
-        window.location.href = "/login";
+        localStorage.removeItem("refreshToken");
+        window.location.href = "/admin/login";
         return Promise.reject(e);
       } finally {
         isRefreshing = false;
