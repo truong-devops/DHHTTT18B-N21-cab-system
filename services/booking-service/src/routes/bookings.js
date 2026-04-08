@@ -9,7 +9,7 @@ const config = require('../config');
 const { getQuote, PricingServiceError } = require('../clients/pricingClient');
 const { estimateEta, EtaServiceError } = require('../clients/etaClient');
 const { getDriverAvailability, listAvailableDrivers, selectBestDriver } = require('../clients/driverClient');
-const { recommendDrivers, forecastDemand, logAiFallback } = require('../clients/aiClient');
+const { recommendDrivers, agentSelectDriver, forecastDemand, logAiFallback } = require('../clients/aiClient');
 const { createPayment } = require('../clients/paymentClient');
 const { sendNotification } = require('../clients/notificationClient');
 const { hashRequest } = require('../utils/idempotency');
@@ -570,7 +570,9 @@ router.post('/', async (req, res) => {
         selected_driver: aiDecision.selectedDriver
       };
 
-      if (noDriversAvailable) {
+      const hasSelectedDriver = Boolean(aiDecision?.selectedDriver);
+      const hasAvailableDrivers = Array.isArray(aiDecision?.availableDrivers) && aiDecision.availableDrivers.length > 0;
+      if (noDriversAvailable && !hasSelectedDriver && !hasAvailableDrivers) {
         responsePayload.message = 'No drivers available';
       }
 
@@ -681,7 +683,7 @@ router.post('/', async (req, res) => {
 router.post('/ai/select-driver', async (req, res) => {
   try {
     const pickup = req.body?.pickup || null;
-    const vehicleType = req.body?.vehicleType || 'CAR';
+    const vehicleType = req.body?.vehicleType || req.body?.vehicle_type || 'CAR';
     if (!pickup || !Number.isFinite(Number(pickup.lat)) || !Number.isFinite(Number(pickup.lng))) {
       return res.status(400).json({
         error: 'pickup.lat and pickup.lng are required'
@@ -697,12 +699,18 @@ router.post('/ai/select-driver', async (req, res) => {
       traceId
     });
     const aiCandidates = mapDriversToAiCandidates(localDecision.availableDrivers);
-    let aiDecision = null;
+    let agentDecision = null;
     try {
-      aiDecision = await recommendDrivers({
+      agentDecision = await agentSelectDriver({
         pickup,
+        drop: req.body?.drop || null,
         vehicleType,
         candidates: aiCandidates,
+        context: req.body?.context || {
+          objective: req.body?.objective || 'auto'
+        },
+        simulateToolError: req.body?.simulate_tool_error === true,
+        simulateModelError: req.body?.simulate_model_error === true,
         authorization,
         traceId
       });
@@ -710,8 +718,32 @@ router.post('/ai/select-driver', async (req, res) => {
       logAiFallback(req, error?.cause?.code || error?.code || error?.message);
     }
 
-    const selectedDriver = aiDecision?.selected_driver ? mapAiDriverToLegacy(aiDecision.selected_driver) : localDecision.selectedDriver;
-    const availableDrivers = aiDecision?.top_3?.length ? mapAiDriversToLegacy(aiDecision.top_3) : localDecision.availableDrivers;
+    let aiDecision = null;
+    if (!agentDecision) {
+      try {
+        aiDecision = await recommendDrivers({
+          pickup,
+          vehicleType,
+          candidates: aiCandidates,
+          authorization,
+          traceId
+        });
+      } catch (error) {
+        logAiFallback(req, error?.cause?.code || error?.code || error?.message);
+      }
+    }
+
+    const selectedDriver = agentDecision?.selected_driver
+      ? mapAiDriverToLegacy(agentDecision.selected_driver)
+      : aiDecision?.selected_driver
+        ? mapAiDriverToLegacy(aiDecision.selected_driver)
+        : localDecision.selectedDriver;
+    const availableDrivers = agentDecision?.top_3?.length
+      ? mapAiDriversToLegacy(agentDecision.top_3)
+      : aiDecision?.top_3?.length
+        ? mapAiDriversToLegacy(aiDecision.top_3)
+        : localDecision.availableDrivers;
+    const decisionLog = agentDecision?.decision_log || aiDecision?.decision_log || null;
 
     return res.json({
       data: {
@@ -720,9 +752,13 @@ router.post('/ai/select-driver', async (req, res) => {
         available_drivers: availableDrivers,
         selected_driver: selectedDriver,
         decision_valid: Boolean(selectedDriver),
-        model_version: aiDecision?.model_version || 'local-rule',
-        latency_ms: Number(aiDecision?.latency_ms || 0),
-        fallback_used: Boolean(aiDecision?.fallback_used ?? true)
+        decision_log: decisionLog,
+        strategy: agentDecision?.strategy || null,
+        tool_calls: agentDecision?.tool_calls || [],
+        retry_count: Number(agentDecision?.retry_count || 0),
+        model_version: agentDecision?.model_version || aiDecision?.model_version || 'local-rule',
+        latency_ms: Number(agentDecision?.latency_ms || aiDecision?.latency_ms || 0),
+        fallback_used: Boolean(agentDecision?.fallback_used ?? aiDecision?.fallback_used ?? true)
       }
     });
   } catch (error) {
@@ -765,14 +801,24 @@ router.get('/:id/mcp-context', async (req, res) => {
     ]);
 
     const aiCandidates = mapDriversToAiCandidates(driverDecision.availableDrivers);
+    let agentDecision = null;
     let aiRecommendation = null;
     let aiForecast = null;
     try {
-      [aiRecommendation, aiForecast] = await Promise.all([
-        recommendDrivers({
+      [agentDecision, aiForecast] = await Promise.all([
+        agentSelectDriver({
           pickup: booking.pickup,
+          drop: booking.dropoff,
           vehicleType: booking.vehicleType,
           candidates: aiCandidates,
+          context: {
+            objective: 'auto',
+            max_eta_min: Number(req.query.max_eta_min || 30),
+            budget_weight: Number(req.query.budget_weight || 0.5),
+            latency_budget_ms: Number(req.query.latency_budget_ms || 200),
+            demand_index: demandIndex,
+            traffic_level: trafficLevel
+          },
           authorization,
           traceId
         }),
@@ -787,14 +833,38 @@ router.get('/:id/mcp-context', async (req, res) => {
     } catch (error) {
       logAiFallback(req, error?.cause?.code || error?.code || error?.message);
     }
+    if (!agentDecision) {
+      try {
+        aiRecommendation = await recommendDrivers({
+          pickup: booking.pickup,
+          vehicleType: booking.vehicleType,
+          candidates: aiCandidates,
+          authorization,
+          traceId
+        });
+      } catch (error) {
+        logAiFallback(req, error?.cause?.code || error?.code || error?.message);
+      }
+    }
 
     return res.json({
       data: {
         ride_id: booking.bookingId,
         pickup: booking.pickup,
         drop: booking.dropoff,
-        available_drivers: aiRecommendation?.top_3?.length ? mapAiDriversToLegacy(aiRecommendation.top_3) : driverDecision.availableDrivers,
-        selected_driver: aiRecommendation?.selected_driver ? mapAiDriverToLegacy(aiRecommendation.selected_driver) : driverDecision.selectedDriver,
+        available_drivers: agentDecision?.top_3?.length
+          ? mapAiDriversToLegacy(agentDecision.top_3)
+          : aiRecommendation?.top_3?.length
+            ? mapAiDriversToLegacy(aiRecommendation.top_3)
+            : driverDecision.availableDrivers,
+        selected_driver: agentDecision?.selected_driver
+          ? mapAiDriverToLegacy(agentDecision.selected_driver)
+          : aiRecommendation?.selected_driver
+            ? mapAiDriverToLegacy(aiRecommendation.selected_driver)
+            : driverDecision.selectedDriver,
+        agent_strategy: agentDecision?.strategy || null,
+        agent_tool_calls: agentDecision?.tool_calls || [],
+        agent_decision_log: agentDecision?.decision_log || null,
         traffic_level: trafficLevel,
         demand_index: demandIndex,
         supply_index: supplyIndex,

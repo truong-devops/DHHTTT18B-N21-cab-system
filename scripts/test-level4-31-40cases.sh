@@ -11,6 +11,8 @@ ADMIN_PASS="${ADMIN_PASS:-secret123}"
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-30}"
 BOOKING_POLL_TIMEOUT_SEC="${BOOKING_POLL_TIMEOUT_SEC:-25}"
+PAYMENT_PATCH_CONNECT_TIMEOUT="${PAYMENT_PATCH_CONNECT_TIMEOUT:-3}"
+PAYMENT_PATCH_MAX_TIME="${PAYMENT_PATCH_MAX_TIME:-12}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -393,7 +395,18 @@ patch_payment_failed_with_retry() {
     local payload
     payload="{\"status\":\"FAILED\",\"failureReason\":\"$failure_reason\"}"
     local patch_resp
-    patch_resp=$(call_json PATCH "/v1/payments/$payment_id" "$ADMIN_TOKEN" "$payload" "x-actor" "level4-script")
+    patch_resp=$(curl -s -X PATCH "$BASE_URL/v1/payments/$payment_id" \
+      --connect-timeout "$PAYMENT_PATCH_CONNECT_TIMEOUT" \
+      --max-time "$PAYMENT_PATCH_MAX_TIME" \
+      -H "Authorization: Bearer $ADMIN_TOKEN" \
+      -H "Content-Type: application/json" \
+      -H "x-actor: level4-script" \
+      -d "$payload" \
+      -w "\nHTTP_STATUS:%{http_code}" || true)
+    if [[ "$patch_resp" != *"HTTP_STATUS:"* ]]; then
+      patch_resp='{"error":"transport error"}'
+      patch_resp="$patch_resp"$'\nHTTP_STATUS:000'
+    fi
     last_status=$(echo "$patch_resp" | sed -n '1p')
     last_body=$(echo "$patch_resp" | sed '1d')
 
@@ -407,7 +420,11 @@ patch_payment_failed_with_retry() {
       break
     fi
 
-    sleep "$attempt"
+    local backoff="$attempt"
+    if [[ "$backoff" -gt 2 ]]; then
+      backoff=2
+    fi
+    sleep "$backoff"
     attempt=$((attempt + 1))
   done
 
@@ -597,17 +614,17 @@ if [[ -n "$C33_PAYMENT_ID" ]]; then
   C33_PATCH_BODY=$(echo "$C33_PATCH" | sed '1d')
 fi
 
+C33_FLOW=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.flow")
+C33_COMP_APPLIED=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.compensation.applied")
 C33_BOOKING_CANCELLED=0
 if [[ "$(echo "$C33_CREATE_BODY" | json_get "booking.status")" == "CANCELLED" ]]; then
   C33_BOOKING_CANCELLED=1
-elif [[ -n "$C33_BOOKING_ID" ]]; then
+elif [[ -n "$C33_BOOKING_ID" ]] && ([[ "$C33_PATCH_STATUS" == "200" ]] || ([[ "$C33_FLOW" == "partial" ]] && [[ "$C33_COMP_APPLIED" == "true" ]])); then
   if wait_booking_status "$C33_TOKEN" "$C33_BOOKING_ID" "CANCELLED" 25; then
     C33_BOOKING_CANCELLED=1
   fi
 fi
 C33_BOOKING_STATUS=$(get_booking_status "$C33_TOKEN" "$C33_BOOKING_ID")
-C33_FLOW=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.flow")
-C33_COMP_APPLIED=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.compensation.applied")
 C33_PAYMENT_STATUS=""
 if [[ -n "$C33_PAYMENT_ID" ]]; then
   C33_PAYMENT_STATUS=$(get_payment_status "$C33_PAYMENT_ID")
