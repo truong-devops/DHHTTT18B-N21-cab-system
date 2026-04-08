@@ -7,7 +7,7 @@ const monitoring = require('./monitoring');
 const { traceMiddleware } = require('./middleware/trace');
 const { requestLogger } = require('./middleware/requestLogger');
 const { authMiddleware } = require('./middleware/auth');
-const { rateLimiter } = require('./middleware/rateLimit');
+const { authLoginRateLimiter, globalRateLimiter } = require('./middleware/rateLimit');
 const { proxyRequest } = require('./proxy/proxyRequest');
 const { sendError } = require('./utils/http');
 
@@ -23,8 +23,9 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 app.get('/readyz', (_req, res) => res.json({ ok: true }));
 
+app.use(authLoginRateLimiter);
 app.use(authMiddleware);
-app.use(rateLimiter);
+app.use(globalRateLimiter);
 
 app.post('/v1/fraud/check', (req, res) => {
   const payload = req.body || {};

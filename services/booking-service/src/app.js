@@ -7,6 +7,10 @@ const monitoring = require('./monitoring');
 const { traceMiddleware } = require('./middleware/trace');
 const { requestLogger } = require('./middleware/requestLogger');
 const logger = require('./utils/logger');
+
+const DEMO_MAX_ASYNC_INFLIGHT = Number(process.env.DEMO_MAX_ASYNC_INFLIGHT || 2000);
+let demoAsyncInflight = 0;
+
 const app = express();
 app.use(helmet());
 app.use(cors());
@@ -32,12 +36,41 @@ app.post('/demo/ride-created', async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    await publish(topics.RideCreated, event, {
-      key: event.rideId
-    });
+    const asyncPublish = String(process.env.DEMO_RIDE_CREATED_ASYNC || 'true') !== 'false';
+    const canQueueAsync =
+      Number.isFinite(DEMO_MAX_ASYNC_INFLIGHT) && DEMO_MAX_ASYNC_INFLIGHT > 0
+        ? demoAsyncInflight < DEMO_MAX_ASYNC_INFLIGHT
+        : true;
+
+    if (asyncPublish) {
+      if (canQueueAsync) {
+        demoAsyncInflight += 1;
+        publish(topics.RideCreated, event, { key: event.rideId })
+          .catch((publishError) => {
+            logger.withTrace(req).error(
+              {
+                err: {
+                  message: publishError.message,
+                  code: publishError.code || 'UNKNOWN'
+                }
+              },
+              'async demo ride.created publish failed'
+            );
+          })
+          .finally(() => {
+            demoAsyncInflight = Math.max(0, demoAsyncInflight - 1);
+          });
+      }
+    } else {
+      await publish(topics.RideCreated, event, {
+        key: event.rideId
+      });
+    }
 
     return res.json({
       published: true,
+      queued: asyncPublish && canQueueAsync,
+      dropped: asyncPublish && !canQueueAsync,
       topic: topics.RideCreated,
       event
     });

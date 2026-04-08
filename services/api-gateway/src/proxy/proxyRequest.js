@@ -1,4 +1,6 @@
 const fetch = require('node-fetch');
+const http = require('http');
+const https = require('https');
 const { propagation, context } = require('@opentelemetry/api');
 const { SERVICE_URLS } = require('../config/services');
 const { sendError } = require('../utils/http');
@@ -6,6 +8,9 @@ const monitoring = require('../monitoring');
 
 const TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS || 30000);
 const RETRY_BACKOFF_MS = Number(process.env.PROXY_RETRY_BACKOFF_MS || 100);
+const KEEPALIVE_MAX_SOCKETS = Number(process.env.PROXY_KEEPALIVE_MAX_SOCKETS || 1024);
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: KEEPALIVE_MAX_SOCKETS });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: KEEPALIVE_MAX_SOCKETS });
 
 async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -53,6 +58,7 @@ async function attemptRequest(targetUrl, options, dependencyInfo) {
   try {
     const response = await fetch(targetUrl, {
       ...options,
+      agent: (parsedUrl) => (parsedUrl.protocol === 'https:' ? httpsAgent : httpAgent),
       signal: controller.signal
     });
     const contentType = response.headers.get('content-type') || '';
