@@ -163,6 +163,8 @@ services:
     build:
       context: ..
       dockerfile: services/booking-service/Dockerfile
+    ports:
+      - '3003:3003'
     environment:
       SERVICE_NAME: booking-service
       OTEL_SERVICE_NAME: booking-service
@@ -239,6 +241,8 @@ services:
     build:
       context: ..
       dockerfile: services/driver-service/Dockerfile
+    ports:
+      - '3011:3011'
     environment:
       SERVICE_NAME: driver-service
       OTEL_SERVICE_NAME: driver-service

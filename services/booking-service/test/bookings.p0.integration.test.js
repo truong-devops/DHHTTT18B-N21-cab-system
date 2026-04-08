@@ -279,6 +279,31 @@ describe('booking-service P0 integration', () => {
     expect(response.body.integration_flow.flow).toBe('success');
   });
 
+  test('does not return no-driver message when a selected driver exists', async () => {
+    const selectedDriver = { driverId: 'driver_1', distanceMeters: 120 };
+    mockGetDriverAvailability.mockResolvedValue({
+      checked: true,
+      available: false,
+      count: 0
+    });
+    mockListAvailableDrivers.mockResolvedValue([selectedDriver]);
+    mockSelectBestDriver.mockReturnValue(selectedDriver);
+
+    const response = await request(app)
+      .post('/v1/bookings')
+      .set('authorization', 'Bearer test-token')
+      .set('x-user-id', 'user_driver')
+      .send({
+        pickup: { lat: 10.76, lng: 106.66 },
+        drop: { lat: 10.77, lng: 106.7 },
+        vehicleType: 'CAR'
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.ai_driver_decision.selected_driver.driverId).toBe('driver_1');
+    expect(response.body.message).toBeUndefined();
+  });
+
   test('AI select driver returns selected candidate', async () => {
     const drivers = [
       { driverId: 'd2', distanceMeters: 1200 },
