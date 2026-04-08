@@ -17,7 +17,13 @@ async function getProducer() {
       idempotent: true,
       retry: config.kafka.producerRetry
     });
-    producerPromise = producer.connect().then(() => producer);
+    producerPromise = producer
+      .connect()
+      .then(() => producer)
+      .catch((error) => {
+        producerPromise = null;
+        throw error;
+      });
   }
   return producerPromise;
 }
