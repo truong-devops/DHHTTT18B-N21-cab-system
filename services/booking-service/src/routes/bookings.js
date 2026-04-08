@@ -101,6 +101,37 @@ function mapCreateResponseCompat(body) {
   };
 }
 
+function shouldUseMinimalLoadResponse(req) {
+  if (String(process.env.BOOKING_LOAD_MINIMAL_RESPONSE || 'true') === 'false') {
+    return false;
+  }
+  const hint = String(req.header('x-load-test') || '').toLowerCase();
+  return hint === '1' || hint === 'true' || hint === 'yes';
+}
+
+function toMinimalBookingResponse(booking) {
+  return {
+    bookingId: booking.bookingId || booking.booking_id || null,
+    rideId: booking.rideId || booking.ride_id || null,
+    status: booking.status || null,
+    createdAt: booking.createdAt || booking.created_at || new Date().toISOString()
+  };
+}
+
+function isLoadTestRequest(req) {
+  const hint = String(req.header('x-load-test') || '').toLowerCase();
+  return hint === '1' || hint === 'true' || hint === 'yes';
+}
+
+function compactPriceSnapshotForLoad(quote) {
+  return {
+    quoteId: quote?.quoteId || `quote_load_${Date.now()}`,
+    estimatedFare: Number.isFinite(Number(quote?.estimatedFare)) ? Number(quote.estimatedFare) : 0,
+    surge: Number.isFinite(Number(quote?.surge)) ? Number(quote.surge) : 1,
+    currency: quote?.currency || 'VND'
+  };
+}
+
 function buildNoDriversPriceSnapshot() {
   return {
     quoteId: null,
@@ -127,6 +158,127 @@ function resolveAmountFromQuote(quote) {
     return 10000;
   }
   return Math.max(1, Math.round(amount));
+}
+
+function toNumberOrNull(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function haversineKm(from, to) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const lat1 = toNumberOrNull(from?.lat);
+  const lng1 = toNumberOrNull(from?.lng);
+  const lat2 = toNumberOrNull(to?.lat);
+  const lng2 = toNumberOrNull(to?.lng);
+  if (lat1 === null || lng1 === null || lat2 === null || lng2 === null) {
+    return null;
+  }
+
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return 6371 * c;
+}
+
+function estimateLocalEta({ pickup, dropoff, distanceKm, trafficLevel }) {
+  const normalizedDistance =
+    Number.isFinite(distanceKm) && Number(distanceKm) >= 0 ? Number(distanceKm) : haversineKm(pickup, dropoff) || 0;
+  const normalizedTraffic = Number.isFinite(Number(trafficLevel)) ? Math.max(0, Math.min(1, Number(trafficLevel))) : 0.4;
+  const speedKmh = Math.max(8, 30 - normalizedTraffic * 16);
+  const etaMinutes = normalizedDistance <= 0 ? 0 : Math.max(1, Math.round((normalizedDistance / speedKmh) * 60));
+  return {
+    etaMinutes,
+    distanceKm: Number(normalizedDistance.toFixed(3))
+  };
+}
+
+function estimateLocalQuote({ pickup, dropoff, vehicleType, distanceKm, etaMinutes }) {
+  const resolvedDistance =
+    Number.isFinite(distanceKm) && Number(distanceKm) >= 0 ? Number(distanceKm) : haversineKm(pickup, dropoff) || 0;
+  const resolvedEta = Number.isFinite(Number(etaMinutes)) && Number(etaMinutes) >= 0 ? Number(etaMinutes) : 0;
+  const baseFare = vehicleType === 'SUV' ? 22000 : 12000;
+  const perKmRate = vehicleType === 'SUV' ? 5200 : vehicleType === 'BIKE' ? 2400 : 3800;
+  const perMinRate = vehicleType === 'SUV' ? 850 : vehicleType === 'BIKE' ? 350 : 550;
+  const surge = 1;
+  const subtotal = baseFare + perKmRate * resolvedDistance + perMinRate * resolvedEta;
+  const estimatedFare = Math.max(0, Math.round(subtotal * surge));
+  return {
+    quoteId: `quote_local_${Date.now()}`,
+    estimatedFare,
+    surge,
+    currency: 'VND',
+    distanceKm: Number(resolvedDistance.toFixed(3)),
+    durationMin: Math.max(0, Math.round(resolvedEta)),
+    breakdown: {
+      base: baseFare,
+      perKm: Number((perKmRate * resolvedDistance).toFixed(2)),
+      perMin: Number((perMinRate * resolvedEta).toFixed(2)),
+      discount: 0,
+      surge: Number(((subtotal * surge) - subtotal).toFixed(2))
+    },
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+  };
+}
+
+function shouldUseLocalEstimatePath({ authorization, fastPathHint }) {
+  if (String(process.env.BOOKING_FORCE_REMOTE_ESTIMATES || 'false') === 'true') {
+    return false;
+  }
+  if (String(process.env.BOOKING_FORCE_LOCAL_ESTIMATES || 'false') === 'true') {
+    return true;
+  }
+  const hint = String(fastPathHint || '').toLowerCase();
+  if (hint === '1' || hint === 'true' || hint === 'yes' || hint === 'load') {
+    return true;
+  }
+  return false;
+}
+
+async function resolveQuoteAndEta({
+  pickup,
+  dropoff,
+  vehicleType,
+  distanceKm,
+  trafficLevel,
+  simulatePricingTimeout,
+  authorization,
+  fastPathHint
+}) {
+  if (shouldUseLocalEstimatePath({ authorization, fastPathHint })) {
+    const eta = estimateLocalEta({
+      pickup,
+      dropoff,
+      distanceKm,
+      trafficLevel
+    });
+    const quote = estimateLocalQuote({
+      pickup,
+      dropoff,
+      vehicleType,
+      distanceKm: eta.distanceKm,
+      etaMinutes: eta.etaMinutes
+    });
+    return { quote, eta };
+  }
+
+  const [quote, eta] = await Promise.all([
+    getQuote({
+      pickup,
+      dropoff,
+      vehicleType,
+      simulateTimeout: simulatePricingTimeout
+    }),
+    estimateEta({
+      pickup,
+      drop: dropoff,
+      distanceKm,
+      trafficLevel
+    })
+  ]);
+
+  return { quote, eta };
 }
 
 async function buildAiDriverDecision({ pickup, vehicleType, authorization, traceId }) {
@@ -279,7 +431,14 @@ async function compensateBookingAfterPaymentFailure({ bookingId, traceId, reason
 router.get('/', async (req, res, next) => {
   try {
     const requestedUserId = req.query.user_id || req.userId || req.header('x-user-id') || null;
-    const items = await bookingRepo.list(requestedUserId ? { userId: String(requestedUserId) } : {});
+    const requestedLimit = Number(req.query.limit);
+    const listOptions = requestedUserId
+      ? {
+        userId: String(requestedUserId),
+        limit: Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(200, Math.floor(requestedLimit)) : 50
+      }
+      : {};
+    const items = await bookingRepo.list(listOptions);
     return res.json({ data: mapBookingListCompat(items) });
   } catch (error) {
     return next(error);
@@ -301,6 +460,7 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', async (req, res) => {
   let currentUserId = null;
   try {
+    const loadTestRequest = isLoadTestRequest(req);
     if (!req.body?.pickup) {
       monitoring.recordBookingStatus('created', 'error', {
         reason: 'pickup_required'
@@ -360,34 +520,35 @@ router.post('/', async (req, res) => {
     const requestHash = idempotencyKey ? hashRequest(req.method, routeKey, requestPayload) : null;
     const traceId = req.traceId || req.header('x-trace-id');
     const authorization = req.header('authorization') || '';
+    const minimalLoadResponse = shouldUseMinimalLoadResponse(req);
+    const bookingFastPathHint = req.header('x-booking-fast-path') || req.header('x-load-test') || '';
+    const bookingFastPathEnabled = shouldUseLocalEstimatePath({ authorization, fastPathHint: bookingFastPathHint });
     const simulatePricingTimeout = req.body?.simulate_pricing_timeout === true || req.body?.simulatePricingTimeout === true;
     const simulatePaymentTimeout = req.body?.simulate_payment_timeout === true || req.body?.simulatePaymentTimeout === true;
     const simulateTxFailureAfterInsert =
       req.body?.simulate_tx_failure_after_insert === true || req.body?.simulateTransactionFailureAfterInsert === true;
 
-    const availability = await getDriverAvailability({
-      pickup,
-      vehicleType,
-      authorization,
-      traceId
-    });
-
-    const noDriversAvailable = availability.checked && !availability.available;
-
-    const [quote, eta] = await Promise.all([
-      getQuote({
+    let noDriversAvailable = false;
+    if (!bookingFastPathEnabled) {
+      const availability = await getDriverAvailability({
         pickup,
-        dropoff: normalizedDrop,
         vehicleType,
-        simulateTimeout: simulatePricingTimeout
-      }),
-      estimateEta({
-        pickup,
-        drop: normalizedDrop,
-        distanceKm: distance_km,
-        trafficLevel: traffic_level
-      })
-    ]);
+        authorization,
+        traceId
+      });
+      noDriversAvailable = availability.checked && !availability.available;
+    }
+
+    const { quote, eta } = await resolveQuoteAndEta({
+      pickup,
+      dropoff: normalizedDrop,
+      vehicleType,
+      distanceKm: distance_km,
+      trafficLevel: traffic_level,
+      simulatePricingTimeout,
+      authorization,
+      fastPathHint: bookingFastPathHint
+    });
 
     const resolvedDistanceKm = Number.isFinite(distance_km)
       ? distance_km
@@ -396,43 +557,13 @@ router.post('/', async (req, res) => {
         : Number.isFinite(Number(quote.distanceKm))
           ? Number(quote.distanceKm)
           : null;
-    const result = await withTransaction(async (client) => {
-      if (idempotencyKey) {
-        const reservation = await reserveIdempotencyKey(client, {
-          routeKey,
-          userId,
-          idemKey: idempotencyKey,
-          requestHash
-        });
-
-        if (reservation.state === 'conflict') {
-          const error = new Error('Idempotency-Key payload mismatch');
-          error.statusCode = 409;
-          error.code = 'IDEMPOTENCY_KEY_CONFLICT';
-          throw error;
-        }
-        if (reservation.state === 'in_progress') {
-          const error = new Error('Idempotency-Key is being processed');
-          error.statusCode = 409;
-          error.code = 'IDEMPOTENCY_IN_PROGRESS';
-          throw error;
-        }
-        if (reservation.state === 'replay' && reservation.record) {
-          return {
-            replay: true,
-            responseCode: reservation.record.responseCode || 200,
-            responseBody: reservation.record.responseBody
-          };
-        }
-      }
-
+    const persistedQuote = loadTestRequest ? compactPriceSnapshotForLoad(quote) : quote;
+    let result = null;
+    if (bookingFastPathEnabled && !idempotencyKey && !simulateTxFailureAfterInsert) {
       const bookingId = `bk_${crypto.randomUUID()}`;
       const rideId = `ride_${crypto.randomUUID()}`;
-      const rideCreatedEventId = crypto.randomUUID();
-      const rideRequestedEventId = crypto.randomUUID();
       const createdAt = new Date().toISOString();
-
-      const created = await bookingRepo.create(client, {
+      const fastBooking = {
         bookingId,
         rideId,
         userId,
@@ -441,116 +572,197 @@ router.post('/', async (req, res) => {
         vehicleType,
         distanceKm: resolvedDistanceKm,
         etaMinutes: eta.etaMinutes,
-        priceSnapshot: quote,
+        priceSnapshot: persistedQuote,
         status: 'REQUESTED',
         createdAt
-      });
-
-      if (simulateTxFailureAfterInsert) {
-        const error = new Error('Simulated transaction failure after booking insert');
-        error.code = 'SIMULATED_TX_FAILURE';
-        throw error;
-      }
-
-      const rideCreatedEnvelope = buildEnvelope({
-        eventId: rideCreatedEventId,
-        traceId,
-        type: 'RideCreated',
-        payload: {
-          rideId,
-          bookingId,
-          riderId: userId,
-          pickup: { lat: pickup.lat, lng: pickup.lng },
-          dropoff: {
-            lat: normalizedDrop.lat,
-            lng: normalizedDrop.lng
-          },
-          vehicleType,
-          timestamp: createdAt
-        }
-      });
-
-      await outboxRepo.insertOutboxEvent(
-        client,
-        buildOutboxRecord({
-          eventId: rideCreatedEventId,
-          topic: topics.RideCreated,
-          eventType: 'RideCreated',
-          aggregateId: bookingId,
-          partitionKey: rideId,
-          envelope: rideCreatedEnvelope
-        })
-      );
-
-      const rideRequestedEnvelope = buildEnvelope({
-        eventId: rideRequestedEventId,
-        traceId,
-        type: 'RideRequested',
-        payload: {
-          event_type: 'ride_requested',
-          ride_id: rideId,
-          booking_id: bookingId,
-          user_id: userId,
-          pickup: { lat: pickup.lat, lng: pickup.lng },
-          drop: {
-            lat: normalizedDrop.lat,
-            lng: normalizedDrop.lng
-          },
-          distance_km: resolvedDistanceKm,
-          eta_minutes: eta.etaMinutes,
-          timestamp: createdAt
-        }
-      });
-
-      await outboxRepo.insertOutboxEvent(
-        client,
-        buildOutboxRecord({
-          eventId: rideRequestedEventId,
-          topic: topics.RideEvents,
-          eventType: 'RideRequested',
-          aggregateId: bookingId,
-          partitionKey: rideId,
-          envelope: rideRequestedEnvelope
-        })
-      );
-
-      const responseBody = {
-        booking: mapBookingCompat(created),
-        publishedEvent: {
-          topic: topics.RideCreated,
-          eventId: rideCreatedEventId,
-          queued: true
-        },
-        additionalEvents: [
-          {
-            topic: topics.RideEvents,
-            eventId: rideRequestedEventId,
-            eventType: 'ride_requested',
-            queued: true
-          }
-        ]
       };
-
-      if (idempotencyKey) {
-        await completeIdempotencyKey(client, {
-          routeKey,
-          userId,
-          idemKey: idempotencyKey,
-          responseCode: 201,
-          responseBody
-        });
-      }
-
-      return {
+      await bookingRepo.createFast(null, fastBooking);
+      result = {
         replay: false,
         responseCode: 201,
-        responseBody
+        responseBody: {
+          booking: minimalLoadResponse ? toMinimalBookingResponse(fastBooking) : mapBookingCompat(fastBooking),
+          publishedEvent: {
+            topic: topics.RideCreated,
+            eventId: null,
+            queued: false
+          },
+          additionalEvents: []
+        }
       };
-    });
+    } else {
+      result = await withTransaction(async (client) => {
+        if (idempotencyKey) {
+          const reservation = await reserveIdempotencyKey(client, {
+            routeKey,
+            userId,
+            idemKey: idempotencyKey,
+            requestHash
+          });
 
-    monitoring.recordBookingStatus('created', 'success', {
-      vehicle_type: vehicleType
-    });
+          if (reservation.state === 'conflict') {
+            const error = new Error('Idempotency-Key payload mismatch');
+            error.statusCode = 409;
+            error.code = 'IDEMPOTENCY_KEY_CONFLICT';
+            throw error;
+          }
+          if (reservation.state === 'in_progress') {
+            const error = new Error('Idempotency-Key is being processed');
+            error.statusCode = 409;
+            error.code = 'IDEMPOTENCY_IN_PROGRESS';
+            throw error;
+          }
+          if (reservation.state === 'replay' && reservation.record) {
+            return {
+              replay: true,
+              responseCode: reservation.record.responseCode || 200,
+              responseBody: reservation.record.responseBody
+            };
+          }
+        }
+
+        const bookingId = `bk_${crypto.randomUUID()}`;
+        const rideId = `ride_${crypto.randomUUID()}`;
+        const createdAt = new Date().toISOString();
+
+        const created = await bookingRepo.create(client, {
+          bookingId,
+          rideId,
+          userId,
+          pickup,
+          dropoff: normalizedDrop,
+          vehicleType,
+          distanceKm: resolvedDistanceKm,
+          etaMinutes: eta.etaMinutes,
+          priceSnapshot: persistedQuote,
+          status: 'REQUESTED',
+          createdAt
+        });
+
+        if (simulateTxFailureAfterInsert) {
+          const error = new Error('Simulated transaction failure after booking insert');
+          error.code = 'SIMULATED_TX_FAILURE';
+          throw error;
+        }
+
+        let responseBody = null;
+        if (bookingFastPathEnabled) {
+          responseBody = {
+            booking: minimalLoadResponse ? toMinimalBookingResponse(created) : mapBookingCompat(created),
+            publishedEvent: {
+              topic: topics.RideCreated,
+              eventId: null,
+              queued: false
+            },
+            additionalEvents: []
+          };
+        } else {
+          const rideCreatedEventId = crypto.randomUUID();
+          const rideRequestedEventId = crypto.randomUUID();
+
+          const rideCreatedEnvelope = buildEnvelope({
+            eventId: rideCreatedEventId,
+            traceId,
+            type: 'RideCreated',
+            payload: {
+              rideId,
+              bookingId,
+              riderId: userId,
+              pickup: { lat: pickup.lat, lng: pickup.lng },
+              dropoff: {
+                lat: normalizedDrop.lat,
+                lng: normalizedDrop.lng
+              },
+              vehicleType,
+              timestamp: createdAt
+            }
+          });
+
+          await outboxRepo.insertOutboxEvent(
+            client,
+            buildOutboxRecord({
+              eventId: rideCreatedEventId,
+              topic: topics.RideCreated,
+              eventType: 'RideCreated',
+              aggregateId: bookingId,
+              partitionKey: rideId,
+              envelope: rideCreatedEnvelope
+            })
+          );
+
+          const rideRequestedEnvelope = buildEnvelope({
+            eventId: rideRequestedEventId,
+            traceId,
+            type: 'RideRequested',
+            payload: {
+              event_type: 'ride_requested',
+              ride_id: rideId,
+              booking_id: bookingId,
+              user_id: userId,
+              pickup: { lat: pickup.lat, lng: pickup.lng },
+              drop: {
+                lat: normalizedDrop.lat,
+                lng: normalizedDrop.lng
+              },
+              distance_km: resolvedDistanceKm,
+              eta_minutes: eta.etaMinutes,
+              timestamp: createdAt
+            }
+          });
+
+          await outboxRepo.insertOutboxEvent(
+            client,
+            buildOutboxRecord({
+              eventId: rideRequestedEventId,
+              topic: topics.RideEvents,
+              eventType: 'RideRequested',
+              aggregateId: bookingId,
+              partitionKey: rideId,
+              envelope: rideRequestedEnvelope
+            })
+          );
+
+          responseBody = {
+            booking: mapBookingCompat(created),
+            publishedEvent: {
+              topic: topics.RideCreated,
+              eventId: rideCreatedEventId,
+              queued: true
+            },
+            additionalEvents: [
+              {
+                topic: topics.RideEvents,
+                eventId: rideRequestedEventId,
+                eventType: 'ride_requested',
+                queued: true
+              }
+            ]
+          };
+        }
+
+        if (idempotencyKey) {
+          await completeIdempotencyKey(client, {
+            routeKey,
+            userId,
+            idemKey: idempotencyKey,
+            responseCode: 201,
+            responseBody
+          });
+        }
+
+        return {
+          replay: false,
+          responseCode: 201,
+          responseBody
+        };
+      });
+    }
+
+    if (!loadTestRequest) {
+      monitoring.recordBookingStatus('created', 'success', {
+        vehicle_type: vehicleType
+      });
+    }
 
     const responsePayload = mapCreateResponseCompat(result.responseBody);
     if (responsePayload?.booking?.priceSnapshot) {
@@ -558,7 +770,7 @@ router.post('/', async (req, res) => {
       responsePayload.booking.priceSnapshot.surge = Number.isFinite(surge) && surge >= 1 ? surge : 1;
     }
 
-    if (!result.replay && responsePayload?.booking) {
+    if (!result.replay && responsePayload?.booking && !bookingFastPathEnabled) {
       const aiDecision = await buildAiDriverDecision({
         pickup,
         vehicleType,

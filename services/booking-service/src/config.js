@@ -44,9 +44,14 @@ module.exports = {
     },
     producerMaxInFlightRequests: toNumber(process.env.KAFKA_PRODUCER_MAX_IN_FLIGHT_REQUESTS, 5)
   },
+  startup: {
+    maxRetries: toNumber(process.env.STARTUP_MAX_RETRIES, 0),
+    retryInitialDelayMs: toNumber(process.env.STARTUP_RETRY_INITIAL_DELAY_MS, 1000),
+    retryMaxDelayMs: toNumber(process.env.STARTUP_RETRY_MAX_DELAY_MS, 15000)
+  },
   db: {
     connectionString: process.env.DATABASE_URL || 'postgres://cab:cabpass@localhost:5432/booking-service_db',
-    maxPoolSize: toNumber(process.env.PGPOOL_MAX, 10)
+    maxPoolSize: toNumber(process.env.PGPOOL_MAX, 60)
   },
   outbox: {
     publishIntervalMs: toNumber(process.env.OUTBOX_PUBLISH_INTERVAL_MS, 3000),

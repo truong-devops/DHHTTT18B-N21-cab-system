@@ -15,10 +15,6 @@ const kafka = new Kafka({
   retry: config.kafka.consumerRetry
 });
 
-const consumer = kafka.consumer({
-  groupId: config.kafka.consumerGroupId
-});
-
 function headerValueToString(value) {
   if (value == null) {
     return '';
@@ -194,6 +190,10 @@ async function startConsumer() {
   if (!config.kafka.consumeTopics.length) {
     return null;
   }
+
+  const consumer = kafka.consumer({
+    groupId: config.kafka.consumerGroupId
+  });
 
   await consumer.connect();
   for (const topic of config.kafka.consumeTopics) {

@@ -48,6 +48,28 @@ async function create(client, booking) {
   return mapRow(result.rows[0]);
 }
 
+async function createFast(client, booking) {
+  const db = executor(client);
+  await db.query(
+    `INSERT INTO bookings
+      (booking_id, ride_id, user_id, pickup, dropoff, vehicle_type, distance_km, eta_minutes, price_snapshot, status, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      booking.bookingId,
+      booking.rideId,
+      booking.userId || null,
+      booking.pickup,
+      booking.dropoff,
+      booking.vehicleType,
+      Number.isFinite(booking.distanceKm) ? booking.distanceKm : null,
+      Number.isFinite(booking.etaMinutes) ? booking.etaMinutes : null,
+      booking.priceSnapshot,
+      booking.status,
+      booking.createdAt || new Date().toISOString()
+    ]
+  );
+}
+
 async function getById(bookingId, client) {
   const db = executor(client);
   const result = await db.query('SELECT * FROM bookings WHERE booking_id = $1 LIMIT 1', [bookingId]);
@@ -126,13 +148,21 @@ async function list(optionsOrClient, maybeClient) {
   const db = executor(client);
   const userId = options.userId || null;
   const result = userId
-    ? await db.query('SELECT * FROM bookings WHERE user_id = $1 ORDER BY created_at DESC', [userId])
+    ? await db.query(
+      `SELECT booking_id, ride_id, user_id, vehicle_type, distance_km, eta_minutes, status, created_at, cancelled_at
+         FROM bookings
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2`,
+      [userId, Number(options.limit) > 0 ? Number(options.limit) : 50]
+    )
     : await db.query('SELECT * FROM bookings ORDER BY created_at DESC');
   return result.rows.map(mapRow);
 }
 
 module.exports = {
   create,
+  createFast,
   getById,
   getByRideId,
   getByIdForUpdate,

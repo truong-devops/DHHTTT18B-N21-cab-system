@@ -1,5 +1,7 @@
 const { context, trace } = require('@opentelemetry/api');
 
+const ACCESS_LOG_ENABLED = String(process.env.HTTP_ACCESS_LOG_ENABLED || 'false') === 'true';
+
 function getOtelTraceId() {
   const span = trace.getSpan(context.active());
   const spanContext = span && span.spanContext();
@@ -7,6 +9,10 @@ function getOtelTraceId() {
 }
 
 function requestLogger(req, res, next) {
+  if (!ACCESS_LOG_ENABLED) {
+    return next();
+  }
+
   const start = process.hrtime.bigint();
 
   res.on('finish', () => {
