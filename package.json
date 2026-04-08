@@ -20,6 +20,7 @@
     "seed:customer:real": "node scripts/seed-real-customer.js",
     "start:ai-service": "npm run start --workspace @services/ai-service",
     "test:level5": "./scripts/test-level5-41-50cases.sh",
+    "test:level6": "./scripts/test-level6-51-60cases.sh",
     "generate:payment-types": "openapi-typescript contracts/openapi/payment-service.yaml -o libs/types/src/payment-service.ts",
     "contracts:events:validate": "node scripts/contracts/events/validate-events.js",
     "contracts:events:compat": "node scripts/contracts/events/check-backward-compat.js"
