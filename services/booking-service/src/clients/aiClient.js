@@ -66,6 +66,26 @@ async function recommendDrivers({ pickup, vehicleType, candidates, authorization
   );
 }
 
+async function agentSelectDriver({ pickup, drop, vehicleType, candidates, context, simulateToolError, simulateModelError, authorization, traceId }) {
+  return post(
+    '/v1/ai/agent/select-driver',
+    {
+      pickup,
+      drop,
+      vehicle_type: vehicleType,
+      candidates,
+      context,
+      simulate_tool_error: Boolean(simulateToolError),
+      simulate_model_error: Boolean(simulateModelError)
+    },
+    {
+      authorization,
+      traceId,
+      operation: 'agent_select_driver'
+    }
+  );
+}
+
 async function forecastDemand({ zoneId, horizonMin, timestamp, authorization, traceId }) {
   return post(
     '/v1/ai/forecast-demand',
@@ -102,6 +122,7 @@ function logAiFallback(req, reason) {
 
 module.exports = {
   recommendDrivers,
+  agentSelectDriver,
   forecastDemand,
   scoreFraud,
   logAiFallback,

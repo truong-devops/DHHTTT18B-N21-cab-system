@@ -29,7 +29,11 @@ const metrics = createServiceMetrics({
 const localStats = {
   inferenceTotal: {},
   fallbackTotal: {},
-  latency: {}
+  latency: {},
+  agentDecisionTotal: 0,
+  agentFallbackTotal: 0,
+  agentToolRetryTotal: 0,
+  agentLatency: []
 };
 
 function recordLocalInference(endpoint, latencyMs, fallbackUsed) {
@@ -90,6 +94,28 @@ function recordAiInference({ endpoint, modelVersion, latencyMs, statusCode = 200
   recordLocalInference(endpoint, latencyMs, fallbackUsed);
 }
 
+function recordAgentDecision({ strategy = 'unknown', fallbackUsed = false, retryCount = 0, latencyMs = 0 }) {
+  localStats.agentDecisionTotal += 1;
+  if (fallbackUsed) {
+    localStats.agentFallbackTotal += 1;
+  }
+  localStats.agentToolRetryTotal += Math.max(0, Number(retryCount) || 0);
+  localStats.agentLatency.push(Number(latencyMs) || 0);
+  if (localStats.agentLatency.length > 2000) {
+    localStats.agentLatency.shift();
+  }
+
+  metrics.recordBusinessEvent({
+    domain: 'ai_agent',
+    event: 'decision',
+    outcome: 'success',
+    attributes: {
+      strategy: String(strategy),
+      fallback_used: String(Boolean(fallbackUsed))
+    }
+  });
+}
+
 function renderPrometheusMetrics() {
   const lines = [];
   lines.push('# HELP ai_inference_total Total AI inferences by endpoint');
@@ -107,10 +133,23 @@ function renderPrometheusMetrics() {
   Object.entries(localStats.latency).forEach(([endpoint, values]) => {
     lines.push(`ai_latency_p95_ms{endpoint="${endpoint}"} ${Number(percentile(values, 95).toFixed(2))}`);
   });
+  lines.push('# HELP agent_decision_total Total AI agent decisions');
+  lines.push('# TYPE agent_decision_total counter');
+  lines.push(`agent_decision_total ${localStats.agentDecisionTotal}`);
+  lines.push('# HELP agent_fallback_total Total AI agent fallback decisions');
+  lines.push('# TYPE agent_fallback_total counter');
+  lines.push(`agent_fallback_total ${localStats.agentFallbackTotal}`);
+  lines.push('# HELP agent_tool_retry_total Total retries performed by agent tools');
+  lines.push('# TYPE agent_tool_retry_total counter');
+  lines.push(`agent_tool_retry_total ${localStats.agentToolRetryTotal}`);
+  lines.push('# HELP agent_latency_p95_ms Last-window p95 for agent decision latency');
+  lines.push('# TYPE agent_latency_p95_ms gauge');
+  lines.push(`agent_latency_p95_ms ${Number(percentile(localStats.agentLatency, 95).toFixed(2))}`);
   return lines.join('\n');
 }
 
 module.exports = Object.assign(metrics, {
   recordAiInference,
+  recordAgentDecision,
   renderPrometheusMetrics
 });

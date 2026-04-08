@@ -6,6 +6,8 @@ const { recommendDrivers } = require('../services/recommendationService');
 const { scoreFraud } = require('../services/fraudService');
 const { forecastDemand } = require('../services/forecastService');
 const { checkDrift } = require('../services/driftService');
+const { selectDriverWithAgent } = require('../services/agentService');
+const { getDecisionByTraceId } = require('../services/decisionLogger');
 
 const router = express.Router();
 
@@ -27,6 +29,78 @@ function ensureLatLng(prefix, value, errors) {
     errors.push({ path: `${prefix}.lng`, message: 'must be a number between -180 and 180' });
   }
 }
+
+router.post(
+  '/agent/select-driver',
+  validateRequest({
+    bodySchema: {
+      required: ['pickup', 'candidates'],
+      properties: {
+        pickup: { type: 'object' },
+        drop: { type: 'object' },
+        vehicle_type: { type: 'string' },
+        candidates: {},
+        context: { type: 'object' },
+        simulate_tool_error: { type: 'boolean' },
+        simulate_model_error: { type: 'boolean' }
+      }
+    },
+    custom: (req, errors) => {
+      ensureLatLng('body.pickup', req.body?.pickup, errors);
+      if (req.body?.drop) {
+        ensureLatLng('body.drop', req.body?.drop, errors);
+      }
+      if (!Array.isArray(req.body?.candidates)) {
+        errors.push({ path: 'body.candidates', message: 'must be an array' });
+      }
+
+      const objective = String(req.body?.context?.objective || 'auto').toLowerCase();
+      if (!['nearest', 'highest_rating', 'balanced_eta_price', 'auto'].includes(objective)) {
+        errors.push({ path: 'body.context.objective', message: 'must be one of nearest|highest_rating|balanced_eta_price|auto' });
+      }
+    }
+  }),
+  async (req, res, next) => {
+    const started = nowMs();
+    try {
+      const result = await selectDriverWithAgent(req.body || {}, {
+        traceId: req.traceId || req.header('x-trace-id'),
+        authorization: req.header('authorization') || ''
+      });
+      const latencyMs = Number((nowMs() - started).toFixed(2));
+      monitoring.recordAiInference({
+        endpoint: 'agent_select_driver',
+        modelVersion: result.model_version,
+        latencyMs,
+        statusCode: 200,
+        fallbackUsed: result.fallback_used
+      });
+      monitoring.recordAgentDecision({
+        strategy: result.strategy || 'unknown',
+        fallbackUsed: result.fallback_used,
+        retryCount: Number(result.retry_count || 0),
+        latencyMs
+      });
+      return res.json({
+        data: {
+          ...result,
+          latency_ms: latencyMs
+        }
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+router.get('/agent/decisions/:trace_id', (req, res) => {
+  const traceId = String(req.params?.trace_id || '');
+  const decision = getDecisionByTraceId(traceId);
+  if (!decision) {
+    throw new ApiError(404, 'NOT_FOUND', 'Decision not found');
+  }
+  return res.json({ data: decision });
+});
 
 router.post(
   '/recommend-drivers',
