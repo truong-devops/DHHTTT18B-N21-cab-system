@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { useRoutePolyline } from '../../hooks/useRoutePolyline';
 import { colors, spacing, typography } from '../../theme/tokens';
+import { IconSymbol } from '../ui/icon-symbol';
 
 const DEFAULT_DELTA = {
   latitudeDelta: 0.012,
@@ -21,9 +22,16 @@ type Props = {
   destination?: Coordinate | null;
   showRoute?: boolean;
   onLocationChange?: (coords: Coordinate) => void;
+  showCenterPickupPin?: boolean;
 };
 
-export const CustomerLiveMap: React.FC<Props> = ({ label = 'Bản đồ trực tiếp', destination, showRoute = false, onLocationChange }) => {
+export const CustomerLiveMap: React.FC<Props> = ({
+  label = 'Ban do truc tiep',
+  destination,
+  showRoute = false,
+  onLocationChange,
+  showCenterPickupPin = false
+}) => {
   const mapRef = useRef<MapView | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const [permission, setPermission] = useState<'checking' | 'granted' | 'denied'>('checking');
@@ -65,7 +73,7 @@ export const CustomerLiveMap: React.FC<Props> = ({ label = 'Bản đồ trực t
         if (!mounted) return;
         if (status !== 'granted') {
           setPermission('denied');
-          setLocationError('Cần cấp quyền vị trí để hiển thị bản đồ trực tiếp.');
+          setLocationError('Can cap quyen vi tri de hien thi ban do.');
           return;
         }
 
@@ -102,7 +110,7 @@ export const CustomerLiveMap: React.FC<Props> = ({ label = 'Bản đồ trực t
       } catch (error: any) {
         if (!mounted) return;
         setPermission('denied');
-        setLocationError(error?.message || 'Không thể lấy vị trí hiện tại của bạn.');
+        setLocationError(error?.message || 'Khong the lay vi tri hien tai cua ban.');
       }
     };
 
@@ -151,8 +159,8 @@ export const CustomerLiveMap: React.FC<Props> = ({ label = 'Bản đồ trực t
   if (permission === 'denied') {
     return (
       <View style={styles.blocked}>
-        <Text style={styles.blockedTitle}>Không thể truy cập vị trí</Text>
-        <Text style={styles.blockedText}>{locationError || 'Vui lòng bật quyền vị trí trong cài đặt thiết bị.'}</Text>
+        <Text style={styles.blockedTitle}>Khong the truy cap vi tri</Text>
+        <Text style={styles.blockedText}>{locationError || 'Vui long bat quyen vi tri trong cai dat thiet bi.'}</Text>
       </View>
     );
   }
@@ -183,7 +191,7 @@ export const CustomerLiveMap: React.FC<Props> = ({ label = 'Bản đồ trực t
         followsUserLocation
         loadingEnabled
       >
-        {userCoordinate ? <Marker coordinate={userCoordinate} title="Vị trí của bạn" /> : null}
+        {userCoordinate ? <Marker coordinate={userCoordinate} title="Vi tri cua ban" /> : null}
         {destination ? <Marker coordinate={destination} title={destination.label || 'Diem den'} pinColor="#F97316" /> : null}
         {polylineCoordinates.length >= 2 ? <Polyline coordinates={polylineCoordinates} strokeWidth={4} strokeColor="#F97316" /> : null}
       </MapView>
@@ -201,10 +209,19 @@ export const CustomerLiveMap: React.FC<Props> = ({ label = 'Bản đồ trực t
         </TouchableOpacity>
       </View>
 
+      {showCenterPickupPin ? (
+        <View pointerEvents="none" style={styles.pickupPinWrap}>
+          <View style={styles.pickupPin}>
+            <IconSymbol name="pin.fill" size={18} color={colors.brand700} />
+          </View>
+          <View style={styles.pickupPinDot} />
+        </View>
+      ) : null}
+
       {showRoute && isRouteLoading ? (
         <View style={styles.routeStatus}>
           <ActivityIndicator size="small" color={colors.brand700} />
-          <Text style={styles.routeStatusText}>Đang tải lộ trình OSRM...</Text>
+          <Text style={styles.routeStatusText}>Dang tai lo trinh OSRM...</Text>
         </View>
       ) : null}
       {showRoute && !isRouteLoading && routeError ? (
@@ -219,7 +236,6 @@ export const CustomerLiveMap: React.FC<Props> = ({ label = 'Bản đồ trực t
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#E8EEF2'
   },
@@ -256,9 +272,33 @@ const styles = StyleSheet.create({
     color: colors.brand700,
     fontWeight: '700'
   },
+  pickupPinWrap: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    marginLeft: -14,
+    marginTop: -34,
+    alignItems: 'center'
+  },
+  pickupPin: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.brand100
+  },
+  pickupPinDot: {
+    marginTop: 2,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.brand700
+  },
   blocked: {
     flex: 1,
-    borderRadius: 14,
     backgroundColor: '#EEF1F4',
     alignItems: 'center',
     justifyContent: 'center',

@@ -5,6 +5,7 @@ import { OutlineButton } from '../../components/common/OutlineButton';
 import { PrimaryButton } from '../../components/common/PrimaryButton';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { useCustomerStore } from '../../store/customerStore';
+import { IconSymbol } from '../../components/ui/icon-symbol';
 
 const primary = '#FF5A1F';
 const primaryDark = '#FF3B1D';
@@ -27,9 +28,9 @@ const ProfileWalletScreen = () => {
     try {
       setSaving(true);
       await updateProfile({ name, email, phone });
-      Alert.alert('Thành công', 'Đã cập nhật thông tin tài khoản.');
+      Alert.alert('Thanh cong', 'Da cap nhat thong tin tai khoan.');
     } catch (e: any) {
-      Alert.alert('Lỗi', e?.message || 'Cập nhật thất bại');
+      Alert.alert('Loi', e?.message || 'Cap nhat that bai');
     } finally {
       setSaving(false);
     }
@@ -38,30 +39,28 @@ const ProfileWalletScreen = () => {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl }}>
-        {/* Header */}
         <View style={styles.headerWrap}>
           <LinearGradient colors={[primary, primaryDark]} style={styles.headerGradient}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{(user?.name || 'K').charAt(0).toUpperCase()}</Text>
             </View>
-            <Text style={styles.name}>{user?.name || 'Khách'}</Text>
-            <Text style={styles.sub}>★ 4.9 · {user?.phone || '090x xxx xxx'}</Text>
+            <Text style={styles.name}>{user?.name || 'Khach'}</Text>
+            <Text style={styles.sub}>4.9 - {user?.phone || '090x xxx xxx'}</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>Thành viên</Text>
+              <Text style={styles.badgeText}>Thanh vien</Text>
             </View>
             <View style={styles.editBtn}>
-              <Text style={styles.editIcon}>✎</Text>
+              <IconSymbol name="edit.fill" size={18} color={primary} />
             </View>
           </LinearGradient>
         </View>
 
-        {/* Thông tin thật từ backend */}
         <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg, gap: spacing.sm }}>
-          <Text style={{ ...typography.h2, color: colors.text }}>Thông tin thật</Text>
-          <Text style={{ ...typography.body, color: colors.muted }}>Dữ liệu lấy trực tiếp từ database qua API Gateway.</Text>
+          <Text style={{ ...typography.h2, color: colors.text }}>Thong tin tai khoan</Text>
+          <Text style={{ ...typography.body, color: colors.muted }}>Du lieu lay truc tiep tu database qua API Gateway.</Text>
           <View style={styles.formRow}>
-            <Text style={styles.infoLabel}>Họ tên</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Nhập họ tên" />
+            <Text style={styles.infoLabel}>Ho ten</Text>
+            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Nhap ho ten" />
           </View>
           <View style={styles.formRow}>
             <Text style={styles.infoLabel}>Email</Text>
@@ -75,18 +74,18 @@ const ProfileWalletScreen = () => {
             />
           </View>
           <View style={styles.formRow}>
-            <Text style={styles.infoLabel}>Số điện thoại</Text>
+            <Text style={styles.infoLabel}>So dien thoai</Text>
             <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="09xxxxxxx" keyboardType="phone-pad" />
           </View>
           <View style={styles.formRow}>
             <Text style={styles.infoLabel}>User ID</Text>
             <Text style={styles.infoValue}>{user?.id}</Text>
           </View>
-          <PrimaryButton title={saving ? 'Đang lưu...' : 'Lưu thay đổi'} onPress={onSave} disabled={saving} />
+          <PrimaryButton title={saving ? 'Dang luu...' : 'Luu thay doi'} onPress={onSave} disabled={saving} />
         </View>
 
         <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg }}>
-          <OutlineButton title="Đăng xuất" onPress={logout} />
+          <OutlineButton title="Dang xuat" onPress={logout} />
         </View>
       </ScrollView>
     </View>
@@ -134,15 +133,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.85)',
     alignItems: 'center',
     justifyContent: 'center'
-  },
-  editIcon: { ...typography.body, color: primary },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 1,
-    borderColor: colors.border
   },
   infoLabel: { ...typography.body, color: colors.muted },
   infoValue: { ...typography.body, color: colors.text, fontWeight: '600' },
