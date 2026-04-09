@@ -1,5 +1,5 @@
 -- migrate:up
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ride_id text NOT NULL,
   user_id text,
@@ -22,7 +22,7 @@ CREATE TABLE payments (
   )
 );
 
-CREATE TABLE payment_status_history (
+CREATE TABLE IF NOT EXISTS payment_status_history (
   id bigserial PRIMARY KEY,
   payment_id uuid NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
   from_status text,

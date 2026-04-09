@@ -4,6 +4,14 @@ function executor(client) {
   return client || pool;
 }
 
+function normalizeLimit(value, fallback = 50, max = 200) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.min(max, Math.floor(parsed));
+}
+
 function mapRow(row) {
   if (!row) {
     return null;
@@ -147,16 +155,26 @@ async function list(optionsOrClient, maybeClient) {
 
   const db = executor(client);
   const userId = options.userId || null;
+  const limit = normalizeLimit(options.limit, 50, 200);
   const result = userId
     ? await db.query(
-      `SELECT booking_id, ride_id, user_id, vehicle_type, distance_km, eta_minutes, status, created_at, cancelled_at
-         FROM bookings
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT $2`,
-      [userId, Number(options.limit) > 0 ? Number(options.limit) : 50]
+      {
+        name: 'bookings-list-by-user-v1',
+        text: `SELECT booking_id, ride_id, user_id, vehicle_type, distance_km, eta_minutes, status, created_at, cancelled_at
+               FROM bookings
+               WHERE user_id = $1
+               ORDER BY created_at DESC
+               LIMIT $2`,
+        values: [userId, limit]
+      }
     )
-    : await db.query('SELECT * FROM bookings ORDER BY created_at DESC');
+    : await db.query({
+      name: 'bookings-list-all-v1',
+      text: 'SELECT * FROM bookings ORDER BY created_at DESC'
+    });
+  if (result.rows.length === 0) {
+    return [];
+  }
   return result.rows.map(mapRow);
 }
 

@@ -1,15 +1,77 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
+const {
+  createDependencyCircuitBreaker,
+  computeExponentialBackoffMs,
+  buildCircuitOpenError
+} = require('./dependencyCircuitBreaker');
 
 const baseURL = process.env.DRIVER_BASE_URL || process.env.DRIVER_SERVICE_URL || 'http://driver-service:3011';
+const REQUEST_TIMEOUT_MS = Math.max(200, Number(process.env.DRIVER_AVAILABILITY_TIMEOUT_MS || 1200));
+const RETRY_MAX = Number(process.env.DRIVER_AVAILABILITY_RETRY_MAX || 1);
+const RETRY_BACKOFF_BASE_MS = Number(process.env.DRIVER_AVAILABILITY_RETRY_BACKOFF_MS || 100);
+const RETRY_BACKOFF_MAX_MS = Number(process.env.DRIVER_AVAILABILITY_RETRY_MAX_BACKOFF_MS || 900);
+const CIRCUIT_BREAKER = createDependencyCircuitBreaker({
+  name: 'driver-service',
+  enabled: String(process.env.DRIVER_CIRCUIT_BREAKER_ENABLED || 'true') !== 'false',
+  failureThreshold: Number(process.env.DRIVER_CIRCUIT_BREAKER_FAILURE_THRESHOLD || 3),
+  openMs: Number(process.env.DRIVER_CIRCUIT_BREAKER_OPEN_MS || 10000)
+});
 
 const http = axios.create({
   baseURL,
-  timeout: Number(process.env.DRIVER_AVAILABILITY_TIMEOUT_MS || 1200)
+  timeout: REQUEST_TIMEOUT_MS
 });
 
 function isAvailabilityCheckEnabled() {
   return process.env.ENABLE_DRIVER_AVAILABILITY_CHECK !== 'false';
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  if (['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'EAI_AGAIN'].includes(code)) {
+    return true;
+  }
+  const status = Number(error?.response?.status);
+  return Number.isFinite(status) && status >= 500;
+}
+
+async function fetchDriverAvailability(params) {
+  const totalAttempts = Math.max(1, RETRY_MAX + 1);
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= totalAttempts; attempt += 1) {
+    const gate = CIRCUIT_BREAKER.allowRequest();
+    if (!gate.allowed) {
+      throw buildCircuitOpenError('driver-service', gate);
+    }
+
+    try {
+      const response = await http.get('/v1/driver/availability', params);
+      CIRCUIT_BREAKER.onSuccess();
+      return response;
+    } catch (error) {
+      CIRCUIT_BREAKER.onFailure();
+      lastError = error;
+      if (!isRetryableError(error) || attempt >= totalAttempts) {
+        break;
+      }
+      const backoff = computeExponentialBackoffMs({
+        attempt,
+        baseMs: RETRY_BACKOFF_BASE_MS,
+        maxMs: RETRY_BACKOFF_MAX_MS
+      });
+      await sleep(backoff);
+    } finally {
+      CIRCUIT_BREAKER.release();
+    }
+  }
+
+  throw lastError || new Error('driver_availability_failed');
 }
 
 async function getDriverAvailability({ pickup, vehicleType, authorization, traceId }) {
@@ -21,17 +83,12 @@ async function getDriverAvailability({ pickup, vehicleType, authorization, trace
   }
 
   try {
-    const res = await http.get('/v1/driver/availability', {
+    const res = await fetchDriverAvailability({
       headers: {
         authorization,
         'x-trace-id': traceId || ''
       },
-      params: {
-        lat: pickup.lat,
-        lng: pickup.lng,
-        vehicleType,
-        limit: 1
-      }
+      params: { lat: pickup.lat, lng: pickup.lng, vehicleType, limit: 1 }
     });
     const count = Number(res.data?.data?.count);
     if (!Number.isFinite(count)) {
@@ -47,7 +104,8 @@ async function getDriverAvailability({ pickup, vehicleType, authorization, trace
       {
         dependency: 'driver-service',
         operation: 'driver_availability',
-        reason: error?.code || error?.message
+        reason: error?.code || error?.message,
+        circuit_state: CIRCUIT_BREAKER.snapshot().state
       },
       'driver availability check failed, continue booking flow'
     );
@@ -64,17 +122,12 @@ async function listAvailableDrivers({ pickup, vehicleType, authorization, traceI
   }
 
   try {
-    const res = await http.get('/v1/driver/availability', {
+    const res = await fetchDriverAvailability({
       headers: {
         authorization,
         'x-trace-id': traceId || ''
       },
-      params: {
-        lat: pickup.lat,
-        lng: pickup.lng,
-        vehicleType,
-        limit
-      }
+      params: { lat: pickup.lat, lng: pickup.lng, vehicleType, limit }
     });
     const items = Array.isArray(res.data?.data?.items) ? res.data.data.items : [];
     return items.filter((item) => item && item.driverId);
@@ -83,7 +136,8 @@ async function listAvailableDrivers({ pickup, vehicleType, authorization, traceI
       {
         dependency: 'driver-service',
         operation: 'list_available_drivers',
-        reason: error?.code || error?.message
+        reason: error?.code || error?.message,
+        circuit_state: CIRCUIT_BREAKER.snapshot().state
       },
       'driver list availability failed'
     );
