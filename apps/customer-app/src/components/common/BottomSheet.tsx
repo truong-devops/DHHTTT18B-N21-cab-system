@@ -16,10 +16,12 @@ export const BottomSheet: React.FC<Props> = ({ collapsedHeight = 140, children }
   };
 
   return (
-    <Pressable style={[styles.container, expanded ? styles.expanded : { height: collapsedHeight }]} onPress={toggle}>
-      <View style={styles.drag} />
+    <View style={[styles.container, expanded ? styles.expanded : { height: collapsedHeight }]}>
+      <Pressable onPress={toggle} style={styles.dragWrap} hitSlop={8}>
+        <View style={styles.drag} />
+      </Pressable>
       {children}
-    </Pressable>
+    </View>
   );
 };
 
@@ -40,6 +42,10 @@ const styles = StyleSheet.create({
   },
   expanded: {
     top: Platform.select({ ios: spacing.xl, android: spacing.xl, default: spacing.xl })
+  },
+  dragWrap: {
+    alignItems: 'center',
+    paddingBottom: spacing.xs
   },
   drag: {
     width: 60,

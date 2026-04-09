@@ -1,12 +1,13 @@
 import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '../../theme/tokens';
+import { IconSymbol, type IconSymbolName } from '../ui/icon-symbol';
 
 type Place = {
   id?: string;
   label: string;
   subtitle?: string;
-  icon?: string;
+  icon?: IconSymbolName;
 };
 
 type Props = {
@@ -23,7 +24,7 @@ export const PlaceList: React.FC<Props> = ({ data, onSelect }) => {
       renderItem={({ item }) => (
         <Pressable style={styles.row} onPress={() => onSelect(item.label)}>
           <View style={styles.iconBubble}>
-            <Text style={styles.iconText}>{item.icon || '•'}</Text>
+            <IconSymbol name={item.icon || 'pin.fill'} size={18} color={colors.brand700} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{item.label}</Text>
@@ -45,7 +46,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  iconText: { ...typography.body, color: colors.brand700 },
   title: { ...typography.body, color: colors.text },
   subtitle: { ...typography.caption, color: colors.muted }
 });
