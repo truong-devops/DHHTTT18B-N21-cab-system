@@ -6,6 +6,7 @@ import { OutlineButton } from '../../components/common/OutlineButton';
 import { PrimaryButton } from '../../components/common/PrimaryButton';
 import { colors, spacing, typography } from '../../theme/tokens';
 import type { RideHistoryItem } from '../../mock/data';
+import { IconSymbol } from '../../components/ui/icon-symbol';
 
 const pickupDot = '#1AA3FF';
 const dropoffDot = '#FF7A00';
@@ -55,7 +56,7 @@ const HistoryScreen = () => {
 
       <View style={styles.routeRow}>
         <View style={styles.vehicleBadge}>
-          <Text style={styles.vehicleIcon}>🛵</Text>
+          <IconSymbol name="motorbike.fill" size={18} color={brand} />
         </View>
         <View style={{ flex: 1, gap: spacing.xs }}>
           <View style={styles.pointRow}>
@@ -158,7 +159,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 2
   },
-  vehicleIcon: { fontSize: 18 },
   pointRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   dot: { fontSize: 14, color: pickupDot },
   place: { ...typography.body, color: colors.text, flex: 1 },
