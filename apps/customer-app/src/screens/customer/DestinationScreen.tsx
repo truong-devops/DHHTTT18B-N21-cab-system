@@ -20,10 +20,13 @@ const DestinationScreen = () => {
     const keyword = query.toLowerCase();
     return destinationPoints
       .filter((item) => item.label.toLowerCase().includes(keyword))
-      .map((item) => ({ label: item.label, subtitle: 'Gợi ý', icon: '📍' }));
+      .map((item) => ({ label: item.label, subtitle: 'Gợi ý', icon: 'pin.fill' as const }));
   }, [query]);
 
-  const recent = useMemo(() => destinations.slice(0, 3).map((label) => ({ label, subtitle: 'Gần đây', icon: '🕓' })), []);
+  const recent = useMemo(
+    () => destinations.slice(0, 3).map((label) => ({ label, subtitle: 'Gần đây', icon: 'clock.fill' as const })),
+    []
+  );
 
   const combined = [...filtered, ...recent.filter((r) => !filtered.find((f) => f.label === r.label))];
 

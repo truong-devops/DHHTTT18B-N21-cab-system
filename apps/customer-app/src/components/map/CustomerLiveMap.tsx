@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '../../theme/tokens';
+import { IconSymbol } from '../ui/icon-symbol';
 
 type Coordinate = {
   latitude: number;
@@ -13,9 +14,10 @@ type Props = {
   destination?: Coordinate | null;
   showRoute?: boolean;
   onLocationChange?: (coords: Coordinate) => void;
+  showCenterPickupPin?: boolean;
 };
 
-export const CustomerLiveMap: React.FC<Props> = ({ label, destination, onLocationChange }) => {
+export const CustomerLiveMap: React.FC<Props> = ({ label, destination, onLocationChange, showCenterPickupPin = false }) => {
   const [current, setCurrent] = useState<Coordinate | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +62,14 @@ export const CustomerLiveMap: React.FC<Props> = ({ label, destination, onLocatio
 
   return (
     <View style={styles.map}>
+      {showCenterPickupPin ? (
+        <View pointerEvents="none" style={styles.pickupPinWrap}>
+          <View style={styles.pickupPin}>
+            <IconSymbol name="pin.fill" size={18} color={colors.brand700} />
+          </View>
+          <View style={styles.pickupPinDot} />
+        </View>
+      ) : null}
       <Text style={styles.title}>{label || 'Ban do vi tri thuc te'}</Text>
       <View style={styles.block}>
         <Text style={styles.kv}>Diem don: Vi tri hien tai</Text>
@@ -83,7 +93,6 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
     backgroundColor: '#EEF1F4',
-    borderRadius: 14,
     padding: spacing.md,
     gap: spacing.sm
   },
@@ -108,5 +117,30 @@ const styles = StyleSheet.create({
   error: {
     ...typography.caption,
     color: '#C53030'
+  },
+  pickupPinWrap: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    marginLeft: -14,
+    marginTop: -34,
+    alignItems: 'center'
+  },
+  pickupPin: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.brand100
+  },
+  pickupPinDot: {
+    marginTop: 2,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.brand700
   }
 });
