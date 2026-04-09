@@ -1,9 +1,9 @@
 -- migrate:up
 ALTER TABLE payments
-  ADD COLUMN payos_order_code bigint,
-  ADD COLUMN payos_payment_link_id text,
-  ADD COLUMN payos_checkout_url text,
-  ADD COLUMN payos_qr_code text;
+  ADD COLUMN IF NOT EXISTS payos_order_code bigint,
+  ADD COLUMN IF NOT EXISTS payos_payment_link_id text,
+  ADD COLUMN IF NOT EXISTS payos_checkout_url text,
+  ADD COLUMN IF NOT EXISTS payos_qr_code text;
 
 CREATE UNIQUE INDEX IF NOT EXISTS payments_payos_order_code_uidx
   ON payments (payos_order_code)

@@ -12,6 +12,7 @@ describe('api-gateway proxy', () => {
     process.env.RIDE_SERVICE_URL = 'http://ride-service.test';
     process.env.BOOKING_SERVICE_URL = 'http://booking-service.test';
     process.env.DRIVER_SERVICE_URL = 'http://driver-service.test';
+    process.env.AUTH_SERVICE_URL = 'http://auth-service.test';
     process.env.JWT_SECRET = TEST_SECRET;
     process.env.PROXY_TIMEOUT_MS = '20';
     process.env.PROXY_RETRY_BACKOFF_MS = '5';
@@ -22,6 +23,7 @@ describe('api-gateway proxy', () => {
     delete process.env.RIDE_SERVICE_URL;
     delete process.env.BOOKING_SERVICE_URL;
     delete process.env.DRIVER_SERVICE_URL;
+    delete process.env.AUTH_SERVICE_URL;
     delete process.env.JWT_SECRET;
     delete process.env.PROXY_TIMEOUT_MS;
     delete process.env.PROXY_RETRY_BACKOFF_MS;
@@ -89,6 +91,27 @@ describe('api-gateway proxy', () => {
 
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('maps /v1/auth/health to auth-service root /health', async () => {
+    const app = require('../src/app');
+    const scope = nock('http://auth-service.test')
+      .get('/health')
+      .reply(200, { ok: true });
+
+    const response = await request(app).get('/v1/auth/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
+    expect(scope.isDone()).toBe(true);
+  });
+
+  it('returns 404 for unknown domain before auth checks', async () => {
+    const app = require('../src/app');
+    const response = await request(app).get('/v1/not-a-domain/health');
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('NOT_FOUND');
   });
 
   it('routes /v1/bookings to booking service domain', async () => {

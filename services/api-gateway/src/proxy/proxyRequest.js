@@ -5,8 +5,9 @@ const { propagation, context } = require('@opentelemetry/api');
 const { SERVICE_URLS } = require('../config/services');
 const { sendError } = require('../utils/http');
 const monitoring = require('../monitoring');
+const circuitBreaker = require('./circuitBreaker');
 
-const TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS || 30000);
+const DEFAULT_TIMEOUT_MS = Number(process.env.PROXY_TIMEOUT_MS || 5000);
 const RETRY_BACKOFF_MS = Number(process.env.PROXY_RETRY_BACKOFF_MS || 100);
 const KEEPALIVE_MAX_SOCKETS = Number(process.env.PROXY_KEEPALIVE_MAX_SOCKETS || 1024);
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: KEEPALIVE_MAX_SOCKETS });
@@ -14,6 +15,20 @@ const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: KEEPALIVE_MAX_
 
 async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parsePositiveInt(raw, fallback) {
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+function resolveTimeoutMs(domain) {
+  const scopedKey = `PROXY_TIMEOUT_MS_${String(domain || '').toUpperCase()}`;
+  const scoped = parsePositiveInt(process.env[scopedKey], NaN);
+  if (Number.isFinite(scoped)) {
+    return scoped;
+  }
+  return parsePositiveInt(DEFAULT_TIMEOUT_MS, 5000);
 }
 
 function buildUpstreamHeaders(req) {
@@ -53,7 +68,8 @@ function buildUpstreamHeaders(req) {
 
 async function attemptRequest(targetUrl, options, dependencyInfo) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeoutMs = parsePositiveInt(dependencyInfo?.timeoutMs, 5000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = Date.now();
   try {
     const response = await fetch(targetUrl, {
@@ -101,11 +117,25 @@ const DOMAIN_PREFIX_MAP = {
   notifications: '/v1/notifications'
 };
 
+const AUTH_ROOT_HEALTH_MAP = {
+  '/v1/auth/health': '/health',
+  '/v1/auth/healthz': '/healthz',
+  '/v1/auth/readyz': '/readyz'
+};
+
 function buildTargetUrl(req, baseUrl) {
   const domain = req.params.domain;
   const original = req.originalUrl || req.url || '/';
+  const requestPath = req.path || original;
   const prefix = `/v1/${domain}`;
   const mappedPrefix = DOMAIN_PREFIX_MAP[domain];
+
+  if (domain === 'auth') {
+    const authHealthPath = AUTH_ROOT_HEALTH_MAP[requestPath];
+    if (authHealthPath) {
+      return new URL(authHealthPath, baseUrl);
+    }
+  }
 
   if (domain === 'notifications' && original.startsWith('/v1/notifications/users')) {
     const suffix = original.slice('/v1/notifications'.length);
@@ -123,6 +153,7 @@ function buildTargetUrl(req, baseUrl) {
 
 async function proxyRequest(req, res) {
   const domain = req.params.domain;
+  const timeoutMs = resolveTimeoutMs(domain);
   const baseUrl = SERVICE_URLS[domain];
   if (!baseUrl) {
     return sendError(res, 404, 'NOT_FOUND', `Unknown domain: ${domain}`, req.traceId);
@@ -143,12 +174,35 @@ async function proxyRequest(req, res) {
   }
 
   const shouldRetry = method === 'GET';
+  const gate = circuitBreaker.allow(domain);
+  if (!gate.allowed) {
+    return sendError(
+      res,
+      503,
+      'UPSTREAM_CIRCUIT_OPEN',
+      'Upstream temporarily unavailable (circuit open)',
+      req.traceId,
+      [
+        {
+          path: 'proxy',
+          message: `retry_after_ms=${gate.retryAfterMs}`
+        }
+      ]
+    );
+  }
+
   try {
     const result = await attemptRequest(targetUrl, options, {
       dependencyName: domain,
       operation: `proxy_${method.toLowerCase()}`,
-      attempt: 'initial'
+      attempt: 'initial',
+      timeoutMs
     });
+    if (result.response.status < 500) {
+      circuitBreaker.markSuccess(domain);
+    } else {
+      circuitBreaker.markFailure(domain);
+    }
     res.status(result.response.status);
     if (result.contentType.includes('application/json')) {
       return res.json(result.body);
@@ -158,15 +212,32 @@ async function proxyRequest(req, res) {
     }
     return res.send(result.rawBody);
   } catch (error) {
+    circuitBreaker.markFailure(domain);
     const isTimeout = error?.name === 'AbortError' || error?.code === 'ETIMEDOUT';
     if (shouldRetry) {
       await sleep(RETRY_BACKOFF_MS);
       try {
+        const retryGate = circuitBreaker.allow(domain);
+        if (!retryGate.allowed) {
+          return sendError(
+            res,
+            503,
+            'UPSTREAM_CIRCUIT_OPEN',
+            'Upstream temporarily unavailable (circuit open)',
+            req.traceId
+          );
+        }
         const result = await attemptRequest(targetUrl, options, {
           dependencyName: domain,
           operation: `proxy_${method.toLowerCase()}`,
-          attempt: 'retry'
+          attempt: 'retry',
+          timeoutMs
         });
+        if (result.response.status < 500) {
+          circuitBreaker.markSuccess(domain);
+        } else {
+          circuitBreaker.markFailure(domain);
+        }
         res.status(result.response.status);
         if (result.contentType.includes('application/json')) {
           return res.json(result.body);
@@ -177,6 +248,7 @@ async function proxyRequest(req, res) {
         return res.send(result.rawBody);
       } catch (retryError) {
         const retryTimeout = retryError?.name === 'AbortError' || retryError?.code === 'ETIMEDOUT';
+        circuitBreaker.markFailure(domain);
         return sendError(
           res,
           retryTimeout ? 504 : 502,

@@ -20,6 +20,11 @@ function parseNumber(value, fallback) {
 const config = {
   serviceName: process.env.SERVICE_NAME || 'payment-service',
   port: Number(process.env.PORT || 3000),
+  startup: {
+    maxRetries: parseNumber(process.env.STARTUP_MAX_RETRIES, 0),
+    retryInitialDelayMs: parseNumber(process.env.STARTUP_RETRY_INITIAL_DELAY_MS, 1000),
+    retryMaxDelayMs: parseNumber(process.env.STARTUP_RETRY_MAX_DELAY_MS, 15000)
+  },
   db: {
     connectionString: process.env.DATABASE_URL || '',
     host: process.env.PGHOST || 'localhost',

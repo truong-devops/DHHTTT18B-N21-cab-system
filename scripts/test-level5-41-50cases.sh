@@ -339,7 +339,7 @@ else
   mark_result 0 "50"
 fi
 
-echo "========== LEVEL 5 STRICT SUMMARY =========="
+echo "========== LEVEL 5 SUMMARY =========="
 echo "PASS: $PASS_COUNT"
 echo "FAIL: $FAIL_COUNT"
 if [[ "$FAIL_COUNT" -gt 0 ]]; then

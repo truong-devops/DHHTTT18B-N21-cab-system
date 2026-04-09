@@ -1,9 +1,24 @@
 const axios = require('axios');
 const monitoring = require('../monitoring');
 const logger = require('../utils/logger');
+const {
+  createDependencyCircuitBreaker,
+  computeExponentialBackoffMs,
+  buildCircuitOpenError
+} = require('./dependencyCircuitBreaker');
 
 const baseURL = process.env.ETA_BASE_URL || 'http://localhost:3012';
-const http = axios.create({ baseURL, timeout: 1500 });
+const REQUEST_TIMEOUT_MS = Math.max(200, Number(process.env.ETA_HTTP_TIMEOUT_MS || 1500));
+const RETRY_MAX = Number(process.env.ETA_HTTP_RETRY_MAX || 1);
+const RETRY_BACKOFF_BASE_MS = Number(process.env.ETA_HTTP_RETRY_BACKOFF_MS || 100);
+const RETRY_BACKOFF_MAX_MS = Number(process.env.ETA_HTTP_RETRY_MAX_BACKOFF_MS || 1200);
+const CIRCUIT_BREAKER = createDependencyCircuitBreaker({
+  name: 'eta-service',
+  enabled: String(process.env.ETA_CIRCUIT_BREAKER_ENABLED || 'true') !== 'false',
+  failureThreshold: Number(process.env.ETA_CIRCUIT_BREAKER_FAILURE_THRESHOLD || 3),
+  openMs: Number(process.env.ETA_CIRCUIT_BREAKER_OPEN_MS || 12000)
+});
+const http = axios.create({ baseURL, timeout: REQUEST_TIMEOUT_MS });
 
 class EtaServiceError extends Error {
   constructor(message, options = {}) {
@@ -54,15 +69,58 @@ function isFallbackEnabled() {
   return process.env.ENABLE_ETA_FALLBACK_MOCK !== 'false';
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function estimateEta({ pickup, drop, distanceKm, trafficLevel }) {
   const startedAt = Date.now();
   try {
-    const res = await http.post('/v1/eta/estimate', {
+    const payload = {
       pickup,
       drop,
       distance_km: distanceKm,
       traffic_level: trafficLevel
-    });
+    };
+    const totalAttempts = Math.max(1, RETRY_MAX + 1);
+    let res = null;
+    let lastError = null;
+    for (let attempt = 1; attempt <= totalAttempts; attempt += 1) {
+      const gate = CIRCUIT_BREAKER.allowRequest();
+      if (!gate.allowed) {
+        lastError = buildCircuitOpenError('eta-service', gate);
+        break;
+      }
+      try {
+        res = await http.post('/v1/eta/estimate', payload);
+        CIRCUIT_BREAKER.onSuccess();
+        break;
+      } catch (error) {
+        CIRCUIT_BREAKER.onFailure();
+        lastError = error;
+        const code = String(error?.code || '').toUpperCase();
+        const retryableCode = ['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'EAI_AGAIN'].includes(code);
+        const status = Number(error?.response?.status);
+        const retryableStatus = Number.isFinite(status) && status >= 500;
+        const retryable = retryableCode || retryableStatus;
+        if (!retryable || attempt >= totalAttempts) {
+          break;
+        }
+        const backoff = computeExponentialBackoffMs({
+          attempt,
+          baseMs: RETRY_BACKOFF_BASE_MS,
+          maxMs: RETRY_BACKOFF_MAX_MS
+        });
+        await sleep(backoff);
+      } finally {
+        CIRCUIT_BREAKER.release();
+      }
+    }
+
+    if (!res) {
+      throw lastError || new Error('eta_request_failed');
+    }
+
     monitoring.recordDependencyRequest({
       dependencyType: 'http',
       dependencyName: 'eta-service',
@@ -98,7 +156,8 @@ async function estimateEta({ pickup, drop, distanceKm, trafficLevel }) {
         {
           dependency: 'eta-service',
           fallback: 'local_rule',
-          reason: error?.code || error?.message
+          reason: error?.code || error?.message,
+          circuit_state: CIRCUIT_BREAKER.snapshot().state
         },
         'eta request failed, using local fallback eta'
       );
