@@ -3,10 +3,18 @@ const path = require('path');
 const { Pool } = require('pg');
 const config = require('../config');
 
-const pool = new Pool({
+const poolOptions = {
   connectionString: config.db.connectionString,
-  max: config.db.maxPoolSize
-});
+  max: config.db.maxPoolSize,
+  min: config.db.minPoolSize,
+  idleTimeoutMillis: config.db.idleTimeoutMs,
+  connectionTimeoutMillis: config.db.connectionTimeoutMs
+};
+if (config.db.maxUses > 0) {
+  poolOptions.maxUses = config.db.maxUses;
+}
+
+const pool = new Pool(poolOptions);
 
 function extractUpSql(raw) {
   const lines = raw.split(/\r?\n/);

@@ -51,7 +51,11 @@ module.exports = {
   },
   db: {
     connectionString: process.env.DATABASE_URL || 'postgres://cab:cabpass@localhost:5432/booking-service_db',
-    maxPoolSize: toNumber(process.env.PGPOOL_MAX, 60)
+    maxPoolSize: toNumber(process.env.PGPOOL_MAX, 60),
+    minPoolSize: toNumber(process.env.PGPOOL_MIN, 10),
+    idleTimeoutMs: toNumber(process.env.PGPOOL_IDLE_TIMEOUT_MS, 10000),
+    connectionTimeoutMs: toNumber(process.env.PGPOOL_CONNECTION_TIMEOUT_MS, 2000),
+    maxUses: toNumber(process.env.PGPOOL_MAX_USES, 0)
   },
   outbox: {
     publishIntervalMs: toNumber(process.env.OUTBOX_PUBLISH_INTERVAL_MS, 3000),

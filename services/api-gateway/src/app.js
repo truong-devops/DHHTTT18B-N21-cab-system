@@ -10,6 +10,7 @@ const { authMiddleware } = require('./middleware/auth');
 const { authLoginRateLimiter, globalRateLimiter } = require('./middleware/rateLimit');
 const { proxyRequest } = require('./proxy/proxyRequest');
 const { sendError } = require('./utils/http');
+const { SERVICE_URLS } = require('./config/services');
 
 const app = express();
 app.use(helmet());
@@ -22,6 +23,15 @@ app.use(requestLogger);
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 app.get('/readyz', (_req, res) => res.json({ ok: true }));
+
+const LOCAL_V1_DOMAINS = new Set(['fraud']);
+app.use('/v1/:domain', (req, res, next) => {
+  const domain = String(req.params?.domain || '');
+  if (SERVICE_URLS[domain] || LOCAL_V1_DOMAINS.has(domain)) {
+    return next();
+  }
+  return sendError(res, 404, 'NOT_FOUND', `Unknown domain: ${domain}`, req.traceId);
+});
 
 app.use(authLoginRateLimiter);
 app.use(authMiddleware);

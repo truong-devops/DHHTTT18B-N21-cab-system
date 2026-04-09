@@ -351,7 +351,7 @@ C20_BODY="${RESP20%HTTP_STATUS:*}"
 print_case "Case 20 - payload too large" "413 Payload Too Large" "$C20_STATUS" "$C20_BODY"
 if [[ "$C20_STATUS" == "413" ]]; then mark_result 1 "20"; else mark_result 0 "20"; fi
 
-echo "========== SUMMARY =========="
+echo "========== LEVEL 2 SUMMARY =========="
 echo "PASS: $PASS_COUNT"
 echo "FAIL: $FAIL_COUNT"
 
