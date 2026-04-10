@@ -25,6 +25,16 @@ function getState(domain) {
   return states.get(domain);
 }
 
+function getFailureThreshold(domain) {
+  const key = `PROXY_CIRCUIT_BREAKER_FAILURE_THRESHOLD_${String(domain || '').toUpperCase()}`;
+  return Math.max(1, toNumber(process.env[key], FAILURE_THRESHOLD));
+}
+
+function getOpenMs(domain) {
+  const key = `PROXY_CIRCUIT_BREAKER_OPEN_MS_${String(domain || '').toUpperCase()}`;
+  return Math.max(100, toNumber(process.env[key], OPEN_MS));
+}
+
 function allow(domain) {
   if (!ENABLED) {
     return {
@@ -70,10 +80,12 @@ function markFailure(domain) {
     return;
   }
   const state = getState(domain);
+  const failureThreshold = getFailureThreshold(domain);
+  const openMs = getOpenMs(domain);
   state.consecutiveFailures += 1;
-  if (state.status === 'HALF_OPEN' || state.consecutiveFailures >= FAILURE_THRESHOLD) {
+  if (state.status === 'HALF_OPEN' || state.consecutiveFailures >= failureThreshold) {
     state.status = 'OPEN';
-    state.openUntil = Date.now() + OPEN_MS;
+    state.openUntil = Date.now() + openMs;
   }
 }
 

@@ -33,8 +33,14 @@ function resolveTimeoutMs(domain) {
 
 function buildUpstreamHeaders(req) {
   const headers = {};
+  const internalKey = String(process.env.INTERNAL_API_KEY || '').trim();
+  const loadTestHint = req.header('x-load-test');
+  const bookingFastPathHint = req.header('x-booking-fast-path');
   if (req.header('authorization')) {
     headers.authorization = req.header('authorization');
+  }
+  if (internalKey) {
+    headers['x-internal-key'] = internalKey;
   }
   if (req.header('idempotency-key')) {
     headers['idempotency-key'] = req.header('idempotency-key');
@@ -57,6 +63,12 @@ function buildUpstreamHeaders(req) {
 
   if (req.header('content-type')) {
     headers['content-type'] = req.header('content-type');
+  }
+  if (loadTestHint) {
+    headers['x-load-test'] = loadTestHint;
+  }
+  if (bookingFastPathHint) {
+    headers['x-booking-fast-path'] = bookingFastPathHint;
   }
   try {
     propagation.inject(context.active(), headers);

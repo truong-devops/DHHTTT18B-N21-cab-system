@@ -6,6 +6,7 @@ const bookingsRouter = require('./routes/bookings');
 const monitoring = require('./monitoring');
 const { traceMiddleware } = require('./middleware/trace');
 const { requestLogger } = require('./middleware/requestLogger');
+const { requireAuth, requireTrustedGateway } = require('./middleware/auth');
 const logger = require('./utils/logger');
 
 const DEMO_MAX_ASYNC_INFLIGHT = Number(process.env.DEMO_MAX_ASYNC_INFLIGHT || 2000);
@@ -21,7 +22,7 @@ app.use(monitoring.createHttpMetricsMiddleware());
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-app.use('/v1/bookings', bookingsRouter);
+app.use('/v1/bookings', requireTrustedGateway, requireAuth, bookingsRouter);
 // DEMO endpoint: publish RideCreated event
 app.post('/demo/ride-created', async (req, res) => {
   try {

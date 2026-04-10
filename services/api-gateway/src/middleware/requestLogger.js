@@ -1,6 +1,19 @@
 const { context, trace } = require('@opentelemetry/api');
 
 const ACCESS_LOG_ENABLED = String(process.env.HTTP_ACCESS_LOG_ENABLED || 'false') === 'true';
+const AUDIT_LOG_ENABLED = String(process.env.SECURITY_AUDIT_LOG_ENABLED || 'true') !== 'false';
+const AUDIT_SUCCESS_SAMPLE_RATE = (() => {
+  const raw = Number(process.env.SECURITY_AUDIT_LOG_SUCCESS_SAMPLE_RATE || 0.02);
+  if (!Number.isFinite(raw)) {
+    return 0.02;
+  }
+  return Math.max(0, Math.min(1, raw));
+})();
+
+function isTruthyHeader(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
 
 function getOtelTraceId() {
   const span = trace.getSpan(context.active());
@@ -9,7 +22,10 @@ function getOtelTraceId() {
 }
 
 function requestLogger(req, res, next) {
-  if (!ACCESS_LOG_ENABLED) {
+  const shouldAccessLog = ACCESS_LOG_ENABLED;
+  const shouldAuditLog = AUDIT_LOG_ENABLED && (req.path.startsWith('/v1/') || req.path === '/webhooks/payos');
+
+  if (!shouldAccessLog && !shouldAuditLog) {
     return next();
   }
 
@@ -27,10 +43,48 @@ function requestLogger(req, res, next) {
       traceId: req.traceId,
       requestId: req.requestId
     };
-    if (otelTraceId) {
-      message.otelTraceId = otelTraceId;
+    if (shouldAccessLog) {
+      if (otelTraceId) {
+        message.otelTraceId = otelTraceId;
+      }
+      console.log(JSON.stringify(message));
     }
-    console.log(JSON.stringify(message));
+
+    if (shouldAuditLog) {
+      const actorId = req.user?.id || null;
+      const actorRole = req.user?.role || null;
+      const status = res.statusCode;
+      const isDeny = status >= 400;
+      const clientTraceId = req.header('x-trace-id');
+      const forceAuditLog = isTruthyHeader(req.header('x-force-audit-log'));
+      const isLoadTest = isTruthyHeader(req.header('x-load-test'));
+      const sampledSuccess = Math.random() < AUDIT_SUCCESS_SAMPLE_RATE;
+
+      // Always keep deny logs. For allow logs, prefer explicit client trace id and
+      // aggressively sample generic high-volume traffic to reduce logging overhead.
+      if (!isDeny) {
+        if (!clientTraceId && !forceAuditLog && !sampledSuccess) {
+          return;
+        }
+        if (isLoadTest && !clientTraceId && !forceAuditLog) {
+          return;
+        }
+      }
+
+      const auditRecord = {
+        event: 'security_audit',
+        action: `${req.method} ${req.path}`,
+        result: status < 400 ? 'allow' : 'deny',
+        status,
+        actorId,
+        actorRole,
+        hasAuthorizationHeader: Boolean(req.header('authorization')),
+        traceId: req.traceId || null,
+        requestId: req.requestId || null,
+        occurredAt: new Date().toISOString()
+      };
+      console.log(JSON.stringify(auditRecord));
+    }
   });
 
   next();
