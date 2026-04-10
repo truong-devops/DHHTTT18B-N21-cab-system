@@ -483,8 +483,11 @@ if [[ -z "$C25_BOOKING_ID" ]]; then
   C26_STATUS="000"
   C26_BODY='{"error":"missing booking id from case 25"}'
 else
+  # Status transition REQUESTED -> ACCEPTED is privileged in production
+  # (driver/admin/service). Use admin token in this integration test.
+  C26_TOKEN="$ADMIN_TOKEN"
   START_MS=$(node -e 'process.stdout.write(String(Date.now()))')
-  C26=$(call_json PATCH "/v1/bookings/$C25_BOOKING_ID/status" "$C25_TOKEN" "{\"booking_id\":\"$C25_BOOKING_ID\",\"status\":\"ACCEPTED\",\"driver_id\":\"${SELECTED_DRIVER_ID:-driver_fallback}\"}")
+  C26=$(call_json PATCH "/v1/bookings/$C25_BOOKING_ID/status" "$C26_TOKEN" "{\"booking_id\":\"$C25_BOOKING_ID\",\"status\":\"ACCEPTED\",\"driver_id\":\"${SELECTED_DRIVER_ID:-driver_fallback}\"}")
   END_MS=$(node -e 'process.stdout.write(String(Date.now()))')
   C26_STATUS=$(echo "$C26" | sed -n '1p')
   C26_BODY=$(echo "$C26" | sed '1d')
