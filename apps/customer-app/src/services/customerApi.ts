@@ -107,9 +107,17 @@ function getSurgeMeta(price: number, breakdown: RidePriceBreakdown) {
 }
 
 function toMethodCode(method: string): 'CASH' | 'WALLET' | 'VIETQR' {
-  const normalized = method.trim().toLowerCase();
-  if (normalized === 'wallet' || normalized === 'vi') return 'WALLET';
-  if (normalized === 'vietqr') return 'VIETQR';
+  const normalized = method.trim().toUpperCase();
+
+  // Keep backend stable: CARD is routed via WALLET flow in Payment Service.
+  if (normalized === 'CARD' || normalized === 'WALLET' || normalized === 'VI') return 'WALLET';
+  if (normalized === 'VIETQR' || normalized === 'QR') return 'VIETQR';
+  if (normalized === 'CASH') return 'CASH';
+
+  // Backward compatibility for old UI labels.
+  const legacy = method.trim().toLowerCase();
+  if (legacy.includes('wallet') || legacy.includes('the')) return 'WALLET';
+  if (legacy.includes('vietqr') || legacy.includes('qr')) return 'VIETQR';
   return 'CASH';
 }
 
