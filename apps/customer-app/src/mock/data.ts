@@ -1,3 +1,16 @@
+export type RidePriceBreakdown = {
+  baseFare: number;
+  distanceFee: number;
+  timeFee: number;
+  surgeFee: number;
+  discount: number;
+  subtotal: number;
+  total: number;
+  distanceKm?: number;
+  durationMin?: number;
+  currency?: string;
+};
+
 export type RideOption = {
   id: string;
   name: string;
@@ -5,6 +18,9 @@ export type RideOption = {
   price: number;
   capacity: number;
   surgeLabel?: string;
+  surgeMultiplier?: number;
+  vehicleIcon?: 'motorbike.fill' | 'car.fill';
+  priceBreakdown?: RidePriceBreakdown;
   quoteId?: string;
   serviceType?: 'STANDARD' | 'PREMIUM';
 };

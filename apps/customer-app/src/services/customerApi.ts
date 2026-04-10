@@ -1,7 +1,8 @@
 import type { ApiError } from '../lib/api';
-import type { DriverInfo, LocationPoint, RideHistoryItem, RideOption } from '../mock/data';
+import type { DriverInfo, LocationPoint, RideHistoryItem, RideOption, RidePriceBreakdown } from '../mock/data';
 import { destinationPoints, pickupPoint } from '../mock/data';
 import * as authApi from './authApi';
+import * as etaApi from './etaApi';
 import * as paymentApi from './paymentApi';
 import * as pricingApi from './pricingApi';
 import * as reviewApi from './reviewApi';
@@ -29,6 +30,80 @@ function normalizeIdentifier(identifier: string) {
 
 function normalizePrice(value: number) {
   return Math.max(Math.round(value), 12000);
+}
+
+function toFiniteNumber(value: unknown, fallback = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function normalizeEta(value: unknown, fallback: number) {
+  const parsed = Math.round(toFiniteNumber(value, fallback));
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return Math.max(fallback, 2);
+  }
+  return Math.max(parsed, 2);
+}
+
+function buildPriceBreakdown(quote: pricingApi.QuoteData, total: number): RidePriceBreakdown {
+  const distanceKm = Math.max(toFiniteNumber(quote.distanceKm, 0), 0);
+  const durationMin = Math.max(toFiniteNumber(quote.durationMin, 0), 0);
+  const baseFare = Math.max(Math.round(toFiniteNumber(quote.breakdown?.base, 0)), 0);
+  const perKm = Math.max(toFiniteNumber(quote.breakdown?.perKm, 0), 0);
+  const perMin = Math.max(toFiniteNumber(quote.breakdown?.perMin, 0), 0);
+  const distanceFee = Math.max(Math.round(perKm * distanceKm), 0);
+  const timeFee = Math.max(Math.round(perMin * durationMin), 0);
+  const surgeFee = Math.max(Math.round(toFiniteNumber(quote.breakdown?.surge, 0)), 0);
+  const discount = Math.max(Math.round(toFiniteNumber(quote.breakdown?.discount, 0)), 0);
+  const subtotal = Math.max(Math.round(baseFare + distanceFee + timeFee), 0);
+
+  return {
+    baseFare,
+    distanceFee,
+    timeFee,
+    surgeFee,
+    discount,
+    subtotal,
+    total,
+    distanceKm: Number(distanceKm.toFixed(2)),
+    durationMin: Math.max(Math.round(durationMin), 0),
+    currency: quote.currency || 'VND'
+  };
+}
+
+function scaleBreakdown(source: RidePriceBreakdown, factor: number, total: number): RidePriceBreakdown {
+  const safeFactor = Number.isFinite(factor) && factor > 0 ? factor : 1;
+
+  return {
+    ...source,
+    baseFare: Math.max(Math.round(source.baseFare * safeFactor), 0),
+    distanceFee: Math.max(Math.round(source.distanceFee * safeFactor), 0),
+    timeFee: Math.max(Math.round(source.timeFee * safeFactor), 0),
+    surgeFee: Math.max(Math.round(source.surgeFee * safeFactor), 0),
+    discount: Math.max(Math.round(source.discount * safeFactor), 0),
+    subtotal: Math.max(Math.round(source.subtotal * safeFactor), 0),
+    total
+  };
+}
+
+function getSurgeMeta(price: number, breakdown: RidePriceBreakdown) {
+  if (!breakdown.surgeFee) {
+    return { surgeLabel: undefined, surgeMultiplier: undefined };
+  }
+
+  const baseFare = Math.max(price - breakdown.surgeFee, 1);
+  const multiplier = Number((price / baseFare).toFixed(2));
+  if (!Number.isFinite(multiplier) || multiplier <= 1) {
+    return { surgeLabel: undefined, surgeMultiplier: undefined };
+  }
+
+  return {
+    surgeLabel: `Surge x${multiplier.toFixed(2)}`,
+    surgeMultiplier: multiplier
+  };
 }
 
 function toMethodCode(method: string): 'CASH' | 'WALLET' | 'VIETQR' {
@@ -157,23 +232,41 @@ export const customerApi = {
     const pickup = getPickupPointOrThrow(pickupLabel);
     const destination = getDestinationPointOrThrow(destinationLabel);
 
-    const [standardQuote, premiumQuote] = await Promise.all([
+    const [standardQuote, premiumQuote, etaEstimate] = await Promise.all([
       pricingApi.createQuote(pickup, destination, 'STANDARD'),
-      pricingApi.createQuote(pickup, destination, 'PREMIUM')
+      pricingApi.createQuote(pickup, destination, 'PREMIUM'),
+      etaApi.estimateEta(pickup, destination).catch(() => null)
     ]);
 
     const standardFare = Number(standardQuote.data.estimatedFare || 0);
     const premiumFare = Number(premiumQuote.data.estimatedFare || 0);
-    const standardEta = Math.max(Math.round(Number(standardQuote.data.durationMin || 6)), 3);
-    const premiumEta = Math.max(Math.round(Number(premiumQuote.data.durationMin || 8)), 4);
+    const etaServiceMinutes = Math.round(toFiniteNumber(etaEstimate?.data?.eta_minutes, 0));
+    const standardEta = etaServiceMinutes > 0 ? Math.max(etaServiceMinutes, 2) : normalizeEta(standardQuote.data.durationMin, 6);
+    const premiumEta = Math.max(normalizeEta(premiumQuote.data.durationMin, 8), standardEta + 1);
+
+    const bikePrice = normalizePrice(standardFare * 0.55);
+    const car4Price = normalizePrice(standardFare);
+    const car7Price = normalizePrice(premiumFare);
+
+    const car4Breakdown = buildPriceBreakdown(standardQuote.data, car4Price);
+    const car7Breakdown = buildPriceBreakdown(premiumQuote.data, car7Price);
+    const bikeBreakdown = scaleBreakdown(car4Breakdown, bikePrice / Math.max(car4Price, 1), bikePrice);
+
+    const bikeSurge = getSurgeMeta(bikePrice, bikeBreakdown);
+    const car4Surge = getSurgeMeta(car4Price, car4Breakdown);
+    const car7Surge = getSurgeMeta(car7Price, car7Breakdown);
 
     return [
       {
         id: 'bike',
         name: 'Xe may',
         etaMinutes: Math.max(standardEta - 2, 2),
-        price: normalizePrice(standardFare * 0.55),
+        price: bikePrice,
         capacity: 1,
+        vehicleIcon: 'motorbike.fill',
+        surgeLabel: bikeSurge.surgeLabel,
+        surgeMultiplier: bikeSurge.surgeMultiplier,
+        priceBreakdown: bikeBreakdown,
         quoteId: standardQuote.data.quoteId,
         serviceType: 'STANDARD'
       },
@@ -181,9 +274,12 @@ export const customerApi = {
         id: 'car4',
         name: 'Xe 4 cho',
         etaMinutes: standardEta,
-        price: normalizePrice(standardFare),
+        price: car4Price,
         capacity: 4,
-        surgeLabel: standardQuote.data.breakdown && Number(standardQuote.data.breakdown.surge) > 0 ? 'Tang gia' : undefined,
+        vehicleIcon: 'car.fill',
+        surgeLabel: car4Surge.surgeLabel,
+        surgeMultiplier: car4Surge.surgeMultiplier,
+        priceBreakdown: car4Breakdown,
         quoteId: standardQuote.data.quoteId,
         serviceType: 'STANDARD'
       },
@@ -191,8 +287,12 @@ export const customerApi = {
         id: 'car7',
         name: 'Xe 7 cho',
         etaMinutes: premiumEta,
-        price: normalizePrice(premiumFare),
+        price: car7Price,
         capacity: 7,
+        vehicleIcon: 'car.fill',
+        surgeLabel: car7Surge.surgeLabel,
+        surgeMultiplier: car7Surge.surgeMultiplier,
+        priceBreakdown: car7Breakdown,
         quoteId: premiumQuote.data.quoteId,
         serviceType: 'PREMIUM'
       }

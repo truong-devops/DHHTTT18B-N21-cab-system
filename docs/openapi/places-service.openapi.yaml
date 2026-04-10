@@ -1,0 +1,182 @@
+openapi: 3.1.0
+info:
+  title: Places Service API
+  version: 0.1.0
+  description: Place autocomplete and user recent destination endpoints for customer destination selection.
+servers:
+  - url: http://localhost:3014
+    description: Direct places-service
+  - url: http://localhost:3000
+    description: API Gateway (prefix /v1/places)
+components:
+  schemas:
+    PlaceItem:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        address:
+          type: string
+        location:
+          type: object
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+    PlaceListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/PlaceItem'
+    SaveRecentRequest:
+      type: object
+      properties:
+        label:
+          type: string
+        address:
+          type: string
+        location:
+          type: object
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+        place:
+          type: object
+          properties:
+            label:
+              type: string
+            address:
+              type: string
+            location:
+              type: object
+              properties:
+                lat:
+                  type: number
+                lng:
+                  type: number
+      anyOf:
+        - required: [label]
+        - required: [place]
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  message:
+                    type: string
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /healthz:
+    get:
+      summary: Liveness check
+      responses:
+        '200':
+          description: OK
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: OK
+  /v1/places/autocomplete:
+    get:
+      summary: Search places for destination selection
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+        - in: query
+          name: lat
+          schema:
+            type: number
+        - in: query
+          name: lng
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Place suggestions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceListResponse'
+  /v1/places/recent:
+    get:
+      summary: Get recent destinations for current user
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+      responses:
+        '200':
+          description: Recent destinations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceListResponse'
+    post:
+      summary: Save a destination to recents for current user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveRecentRequest'
+      responses:
+        '201':
+          description: Saved and returned updated recents
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PlaceListResponse'
+                  - type: object
+                    properties:
+                      ok:
+                        type: boolean
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'

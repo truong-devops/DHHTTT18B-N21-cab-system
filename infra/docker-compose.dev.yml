@@ -50,6 +50,7 @@ services:
       BOOKING_SERVICE_URL: http://booking-service:3003
       DRIVER_SERVICE_URL: http://driver-service:3011
       ETA_SERVICE_URL: http://eta-service:3012
+      PLACES_SERVICE_URL: http://places-service:3014
       NOTIFICATION_SERVICE_URL: http://notification-service:3010
       PAYMENT_SERVICE_URL: http://payment-service:3007
       PRICING_SERVICE_URL: http://pricing-service:3006
@@ -65,6 +66,7 @@ services:
       - booking-service
       - driver-service
       - eta-service
+      - places-service
       - notification-service
       - payment-service
       - pricing-service
@@ -226,6 +228,26 @@ services:
       SERVICE_NAME: eta-service
       OTEL_SERVICE_NAME: eta-service
       PORT: 3012
+    networks:
+      - backend
+
+  places-service:
+    build:
+      context: ..
+      dockerfile: services/places-service/Dockerfile
+    ports:
+      - '3014:3014'
+    environment:
+      SERVICE_NAME: places-service
+      OTEL_SERVICE_NAME: places-service
+      PORT: 3014
+      DATABASE_URL: postgres://cab:cabpass@postgres:5432/places-service_db
+      PLACES_PROVIDER_ENABLED: ${PLACES_PROVIDER_ENABLED:-true}
+      PLACES_PROVIDER_BASE_URL: ${PLACES_PROVIDER_BASE_URL:-https://nominatim.openstreetmap.org}
+      PLACES_PROVIDER_TIMEOUT_MS: ${PLACES_PROVIDER_TIMEOUT_MS:-1800}
+      PLACES_PROVIDER_COUNTRY_CODES: ${PLACES_PROVIDER_COUNTRY_CODES:-vn}
+    depends_on:
+      - postgres
     networks:
       - backend
 
