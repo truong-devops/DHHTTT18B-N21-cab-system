@@ -33,6 +33,7 @@ function toReviewResponse(row) {
     driverId: row.driver_id,
     rating: row.rating,
     comment: row.comment,
+    tipAmount: row.tip_amount,
     status: row.status,
     statusUpdatedAt: row.status_updated_at,
     createdAt: row.created_at,
@@ -62,6 +63,7 @@ router.post(
         driverId: { type: 'string' },
         rating: { type: 'integer', minimum: 1, maximum: 5 },
         comment: { type: 'string' },
+        tipAmount: { type: 'integer', minimum: 0 },
         status: { type: 'string' }
       }
     },
@@ -169,6 +171,7 @@ router.post(
           driverId: req.body.driverId,
           rating: req.body.rating,
           comment: req.body.comment,
+          tipAmount: req.body.tipAmount,
           status: req.body.status || 'submitted'
         });
       } catch (error) {
@@ -367,12 +370,13 @@ router.patch(
       properties: {
         rating: { type: 'integer', minimum: 1, maximum: 5 },
         comment: { type: 'string' },
+        tipAmount: { type: 'integer', minimum: 0 },
         status: { type: 'string' },
         statusReason: { type: 'string' }
       }
     },
     custom: (req, errors) => {
-      const hasUpdatableFields = ['rating', 'comment', 'status'].some((field) => req.body?.[field] !== undefined);
+      const hasUpdatableFields = ['rating', 'comment', 'tipAmount', 'status'].some((field) => req.body?.[field] !== undefined);
       if (!hasUpdatableFields) {
         errors.push({
           path: 'body',
@@ -397,10 +401,11 @@ router.patch(
       }
     }
 
-    if (req.body.rating !== undefined || req.body.comment !== undefined) {
+    if (req.body.rating !== undefined || req.body.comment !== undefined || req.body.tipAmount !== undefined) {
       review = await updateReviewFields(req.params.id, {
         rating: req.body.rating,
-        comment: req.body.comment
+        comment: req.body.comment,
+        tipAmount: req.body.tipAmount
       });
     }
 

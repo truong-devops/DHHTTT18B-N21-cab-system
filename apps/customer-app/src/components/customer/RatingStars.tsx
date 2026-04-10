@@ -1,6 +1,7 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '../../theme/tokens';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { spacing } from '../../theme/tokens';
 
 type Props = {
   value: number;
@@ -15,8 +16,8 @@ export const RatingStars: React.FC<Props> = ({ value, max = 5, onChange }) => {
         const starValue = idx + 1;
         const active = starValue <= value;
         return (
-          <Pressable key={starValue} onPress={() => onChange(starValue)}>
-            <Text style={[styles.star, active ? styles.active : null]}>★</Text>
+          <Pressable key={starValue} onPress={() => onChange(starValue)} hitSlop={6}>
+            <MaterialIcons name={active ? 'star' : 'star-border'} size={34} color={active ? '#F59E0B' : '#D0D5DD'} />
           </Pressable>
         );
       })}
@@ -25,7 +26,5 @@ export const RatingStars: React.FC<Props> = ({ value, max = 5, onChange }) => {
 };
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: spacing.sm },
-  star: { fontSize: 32, color: colors.border },
-  active: { color: colors.warning }
+  row: { flexDirection: 'row', gap: spacing.sm }
 });
