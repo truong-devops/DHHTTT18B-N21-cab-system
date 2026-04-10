@@ -26,6 +26,8 @@ export type RideListResponse = {
 };
 
 type CreateRidePayload = {
+  externalRideId?: string;
+  bookingId?: string;
   pickupLat: number;
   pickupLng: number;
   pickupLabel?: string;

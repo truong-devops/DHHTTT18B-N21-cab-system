@@ -2,6 +2,8 @@ import type { ApiError } from '../lib/api';
 import type { DriverInfo, LocationPoint, RideHistoryItem, RideOption, RidePriceBreakdown } from '../mock/data';
 import { destinationPoints, pickupPoint } from '../mock/data';
 import * as authApi from './authApi';
+import * as bookingApi from './bookingApi';
+import { getDriverProfileById } from './driverApi';
 import * as etaApi from './etaApi';
 import * as paymentApi from './paymentApi';
 import * as pricingApi from './pricingApi';
@@ -11,6 +13,7 @@ import * as rideApi from './rideApi';
 type StartRidePayload = {
   pickupLabel: string;
   destinationLabel: string;
+  vehicleOptionId?: string;
 };
 
 type LivePickup = {
@@ -178,6 +181,33 @@ function ensureNumberCoordinate(value: number | null | undefined, field: string)
   return Number(value);
 }
 
+function mapVehicleTypeFromOption(optionId?: string): bookingApi.BookingVehicleType {
+  const normalized = String(optionId || '').trim().toLowerCase();
+  if (normalized === 'bike') return 'BIKE';
+  if (normalized === 'car7') return 'SUV';
+  return 'CAR';
+}
+
+function resolveBookingId(payload: bookingApi.CreateBookingResponse) {
+  const booking = payload?.booking;
+  if (!booking) return null;
+  const bookingId = booking.bookingId || booking.booking_id || null;
+  return typeof bookingId === 'string' && bookingId.trim() ? bookingId.trim() : null;
+}
+
+function resolveBookingRideId(payload: bookingApi.CreateBookingResponse) {
+  const booking = payload?.booking;
+  if (!booking) return null;
+  const rideId = booking.rideId || booking.ride_id || null;
+  return typeof rideId === 'string' && rideId.trim() ? rideId.trim() : null;
+}
+
+function parseTimestamp(value: string | null | undefined) {
+  if (!value) return 0;
+  const ts = Date.parse(value);
+  return Number.isFinite(ts) ? ts : 0;
+}
+
 async function moveRideToStatus(rideId: string, status: string) {
   try {
     return await rideApi.updateRideStatus(rideId, status);
@@ -307,11 +337,33 @@ export const customerApi = {
     ];
   },
 
-  async startRide({ pickupLabel, destinationLabel }: StartRidePayload) {
+  async startRide({ pickupLabel, destinationLabel, vehicleOptionId }: StartRidePayload) {
     const pickup = getPickupPointOrThrow(pickupLabel);
     const destination = getDestinationPointOrThrow(destinationLabel);
 
+    let bookingId: string | null = null;
+    let bookingRideId: string | null = null;
+    try {
+      const booking = await bookingApi.createBooking({
+        pickup: { lat: pickup.lat, lng: pickup.lng, address: pickupLabel },
+        dropoff: { lat: destination.lat, lng: destination.lng, address: destinationLabel },
+        vehicleType: mapVehicleTypeFromOption(vehicleOptionId)
+      });
+      bookingId = resolveBookingId(booking);
+      bookingRideId = resolveBookingRideId(booking);
+      if (!bookingId) {
+        throw new Error('Booking service did not return bookingId');
+      }
+    } catch (error) {
+      if (isApiError(error) && error.code === 'ACTIVE_BOOKING_EXISTS') {
+        throw new Error('Ban dang co booking dang hoat dong. Vui long hoan tat hoac huy chuyen truoc.');
+      }
+      throw error;
+    }
+
     const created = await rideApi.createRide({
+      externalRideId: bookingRideId || undefined,
+      bookingId,
       pickupLat: pickup.lat,
       pickupLng: pickup.lng,
       pickupLabel,
@@ -379,10 +431,11 @@ export const customerApi = {
     if (!riderId) return [];
     const [ridesResult, paymentsResult] = await Promise.all([rideApi.listRides({ limit: 50, riderId }), paymentApi.listPayments(100)]);
 
-    const amountByRideId = (paymentsResult.data || []).reduce<Record<string, number>>((acc, payment) => {
-      const current = acc[payment.rideId] || 0;
-      const amount = Number(payment.amount || 0);
-      acc[payment.rideId] = current + (Number.isFinite(amount) ? amount : 0);
+    const paymentsByRideId = (paymentsResult.data || []).reduce<Record<string, paymentApi.Payment[]>>((acc, payment) => {
+      if (!acc[payment.rideId]) {
+        acc[payment.rideId] = [];
+      }
+      acc[payment.rideId].push(payment);
       return acc;
     }, {});
 
@@ -392,13 +445,71 @@ export const customerApi = {
       return status === 'completed' || status === 'cancelled';
     });
 
-    return filtered.map((ride) => ({
-      id: ride.id,
-      date: (ride.createdAt || new Date().toISOString()).slice(0, 16).replace('T', ' '),
-      pickup: ride.pickupLabel || formatLocation(ride.pickupLat, ride.pickupLng),
-      destination: ride.dropoffLabel || formatLocation(ride.dropoffLat, ride.dropoffLng),
-      amount: Math.round(amountByRideId[ride.id] || 0),
-      status: String(ride.status || '').toLowerCase() === 'cancelled' ? 'cancelled' : 'completed'
-    }));
+    const uniqueDriverIds = Array.from(new Set(filtered.map((ride) => String(ride.driverId || '').trim()).filter(Boolean)));
+    const driverProfiles = await Promise.all(
+      uniqueDriverIds.map(async (driverId) => {
+        try {
+          const profile = await getDriverProfileById(driverId);
+          return [
+            driverId,
+            {
+              name: profile.data.driver?.fullName || null,
+              phone: profile.data.driver?.phone || null,
+              vehicleType: profile.data.vehicle?.vehicleType || null,
+              plateNumber: profile.data.vehicle?.plateNumber || null
+            }
+          ] as const;
+        } catch {
+          return [driverId, null] as const;
+        }
+      })
+    );
+    const driverProfileById = Object.fromEntries(driverProfiles);
+
+    return filtered.map((ride) => {
+      const ridePayments = paymentsByRideId[ride.id] || [];
+      const amount = Math.round(
+        ridePayments.reduce((sum, payment) => {
+          const value = Number(payment.amount || 0);
+          return sum + (Number.isFinite(value) ? value : 0);
+        }, 0)
+      );
+
+      const latestPayment = [...ridePayments].sort((a, b) => parseTimestamp(b.createdAt) - parseTimestamp(a.createdAt))[0] || null;
+      const normalizedDriverId = String(ride.driverId || '').trim() || null;
+      const profile = normalizedDriverId ? (driverProfileById[normalizedDriverId] as any) : null;
+
+      return {
+        id: ride.id,
+        externalRideId: ride.externalRideId || null,
+        bookingId: ride.bookingId || null,
+        riderId: ride.riderId || null,
+        date: (ride.createdAt || new Date().toISOString()).slice(0, 16).replace('T', ' '),
+        pickup: ride.pickupLabel || formatLocation(ride.pickupLat, ride.pickupLng),
+        destination: ride.dropoffLabel || formatLocation(ride.dropoffLat, ride.dropoffLng),
+        amount,
+        status: String(ride.status || '').toLowerCase() === 'cancelled' ? 'cancelled' : 'completed',
+        rideStatusRaw: ride.status || null,
+        rideStatusUpdatedAt: ride.statusUpdatedAt || null,
+        rideCreatedAt: ride.createdAt || null,
+        rideUpdatedAt: ride.updatedAt || null,
+        pickupLat: ride.pickupLat ?? null,
+        pickupLng: ride.pickupLng ?? null,
+        dropoffLat: ride.dropoffLat ?? null,
+        dropoffLng: ride.dropoffLng ?? null,
+        paymentId: latestPayment?.id || null,
+        paymentMethod: latestPayment?.method || null,
+        paymentStatus: latestPayment?.status || null,
+        paymentCurrency: latestPayment?.currency || null,
+        paymentAmount: latestPayment ? Number(latestPayment.amount || 0) : null,
+        paymentCreatedAt: latestPayment?.createdAt || null,
+        paymentUpdatedAt: latestPayment?.updatedAt || null,
+        driverId: normalizedDriverId,
+        driverName: profile?.name || null,
+        driverPhone: profile?.phone || null,
+        vehicleType: profile?.vehicleType || null,
+        plateNumber: profile?.plateNumber || null
+      };
+    });
   }
 };

@@ -321,7 +321,8 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const result = await customerApi.startRide({
         pickupLabel: pickup,
-        destinationLabel: destinationValue
+        destinationLabel: destinationValue,
+        vehicleOptionId: selectedOption.id
       });
 
       setActiveRide({
