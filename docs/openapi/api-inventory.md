@@ -11,6 +11,7 @@ This inventory is derived from code in the repository (routes/controllers/middle
 | booking-service      | `services/booking-service`      | Express   | `/v1/bookings/*`, `/demo/ride-created`           |
 | driver-service       | `services/driver-service`       | Express   | `/v1/driver/*`, `/v1/admin/*`, `/v1/internal/*`  |
 | eta-service          | `services/eta-service`          | Express   | `/v1/eta/*`                                      |
+| places-service       | `services/places-service`       | Express   | `/v1/places/*`                                   |
 | notification-service | `services/notification-service` | Express   | `/v1/notifications/*`, `/v1/users/*`             |
 | payment-service      | `services/payment-service`      | Express   | `/v1/payments/*`                                 |
 | pricing-service      | `services/pricing-service`      | Express   | `/v1/pricing/*`                                  |
@@ -26,6 +27,7 @@ This inventory is derived from code in the repository (routes/controllers/middle
 | bookings                            | booking-service      | `http://localhost:3003`      | Pass-through                                                |
 | driver / drivers / admin / internal | driver-service       | `http://localhost:3003`      | Pass-through                                                |
 | eta                                 | eta-service          | `http://localhost:3012`      | Pass-through                                                |
+| places                              | places-service       | `http://localhost:3014`      | Pass-through                                                |
 | notifications                       | notification-service | `http://localhost:3010`      | `/v1/notifications/users/*` rewrites to `/v1/users/*`       |
 | payments                            | payment-service      | `http://localhost:3007`      | Pass-through                                                |
 | pricing                             | pricing-service      | `http://localhost:3006`      | Pass-through                                                |
@@ -92,6 +94,14 @@ This inventory is derived from code in the repository (routes/controllers/middle
 | POST   | `/v1/internal/drivers/{driverId}/mark-busy`      | Internal       | `{ rideId }`                     | `{ data: { driver, rideId } }`     |
 | POST   | `/v1/internal/drivers/{driverId}/mark-available` | Internal       | —                                | `{ data: { driver } }`             |
 | POST   | `/v1/internal/drivers/bulk`                      | Internal       | `{ ids }`                        | `{ data: items[] }`                |
+
+### places-service
+
+| Method | Path                      | Auth   | Request Model                                               | Response Model               |
+| ------ | ------------------------- | ------ | ----------------------------------------------------------- | ---------------------------- |
+| GET    | `/v1/places/autocomplete` | Bearer | query `q`, `limit`, optional `lat`, `lng`                  | `{ data: { items[] } }`      |
+| GET    | `/v1/places/recent`       | Bearer | query `limit`; user resolved from `x-user-id`              | `{ data: { items[] } }`      |
+| POST   | `/v1/places/recent`       | Bearer | `{ label }` or `{ place: { label, address, location } }`   | `{ ok: true, data: items[] }` |
 
 ### notification-service
 

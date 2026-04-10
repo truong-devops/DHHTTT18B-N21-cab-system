@@ -9,7 +9,8 @@ FROM (
     ('user-service_db'),
     ('driver-service_db'),
     ('review-service_db'),
-    ('payment-service_db')
+    ('payment-service_db'),
+    ('places-service_db')
 ) AS service_dbs(db_name)
 WHERE NOT EXISTS (
   SELECT 1

@@ -7,6 +7,7 @@ const SERVICE_URLS = {
   admin: process.env.DRIVER_SERVICE_URL || 'http://localhost:3011',
   bookings: process.env.BOOKING_SERVICE_URL || 'http://localhost:3003',
   eta: process.env.ETA_SERVICE_URL || 'http://localhost:3012',
+  places: process.env.PLACES_SERVICE_URL || 'http://localhost:3014',
   pricing: process.env.PRICING_SERVICE_URL || 'http://localhost:3006',
   ai: process.env.AI_SERVICE_URL || 'http://localhost:3013',
   payments: process.env.PAYMENT_SERVICE_URL || 'http://localhost:3007',
