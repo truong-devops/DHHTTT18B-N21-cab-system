@@ -1,6 +1,7 @@
-import React from 'react';
+﻿import React from 'react';
 import { StyleSheet, TextInput } from 'react-native';
-import { colors, spacing, typography } from '../../theme/tokens';
+import { radius, spacing, typography } from '../../theme/tokens';
+import { useAppPalette } from '../../theme/palette';
 
 type Props = {
   value: string;
@@ -10,15 +11,18 @@ type Props = {
 };
 
 export const TextArea: React.FC<Props> = ({ value, placeholder, onChangeText, minHeight = 120 }) => {
+  const palette = useAppPalette();
+
   return (
     <TextInput
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
-      placeholderTextColor={colors.muted}
-      style={[styles.input, { minHeight }]}
+      placeholderTextColor={palette.muted}
+      style={[styles.input, { minHeight, borderColor: palette.border, color: palette.text, backgroundColor: palette.surface }]}
       multiline
       textAlignVertical="top"
+      accessibilityLabel={placeholder || 'Ô nhập nội dung'}
     />
   );
 };
@@ -26,10 +30,8 @@ export const TextArea: React.FC<Props> = ({ value, placeholder, onChangeText, mi
 const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: radius.input,
     padding: spacing.md,
-    ...typography.body,
-    color: colors.text
+    ...typography.body
   }
 });

@@ -1,6 +1,7 @@
 ﻿import React from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { radius, spacing, typography } from '../../theme/tokens';
+import { useAppPalette } from '../../theme/palette';
 
 type Props = {
   title: string;
@@ -9,8 +10,21 @@ type Props = {
 };
 
 export const PrimaryButton: React.FC<Props> = ({ title, onPress, disabled }) => {
+  const palette = useAppPalette();
+
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled ? styles.disabled : null]}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      style={({ pressed }) => [
+        styles.btn,
+        { backgroundColor: palette.brand600 },
+        disabled ? styles.disabled : null,
+        pressed && !disabled ? styles.pressed : null
+      ]}
+    >
       <Text style={styles.text}>{title}</Text>
     </Pressable>
   );
@@ -18,15 +32,17 @@ export const PrimaryButton: React.FC<Props> = ({ title, onPress, disabled }) => 
 
 const styles = StyleSheet.create({
   btn: {
-    height: 44,
+    minHeight: 46,
     borderRadius: radius.button,
-    backgroundColor: colors.brand600,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg
   },
   disabled: {
     opacity: 0.5
+  },
+  pressed: {
+    opacity: 0.9
   },
   text: {
     ...typography.body,

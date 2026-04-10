@@ -1,6 +1,7 @@
-import React from 'react';
+﻿import React from 'react';
 import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { colors, radius, spacing } from '../../theme/tokens';
+import { radius, spacing } from '../../theme/tokens';
+import { useAppPalette } from '../../theme/palette';
 
 type Props = {
   children: React.ReactNode;
@@ -9,24 +10,52 @@ type Props = {
 };
 
 export const Card: React.FC<Props> = ({ children, style, onPress }) => {
+  const palette = useAppPalette();
+
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={[styles.card, style]}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        style={({ pressed }) => [
+          styles.card,
+          {
+            backgroundColor: palette.surface,
+            borderColor: palette.border
+          },
+          pressed ? styles.pressed : null,
+          style
+        ]}
+      >
         {children}
       </Pressable>
     );
   }
 
-  return <View style={[styles.card, style]}>{children}</View>;
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: palette.surface,
+          borderColor: palette.border
+        },
+        style
+      ]}
+    >
+      {children}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.card,
     padding: spacing.lg,
     gap: spacing.md
+  },
+  pressed: {
+    opacity: 0.88
   }
 });

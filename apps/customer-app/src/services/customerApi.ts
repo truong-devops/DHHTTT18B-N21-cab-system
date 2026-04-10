@@ -1,4 +1,4 @@
-import type { ApiError } from '../lib/api';
+﻿import type { ApiError } from '../lib/api';
 import type { DriverInfo, LocationPoint, RideHistoryItem, RideOption, RidePriceBreakdown } from '../mock/data';
 import { destinationPoints, pickupPoint } from '../mock/data';
 import * as authApi from './authApi';
@@ -104,7 +104,7 @@ function getSurgeMeta(price: number, breakdown: RidePriceBreakdown) {
   }
 
   return {
-    surgeLabel: `Surge x${multiplier.toFixed(2)}`,
+    surgeLabel: `Cao điểm x${multiplier.toFixed(2)}`,
     surgeMultiplier: multiplier
   };
 }
@@ -137,13 +137,13 @@ function buildUserName(identifier: string, user: authApi.AuthUser) {
 
 function buildPhone(identifier: string) {
   const normalized = identifier.trim();
-  return normalized.includes('@') ? 'N/A' : normalized;
+  return normalized.includes('@') ? 'Không có' : normalized;
 }
 
 function getDestinationPointOrThrow(label: string): LocationPoint {
   const point = destinationPoints.find((item) => item.label === label);
   if (!point) {
-    throw new Error(`Khong tim thay toa do diem den: ${label}`);
+    throw new Error(`Không tìm thấy tọa độ điểm đến: ${label}`);
   }
   return point;
 }
@@ -151,7 +151,7 @@ function getDestinationPointOrThrow(label: string): LocationPoint {
 function getPickupPointOrThrow(label: string): LocationPoint {
   if (label === pickupPoint.label) {
     if (!livePickupCoordinate) {
-      throw new Error('Khong lay duoc toa do diem don. Vui long bat GPS va thu lai.');
+      throw new Error('Không lấy được tọa độ điểm đón. Vui lòng bật GPS và thử lại.');
     }
     return {
       label,
@@ -162,7 +162,7 @@ function getPickupPointOrThrow(label: string): LocationPoint {
 
   const point = destinationPoints.find((item) => item.label === label);
   if (!point) {
-    throw new Error(`Khong tim thay toa do diem don: ${label}`);
+    throw new Error(`Không tìm thấy tọa độ điểm đón: ${label}`);
   }
   return point;
 }
@@ -176,7 +176,7 @@ function formatLocation(lat?: number | null, lng?: number | null) {
 
 function ensureNumberCoordinate(value: number | null | undefined, field: string) {
   if (!Number.isFinite(value)) {
-    throw new Error(`Du lieu ${field} khong hop le tu backend`);
+    throw new Error(`Dữ liệu ${field} không hợp lệ từ backend`);
   }
   return Number(value);
 }
@@ -238,10 +238,10 @@ export const customerApi = {
     const normalizedIdentifier = normalizeIdentifier(identifier);
     const password = otp.trim();
     if (!normalizedIdentifier) {
-      throw new Error('Thieu so dien thoai/email');
+      throw new Error('Thiếu số điện thoại/email');
     }
     if (!password) {
-      throw new Error('Thieu OTP/mat khau');
+      throw new Error('Thiếu OTP/mật khẩu');
     }
 
     let authResult: authApi.AuthResponse;
@@ -297,7 +297,7 @@ export const customerApi = {
     return [
       {
         id: 'bike',
-        name: 'Xe may',
+        name: 'Xe máy',
         etaMinutes: Math.max(standardEta - 2, 2),
         price: bikePrice,
         capacity: 1,
@@ -310,7 +310,7 @@ export const customerApi = {
       },
       {
         id: 'car4',
-        name: 'Xe 4 cho',
+        name: 'Xe 4 chỗ',
         etaMinutes: standardEta,
         price: car4Price,
         capacity: 4,
@@ -323,7 +323,7 @@ export const customerApi = {
       },
       {
         id: 'car7',
-        name: 'Xe 7 cho',
+        name: 'Xe 7 chỗ',
         etaMinutes: premiumEta,
         price: car7Price,
         capacity: 7,
@@ -352,11 +352,11 @@ export const customerApi = {
       bookingId = resolveBookingId(booking);
       bookingRideId = resolveBookingRideId(booking);
       if (!bookingId) {
-        throw new Error('Booking service did not return bookingId');
+        throw new Error('Dịch vụ booking không trả về mã booking');
       }
     } catch (error) {
       if (isApiError(error) && error.code === 'ACTIVE_BOOKING_EXISTS') {
-        throw new Error('Ban dang co booking dang hoat dong. Vui long hoan tat hoac huy chuyen truoc.');
+        throw new Error('Bạn đang có booking đang hoạt động. Vui lòng hoàn tất hoặc hủy chuyến trước.');
       }
       throw error;
     }
@@ -397,6 +397,46 @@ export const customerApi = {
     };
   },
 
+  async cancelRide(rideId: string, bookingId?: string | null) {
+    const normalizedRideId = String(rideId || '').trim();
+    const normalizedBookingId = String(bookingId || '').trim();
+    if (!normalizedRideId) {
+      throw new Error('Mã chuyến đi không hợp lệ để hủy chuyến');
+    }
+
+    let bookingCancelled = false;
+    let rideCancelled = false;
+    let lastError: unknown = null;
+
+    if (normalizedBookingId) {
+      try {
+        await bookingApi.cancelBooking(normalizedBookingId);
+        bookingCancelled = true;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    try {
+      await rideApi.cancelRide(normalizedRideId, 'CANCELLED_BY_CUSTOMER');
+      rideCancelled = true;
+    } catch (error) {
+      const maybeApiError = error as ApiError;
+      // Accept already-ended cases to keep UX stable.
+      if (isApiError(maybeApiError) && (maybeApiError.status === 404 || maybeApiError.status === 409)) {
+        rideCancelled = true;
+      } else {
+        lastError = error;
+      }
+    }
+
+    if (!bookingCancelled && !rideCancelled) {
+      throw (lastError as Error) || new Error('Không thể hủy chuyến đi lúc này');
+    }
+
+    return { bookingCancelled, rideCancelled };
+  },
+
   async createPayment(rideId: string, method: string, amount: number) {
     await moveRideToStatus(rideId, 'ARRIVING');
     await moveRideToStatus(rideId, 'IN_PROGRESS');
@@ -412,11 +452,11 @@ export const customerApi = {
 
   async submitRating(rideId: string, driverId: string | undefined, stars: number, comment: string, tipAmount?: number | null) {
     if (!isUuid(rideId)) {
-      throw new Error('Ride ID khong hop le');
+      throw new Error('Mã chuyến đi không hợp lệ');
     }
     const normalizedDriverId = typeof driverId === 'string' ? driverId.trim() : '';
     if (!normalizedDriverId) {
-      throw new Error('Driver ID khong hop le');
+      throw new Error('Mã tài xế không hợp lệ');
     }
     return reviewApi.createReview({
       rideId,
@@ -513,3 +553,6 @@ export const customerApi = {
     });
   }
 };
+
+
+

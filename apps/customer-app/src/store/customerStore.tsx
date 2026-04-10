@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { DriverInfo, RideHistoryItem, RideOption } from '../mock/data';
 import { setOnAuthFailure } from '../lib/api';
 import { clearTokens, getRefreshToken, hydrateTokens, setTokens } from '../lib/token-store';
@@ -17,6 +17,8 @@ type User = {
 
 type ActiveRide = {
   id: string;
+  bookingId?: string | null;
+  status?: string | null;
   pickup: string;
   destination: string;
   pickupLat: number;
@@ -81,6 +83,7 @@ type CustomerContextValue = {
   updateProfile: (data: Partial<Pick<User, 'name' | 'email' | 'phone'>>) => Promise<void>;
   chooseOption: (option: RideOption) => void;
   startRide: (pickup: string, destination: string) => Promise<void>;
+  cancelActiveRide: () => Promise<void>;
   assignDriverToActiveRide: (driverId: string) => void;
   refreshActiveRide: () => Promise<ActiveRide | null>;
   decreaseEta: () => void;
@@ -97,6 +100,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [destination, setDestination] = useState('');
   const [selectedOption, setSelectedOption] = useState<RideOption | null>(null);
   const [activeRide, setActiveRide] = useState<ActiveRide | null>(null);
+  const activeRideRef = useRef<ActiveRide | null>(null);
   const [history, setHistory] = useState<RideHistoryItem[]>([]);
   const [walletBalance] = useState(450000);
   const refreshInFlightRef = useRef(false);
@@ -136,7 +140,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setUser({
         id: profile.data.id,
         name: profile.data.fullName || identifier,
-        phone: profile.data.phone || (identifier.includes('@') ? 'KhÃ´ng cÃ³' : identifier),
+        phone: profile.data.phone || (identifier.includes('@') ? 'Không có' : identifier),
         email: profile.data.email
       });
     } catch {
@@ -144,7 +148,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setUser({
         id: userId,
         name: identifier,
-        phone: identifier.includes('@') ? 'KhÃ´ng cÃ³' : identifier
+        phone: identifier.includes('@') ? 'Không có' : identifier
       });
     }
   }, []);
@@ -154,10 +158,10 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const normalizedIdentifier = typeof identifier === 'string' ? identifier.trim() : '';
       const normalizedCredential = typeof otp === 'string' ? otp.trim() : '';
       if (!normalizedIdentifier) {
-        throw new Error('Thiáº¿u sá»‘ Ä‘iá»‡n thoáº¡i/email.');
+        throw new Error('Thiếu số điện thoại/email.');
       }
       if (!normalizedCredential) {
-        throw new Error('Thiáº¿u OTP/máº­t kháº©u.');
+        throw new Error('Thiếu OTP/mật khẩu.');
       }
 
       const result = await customerApi.verifyOtp(normalizedIdentifier, normalizedCredential);
@@ -182,6 +186,10 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [logout]);
 
   useEffect(() => {
+    activeRideRef.current = activeRide;
+  }, [activeRide]);
+
+  useEffect(() => {
     let mounted = true;
 
     hydrateTokens()
@@ -191,7 +199,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         try {
           const verified = await authApi.verify();
           if (!mounted) return;
-          await syncUserFromProfile('KhÃ¡ch hÃ ng', verified.data.userId);
+          await syncUserFromProfile('Khách hàng', verified.data.userId);
         } catch {
           await clearTokens();
           if (mounted) {
@@ -225,7 +233,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateProfile = useCallback(
     async (data: Partial<Pick<User, 'name' | 'email' | 'phone'>>) => {
-      if (!user?.id) throw new Error('KhÃ´ng tÃ¬m tháº¥y user');
+      if (!user?.id) throw new Error('Không tìm thấy người dùng');
       const updated = await userApi.updateUser(user.id, {
         fullName: data.name ?? user.name,
         email: data.email ?? user.email ?? undefined,
@@ -270,7 +278,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const resolvedDriverId = resolvePreferredDriverId(canonicalDriverId, prevDriverSnapshotId, prevDriverId, normalizedLookupId);
         if (!resolvedDriverId) return prev;
 
-        const resolvedName = input.fullName?.trim() || prev.driver?.name || 'Tai xe';
+        const resolvedName = input.fullName?.trim() || prev.driver?.name || 'Tài xế';
         const resolvedPhone = input.phone?.trim() || prev.driver?.phone || undefined;
         return {
           ...prev,
@@ -316,7 +324,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const startRide = useCallback(
     async (pickup: string, destinationValue: string) => {
       if (!selectedOption) {
-        throw new Error('ChÆ°a chá»n loáº¡i xe');
+        throw new Error('Chưa chọn loại xe');
       }
 
       const result = await customerApi.startRide({
@@ -327,6 +335,8 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       setActiveRide({
         id: result.ride.id,
+        bookingId: result.ride.bookingId || null,
+        status: result.ride.status || null,
         pickup: result.pickup.label,
         destination: result.destination.label,
         pickupLat: result.pickup.lat,
@@ -345,6 +355,13 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     },
     [hydrateDriverProfile, selectedOption]
   );
+
+  const cancelActiveRide = useCallback(async () => {
+    const ride = activeRideRef.current;
+    if (!ride?.id) return;
+    await customerApi.cancelRide(ride.id, ride.bookingId || null);
+    setActiveRide(null);
+  }, []);
 
   const assignDriverToActiveRide = useCallback(
     (driverId: string) => {
@@ -393,6 +410,8 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const nextRide: ActiveRide = {
         ...activeRide,
+        bookingId: serverRide.bookingId || activeRide.bookingId || null,
+        status: serverRide.status || activeRide.status || null,
         pickup: nextPickup,
         destination: nextDestination,
         pickupLat: nextPickupLat,
@@ -407,6 +426,8 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (!prev || prev.id !== activeRide.id) return prev;
         return {
           ...prev,
+          bookingId: serverRide.bookingId || prev.bookingId || null,
+          status: serverRide.status || prev.status || null,
           pickup: nextPickup,
           destination: nextDestination,
           pickupLat: nextPickupLat,
@@ -439,7 +460,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const completeRidePayment = useCallback(
     async (method: string) => {
-      if (!activeRide) throw new Error('KhÃ´ng cÃ³ chuyáº¿n Ä‘i Ä‘ang hoáº¡t Ä‘á»™ng');
+      if (!activeRide) throw new Error('Không có chuyến đi đang hoạt động');
       await customerApi.createPayment(activeRide.id, method, activeRide.option.price);
     },
     [activeRide]
@@ -447,9 +468,9 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const submitRating = useCallback(
     async (stars: number, comment: string, tipAmount?: number | null) => {
-      if (!activeRide) throw new Error('KhÃ´ng cÃ³ chuyáº¿n Ä‘i Ä‘ang hoáº¡t Ä‘á»™ng');
+      if (!activeRide) throw new Error('Không có chuyến đi đang hoạt động');
       let reviewDriverId = resolvePreferredDriverId(activeRide.driver?.id, activeRide.driverId);
-      if (!reviewDriverId) throw new Error('Chua co du lieu tai xe tu he thong');
+      if (!reviewDriverId) throw new Error('Chưa có dữ liệu tài xế từ hệ thống');
 
       try {
         const latestRide = await rideApi.getRide(activeRide.id);
@@ -505,6 +526,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       updateProfile,
       chooseOption,
       startRide,
+      cancelActiveRide,
       assignDriverToActiveRide,
       refreshActiveRide,
       decreaseEta,
@@ -526,6 +548,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       updateProfile,
       chooseOption,
       startRide,
+      cancelActiveRide,
       assignDriverToActiveRide,
       refreshActiveRide,
       decreaseEta,
@@ -539,6 +562,6 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
 export const useCustomerStore = () => {
   const ctx = useContext(CustomerContext);
-  if (!ctx) throw new Error('useCustomerStore must be used inside CustomerProvider');
+  if (!ctx) throw new Error('useCustomerStore phải được dùng trong CustomerProvider');
   return ctx;
 };
