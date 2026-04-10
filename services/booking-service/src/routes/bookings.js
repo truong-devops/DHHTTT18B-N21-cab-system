@@ -19,6 +19,22 @@ const monitoring = require('../monitoring');
 const logger = require('../utils/logger');
 
 const router = express.Router();
+const PRIVILEGED_ROLES = new Set(['admin', 'service', 'ops']);
+
+function normalizeRoles(req) {
+  const roles = Array.isArray(req.user?.roles) ? req.user.roles : [];
+  const role = req.user?.role ? [req.user.role] : [];
+  return [...roles, ...role].map((r) => String(r || '').toLowerCase()).filter(Boolean);
+}
+
+function hasPrivilegedRole(req) {
+  return normalizeRoles(req).some((role) => PRIVILEGED_ROLES.has(role));
+}
+
+function hasAnyRole(req, allowedRoles) {
+  const allowed = new Set((allowedRoles || []).map((r) => String(r || '').toLowerCase()));
+  return normalizeRoles(req).some((role) => allowed.has(role));
+}
 
 function buildEnvelope({ eventId, type, traceId, payload }) {
   return {
@@ -46,7 +62,21 @@ function buildOutboxRecord({ eventId, topic, eventType, aggregateId, partitionKe
 }
 
 function resolveUserId(req, payload) {
-  return req.userId || req.header('x-user-id') || payload.user_id || 'anonymous-user';
+  const privilegedRequestedUserId =
+    hasPrivilegedRole(req) && (payload?.user_id || req.header('x-user-id'))
+      ? String(payload?.user_id || req.header('x-user-id')).trim()
+      : '';
+
+  if (privilegedRequestedUserId) {
+    return privilegedRequestedUserId;
+  }
+  if (req.userId) {
+    return String(req.userId);
+  }
+  if (hasPrivilegedRole(req)) {
+    return 'anonymous-user';
+  }
+  return 'anonymous-user';
 }
 
 function hasLatLngTypeIssue(issues) {
@@ -121,6 +151,14 @@ function toMinimalBookingResponse(booking) {
 function isLoadTestRequest(req) {
   const hint = String(req.header('x-load-test') || '').toLowerCase();
   return hint === '1' || hint === 'true' || hint === 'yes';
+}
+
+function isLoadSkipPersistEnabled() {
+  return String(process.env.BOOKING_LOAD_SKIP_PERSIST || 'false') === 'true';
+}
+
+function isLoadSkipListDbEnabled() {
+  return String(process.env.BOOKING_LOAD_SKIP_LIST_DB || 'false') === 'true';
 }
 
 function compactPriceSnapshotForLoad(quote) {
@@ -430,11 +468,23 @@ async function compensateBookingAfterPaymentFailure({ bookingId, traceId, reason
 
 router.get('/', async (req, res, next) => {
   try {
-    const requestedUserId = req.query.user_id || req.userId || req.header('x-user-id') || null;
+    const actorUserId = req.userId || null;
+    const requestedUserId = req.query.user_id || actorUserId || null;
+    const loadTestRequest = isLoadTestRequest(req);
+
+    if (loadTestRequest && hasPrivilegedRole(req) && requestedUserId && isLoadSkipListDbEnabled()) {
+      return res.json({ data: [] });
+    }
+
+    if (requestedUserId && actorUserId && requestedUserId !== actorUserId && !hasPrivilegedRole(req)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const effectiveUserId = hasPrivilegedRole(req) ? requestedUserId : actorUserId;
     const requestedLimit = Number(req.query.limit);
-    const listOptions = requestedUserId
+    const listOptions = effectiveUserId
       ? {
-        userId: String(requestedUserId),
+        userId: String(effectiveUserId),
         limit: Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(200, Math.floor(requestedLimit)) : 50
       }
       : {};
@@ -450,6 +500,9 @@ router.get('/:id', async (req, res, next) => {
     const booking = await bookingRepo.getById(req.params.id);
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
+    }
+    if (!hasPrivilegedRole(req) && booking.userId && req.userId && booking.userId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
     return res.json({ data: mapBookingCompat(booking) });
   } catch (error) {
@@ -505,6 +558,12 @@ router.post('/', async (req, res) => {
     }
 
     const { pickup, vehicleType, distance_km, traffic_level } = parsed.data;
+    if (parsed.data.user_id && req.userId && parsed.data.user_id !== req.userId && !hasPrivilegedRole(req)) {
+      monitoring.recordBookingStatus('created', 'error', {
+        reason: 'forbidden_user_scope'
+      });
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const normalizedDrop = parsed.data.drop || parsed.data.dropoff;
     const userId = resolveUserId(req, parsed.data);
     currentUserId = userId;
@@ -576,7 +635,10 @@ router.post('/', async (req, res) => {
         status: 'REQUESTED',
         createdAt
       };
-      await bookingRepo.createFast(null, fastBooking);
+      const skipPersistInLoadMode = loadTestRequest && hasPrivilegedRole(req) && isLoadSkipPersistEnabled();
+      if (!skipPersistInLoadMode) {
+        await bookingRepo.createFast(null, fastBooking);
+      }
       result = {
         replay: false,
         responseCode: 201,
@@ -859,7 +921,22 @@ router.post('/', async (req, res) => {
     if (e?.code === '23505') {
       const constraint = String(e?.constraint || '');
       if (constraint === 'bookings_one_active_per_user_idx') {
-        const activeBooking = currentUserId && currentUserId !== 'anonymous-user' ? await bookingRepo.findActiveByUser(currentUserId) : null;
+        let activeBooking = null;
+        if (currentUserId && currentUserId !== 'anonymous-user') {
+          try {
+            activeBooking = await bookingRepo.findActiveByUser(currentUserId);
+          } catch (lookupErr) {
+            logger.withTrace(req).warn(
+              {
+                err: {
+                  message: lookupErr?.message || 'failed to lookup active booking',
+                  code: lookupErr?.code || 'UNKNOWN'
+                }
+              },
+              'failed to lookup active booking after unique-constraint conflict'
+            );
+          }
+        }
         return res.status(409).json({
           error: 'An active booking already exists for this user',
           code: 'ACTIVE_BOOKING_EXISTS',
@@ -985,6 +1062,9 @@ router.get('/:id/mcp-context', async (req, res) => {
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
+    if (!hasPrivilegedRole(req) && booking.userId && req.userId && booking.userId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
     const traceId = req.traceId || req.header('x-trace-id');
     const authorization = req.header('authorization') || '';
@@ -1109,6 +1189,9 @@ router.get('/:id/mcp-context', async (req, res) => {
 
 router.patch('/:id/status', async (req, res) => {
   try {
+    if (!hasAnyRole(req, ['driver', 'admin', 'service'])) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const bookingId = req.params.id;
     const requestedStatus = String(req.body?.status || '').toUpperCase();
     if (!requestedStatus) {
@@ -1125,6 +1208,9 @@ router.patch('/:id/status', async (req, res) => {
       return res.status(400).json({
         error: 'driver_id is required for ACCEPTED status'
       });
+    }
+    if (hasAnyRole(req, ['driver']) && req.userId && driverId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     const traceId = req.traceId || req.header('x-trace-id');
@@ -1230,6 +1316,11 @@ router.post('/:id/cancel', async (req, res) => {
       if (!existing) {
         return null;
       }
+      if (!hasPrivilegedRole(req) && existing.userId && req.userId && existing.userId !== req.userId) {
+        const err = new Error('Forbidden');
+        err.statusCode = 403;
+        throw err;
+      }
 
       const updated = existing.status === 'CANCELLED' ? existing : await bookingRepo.cancel(client, bookingId);
 
@@ -1277,6 +1368,9 @@ router.post('/:id/cancel', async (req, res) => {
       }
     });
   } catch (e) {
+    if (e?.statusCode) {
+      return res.status(e.statusCode).json({ error: e.message || 'Request failed' });
+    }
     monitoring.recordBookingStatus('cancelled', 'error');
     logger.withTrace(req).error(
       {

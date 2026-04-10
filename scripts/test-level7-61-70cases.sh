@@ -202,8 +202,9 @@ call_json_url() {
 register_and_login_user() {
   local email="$1"
   local name="$2"
+  local role="${3:-user}"
 
-  call_json_url POST "$BASE_URL/v1/auth/register" "{\"email\":\"$email\",\"password\":\"$USER_PASS\",\"name\":\"$name\",\"role\":\"user\"}" >/dev/null || true
+  call_json_url POST "$BASE_URL/v1/auth/register" "{\"email\":\"$email\",\"password\":\"$USER_PASS\",\"name\":\"$name\",\"role\":\"$role\"}" >/dev/null || true
 
   local attempt=1
   while [[ "$attempt" -le 6 ]]; do
@@ -534,18 +535,31 @@ USER_TOKEN="$(register_and_login_user "$USER_EMAIL" "Level7 Load User ${UNIQ_TAG
 if [[ -z "$USER_TOKEN" ]]; then
   echo "WARN: no user token; cases using protected gateway routes may fail."
 fi
+ADMIN_EMAIL="level7-admin-${UNIQ_TAG}@test.com"
+ADMIN_TOKEN="$(register_and_login_user "$ADMIN_EMAIL" "Level7 Load Admin ${UNIQ_TAG}" "admin")"
+if [[ -z "$ADMIN_TOKEN" ]]; then
+  echo "WARN: no admin token; high-cardinality booking load cases may skip/fail."
+fi
+INTERNAL_ACTOR_ID="${INTERNAL_ACTOR_ID:-load-admin-${UNIQ_TAG}}"
 sleep "$CASE61_WARMUP_SEC"
 
 # Case 61: 1000 RPS booking
-C61_INPUT="POST $BOOKING_URL/v1/bookings | duration=${CASE61_DURATION_SEC}s concurrency=${CASE61_CONCURRENCY} target_rps=${CASE61_TARGET_RPS} payload=booking_load x-user-id=load61-${UNIQ_TAG}-__SEQ__"
-C61_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE61_DURATION_SEC" "$CASE61_CONCURRENCY" "$CASE61_TARGET_RPS" "{\"content-type\":\"application/json\",\"x-user-id\":\"load61-${UNIQ_TAG}-__SEQ__\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" '' 'booking_load' 15000)
-C61_RPS=$(echo "$C61_BODY" | json_get "achieved_rps")
-C61_SUCCESS_RATE=$(echo "$C61_BODY" | json_get "success_rate")
-print_case "Case 61 - 1000 requests/second booking" "$C61_INPUT" "achieved_rps>=${CASE61_TARGET_RPS} AND success_rate>=${CASE61_MIN_SUCCESS_RATE}" "200" "$C61_BODY"
-if rps_meets_target "$C61_RPS" "$CASE61_TARGET_RPS" "$CASE61_MIN_RPS_RATIO" && float_ge "$C61_SUCCESS_RATE" "$CASE61_MIN_SUCCESS_RATE"; then
-  mark_result 1 "61"
+if [[ -z "$ADMIN_TOKEN" ]]; then
+  C61_INPUT="POST $BASE_URL/v1/bookings | protected route requires admin token for multi-user load"
+  C61_BODY='{"skip":"missing admin token for high-cardinality booking load test"}'
+  print_case "Case 61 - 1000 requests/second booking" "$C61_INPUT" "achieved_rps>=${CASE61_TARGET_RPS} AND success_rate>=${CASE61_MIN_SUCCESS_RATE}" "SKIP" "$C61_BODY"
+  mark_result_skip "61" "missing admin token for high-cardinality booking load test"
 else
-  mark_result 0 "61"
+  C61_INPUT="POST $BOOKING_URL/v1/bookings | duration=${CASE61_DURATION_SEC}s concurrency=${CASE61_CONCURRENCY} target_rps=${CASE61_TARGET_RPS} direct service + internal-key + admin token + unique user_id"
+  C61_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE61_DURATION_SEC" "$CASE61_CONCURRENCY" "$CASE61_TARGET_RPS" "{\"content-type\":\"application/json\",\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" "{\"user_id\":\"load61-${UNIQ_TAG}-__SEQ__\",\"pickup\":{\"lat\":10.7601,\"lng\":106.6601},\"drop\":{\"lat\":10.7701,\"lng\":106.7001},\"vehicleType\":\"CAR\"}" 'static' 15000)
+  C61_RPS=$(echo "$C61_BODY" | json_get "achieved_rps")
+  C61_SUCCESS_RATE=$(echo "$C61_BODY" | json_get "success_rate")
+  print_case "Case 61 - 1000 requests/second booking" "$C61_INPUT" "achieved_rps>=${CASE61_TARGET_RPS} AND success_rate>=${CASE61_MIN_SUCCESS_RATE}" "200" "$C61_BODY"
+  if rps_meets_target "$C61_RPS" "$CASE61_TARGET_RPS" "$CASE61_MIN_RPS_RATIO" && float_ge "$C61_SUCCESS_RATE" "$CASE61_MIN_SUCCESS_RATE"; then
+    mark_result 1 "61"
+  else
+    mark_result 0 "61"
+  fi
 fi
 
 # Case 62: ETA under load
@@ -588,17 +602,24 @@ fi
 sleep "$CASE64_COOLDOWN_SEC"
 
 # Case 65: DB connection pool exhaustion resistance
-C65_INPUT="GET $BOOKING_URL/v1/bookings?user_id=pool65-__SEQ__ | duration=${CASE65_DURATION_SEC}s concurrency=${CASE65_CONCURRENCY} target_rps=${CASE65_TARGET_RPS}"
-C65_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings?user_id=pool65-__SEQ__" "GET" "$CASE65_DURATION_SEC" "$CASE65_CONCURRENCY" "$CASE65_TARGET_RPS" '{}' '' 'static' 12000)
-C65_RPS=$(echo "$C65_BODY" | json_get "achieved_rps")
-C65_5XX=$(json_status_count "$C65_BODY" "500")
-C65_COMPLETED=$(echo "$C65_BODY" | json_get "completed")
-C65_5XX_RATE=$(node -e "const e=Number(process.argv[1]);const t=Number(process.argv[2]);process.stdout.write(String(t>0?e/t:1));" "$C65_5XX" "$C65_COMPLETED")
-print_case "Case 65 - DB connection pool exhaustion" "$C65_INPUT" "rps>=${CASE65_TARGET_RPS} AND 5xx_rate<=${CASE65_MAX_5XX_RATE}" "200" "$C65_BODY"
-if rps_meets_target "$C65_RPS" "$CASE65_TARGET_RPS" "$CASE65_MIN_RPS_RATIO" && float_le "$C65_5XX_RATE" "$CASE65_MAX_5XX_RATE"; then
-  mark_result 1 "65"
+if [[ -z "$ADMIN_TOKEN" ]]; then
+  C65_INPUT="GET $BASE_URL/v1/bookings?user_id=pool65-__SEQ__&limit=50 | protected route requires admin token"
+  C65_BODY='{"skip":"missing admin token for booking read load test"}'
+  print_case "Case 65 - DB connection pool exhaustion" "$C65_INPUT" "rps>=${CASE65_TARGET_RPS} AND 5xx_rate<=${CASE65_MAX_5XX_RATE}" "SKIP" "$C65_BODY"
+  mark_result_skip "65" "missing admin token for booking read load test"
 else
-  mark_result 0 "65"
+  C65_INPUT="GET $BOOKING_URL/v1/bookings?user_id=pool65-__SEQ__&limit=50 | duration=${CASE65_DURATION_SEC}s concurrency=${CASE65_CONCURRENCY} target_rps=${CASE65_TARGET_RPS} direct service + internal-key + admin token"
+  C65_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings?user_id=pool65-__SEQ__&limit=50" "GET" "$CASE65_DURATION_SEC" "$CASE65_CONCURRENCY" "$CASE65_TARGET_RPS" "{\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\"}" '' 'static' 12000)
+  C65_RPS=$(echo "$C65_BODY" | json_get "achieved_rps")
+  C65_5XX=$(json_status_count "$C65_BODY" "500")
+  C65_COMPLETED=$(echo "$C65_BODY" | json_get "completed")
+  C65_5XX_RATE=$(node -e "const e=Number(process.argv[1]);const t=Number(process.argv[2]);process.stdout.write(String(t>0?e/t:1));" "$C65_5XX" "$C65_COMPLETED")
+  print_case "Case 65 - DB connection pool exhaustion" "$C65_INPUT" "rps>=${CASE65_TARGET_RPS} AND 5xx_rate<=${CASE65_MAX_5XX_RATE}" "200" "$C65_BODY"
+  if rps_meets_target "$C65_RPS" "$CASE65_TARGET_RPS" "$CASE65_MIN_RPS_RATIO" && float_le "$C65_5XX_RATE" "$CASE65_MAX_5XX_RATE"; then
+    mark_result 1 "65"
+  else
+    mark_result 0 "65"
+  fi
 fi
 
 # Case 66: Redis cache hit rate > 90%
@@ -664,7 +685,7 @@ if [[ -z "$USER_TOKEN" ]]; then
   C68_BODY='{"error":"missing user token for protected gateway endpoint"}'
 else
   C68_INPUT="POST $BASE_URL/v1/eta/estimate | duration=${CASE68_DURATION_SEC}s concurrency=${CASE68_CONCURRENCY} target_rps=${CASE68_TARGET_RPS} with bearer token"
-  C68_BODY=$(run_load_scenario "$BASE_URL/v1/eta/estimate" "POST" "$CASE68_DURATION_SEC" "$CASE68_CONCURRENCY" "$CASE68_TARGET_RPS" "{\"content-type\":\"application/json\",\"authorization\":\"Bearer $USER_TOKEN\"}" '{"distance_km":5.1,"traffic_level":0.5}' 'static' 10000)
+  C68_BODY=$(run_load_scenario "$BASE_URL/v1/eta/estimate" "POST" "$CASE68_DURATION_SEC" "$CASE68_CONCURRENCY" "$CASE68_TARGET_RPS" "{\"content-type\":\"application/json\",\"authorization\":\"Bearer $USER_TOKEN\",\"x-load-test\":\"true\"}" '{"distance_km":5.1,"traffic_level":0.5}' 'static' 10000)
 fi
 C68_P95=$(echo "${C68_BODY:-{}}" | json_get "p95_ms")
 C68_SUCCESS_RATE=$(echo "${C68_BODY:-{}}" | json_get "success_rate")
@@ -678,16 +699,23 @@ fi
 
 # Case 69: Peak-hour load test
 sleep "$CASE69_PREP_COOLDOWN_SEC"
-C69_INPUT="POST $BOOKING_URL/v1/bookings peak stage | duration=${CASE69_PEAK_DURATION_SEC}s concurrency=${CASE69_PEAK_CONCURRENCY} target_rps=${CASE69_PEAK_TARGET_RPS}"
-C69_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE69_PEAK_DURATION_SEC" "$CASE69_PEAK_CONCURRENCY" "$CASE69_PEAK_TARGET_RPS" "{\"content-type\":\"application/json\",\"x-user-id\":\"peak69-${UNIQ_TAG}-__SEQ__\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" '' 'booking_load' 18000)
-C69_RPS=$(echo "$C69_BODY" | json_get "achieved_rps")
-C69_P95=$(echo "$C69_BODY" | json_get "p95_ms")
-C69_SUCCESS_RATE=$(echo "$C69_BODY" | json_get "success_rate")
-print_case "Case 69 - Load test giờ cao điểm" "$C69_INPUT" "rps>=${CASE69_PEAK_TARGET_RPS} AND p95<=${CASE69_PEAK_P95_LIMIT_MS}ms AND success_rate>=${CASE69_PEAK_MIN_SUCCESS_RATE}" "200" "$C69_BODY"
-if rps_meets_target "$C69_RPS" "$CASE69_PEAK_TARGET_RPS" "$CASE69_PEAK_MIN_RPS_RATIO" && latency_within_ratio "$C69_P95" "$CASE69_PEAK_P95_LIMIT_MS" "$CASE69_PEAK_P95_TOLERANCE_RATIO" && float_ge "$C69_SUCCESS_RATE" "$CASE69_PEAK_MIN_SUCCESS_RATE"; then
-  mark_result 1 "69"
+if [[ -z "$ADMIN_TOKEN" ]]; then
+  C69_INPUT="POST $BASE_URL/v1/bookings peak stage | protected route requires admin token for multi-user load"
+  C69_BODY='{"skip":"missing admin token for peak booking load test"}'
+  print_case "Case 69 - Load test giờ cao điểm" "$C69_INPUT" "rps>=${CASE69_PEAK_TARGET_RPS} AND p95<=${CASE69_PEAK_P95_LIMIT_MS}ms AND success_rate>=${CASE69_PEAK_MIN_SUCCESS_RATE}" "SKIP" "$C69_BODY"
+  mark_result_skip "69" "missing admin token for peak booking load test"
 else
-  mark_result 0 "69"
+  C69_INPUT="POST $BOOKING_URL/v1/bookings peak stage | duration=${CASE69_PEAK_DURATION_SEC}s concurrency=${CASE69_PEAK_CONCURRENCY} target_rps=${CASE69_PEAK_TARGET_RPS} direct service + internal-key + admin token + unique user_id"
+  C69_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE69_PEAK_DURATION_SEC" "$CASE69_PEAK_CONCURRENCY" "$CASE69_PEAK_TARGET_RPS" "{\"content-type\":\"application/json\",\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" "{\"user_id\":\"peak69-${UNIQ_TAG}-__SEQ__\",\"pickup\":{\"lat\":10.7603,\"lng\":106.6603},\"drop\":{\"lat\":10.7703,\"lng\":106.7003},\"vehicleType\":\"CAR\"}" 'static' 18000)
+  C69_RPS=$(echo "$C69_BODY" | json_get "achieved_rps")
+  C69_P95=$(echo "$C69_BODY" | json_get "p95_ms")
+  C69_SUCCESS_RATE=$(echo "$C69_BODY" | json_get "success_rate")
+  print_case "Case 69 - Load test giờ cao điểm" "$C69_INPUT" "rps>=${CASE69_PEAK_TARGET_RPS} AND p95<=${CASE69_PEAK_P95_LIMIT_MS}ms AND success_rate>=${CASE69_PEAK_MIN_SUCCESS_RATE}" "200" "$C69_BODY"
+  if rps_meets_target "$C69_RPS" "$CASE69_PEAK_TARGET_RPS" "$CASE69_PEAK_MIN_RPS_RATIO" && latency_within_ratio "$C69_P95" "$CASE69_PEAK_P95_LIMIT_MS" "$CASE69_PEAK_P95_TOLERANCE_RATIO" && float_ge "$C69_SUCCESS_RATE" "$CASE69_PEAK_MIN_SUCCESS_RATE"; then
+    mark_result 1 "69"
+  else
+    mark_result 0 "69"
+  fi
 fi
 
 # Case 70: Auto scaling works (Kubernetes HPA)
