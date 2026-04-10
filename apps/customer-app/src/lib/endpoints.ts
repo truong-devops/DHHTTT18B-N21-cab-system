@@ -18,6 +18,11 @@ export const endpoints = {
     detail: (id: string) => `/v1/rides/${id}`,
     update: (id: string) => `/v1/rides/${id}`
   },
+  booking: {
+    create: '/v1/bookings',
+    list: '/v1/bookings',
+    detail: (id: string) => `/v1/bookings/${id}`
+  },
   payment: {
     list: '/v1/payments',
     create: '/v1/payments',

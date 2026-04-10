@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const {
   createRide,
   getRideById,
+  getRideByExternalId,
   getActiveRideForDriver,
   listRides,
   claimRideForDriver,
@@ -57,6 +58,7 @@ router.post(
     bodySchema: {
       required: ['pickupLat', 'pickupLng', 'dropoffLat', 'dropoffLng'],
       properties: {
+        externalRideId: { type: 'string' },
         pickupLat: { type: 'number' },
         pickupLng: { type: 'number' },
         dropoffLat: { type: 'number' },
@@ -167,10 +169,44 @@ router.post(
         requestHash
       });
 
+      const requestedExternalRideId =
+        typeof req.body?.externalRideId === 'string' && req.body.externalRideId.trim() ? req.body.externalRideId.trim() : null;
+      if (requestedExternalRideId) {
+        const existingRide = await getRideByExternalId(requestedExternalRideId);
+        if (existingRide) {
+          responseStatus = 200;
+          responseBody = { data: toRideResponse(existingRide) };
+
+          const responseHeaders = {
+            'content-type': 'application/json',
+            'x-trace-id': req.traceId,
+            'x-request-id': req.requestId
+          };
+
+          await setResponse({
+            routeKey,
+            userId: req.userId,
+            idempotencyKey,
+            responseStatus,
+            responseHeaders,
+            responseBody
+          });
+
+          await saveCachedResponse(cacheKey, {
+            status: responseStatus,
+            headers: responseHeaders,
+            body: responseBody,
+            requestHash,
+            createdAt: new Date().toISOString()
+          });
+
+          return res.status(responseStatus).json(responseBody);
+        }
+      }
       const shouldAutoAssign = AUTO_ASSIGN_DRIVER && !req.body?.driverId && DEFAULT_DRIVER_ID.length > 0;
 
       const ride = await createRide({
-        externalRideId: crypto.randomUUID(),
+        externalRideId: requestedExternalRideId || crypto.randomUUID(),
         bookingId: req.body.bookingId,
         riderId: req.userId,
         driverId: shouldAutoAssign ? DEFAULT_DRIVER_ID : req.body.driverId,
