@@ -19,6 +19,7 @@ const MAPPING = {
   'gift.fill': 'card-giftcard',
   'motorbike.fill': 'two-wheeler',
   'apps.fill': 'apps',
+  'gearshape.fill': 'settings',
   'edit.fill': 'edit'
 } as const satisfies IconMapping;
 

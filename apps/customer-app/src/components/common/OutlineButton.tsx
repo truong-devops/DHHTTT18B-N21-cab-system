@@ -1,6 +1,7 @@
-import React from 'react';
+﻿import React from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { radius, spacing, typography } from '../../theme/tokens';
+import { useAppPalette } from '../../theme/palette';
 
 type Props = {
   title: string;
@@ -10,23 +11,41 @@ type Props = {
   textStyle?: StyleProp<TextStyle>;
 };
 
-export const OutlineButton: React.FC<Props> = ({ title, onPress, disabled, style, textStyle }) => (
-  <Pressable onPress={onPress} disabled={disabled} style={[styles.btn, disabled ? styles.disabled : null, style]}>
-    <Text style={[styles.text, disabled ? styles.textDisabled : null, textStyle]}>{title}</Text>
-  </Pressable>
-);
+export const OutlineButton: React.FC<Props> = ({ title, onPress, disabled, style, textStyle }) => {
+  const palette = useAppPalette();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      style={({ pressed }) => [
+        styles.btn,
+        {
+          borderColor: palette.border,
+          backgroundColor: palette.surface
+        },
+        disabled ? styles.disabled : null,
+        pressed && !disabled ? styles.pressed : null,
+        style
+      ]}
+    >
+      <Text style={[styles.text, { color: palette.text }, disabled ? { color: palette.muted } : null, textStyle]}>{title}</Text>
+    </Pressable>
+  );
+};
 
 const styles = StyleSheet.create({
   btn: {
-    height: 44,
+    minHeight: 46,
     borderRadius: radius.button,
     borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg
   },
   disabled: { opacity: 0.6 },
-  text: { ...typography.body, color: colors.text },
-  textDisabled: { color: colors.muted }
+  pressed: { opacity: 0.86 },
+  text: { ...typography.body, fontWeight: '500' }
 });

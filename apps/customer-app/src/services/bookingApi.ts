@@ -42,3 +42,10 @@ export async function createBooking(payload: CreateBookingPayload) {
     body: payload
   });
 }
+
+export async function cancelBooking(bookingId: string) {
+  return apiRequest<{ booking?: Booking | null }>({
+    method: 'POST',
+    path: endpoints.booking.cancel(bookingId)
+  });
+}

@@ -4,7 +4,7 @@ import HomeMapScreen from '../screens/customer/HomeMapScreen';
 import HistoryScreen from '../screens/customer/HistoryScreen';
 import ProfileWalletScreen from '../screens/customer/ProfileWalletScreen';
 import WalletScreen from '../screens/customer/WalletScreen';
-import PromoScreen from '../screens/customer/PromoScreen';
+import SettingsScreen from '../screens/customer/SettingsScreen';
 import { colors } from '../theme/tokens';
 import { IconSymbol } from '../components/ui/icon-symbol';
 
@@ -12,8 +12,8 @@ export type TabParamList = {
   Home: undefined;
   History: undefined;
   Wallet: undefined;
-  Promo: undefined;
   Profile: undefined;
+  Settings: undefined;
 };
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -25,6 +25,7 @@ const Tabs = () => {
         headerShown: false,
         tabBarActiveTintColor: colors.brand600,
         tabBarInactiveTintColor: colors.muted,
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
           backgroundColor: colors.white,
           borderTopColor: colors.border,
@@ -66,21 +67,21 @@ const Tabs = () => {
         }}
       />
       <Tab.Screen
-        name="Promo"
-        component={PromoScreen}
-        options={{
-          title: 'Ưu đãi',
-          tabBarLabel: 'Ưu đãi',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="ticket.fill" color={color} />
-        }}
-      />
-      <Tab.Screen
         name="Profile"
         component={ProfileWalletScreen}
         options={{
           title: 'Tài khoản',
           tabBarLabel: 'Tài khoản',
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.fill" color={color} />
+        }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          title: 'Cài đặt',
+          tabBarLabel: 'Cài đặt',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="gearshape.fill" color={color} />
         }}
       />
     </Tab.Navigator>

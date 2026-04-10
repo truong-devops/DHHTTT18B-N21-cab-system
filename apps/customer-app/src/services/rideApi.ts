@@ -82,3 +82,11 @@ export async function updateRideStatus(id: string, status: string) {
     body: { status }
   });
 }
+
+export async function cancelRide(id: string, reason?: string) {
+  return apiRequest<{ data: Ride }>({
+    method: 'DELETE',
+    path: endpoints.ride.detail(id),
+    body: reason ? { reason } : undefined
+  });
+}

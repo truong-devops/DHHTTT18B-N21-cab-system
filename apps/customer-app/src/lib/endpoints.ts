@@ -21,7 +21,8 @@ export const endpoints = {
   booking: {
     create: '/v1/bookings',
     list: '/v1/bookings',
-    detail: (id: string) => `/v1/bookings/${id}`
+    detail: (id: string) => `/v1/bookings/${id}`,
+    cancel: (id: string) => `/v1/bookings/${id}/cancel`
   },
   payment: {
     list: '/v1/payments',

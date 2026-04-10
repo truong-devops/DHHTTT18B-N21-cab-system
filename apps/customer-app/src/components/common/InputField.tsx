@@ -1,7 +1,8 @@
-import React from 'react';
+﻿import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { TextInputProps } from 'react-native';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { radius, spacing, typography } from '../../theme/tokens';
+import { useAppPalette } from '../../theme/palette';
 
 type Props = {
   label?: string;
@@ -12,21 +13,30 @@ type Props = {
 };
 
 export const InputField: React.FC<Props> = ({ label, value, onChangeText, placeholder, keyboardType }) => {
+  const palette = useAppPalette();
+
   return (
     <View style={styles.wrap}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
-      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} keyboardType={keyboardType} style={styles.input} />
+      {label ? <Text style={[styles.label, { color: palette.muted }]}>{label}</Text> : null}
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={palette.muted}
+        keyboardType={keyboardType}
+        accessibilityLabel={label || placeholder || 'Ô nhập liệu'}
+        style={[styles.input, { borderColor: palette.border, color: palette.text, backgroundColor: palette.surface }]}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },
-  label: { ...typography.caption, color: colors.muted },
+  label: { ...typography.caption, fontWeight: '600' },
   input: {
-    height: 44,
+    minHeight: 46,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.input,
     paddingHorizontal: spacing.md,
     ...typography.body

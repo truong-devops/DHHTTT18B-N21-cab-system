@@ -1,8 +1,9 @@
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+﻿import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import React, { useMemo } from 'react';
 import { Alert, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { DriverInfo } from '../../mock/data';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { useAppPalette } from '../../theme/palette';
 
 type Props = {
   driver: DriverInfo;
@@ -30,36 +31,38 @@ function normalizePhone(value: string | null | undefined) {
   return trimmed.replace(/\s+/g, '');
 }
 
-function resolveStatusMeta(etaMinutes: number) {
+function resolveStatusMeta(etaMinutes: number, mutedColor: string) {
   if (etaMinutes <= 2) {
     return {
-      label: 'Sap den diem don',
+      label: 'Sắp đến điểm đón',
       backgroundColor: '#E7F7EC',
       textColor: '#1F9254'
     };
   }
   if (etaMinutes <= 5) {
     return {
-      label: 'Dang den diem don',
+      label: 'Đang đến điểm đón',
       backgroundColor: colors.brand100,
       textColor: colors.brand700
     };
   }
   return {
-    label: 'Dang di chuyen',
-    backgroundColor: colors.surface2,
-    textColor: colors.muted
+    label: 'Đang di chuyển',
+    backgroundColor: '#EEF2F7',
+    textColor: mutedColor
   };
 }
 
 export const DriverInfoCard: React.FC<Props> = ({ driver, etaMinutes, onCallPress, onChatPress }) => {
-  const ratingLabel = typeof driver.rating === 'number' && Number.isFinite(driver.rating) ? String(driver.rating) : 'Khong co du lieu';
-  const plateLabel = driver.plate && driver.plate.trim() ? driver.plate : 'Khong co du lieu';
-  const vehicleLabel = driver.vehicle && driver.vehicle.trim() ? driver.vehicle : 'Khong co du lieu';
+  const palette = useAppPalette();
+
+  const ratingLabel = typeof driver.rating === 'number' && Number.isFinite(driver.rating) ? String(driver.rating) : 'Không có dữ liệu';
+  const plateLabel = driver.plate && driver.plate.trim() ? driver.plate : 'Không có dữ liệu';
+  const vehicleLabel = driver.vehicle && driver.vehicle.trim() ? driver.vehicle : 'Không có dữ liệu';
   const phoneLabel = normalizePhone(driver.phone);
-  const initials = useMemo(() => toInitials(driver.name || 'Tai xe'), [driver.name]);
+  const initials = useMemo(() => toInitials(driver.name || 'Tài xế'), [driver.name]);
   const avatarUrl = typeof driver.avatarUrl === 'string' && driver.avatarUrl.trim() ? driver.avatarUrl.trim() : null;
-  const statusMeta = useMemo(() => resolveStatusMeta(etaMinutes), [etaMinutes]);
+  const statusMeta = useMemo(() => resolveStatusMeta(etaMinutes, palette.muted), [etaMinutes, palette.muted]);
 
   const handleCall = async () => {
     if (onCallPress) {
@@ -68,7 +71,7 @@ export const DriverInfoCard: React.FC<Props> = ({ driver, etaMinutes, onCallPres
     }
 
     if (!phoneLabel) {
-      Alert.alert('Khong co so dien thoai', 'Thong tin tai xe chua co so dien thoai.');
+      Alert.alert('Không có số điện thoại', 'Thông tin tài xế chưa có số điện thoại.');
       return;
     }
 
@@ -76,12 +79,12 @@ export const DriverInfoCard: React.FC<Props> = ({ driver, etaMinutes, onCallPres
     try {
       const supported = await Linking.canOpenURL(callUrl);
       if (!supported) {
-        Alert.alert('Khong the goi', 'Thiet bi khong ho tro tinh nang goi truc tiep.');
+        Alert.alert('Không thể gọi', 'Thiết bị không hỗ trợ tính năng gọi trực tiếp.');
         return;
       }
       await Linking.openURL(callUrl);
     } catch {
-      Alert.alert('Khong the goi', 'Vui long thu lai sau.');
+      Alert.alert('Không thể gọi', 'Vui lòng thử lại sau.');
     }
   };
 
@@ -92,7 +95,7 @@ export const DriverInfoCard: React.FC<Props> = ({ driver, etaMinutes, onCallPres
     }
 
     if (!phoneLabel) {
-      Alert.alert('Khong co so dien thoai', 'Thong tin tai xe chua co so dien thoai.');
+      Alert.alert('Không có số điện thoại', 'Thông tin tài xế chưa có số điện thoại.');
       return;
     }
 
@@ -100,24 +103,24 @@ export const DriverInfoCard: React.FC<Props> = ({ driver, etaMinutes, onCallPres
     try {
       const supported = await Linking.canOpenURL(chatUrl);
       if (!supported) {
-        Alert.alert('Khong the nhan tin', 'Thiet bi khong ho tro tinh nang nhan tin.');
+        Alert.alert('Không thể nhắn tin', 'Thiết bị không hỗ trợ tính năng nhắn tin.');
         return;
       }
       await Linking.openURL(chatUrl);
     } catch {
-      Alert.alert('Khong the nhan tin', 'Vui long thu lai sau.');
+      Alert.alert('Không thể nhắn tin', 'Vui lòng thử lại sau.');
     }
   };
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { borderColor: palette.border, backgroundColor: palette.surface }]}> 
       <View style={styles.badgeRow}>
         <View style={[styles.statusBadge, { backgroundColor: statusMeta.backgroundColor }]}>
           <Text style={[styles.statusText, { color: statusMeta.textColor }]}>{statusMeta.label}</Text>
         </View>
         <View style={styles.etaBadge}>
           <MaterialIcons name="schedule" size={12} color={colors.brand700} />
-          <Text style={styles.etaBadgeText}>ETA {etaMinutes} phut</Text>
+          <Text style={styles.etaBadgeText}>Dự kiến {etaMinutes} phút</Text>
         </View>
       </View>
 
@@ -126,41 +129,48 @@ export const DriverInfoCard: React.FC<Props> = ({ driver, etaMinutes, onCallPres
           {avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatarImage} /> : <Text style={styles.avatarText}>{initials}</Text>}
         </View>
         <View style={styles.headerInfo}>
-          <Text style={styles.title}>{driver.name || 'Tai xe'}</Text>
+          <Text style={[styles.title, { color: palette.text }]}>{driver.name || 'Tài xế'}</Text>
           <View style={styles.ratingRow}>
             <MaterialIcons name="star" size={14} color={colors.warning} />
-            <Text style={styles.ratingText}>{ratingLabel} / 5.0</Text>
+            <Text style={[styles.ratingText, { color: palette.text }]}>{ratingLabel} / 5.0</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.metricsRow}>
-        <View style={styles.metricChip}>
-          <MaterialIcons name="directions-car" size={14} color={colors.muted} />
-          <Text style={styles.metricText}>{vehicleLabel}</Text>
+        <View style={[styles.metricChip, { backgroundColor: palette.surface2 }]}> 
+          <MaterialIcons name="directions-car" size={14} color={palette.muted} />
+          <Text style={[styles.metricText, { color: palette.muted }]}>{vehicleLabel}</Text>
         </View>
-        <View style={styles.metricChip}>
-          <MaterialIcons name="local-offer" size={14} color={colors.muted} />
-          <Text style={styles.metricText}>{plateLabel}</Text>
+        <View style={[styles.metricChip, { backgroundColor: palette.surface2 }]}> 
+          <MaterialIcons name="local-offer" size={14} color={palette.muted} />
+          <Text style={[styles.metricText, { color: palette.muted }]}>{plateLabel}</Text>
         </View>
       </View>
 
       <View style={styles.phoneRow}>
-        <MaterialIcons name="phone" size={14} color={colors.muted} />
-        <Text style={styles.phoneText}>{phoneLabel || 'Khong co so dien thoai'}</Text>
+        <MaterialIcons name="phone" size={14} color={palette.muted} />
+        <Text style={[styles.phoneText, { color: palette.muted }]}>{phoneLabel || 'Không có số điện thoại'}</Text>
       </View>
 
       <View style={styles.actionsRow}>
         <Pressable
           style={({ pressed }) => [styles.actionButton, styles.callButton, pressed ? styles.callButtonPressed : null]}
           onPress={handleCall}
+          accessibilityRole="button"
+          accessibilityLabel="Gọi tài xế"
         >
           <MaterialIcons name="phone" size={16} color={colors.white} />
-          <Text style={styles.callText}>Call</Text>
+          <Text style={styles.callText}>Gọi</Text>
         </Pressable>
-        <Pressable style={({ pressed }) => [styles.actionButton, styles.chatButton, pressed ? styles.actionPressed : null]} onPress={handleChat}>
+        <Pressable
+          style={({ pressed }) => [styles.actionButton, styles.chatButton, { borderColor: palette.border, backgroundColor: palette.surface }, pressed ? styles.actionPressed : null]}
+          onPress={handleChat}
+          accessibilityRole="button"
+          accessibilityLabel="Nhắn tin tài xế"
+        >
           <MaterialIcons name="chat" size={16} color={colors.brand700} />
-          <Text style={styles.chatText}>Chat</Text>
+          <Text style={styles.chatText}>Nhắn tin</Text>
         </Pressable>
       </View>
     </View>
@@ -170,10 +180,8 @@ export const DriverInfoCard: React.FC<Props> = ({ driver, etaMinutes, onCallPres
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 16,
     padding: spacing.lg,
-    backgroundColor: colors.surface,
     gap: spacing.sm
   },
   badgeRow: {
@@ -232,7 +240,7 @@ const styles = StyleSheet.create({
     ...typography.h2,
     color: colors.brand700
   },
-  title: { ...typography.h2, color: colors.text, fontWeight: '700' },
+  title: { ...typography.h2, fontWeight: '700' },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -240,7 +248,6 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     ...typography.caption,
-    color: colors.text,
     fontWeight: '600'
   },
   metricsRow: {
@@ -252,14 +259,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.surface2,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5
   },
   metricText: {
     ...typography.caption,
-    color: colors.muted,
     fontWeight: '600'
   },
   phoneRow: {
@@ -268,8 +273,7 @@ const styles = StyleSheet.create({
     gap: 4
   },
   phoneText: {
-    ...typography.body,
-    color: colors.muted
+    ...typography.body
   },
   actionsRow: {
     flexDirection: 'row',
@@ -284,7 +288,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: spacing.xs
+    gap: spacing.xs,
+    minHeight: 44
   },
   callButton: {
     backgroundColor: colors.brand600
@@ -293,9 +298,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brand700
   },
   chatButton: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.white
+    borderWidth: 1
   },
   actionPressed: {
     opacity: 0.85
