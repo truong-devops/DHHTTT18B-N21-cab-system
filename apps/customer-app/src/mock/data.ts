@@ -37,11 +37,34 @@ export type DriverInfo = {
 
 export type RideHistoryItem = {
   id: string;
+  externalRideId?: string | null;
+  bookingId?: string | null;
+  riderId?: string | null;
   date: string;
   pickup: string;
   destination: string;
   amount: number;
   status: 'completed' | 'cancelled';
+  rideStatusRaw?: string;
+  rideStatusUpdatedAt?: string;
+  rideCreatedAt?: string;
+  rideUpdatedAt?: string;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  dropoffLat?: number | null;
+  dropoffLng?: number | null;
+  paymentId?: string | null;
+  paymentMethod?: string | null;
+  paymentStatus?: string | null;
+  paymentCurrency?: string | null;
+  paymentAmount?: number | null;
+  paymentCreatedAt?: string | null;
+  paymentUpdatedAt?: string | null;
+  driverId?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  vehicleType?: string | null;
+  plateNumber?: string | null;
 };
 
 export type LocationPoint = {
