@@ -31,6 +31,8 @@ export type DriverInfo = {
   rating?: number | null;
   vehicle?: string | null;
   plate?: string | null;
+  phone?: string | null;
+  avatarUrl?: string | null;
 };
 
 export type RideHistoryItem = {
@@ -85,7 +87,8 @@ export const mockDriver: DriverInfo = {
   name: 'Tran Minh Hieu',
   rating: 4.9,
   vehicle: 'Toyota Vios',
-  plate: '51K-999.88'
+  plate: '51K-999.88',
+  phone: '0901234567'
 };
 
 export const paymentMethods = ['Tiền mặt', 'Ví', 'VietQR'];

@@ -250,6 +250,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       fullName?: string | null;
       vehicleType?: string | null;
       plate?: string | null;
+      phone?: string | null;
     }) => {
       const canonicalDriverId = normalizeIdentifier(input.canonicalDriverId);
       setActiveRide((prev) => {
@@ -270,6 +271,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (!resolvedDriverId) return prev;
 
         const resolvedName = input.fullName?.trim() || prev.driver?.name || 'Tai xe';
+        const resolvedPhone = input.phone?.trim() || prev.driver?.phone || undefined;
         return {
           ...prev,
           driverId: resolvedDriverId,
@@ -278,7 +280,8 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             name: resolvedName,
             rating: prev.driver?.rating,
             vehicle: input.vehicleType?.trim() || prev.driver?.vehicle || undefined,
-            plate: input.plate?.trim() || prev.driver?.plate || undefined
+            plate: input.plate?.trim() || prev.driver?.plate || undefined,
+            phone: resolvedPhone
           }
         };
       });
@@ -290,7 +293,8 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         canonicalDriverId: profile.data.driver?.id || null,
         fullName: profile.data.driver?.fullName || null,
         vehicleType: profile.data.vehicle?.vehicleType || null,
-        plate: profile.data.vehicle?.plateNumber || null
+        plate: profile.data.vehicle?.plateNumber || null,
+        phone: profile.data.driver?.phone || null
       });
       return;
     } catch {
@@ -301,7 +305,8 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const userProfile = await userApi.getUserById(normalizedLookupId);
       applyDriverSnapshot({
         canonicalDriverId: null,
-        fullName: userProfile.data.fullName || null
+        fullName: userProfile.data.fullName || null,
+        phone: userProfile.data.phone || null
       });
     } catch {
       // Keep state unchanged when both profile sources are unavailable
