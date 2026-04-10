@@ -20,6 +20,7 @@ type Coordinate = {
 type Props = {
   label?: string;
   destination?: Coordinate | null;
+  driverLocation?: Coordinate | null;
   showRoute?: boolean;
   onLocationChange?: (coords: Coordinate) => void;
   showCenterPickupPin?: boolean;
@@ -28,6 +29,7 @@ type Props = {
 export const CustomerLiveMap: React.FC<Props> = ({
   label = 'Ban do truc tiep',
   destination,
+  driverLocation,
   showRoute = false,
   onLocationChange,
   showCenterPickupPin = false
@@ -41,7 +43,7 @@ export const CustomerLiveMap: React.FC<Props> = ({
     longitudeDelta: DEFAULT_DELTA.longitudeDelta
   });
   const [locationError, setLocationError] = useState<string | null>(null);
-  const routeOrigin = showRoute ? userCoordinate : null;
+  const routeOrigin = showRoute ? driverLocation || userCoordinate : null;
   const routeDestination = showRoute ? destination || null : null;
   const {
     coords: routeCoords,
@@ -192,6 +194,7 @@ export const CustomerLiveMap: React.FC<Props> = ({
         loadingEnabled
       >
         {userCoordinate ? <Marker coordinate={userCoordinate} title="Vi tri cua ban" /> : null}
+        {driverLocation ? <Marker coordinate={driverLocation} title={driverLocation.label || 'Tai xe'} pinColor="#2563EB" /> : null}
         {destination ? <Marker coordinate={destination} title={destination.label || 'Diem den'} pinColor="#F97316" /> : null}
         {polylineCoordinates.length >= 2 ? <Polyline coordinates={polylineCoordinates} strokeWidth={4} strokeColor="#F97316" /> : null}
       </MapView>
