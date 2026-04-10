@@ -1,7 +1,8 @@
-import React from 'react';
+﻿import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import { IconSymbol } from '../ui/icon-symbol';
+import { useAppPalette } from '../../theme/palette';
 
 type Props = {
   value?: string;
@@ -9,16 +10,23 @@ type Props = {
   onPress: () => void;
 };
 
-export const LocationSearch: React.FC<Props> = ({ value, placeholder = 'Ban muon di den dau?', onPress }) => {
+export const LocationSearch: React.FC<Props> = ({ value, placeholder = 'Bạn muốn đi đến đâu?', onPress }) => {
+  const palette = useAppPalette();
+
   return (
-    <Pressable style={styles.container} onPress={onPress}>
+    <Pressable
+      style={[styles.container, { borderColor: palette.border, backgroundColor: palette.surface }]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Chọn điểm đến"
+    >
       <View style={styles.left}>
         <IconSymbol name="location.fill" size={18} color={colors.brand700} />
-        <Text style={styles.value} numberOfLines={1}>
+        <Text style={[styles.value, { color: palette.text }]} numberOfLines={1}>
           {value?.trim() ? value : placeholder}
         </Text>
       </View>
-      <Text style={styles.action}>Set</Text>
+      <Text style={styles.action}>Chọn</Text>
     </Pressable>
   );
 };
@@ -28,9 +36,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: radius.input,
     borderWidth: 1,
-    borderColor: colors.border,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.white,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -44,7 +50,6 @@ const styles = StyleSheet.create({
   },
   value: {
     ...typography.body,
-    color: colors.text,
     flex: 1
   },
   action: {

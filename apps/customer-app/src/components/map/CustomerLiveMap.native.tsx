@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Location from 'expo-location';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -27,7 +27,7 @@ type Props = {
 };
 
 export const CustomerLiveMap: React.FC<Props> = ({
-  label = 'Ban do truc tiep',
+  label = 'Bản đồ trực tiếp',
   destination,
   driverLocation,
   showRoute = false,
@@ -75,7 +75,7 @@ export const CustomerLiveMap: React.FC<Props> = ({
         if (!mounted) return;
         if (status !== 'granted') {
           setPermission('denied');
-          setLocationError('Can cap quyen vi tri de hien thi ban do.');
+          setLocationError('Cần cấp quyền vị trí để hiển thị bản đồ.');
           return;
         }
 
@@ -112,7 +112,7 @@ export const CustomerLiveMap: React.FC<Props> = ({
       } catch (error: any) {
         if (!mounted) return;
         setPermission('denied');
-        setLocationError(error?.message || 'Khong the lay vi tri hien tai cua ban.');
+        setLocationError(error?.message || 'Không thể lấy vị trí hiện tại của bạn.');
       }
     };
 
@@ -161,8 +161,8 @@ export const CustomerLiveMap: React.FC<Props> = ({
   if (permission === 'denied') {
     return (
       <View style={styles.blocked}>
-        <Text style={styles.blockedTitle}>Khong the truy cap vi tri</Text>
-        <Text style={styles.blockedText}>{locationError || 'Vui long bat quyen vi tri trong cai dat thiet bi.'}</Text>
+        <Text style={styles.blockedTitle}>Không thể truy cập vị trí</Text>
+        <Text style={styles.blockedText}>{locationError || 'Vui lòng bật quyền vị trí trong cài đặt thiết bị.'}</Text>
       </View>
     );
   }
@@ -171,7 +171,7 @@ export const CustomerLiveMap: React.FC<Props> = ({
     return (
       <View style={styles.blocked}>
         <ActivityIndicator size="small" color={colors.brand700} />
-        <Text style={styles.blockedText}>Dang lay vi tri GPS...</Text>
+        <Text style={styles.blockedText}>Đang lấy vị trí GPS...</Text>
       </View>
     );
   }
@@ -193,9 +193,9 @@ export const CustomerLiveMap: React.FC<Props> = ({
         followsUserLocation
         loadingEnabled
       >
-        {userCoordinate ? <Marker coordinate={userCoordinate} title="Vi tri cua ban" /> : null}
-        {driverLocation ? <Marker coordinate={driverLocation} title={driverLocation.label || 'Tai xe'} pinColor="#2563EB" /> : null}
-        {destination ? <Marker coordinate={destination} title={destination.label || 'Diem den'} pinColor="#F97316" /> : null}
+        {userCoordinate ? <Marker coordinate={userCoordinate} title="Vị trí của bạn" /> : null}
+        {driverLocation ? <Marker coordinate={driverLocation} title={driverLocation.label || 'Tài xế'} pinColor="#2563EB" /> : null}
+        {destination ? <Marker coordinate={destination} title={destination.label || 'Điểm đến'} pinColor="#F97316" /> : null}
         {polylineCoordinates.length >= 2 ? <Polyline coordinates={polylineCoordinates} strokeWidth={4} strokeColor="#F97316" /> : null}
       </MapView>
 
@@ -224,12 +224,12 @@ export const CustomerLiveMap: React.FC<Props> = ({
       {showRoute && isRouteLoading ? (
         <View style={styles.routeStatus}>
           <ActivityIndicator size="small" color={colors.brand700} />
-          <Text style={styles.routeStatusText}>Dang tai lo trinh OSRM...</Text>
+          <Text style={styles.routeStatusText}>Đang tải lộ trình OSRM...</Text>
         </View>
       ) : null}
       {showRoute && !isRouteLoading && routeError ? (
         <View style={styles.routeStatus}>
-          <Text style={styles.routeStatusText}>Khong lay duoc lo trinh OSRM: {routeError}</Text>
+          <Text style={styles.routeStatusText}>Không lấy được lộ trình OSRM: {routeError}</Text>
         </View>
       ) : null}
     </View>

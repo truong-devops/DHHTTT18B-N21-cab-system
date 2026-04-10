@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { useNavigation } from '@react-navigation/native';
@@ -13,6 +13,9 @@ import { destinationPoints, pickupPoint } from '../../mock/data';
 import { useCustomerStore } from '../../store/customerStore';
 import { customerApi } from '../../services/customerApi';
 import { useRealtimeStream } from '../../hooks/useRealtimeStream';
+import { listSavedLocations, upsertSavedLocation } from '../../lib/settings-storage';
+import { useAppPalette } from '../../theme/palette';
+import { useScreenMetrics } from '../../hooks/useScreenMetrics';
 
 type Coordinate = {
   latitude: number;
@@ -47,16 +50,61 @@ const HomeMapScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { destination, setDestination } = useCustomerStore();
   const { nearbyDrivers } = useRealtimeStream();
-  const [pickupAddress, setPickupAddress] = useState('Dang xac dinh pickup address...');
+  const palette = useAppPalette();
+  const metrics = useScreenMetrics();
+
+  const [pickupAddress, setPickupAddress] = useState('Đang xác định địa chỉ điểm đón...');
   const geocodeRef = useRef<{ at: number; coords: Coordinate } | null>(null);
+  const [savedHomeWork, setSavedHomeWork] = useState<Array<{ id: string; label: string; destination: string }>>([]);
 
   const shortcuts = useMemo(() => {
+    if (savedHomeWork.length) {
+      return savedHomeWork;
+    }
     const home = destinationPoints[0];
     const work = destinationPoints[1] || destinationPoints[0];
     return [
-      home ? { id: 'home', label: 'Home', destination: home.label } : null,
-      work ? { id: 'work', label: 'Work', destination: work.label } : null
+      home ? { id: 'home', label: 'Nhà', destination: home.label } : null,
+      work ? { id: 'work', label: 'Cơ quan', destination: work.label } : null
     ].filter((item): item is { id: string; label: string; destination: string } => Boolean(item));
+  }, [savedHomeWork]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const setupDefaultSavedLocations = async () => {
+      const current = await listSavedLocations();
+      if (current.length === 0) {
+        const home = destinationPoints[0];
+        const work = destinationPoints[1] || destinationPoints[0];
+        if (home) {
+          await upsertSavedLocation({ id: 'saved-home', label: 'Nhà', address: home.label });
+        }
+        if (work) {
+          await upsertSavedLocation({ id: 'saved-work', label: 'Cơ quan', address: work.label });
+        }
+      }
+      const updated = await listSavedLocations();
+      if (!mounted) return;
+      const preferred = updated
+        .filter((item) => {
+          const normalized = item.label.trim().toLowerCase();
+          return ['nhà', 'co quan', 'cơ quan', 'home', 'work'].includes(normalized);
+        })
+        .slice(0, 2)
+        .map((item) => ({
+          id: item.id,
+          label: item.label,
+          destination: item.address
+        }));
+      setSavedHomeWork(preferred);
+    };
+
+    void setupDefaultSavedLocations();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const openDestination = useCallback(() => {
@@ -114,32 +162,38 @@ const HomeMapScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <CustomerLiveMap label="Map & Pickup" onLocationChange={handleLocationChange} showCenterPickupPin />
+    <View style={[styles.container, { backgroundColor: palette.bg }]}> 
+      <CustomerLiveMap label="Bản đồ & Điểm đón" onLocationChange={handleLocationChange} showCenterPickupPin />
 
       <BottomSheet collapsedHeight={300}>
-        <Text style={styles.sheetTitle}>Pickup</Text>
-        <Text style={styles.addressLabel}>Pickup address (auto-detect)</Text>
-        <Text style={styles.addressValue} numberOfLines={2}>
+        <Text style={[styles.sheetTitle, { color: palette.text }]}>Điểm đón</Text>
+        <Text style={[styles.addressLabel, { color: palette.muted }]}>Địa chỉ điểm đón (tự động nhận diện)</Text>
+        <Text style={[styles.addressValue, { color: palette.text }]} numberOfLines={2}>
           {pickupAddress}
         </Text>
 
-        <Text style={styles.nearby}>Driver nearby: {nearbyDrivers}</Text>
+        <Text style={styles.nearby}>Tài xế gần bạn: {nearbyDrivers}</Text>
 
-        <LocationSearch value={destination} placeholder="Set destination" onPress={openDestination} />
+        <LocationSearch value={destination} placeholder="Nhập điểm đến" onPress={openDestination} />
 
-        <View style={styles.shortcutRow}>
+        <View style={[styles.shortcutRow, metrics.isCompact ? styles.shortcutRowCompact : null]}>
           {shortcuts.map((item) => (
-            <Pressable key={item.id} style={styles.shortcutChip} onPress={() => handleShortcut(item.destination)}>
-              <Text style={styles.shortcutTitle}>{item.label}</Text>
-              <Text style={styles.shortcutSubtitle} numberOfLines={1}>
+            <Pressable
+              key={item.id}
+              style={[styles.shortcutChip, { borderColor: palette.border, backgroundColor: palette.surface2 }]}
+              onPress={() => handleShortcut(item.destination)}
+              accessibilityRole="button"
+              accessibilityLabel={`Chọn nhanh ${item.label}`}
+            >
+              <Text style={[styles.shortcutTitle, { color: palette.text }]}>{item.label}</Text>
+              <Text style={[styles.shortcutSubtitle, { color: palette.muted }]} numberOfLines={1}>
                 {item.destination}
               </Text>
             </Pressable>
           ))}
         </View>
 
-        <PrimaryButton title="Set Destination" onPress={openDestination} />
+        <PrimaryButton title="Đặt điểm đến" onPress={openDestination} />
       </BottomSheet>
     </View>
   );
@@ -147,20 +201,16 @@ const HomeMapScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000'
+    flex: 1
   },
   sheetTitle: {
-    ...typography.h2,
-    color: colors.text
+    ...typography.h2
   },
   addressLabel: {
-    ...typography.caption,
-    color: colors.muted
+    ...typography.caption
   },
   addressValue: {
-    ...typography.body,
-    color: colors.text
+    ...typography.body
   },
   nearby: {
     ...typography.body,
@@ -171,24 +221,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm
   },
+  shortcutRowCompact: {
+    flexDirection: 'column'
+  },
   shortcutChip: {
     flex: 1,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface2,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     gap: spacing.xs
   },
   shortcutTitle: {
     ...typography.body,
-    color: colors.text,
     fontWeight: '700'
   },
   shortcutSubtitle: {
-    ...typography.caption,
-    color: colors.muted
+    ...typography.caption
   }
 });
 

@@ -1,91 +1,63 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+﻿import React from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { OutlineButton } from '../../components/common/OutlineButton';
-import { PrimaryButton } from '../../components/common/PrimaryButton';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { useCustomerStore } from '../../store/customerStore';
-import { IconSymbol } from '../../components/ui/icon-symbol';
+import { useScreenMetrics } from '../../hooks/useScreenMetrics';
+import { useAppPalette } from '../../theme/palette';
 
 const primary = '#FF5A1F';
 const primaryDark = '#FF3B1D';
-const sectionBg = '#F9F4F2';
 
 const ProfileWalletScreen = () => {
-  const { user, logout, updateProfile } = useCustomerStore();
-  const [name, setName] = useState(user?.name || '');
-  const [email, setEmail] = useState(user?.email || '');
-  const [phone, setPhone] = useState(user?.phone || '');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setName(user?.name || '');
-    setEmail(user?.email || '');
-    setPhone(user?.phone || '');
-  }, [user]);
-
-  const onSave = async () => {
-    try {
-      setSaving(true);
-      await updateProfile({ name, email, phone });
-      Alert.alert('Thanh cong', 'Da cap nhat thong tin tai khoan.');
-    } catch (e: any) {
-      Alert.alert('Loi', e?.message || 'Cap nhat that bai');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { user, logout } = useCustomerStore();
+  const metrics = useScreenMetrics();
+  const palette = useAppPalette();
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl }}>
+    <View style={[styles.container, { backgroundColor: palette.bg, paddingHorizontal: metrics.horizontalPadding }]}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { maxWidth: metrics.contentMaxWidth }]}> 
         <View style={styles.headerWrap}>
           <LinearGradient colors={[primary, primaryDark]} style={styles.headerGradient}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{(user?.name || 'K').charAt(0).toUpperCase()}</Text>
             </View>
-            <Text style={styles.name}>{user?.name || 'Khach'}</Text>
-            <Text style={styles.sub}>4.9 - {user?.phone || '090x xxx xxx'}</Text>
+            <Text style={styles.name}>{user?.name || 'Khách'}</Text>
+            <Text style={styles.sub}>4.9 • {user?.phone || '090x xxx xxx'}</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>Thanh vien</Text>
-            </View>
-            <View style={styles.editBtn}>
-              <IconSymbol name="edit.fill" size={18} color={primary} />
+              <Text style={styles.badgeText}>Thành viên</Text>
             </View>
           </LinearGradient>
         </View>
 
-        <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg, gap: spacing.sm }}>
-          <Text style={{ ...typography.h2, color: colors.text }}>Thong tin tai khoan</Text>
-          <Text style={{ ...typography.body, color: colors.muted }}>Du lieu lay truc tiep tu database qua API Gateway.</Text>
-          <View style={styles.formRow}>
-            <Text style={styles.infoLabel}>Ho ten</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Nhap ho ten" />
+        <View style={styles.infoWrap}>
+          <Text style={[styles.infoTitle, { color: palette.text }]}>Thông tin tài khoản</Text>
+          <Text style={[styles.infoSubtitle, { color: palette.muted }]}>Thông tin chỉ để xem, không cho phép chỉnh sửa.</Text>
+
+          <View style={[styles.infoRow, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+            <Text style={[styles.infoLabel, { color: palette.muted }]}>Họ tên</Text>
+            <Text style={[styles.infoValue, { color: palette.text }]}>{user?.name || '-'}</Text>
           </View>
-          <View style={styles.formRow}>
-            <Text style={styles.infoLabel}>Email</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
+
+          <View style={[styles.infoRow, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+            <Text style={[styles.infoLabel, { color: palette.muted }]}>Email</Text>
+            <Text style={[styles.infoValue, { color: palette.text }]}>{user?.email || '-'}</Text>
           </View>
-          <View style={styles.formRow}>
-            <Text style={styles.infoLabel}>So dien thoai</Text>
-            <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="09xxxxxxx" keyboardType="phone-pad" />
+
+          <View style={[styles.infoRow, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+            <Text style={[styles.infoLabel, { color: palette.muted }]}>Số điện thoại</Text>
+            <Text style={[styles.infoValue, { color: palette.text }]}>{user?.phone || '-'}</Text>
           </View>
-          <View style={styles.formRow}>
-            <Text style={styles.infoLabel}>User ID</Text>
-            <Text style={styles.infoValue}>{user?.id}</Text>
+
+          <View style={[styles.infoRow, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+            <Text style={[styles.infoLabel, { color: palette.muted }]}>Mã người dùng</Text>
+            <Text style={[styles.infoValue, { color: palette.text }]}>{user?.id || '-'}</Text>
           </View>
-          <PrimaryButton title={saving ? 'Dang luu...' : 'Luu thay doi'} onPress={onSave} disabled={saving} />
         </View>
 
-        <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg }}>
-          <OutlineButton title="Dang xuat" onPress={logout} />
+        <View style={styles.logoutWrap}>
+          <OutlineButton title="Đăng xuất" onPress={logout} />
         </View>
       </ScrollView>
     </View>
@@ -93,13 +65,13 @@ const ProfileWalletScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: sectionBg },
-  headerWrap: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
+  container: { flex: 1 },
+  scrollContent: { width: '100%', alignSelf: 'center', paddingBottom: spacing.xl },
+  headerWrap: { paddingTop: spacing.lg },
   headerGradient: {
     borderRadius: 20,
     paddingVertical: spacing.xl,
     alignItems: 'center',
-    position: 'relative',
     overflow: 'hidden'
   },
   avatar: {
@@ -123,29 +95,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.25)'
   },
   badgeText: { ...typography.body, color: '#FFF', fontWeight: '700' },
-  editBtn: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  infoLabel: { ...typography.body, color: colors.muted },
-  infoValue: { ...typography.body, color: colors.text, fontWeight: '600' },
-  formRow: { gap: spacing.xs, marginTop: spacing.sm },
-  input: {
+  infoWrap: { marginTop: spacing.lg, gap: spacing.sm },
+  infoTitle: { ...typography.h2 },
+  infoSubtitle: { ...typography.body },
+  infoLabel: { ...typography.body },
+  infoValue: { ...typography.body, fontWeight: '600' },
+  infoRow: {
+    gap: spacing.xs,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: '#fff',
-    color: colors.text
-  }
+    paddingVertical: spacing.sm
+  },
+  logoutWrap: { marginTop: spacing.lg }
 });
 
 export default ProfileWalletScreen;

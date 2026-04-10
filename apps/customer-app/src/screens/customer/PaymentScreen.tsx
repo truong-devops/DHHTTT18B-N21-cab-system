@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+﻿import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Card } from '../../components/common/Card';
 import { OutlineButton } from '../../components/common/OutlineButton';
@@ -10,74 +10,138 @@ import { useCustomerStore } from '../../store/customerStore';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { formatVnd } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
+import { listPaymentMethods } from '../../lib/settings-storage';
+import { useScreenMetrics } from '../../hooks/useScreenMetrics';
+import { useAppPalette } from '../../theme/palette';
+import { StateView } from '../../components/common/StateView';
+import { SkeletonBlock } from '../../components/common/SkeletonBlock';
 
-type RequiredPaymentCode = 'CASH' | 'CARD' | 'WALLET';
+type PaymentCode = 'CASH' | 'CARD' | 'WALLET' | 'VIETQR';
 
-type RequiredMethod = {
-  code: RequiredPaymentCode;
+type SelectableMethod = {
+  id: string;
+  code: PaymentCode;
   label: string;
+  isDefault?: boolean;
 };
 
-const requiredMethods: RequiredMethod[] = [
-  { label: 'Cash', code: 'CASH' },
-  { label: 'Card', code: 'CARD' },
-  { label: 'Wallet', code: 'WALLET' }
+const fallbackMethods: SelectableMethod[] = [
+  { id: 'fallback-cash', label: 'Tiền mặt', code: 'CASH', isDefault: true },
+  { id: 'fallback-card', label: 'Thẻ', code: 'CARD' },
+  { id: 'fallback-wallet', label: 'Ví', code: 'WALLET' }
 ];
 
 const PaymentScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { activeRide, completeRidePayment } = useCustomerStore();
   const { push } = useToast();
-  const [method, setMethod] = useState<RequiredMethod>(requiredMethods[0]);
+  const metrics = useScreenMetrics();
+  const palette = useAppPalette();
+
+  const [methods, setMethods] = useState<SelectableMethod[]>(fallbackMethods);
+  const [selectedMethodId, setSelectedMethodId] = useState<string>(fallbackMethods[0].id);
   const [loading, setLoading] = useState(false);
+  const [methodsLoading, setMethodsLoading] = useState(true);
+  const [methodsError, setMethodsError] = useState<string | null>(null);
+
+  const loadMethods = useCallback(async () => {
+    setMethodsLoading(true);
+    setMethodsError(null);
+
+    try {
+      const items = await listPaymentMethods();
+      const mapped = items
+        .filter((item) => ['CASH', 'CARD', 'WALLET', 'VIETQR'].includes(item.type))
+        .map((item) => ({
+          id: item.id,
+          code: item.type as PaymentCode,
+          label: item.label || item.type,
+          isDefault: item.isDefault
+        }));
+
+      const next = mapped.length ? mapped : fallbackMethods;
+      setMethods(next);
+      const defaultMethod = next.find((item) => item.isDefault) || next[0];
+      setSelectedMethodId(defaultMethod.id);
+    } catch {
+      setMethodsError('Không tải được phương thức thanh toán.');
+      setMethods(fallbackMethods);
+      setSelectedMethodId(fallbackMethods[0].id);
+    } finally {
+      setMethodsLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadMethods();
+    }, [loadMethods])
+  );
+
+  const selectedMethod = useMemo(() => methods.find((item) => item.id === selectedMethodId) || methods[0], [methods, selectedMethodId]);
 
   const handlePay = async () => {
+    if (!selectedMethod) {
+      push('Chưa có phương thức thanh toán hợp lệ', 'danger');
+      return;
+    }
     try {
       setLoading(true);
-      await completeRidePayment(method.code);
+      await completeRidePayment(selectedMethod.code);
       navigation.replace('Rating');
     } catch (err: any) {
-      push(err?.message || 'Thanh toan that bai', 'danger');
+      push(err?.message || 'Thanh toán thất bại', 'danger');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Thanh toan</Text>
+    <View style={[styles.container, { backgroundColor: palette.bg, paddingHorizontal: metrics.horizontalPadding }]}>
+      <View style={[styles.contentWrap, { maxWidth: metrics.contentMaxWidth }]}>
+        <Text style={[styles.title, { color: palette.text }]}>Thanh toán</Text>
 
-      <Card>
-        <Text style={styles.label}>Tong cuoc phi</Text>
-        <Text style={styles.amount}>{formatVnd(activeRide?.option.price || 0)}</Text>
-      </Card>
+        <Card>
+          <Text style={[styles.label, { color: palette.muted }]}>Tổng cước phí</Text>
+          <Text style={styles.amount}>{formatVnd(activeRide?.option.price || 0)}</Text>
+        </Card>
 
-      <Card>
-        <Text style={styles.label}>Phuong thuc thanh toan</Text>
-        {requiredMethods.map((item) =>
-          item.code === method.code ? (
-            <PrimaryButton key={item.code} title={`${item.label} (da chon)`} onPress={() => setMethod(item)} />
+        <Card style={styles.methodCard}>
+          <Text style={[styles.label, { color: palette.muted }]}>Phương thức thanh toán</Text>
+
+          {methodsLoading ? (
+            <View style={styles.skeletonList}>
+              <SkeletonBlock height={42} />
+              <SkeletonBlock height={42} />
+              <SkeletonBlock height={42} />
+            </View>
+          ) : methodsError ? (
+            <StateView type="error" title="Không tải được phương thức" message={methodsError} actionLabel="Thử lại" onAction={() => void loadMethods()} />
           ) : (
-            <OutlineButton key={item.code} title={item.label} onPress={() => setMethod(item)} />
-          )
-        )}
-      </Card>
+            methods.map((item) =>
+              item.id === selectedMethod?.id ? (
+                <PrimaryButton key={item.id} title={`${item.label} (đang chọn)`} onPress={() => setSelectedMethodId(item.id)} />
+              ) : (
+                <OutlineButton key={item.id} title={item.label} onPress={() => setSelectedMethodId(item.id)} />
+              )
+            )
+          )}
+        </Card>
 
-      <PrimaryButton title={loading ? 'Dang xu ly...' : 'Thanh toan'} onPress={handlePay} disabled={loading} />
-
-      <OutlineButton
-        title="VietQR (tuy chon)"
-        onPress={() => push('VietQR la phuong thuc tuy chon, se mo khi backend san sang.', 'info')}
-      />
+        <PrimaryButton title={loading ? 'Đang xử lý...' : 'Thanh toán'} onPress={handlePay} disabled={loading || methodsLoading} />
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.xl, gap: spacing.md },
-  title: { ...typography.title, color: colors.text },
-  label: { ...typography.body, color: colors.muted },
-  amount: { ...typography.title, color: colors.brand700 }
+  container: { flex: 1, paddingTop: spacing.xl, paddingBottom: spacing.xl },
+  contentWrap: { width: '100%', alignSelf: 'center', gap: spacing.md },
+  title: { ...typography.title },
+  label: { ...typography.body },
+  amount: { ...typography.title, color: colors.brand700 },
+  methodCard: { gap: spacing.sm },
+  skeletonList: { gap: spacing.sm }
 });
 
 export default PaymentScreen;

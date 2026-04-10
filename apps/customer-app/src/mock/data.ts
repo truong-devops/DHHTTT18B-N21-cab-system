@@ -1,4 +1,4 @@
-export type RidePriceBreakdown = {
+﻿export type RidePriceBreakdown = {
   baseFare: number;
   distanceFee: number;
   timeFee: number;
@@ -99,7 +99,7 @@ export const rideOptions: RideOption[] = [
     etaMinutes: 6,
     price: 74000,
     capacity: 4,
-    surgeLabel: 'Tăng giá x1.2',
+    surgeLabel: 'Cao điểm x1.2',
     serviceType: 'STANDARD'
   },
   { id: 'car7', name: 'Xe 7 chỗ', etaMinutes: 7, price: 98000, capacity: 7, serviceType: 'PREMIUM' }
@@ -107,7 +107,7 @@ export const rideOptions: RideOption[] = [
 
 export const mockDriver: DriverInfo = {
   id: 'driver-01',
-  name: 'Tran Minh Hieu',
+  name: 'Trần Minh Hiếu',
   rating: 4.9,
   vehicle: 'Toyota Vios',
   plate: '51K-999.88',

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { MainStackParamList } from '../../navigation/MainStack';
@@ -8,24 +8,33 @@ import type { RideOption } from '../../mock/data';
 import { RideOptionCard } from '../../components/customer/RideOptionCard';
 import { PrimaryButton } from '../../components/common/PrimaryButton';
 import { OutlineButton } from '../../components/common/OutlineButton';
-import { colors, spacing, typography } from '../../theme/tokens';
+import { spacing, typography } from '../../theme/tokens';
 import { useCustomerStore } from '../../store/customerStore';
 import { useToast } from '../../hooks/useToast';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PriceBreakdownModal } from '../../components/customer/PriceBreakdownModal';
+import { SkeletonBlock } from '../../components/common/SkeletonBlock';
+import { StateView } from '../../components/common/StateView';
+import { useScreenMetrics } from '../../hooks/useScreenMetrics';
+import { useAppPalette } from '../../theme/palette';
 
 const RideOptionsScreen = () => {
   const route = useRoute<RouteProp<MainStackParamList, 'RideOptions'>>();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { chooseOption, selectedOption } = useCustomerStore();
+  const { push } = useToast();
+  const metrics = useScreenMetrics();
+  const colors = useAppPalette();
+
   const [options, setOptions] = useState<RideOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
-  const { push } = useToast();
 
-  useEffect(() => {
+  const fetchOptions = useCallback(() => {
     let disposed = false;
     setLoading(true);
+    setError(null);
 
     customerApi
       .getRideOptions(route.params.pickup, route.params.destination)
@@ -36,9 +45,11 @@ const RideOptionsScreen = () => {
           chooseOption(result[0]);
         }
       })
-      .catch((error) => {
+      .catch((fetchError) => {
         if (disposed) return;
-        push(error?.message || 'Khong tai duoc lua chon xe', 'danger');
+        const message = fetchError?.message || 'Không tải được lựa chọn xe';
+        setError(message);
+        push(message, 'danger');
       })
       .finally(() => {
         if (!disposed) setLoading(false);
@@ -49,46 +60,59 @@ const RideOptionsScreen = () => {
     };
   }, [chooseOption, push, route.params.destination, route.params.pickup, selectedOption]);
 
+  useEffect(() => {
+    const dispose = fetchOptions();
+    return dispose;
+  }, [fetchOptions]);
+
   const activeOption = useMemo(() => {
     if (!selectedOption) return null;
     return options.find((item) => item.id === selectedOption.id) || selectedOption;
   }, [options, selectedOption]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Ride options</Text>
-        <Text style={styles.subtitle}>{`${route.params.pickup} -> ${route.params.destination}`}</Text>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.bg, paddingHorizontal: metrics.horizontalPadding }]}>
+      <View style={[styles.contentWrap, { maxWidth: metrics.contentMaxWidth }]}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>Lựa chọn chuyến xe</Text>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>{`${route.params.pickup} → ${route.params.destination}`}</Text>
+        </View>
 
-      <View style={styles.optionSection}>
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color={colors.brand600} />
-          </View>
-        ) : (
-          <View style={styles.optionList}>
-            {options.map((item) => (
-              <View key={item.id} style={styles.optionItem}>
-                <RideOptionCard option={item} selected={activeOption?.id === item.id} onPress={() => chooseOption(item)} />
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
+        <View style={styles.optionSection}>
+          {loading ? (
+            <View style={styles.optionList}>
+              <SkeletonBlock height={92} />
+              <SkeletonBlock height={92} />
+              <SkeletonBlock height={92} />
+            </View>
+          ) : error ? (
+            <StateView type="error" title="Không tải được lựa chọn xe" message={error} actionLabel="Thử lại" onAction={fetchOptions} />
+          ) : !options.length ? (
+            <StateView type="empty" title="Không có lựa chọn xe" message="Thử đổi điểm đón hoặc điểm đến để tìm lại." />
+          ) : (
+            <View style={styles.optionList}>
+              {options.map((item) => (
+                <View key={item.id} style={styles.optionItem}>
+                  <RideOptionCard option={item} selected={activeOption?.id === item.id} onPress={() => chooseOption(item)} />
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
 
-      <View style={styles.actions}>
-        <PrimaryButton
-          title="Tim tai xe"
-          onPress={() => {
-            if (!activeOption) {
-              push('Vui long chon mot loai xe', 'danger');
-              return;
-            }
-            navigation.navigate('SearchingDriver', route.params);
-          }}
-        />
-        <OutlineButton title="Xem chi tiet gia" onPress={() => setShowBreakdown(true)} disabled={!activeOption} />
+        <View style={styles.actions}>
+          <PrimaryButton
+            title="Tìm tài xế"
+            onPress={() => {
+              if (!activeOption) {
+                push('Vui lòng chọn một loại xe', 'danger');
+                return;
+              }
+              navigation.navigate('SearchingDriver', route.params);
+            }}
+          />
+          <OutlineButton title="Xem chi tiết giá" onPress={() => setShowBreakdown(true)} disabled={!activeOption} />
+        </View>
       </View>
 
       <PriceBreakdownModal option={activeOption} visible={showBreakdown} onClose={() => setShowBreakdown(false)} />
@@ -99,33 +123,28 @@ const RideOptionsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
     paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
-    gap: spacing.md
+    paddingBottom: spacing.xl
+  },
+  contentWrap: {
+    width: '100%',
+    alignSelf: 'center',
+    gap: spacing.md,
+    flex: 1
   },
   header: {
-    paddingHorizontal: spacing.xl,
     gap: spacing.xs
   },
   title: {
-    ...typography.title,
-    color: colors.text
+    ...typography.title
   },
   subtitle: {
-    ...typography.caption,
-    color: colors.muted
+    ...typography.caption
   },
-  optionSection: { paddingHorizontal: spacing.xl },
-  loadingWrap: {
-    height: 140,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
+  optionSection: { flex: 1 },
   optionList: { gap: spacing.sm },
   optionItem: { width: '100%' },
   actions: {
-    paddingHorizontal: spacing.xl,
     gap: spacing.sm
   }
 });
