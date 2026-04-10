@@ -1,0 +1,83 @@
+Những gì đã làm:
+
+Destination giờ ưu tiên gọi Places API backend cho:
+Suggested places (autocomplete)
+Recent destinations (load + push)
+Nếu backend chưa có endpoint/domain places, app tự fallback sang local data + AsyncStorage để không vỡ luồng.
+Đã tách rõ 2 section Suggested/Recent (không gộp 1 list).
+File đã cập nhật:
+
+DestinationScreen.tsx
+placeApi.ts
+endpoints.ts
+recent-destinations.ts
+PlaceList.tsx
+Kiểm tra:
+
+npx tsc --noEmit -p apps/customer-app/tsconfig.json pass.
+Các thay đổi backend cần có để bật Places API thật:
+
+Thêm domain places trong API Gateway SERVICE_URLS (hiện chưa có)
+services.js
+Vì gateway đang chặn domain lạ (Unknown domain: places), cần map /v1/places/* tới service thật
+app.js
+Cần có các API:
+GET /v1/places/autocomplete?q=&limit=&lat=&lng=
+GET /v1/places/recent?limit=
+POST /v1/places/recent body { label }
+
+Đã thêm mới
+
+Service backend mới places-service (chạy thật, có DB + provider + fallback):
+services/places-service/src/server.js
+services/places-service/src/app.js
+services/places-service/src/routes/places.js
+services/places-service/src/repositories/recentRepository.js
+services/places-service/src/db/init.js
+services/places-service/src/providers/nominatimProvider.js
+services/places-service/test/app.test.js
+OpenAPI cho service mới:
+docs/openapi/places-service.openapi.yaml
+Đã sửa
+
+Map domain places tại gateway:
+services/api-gateway/src/config/services.js
+Thêm test route proxy cho places:
+services/api-gateway/test/proxy.test.js
+Compose dev + env + depends_on cho places-service:
+infra/docker-compose.dev.yml
+Tạo DB places-service_db trong script init:
+infra/postgres/init/01-create-service-databases.sql
+Cập nhật docs inventory/index:
+docs/openapi/api-inventory.md
+docs/openapi/index.html
+Lockfile cập nhật dependency:
+package-lock.json
+Có ảnh hưởng API cũ không?
+
+Không đổi contract/route của các API cũ.
+Chỉ thêm domain mới places ở gateway và thêm service mới.
+Ảnh hưởng ở mức hạ tầng: compose có thêm service + DB mới, không sửa luồng API cũ.
+
+places-service là backend chuyên cho luồng chọn điểm đến của app khách (Destination Selection), gồm 3 tác dụng chính:
+
+GET /v1/places/autocomplete
+Trả gợi ý địa điểm theo từ khóa.
+Ưu tiên gọi provider địa điểm (Nominatim), fallback về catalog local nếu provider lỗi/chậm.
+GET /v1/places/recent
+Trả danh sách điểm đến gần đây theo từng user (x-user-id), lưu ở DB backend.
+POST /v1/places/recent
+Lưu điểm đến vừa chọn vào lịch sử recent của user.
+Trong hệ thống bạn, nó giúp:
+
+Tách riêng logic tìm địa điểm khỏi frontend/gateway.
+Có dữ liệu recent bền vững (không mất khi app restart).
+Chuẩn bị sẵn để thay provider địa điểm sau này mà không phải sửa client nhiều.
+
+Không bắt buộc tuyệt đối cho MVP, nhưng cần nếu bạn muốn hệ thống chạy chuẩn production.
+
+Không cần nếu chỉ demo với danh sách điểm đến cố định + recent lưu local trên app.
+Nên có (và hiện tại hợp lý) nếu cần:
+tìm địa điểm thật từ backend/provider,
+recent theo user và đồng bộ nhiều thiết bị,
+kiểm soát logging/rate-limit/cache/thay provider mà không sửa app.

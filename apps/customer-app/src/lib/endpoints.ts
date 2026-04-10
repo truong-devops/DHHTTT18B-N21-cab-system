@@ -10,6 +10,9 @@ export const endpoints = {
   pricing: {
     quotes: '/v1/pricing/quotes'
   },
+  eta: {
+    estimate: '/v1/eta/estimate'
+  },
   ride: {
     list: '/v1/rides',
     detail: (id: string) => `/v1/rides/${id}`,
@@ -20,6 +23,10 @@ export const endpoints = {
     create: '/v1/payments',
     detail: (id: string) => `/v1/payments/${id}`,
     vietqr: (id: string) => `/v1/payments/${id}/vietqr-codes`
+  },
+  places: {
+    autocomplete: '/v1/places/autocomplete',
+    recent: '/v1/places/recent'
   },
   review: {
     list: '/v1/reviews',

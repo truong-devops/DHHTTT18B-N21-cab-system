@@ -12,6 +12,7 @@ describe('api-gateway proxy', () => {
     process.env.RIDE_SERVICE_URL = 'http://ride-service.test';
     process.env.BOOKING_SERVICE_URL = 'http://booking-service.test';
     process.env.DRIVER_SERVICE_URL = 'http://driver-service.test';
+    process.env.PLACES_SERVICE_URL = 'http://places-service.test';
     process.env.AUTH_SERVICE_URL = 'http://auth-service.test';
     process.env.JWT_SECRET = TEST_SECRET;
     process.env.PROXY_TIMEOUT_MS = '20';
@@ -23,6 +24,7 @@ describe('api-gateway proxy', () => {
     delete process.env.RIDE_SERVICE_URL;
     delete process.env.BOOKING_SERVICE_URL;
     delete process.env.DRIVER_SERVICE_URL;
+    delete process.env.PLACES_SERVICE_URL;
     delete process.env.AUTH_SERVICE_URL;
     delete process.env.JWT_SECRET;
     delete process.env.PROXY_TIMEOUT_MS;
@@ -131,5 +133,27 @@ describe('api-gateway proxy', () => {
     expect(response.status).toBe(201);
     expect(response.body.booking.booking_id).toBe('bk_1');
     expect(bookingScope.isDone()).toBe(true);
+  });
+
+  it('routes /v1/places/autocomplete to places service domain', async () => {
+    const app = require('../src/app');
+    const placesScope = nock('http://places-service.test')
+      .get('/v1/places/autocomplete')
+      .query({ q: 'ben', limit: '5' })
+      .matchHeader('x-user-id', 'user-123')
+      .reply(200, {
+        data: {
+          items: [{ id: 'ben-thanh-market', label: 'Cho Ben Thanh' }]
+        }
+      });
+
+    const response = await request(app)
+      .get('/v1/places/autocomplete')
+      .query({ q: 'ben', limit: 5 })
+      .set('Authorization', authHeader({ sub: 'user-123' }));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.items[0].id).toBe('ben-thanh-market');
+    expect(placesScope.isDone()).toBe(true);
   });
 });
