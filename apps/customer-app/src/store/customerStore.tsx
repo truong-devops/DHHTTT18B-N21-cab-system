@@ -85,7 +85,7 @@ type CustomerContextValue = {
   refreshActiveRide: () => Promise<ActiveRide | null>;
   decreaseEta: () => void;
   completeRidePayment: (method: string) => Promise<void>;
-  submitRating: (stars: number, comment: string) => Promise<void>;
+  submitRating: (stars: number, comment: string, tipAmount?: number | null) => Promise<void>;
 };
 
 const CustomerContext = createContext<CustomerContextValue | undefined>(undefined);
@@ -445,7 +445,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
 
   const submitRating = useCallback(
-    async (stars: number, comment: string) => {
+    async (stars: number, comment: string, tipAmount?: number | null) => {
       if (!activeRide) throw new Error('KhÃ´ng cÃ³ chuyáº¿n Ä‘i Ä‘ang hoáº¡t Ä‘á»™ng');
       let reviewDriverId = resolvePreferredDriverId(activeRide.driver?.id, activeRide.driverId);
       if (!reviewDriverId) throw new Error('Chua co du lieu tai xe tu he thong');
@@ -466,7 +466,7 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
 
-      await customerApi.submitRating(activeRide.id, reviewDriverId, stars, comment);
+      await customerApi.submitRating(activeRide.id, reviewDriverId, stars, comment, tipAmount);
 
       setHistory((prev) => [
         {

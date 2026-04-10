@@ -358,7 +358,7 @@ export const customerApi = {
     });
   },
 
-  async submitRating(rideId: string, driverId: string | undefined, stars: number, comment: string) {
+  async submitRating(rideId: string, driverId: string | undefined, stars: number, comment: string, tipAmount?: number | null) {
     if (!isUuid(rideId)) {
       throw new Error('Ride ID khong hop le');
     }
@@ -370,7 +370,8 @@ export const customerApi = {
       rideId,
       driverId: normalizedDriverId,
       rating: stars,
-      comment: comment.trim() || undefined
+      comment: comment.trim() || undefined,
+      tipAmount: typeof tipAmount === 'number' && Number.isFinite(tipAmount) ? Math.max(Math.round(tipAmount), 0) : undefined
     });
   },
 

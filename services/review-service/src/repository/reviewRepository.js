@@ -63,7 +63,7 @@ async function normalizeIdForColumn(tableName, columnName, value) {
   return normalized;
 }
 
-async function createReview({ rideId, riderId, driverId, rating, comment = null, status }) {
+async function createReview({ rideId, riderId, driverId, rating, comment = null, tipAmount = null, status }) {
   const normalizedRideId = await normalizeIdForColumn('reviews', 'ride_id', rideId);
   const normalizedRiderId = await normalizeIdForColumn('reviews', 'rider_id', riderId);
   const normalizedDriverId = await normalizeIdForColumn('reviews', 'driver_id', driverId);
@@ -79,13 +79,14 @@ async function createReview({ rideId, riderId, driverId, rating, comment = null,
           driver_id,
           rating,
           comment,
+          tip_amount,
           status,
           status_updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, now())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, now())
         RETURNING *
       `,
-      [normalizedRideId, normalizedRiderId, normalizedDriverId, rating, comment, status]
+      [normalizedRideId, normalizedRiderId, normalizedDriverId, rating, comment, tipAmount, status]
     );
 
     const review = result.rows[0];
@@ -138,6 +139,11 @@ async function updateReviewFields(id, fields) {
   if (fields.comment !== undefined) {
     columns.push(`comment = $${index++}`);
     values.push(fields.comment);
+  }
+
+  if (fields.tipAmount !== undefined) {
+    columns.push(`tip_amount = $${index++}`);
+    values.push(fields.tipAmount);
   }
 
   if (!columns.length) {

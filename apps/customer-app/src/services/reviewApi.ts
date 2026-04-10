@@ -9,6 +9,7 @@ export type Review = {
   driverId: string;
   rating: number;
   comment?: string | null;
+  tipAmount?: number | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -19,6 +20,7 @@ type CreateReviewPayload = {
   driverId: string;
   rating: number;
   comment?: string;
+  tipAmount?: number;
 };
 
 export async function createReview(payload: CreateReviewPayload) {
