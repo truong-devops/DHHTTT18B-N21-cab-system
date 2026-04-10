@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -17,16 +17,16 @@ const SplashScreen = () => {
   }, [navigation]);
 
   const slides = [
-    { title: 'Book', subtitle: 'Đặt chuyến nhanh, tối ưu hành trình' },
-    { title: 'Track', subtitle: 'Theo dõi tài xế theo thời gian thực' },
-    { title: 'Pay', subtitle: 'Thanh toán an toàn, nhiều phương thức' }
+    { title: 'Đặt xe', subtitle: 'Đặt chuyến nhanh, tối ưu hành trình' },
+    { title: 'Theo dõi', subtitle: 'Theo dõi tài xế theo thời gian thực' },
+    { title: 'Thanh toán', subtitle: 'Thanh toán an toàn, nhiều phương thức' }
   ];
 
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>CAB KHÁCH HÀNG</Text>
       <Carousel slides={slides} activeIndex={index} onIndexChange={setIndex} />
-      <PrimaryButton title="Get Started" onPress={() => navigation.replace('Login')} />
+      <PrimaryButton title="Bắt đầu" onPress={() => navigation.replace('Login')} />
     </View>
   );
 };

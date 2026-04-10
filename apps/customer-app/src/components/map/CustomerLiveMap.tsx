@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { IconSymbol } from '../ui/icon-symbol';
@@ -30,7 +30,7 @@ export const CustomerLiveMap: React.FC<Props> = ({
 
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setError('Trinh duyet khong ho tro geolocation');
+      setError('Trình duyệt không hỗ trợ định vị');
       return;
     }
 
@@ -45,7 +45,7 @@ export const CustomerLiveMap: React.FC<Props> = ({
         onLocationChange?.(next);
       },
       (geoError) => {
-        setError(geoError.message || 'Khong lay duoc vi tri hien tai');
+        setError(geoError.message || 'Không lấy được vị trí hiện tại');
       },
       {
         enableHighAccuracy: true,
@@ -58,17 +58,17 @@ export const CustomerLiveMap: React.FC<Props> = ({
   }, [onLocationChange]);
 
   const currentLabel = useMemo(() => {
-    if (!current) return 'Dang cho vi tri GPS...';
+    if (!current) return 'Đang chờ vị trí GPS...';
     return `${current.latitude.toFixed(6)}, ${current.longitude.toFixed(6)}`;
   }, [current]);
 
   const destinationLabel = useMemo(() => {
-    if (!destination) return 'Chua chon diem den';
+    if (!destination) return 'Chưa chọn điểm đến';
     return destination.label || `${destination.latitude.toFixed(6)}, ${destination.longitude.toFixed(6)}`;
   }, [destination]);
 
   const driverLabel = useMemo(() => {
-    if (!driverLocation) return 'Chua co vi tri tai xe';
+    if (!driverLocation) return 'Chưa có vị trí tài xế';
     return driverLocation.label || `${driverLocation.latitude.toFixed(6)}, ${driverLocation.longitude.toFixed(6)}`;
   }, [driverLocation]);
 
@@ -82,22 +82,22 @@ export const CustomerLiveMap: React.FC<Props> = ({
           <View style={styles.pickupPinDot} />
         </View>
       ) : null}
-      <Text style={styles.title}>{label || 'Ban do vi tri thuc te'}</Text>
+      <Text style={styles.title}>{label || 'Bản đồ vị trí thực tế'}</Text>
       <View style={styles.block}>
-        <Text style={styles.kv}>Diem don: Vi tri hien tai</Text>
-        <Text style={styles.value}>Toa do: {currentLabel}</Text>
+        <Text style={styles.kv}>Điểm đón: Vị trí hiện tại</Text>
+        <Text style={styles.value}>Tọa độ: {currentLabel}</Text>
       </View>
       <View style={styles.block}>
-        <Text style={styles.kv}>Diem den:</Text>
+        <Text style={styles.kv}>Điểm đến:</Text>
         <Text style={styles.value}>{destinationLabel}</Text>
         {destination ? (
           <Text style={styles.kv}>
-            Toa do: {destination.latitude.toFixed(6)}, {destination.longitude.toFixed(6)}
+            Tọa độ: {destination.latitude.toFixed(6)}, {destination.longitude.toFixed(6)}
           </Text>
         ) : null}
       </View>
       <View style={styles.block}>
-        <Text style={styles.kv}>Tai xe:</Text>
+        <Text style={styles.kv}>Tài xế:</Text>
         <Text style={styles.value}>{driverLabel}</Text>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}

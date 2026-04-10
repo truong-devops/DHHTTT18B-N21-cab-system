@@ -5,6 +5,10 @@ import { useCustomerStore } from '../../store/customerStore';
 import { colors, spacing, typography } from '../../theme/tokens';
 import type { RideHistoryItem } from '../../mock/data';
 import { IconSymbol } from '../../components/ui/icon-symbol';
+import { StateView } from '../../components/common/StateView';
+import { SkeletonBlock } from '../../components/common/SkeletonBlock';
+import { useAppPalette } from '../../theme/palette';
+import { useScreenMetrics } from '../../hooks/useScreenMetrics';
 
 const pickupDot = '#1AA3FF';
 const dropoffDot = '#FF7A00';
@@ -16,51 +20,51 @@ type DateFilter = 'all' | '7d' | '30d' | '90d';
 type SelectTarget = 'status' | 'date' | null;
 
 const statusOptions: Array<{ label: string; value: StatusFilter }> = [
-  { label: 'Tat ca', value: 'all' },
-  { label: 'Hoan thanh', value: 'completed' },
-  { label: 'Huy', value: 'cancelled' }
+  { label: 'Tất cả', value: 'all' },
+  { label: 'Hoàn thành', value: 'completed' },
+  { label: 'Đã hủy', value: 'cancelled' }
 ];
 
 const dateOptions: Array<{ label: string; value: DateFilter }> = [
-  { label: 'Tat ca', value: 'all' },
-  { label: '7 ngay', value: '7d' },
-  { label: '30 ngay', value: '30d' },
-  { label: '90 ngay', value: '90d' }
+  { label: 'Tất cả', value: 'all' },
+  { label: '7 ngày', value: '7d' },
+  { label: '30 ngày', value: '30d' },
+  { label: '90 ngày', value: '90d' }
 ];
 
 function monthLabel(dateStr: string) {
   const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return 'Khac';
+  if (Number.isNaN(d.getTime())) return 'Khác';
   const month = `${d.getMonth() + 1}`.padStart(2, '0');
-  return `Thang ${month}/${d.getFullYear()}`;
+  return `Tháng ${month}/${d.getFullYear()}`;
 }
 
 function paymentMethodLabel(value: string | null | undefined) {
   const method = String(value || '').toUpperCase();
-  if (method === 'CASH') return 'Cash';
-  if (method === 'WALLET') return 'Wallet';
+  if (method === 'CASH') return 'Tiền mặt';
+  if (method === 'WALLET') return 'Ví';
   if (method === 'VIETQR') return 'VietQR';
-  if (method === 'CARD') return 'Card';
-  return 'Khong co du lieu';
+  if (method === 'CARD') return 'Thẻ';
+  return 'Không có dữ liệu';
 }
 
 function paymentStatusLabel(value: string | null | undefined) {
   const status = String(value || '').toUpperCase();
-  if (!status) return 'Khong co du lieu';
-  if (status === 'SUCCESS' || status === 'SUCCEEDED') return 'Thanh cong';
-  if (status === 'FAILED') return 'That bai';
-  if (status === 'PENDING') return 'Dang xu ly';
-  if (status === 'TIMEOUT') return 'Het thoi gian';
+  if (!status) return 'Không có dữ liệu';
+  if (status === 'SUCCESS' || status === 'SUCCEEDED') return 'Thành công';
+  if (status === 'FAILED') return 'Thất bại';
+  if (status === 'PENDING') return 'Đang xử lý';
+  if (status === 'TIMEOUT') return 'Hết thời gian';
   return status;
 }
 
 function formatVnd(value: number | null | undefined) {
   const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0;
-  return `${Math.round(amount).toLocaleString('vi-VN')}d`;
+  return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
 }
 
 function formatDateTime(value: string | null | undefined) {
-  if (!value) return 'Khong co du lieu';
+  if (!value) return 'Không có dữ liệu';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
   return d.toISOString().slice(0, 16).replace('T', ' ');
@@ -86,15 +90,33 @@ function groupByMonth(items: RideHistoryItem[]) {
 
 const HistoryScreen = () => {
   const { history, loadHistory } = useCustomerStore();
+  const palette = useAppPalette();
+  const metrics = useScreenMetrics();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [selectedRide, setSelectedRide] = useState<RideHistoryItem | null>(null);
   const [selectTarget, setSelectTarget] = useState<SelectTarget>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadHistory().catch(() => {
-      // ignore history fetch errors in UI
-    });
+    let mounted = true;
+    const fetch = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        await loadHistory();
+      } catch {
+        if (!mounted) return;
+        setError('Không tải được lịch sử chuyến đi.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    void fetch();
+    return () => {
+      mounted = false;
+    };
   }, [loadHistory]);
 
   const displayHistory = useMemo(() => {
@@ -106,16 +128,27 @@ const HistoryScreen = () => {
   }, [dateFilter, history, statusFilter]);
 
   const grouped = useMemo(() => groupByMonth(displayHistory), [displayHistory]);
+  const reloadHistory = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await loadHistory();
+    } catch {
+      setError('Không tải được lịch sử chuyến đi.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const statusLabel = statusOptions.find((item) => item.value === statusFilter)?.label || 'Tat ca';
-  const dateLabel = dateOptions.find((item) => item.value === dateFilter)?.label || 'Tat ca';
+  const statusLabel = statusOptions.find((item) => item.value === statusFilter)?.label || 'Tất cả';
+  const dateLabel = dateOptions.find((item) => item.value === dateFilter)?.label || 'Tất cả';
 
   const renderSelect = (label: string, value: string, onPress: () => void) => (
     <View style={styles.selectGroup}>
       <Text style={styles.filterLabel}>{label}</Text>
       <Pressable onPress={onPress} style={styles.selectTrigger}>
         <Text style={styles.selectValue}>{value}</Text>
-        <Text style={styles.selectCaret}>v</Text>
+        <Text style={styles.selectCaret}>▾</Text>
       </Pressable>
     </View>
   );
@@ -127,7 +160,7 @@ const HistoryScreen = () => {
           <Text style={styles.time}>{formatDateTime(item.rideCreatedAt || item.date)}</Text>
           <View style={[styles.statusChip, item.status === 'completed' ? styles.statusSuccess : styles.statusCancel]}>
             <Text style={[styles.statusText, item.status === 'completed' ? styles.statusTextSuccess : styles.statusTextCancel]}>
-              {item.status === 'completed' ? 'Hoan thanh' : 'Huy'}
+              {item.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
             </Text>
           </View>
         </View>
@@ -154,7 +187,7 @@ const HistoryScreen = () => {
 
         <View style={styles.rowBetween}>
           <Text style={styles.price}>{formatVnd(item.amount)}</Text>
-          <Text style={styles.tapHint}>Nhan vao de xem chi tiet</Text>
+          <Text style={styles.tapHint}>Nhấn để xem chi tiết</Text>
         </View>
       </Card>
     </Pressable>
@@ -162,25 +195,36 @@ const HistoryScreen = () => {
 
   return (
     <>
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={[styles.container, { backgroundColor: palette.bg }]} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.title}>Lich su chuyen di</Text>
+          <Text style={styles.title}>Lịch sử chuyến đi</Text>
           <View style={styles.filtersBlock}>
             <View style={styles.filterInlineRow}>
-              {renderSelect('Status', statusLabel, () => setSelectTarget('status'))}
-              {renderSelect('Date', dateLabel, () => setSelectTarget('date'))}
+              {renderSelect('Trạng thái', statusLabel, () => setSelectTarget('status'))}
+              {renderSelect('Thời gian', dateLabel, () => setSelectTarget('date'))}
             </View>
           </View>
         </View>
 
-        <View style={styles.body}>
-          {displayHistory.length === 0 ? <Text style={styles.emptyText}>Khong co chuyen di phu hop bo loc.</Text> : null}
-          {Object.entries(grouped).map(([label, items]) => (
-            <View key={label} style={styles.monthBlock}>
-              <Text style={styles.month}>{label}</Text>
-              {items.map((it, idx) => renderItem(it, idx))}
+        <View style={[styles.body, { paddingHorizontal: metrics.horizontalPadding }]}>
+          {loading ? (
+            <View style={styles.loadingList}>
+              <SkeletonBlock height={86} />
+              <SkeletonBlock height={86} />
+              <SkeletonBlock height={86} />
             </View>
-          ))}
+          ) : error ? (
+            <StateView type="error" title="Không tải được lịch sử" message={error} actionLabel="Thử lại" onAction={() => void reloadHistory()} />
+          ) : displayHistory.length === 0 ? (
+            <StateView type="empty" title="Chưa có chuyến đi phù hợp" message="Thử thay đổi bộ lọc thời gian hoặc trạng thái." />
+          ) : (
+            Object.entries(grouped).map(([label, items]) => (
+              <View key={label} style={styles.monthBlock}>
+                <Text style={styles.month}>{label}</Text>
+                {items.map((it, idx) => renderItem(it, idx))}
+              </View>
+            ))
+          )}
         </View>
       </ScrollView>
 
@@ -188,9 +232,9 @@ const HistoryScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalPanel}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chi tiet chuyen di</Text>
+              <Text style={styles.modalTitle}>Chi tiết chuyến đi</Text>
               <Pressable onPress={() => setSelectedRide(null)} style={styles.closeBtn}>
-                <Text style={styles.closeBtnText}>Dong</Text>
+                <Text style={styles.closeBtnText}>Đóng</Text>
               </Pressable>
             </View>
 
@@ -198,52 +242,52 @@ const HistoryScreen = () => {
               {selectedRide ? (
                 <View style={styles.detailSectionWrap}>
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>Tong quan</Text>
-                    <Text style={styles.detailLine}>Ride ID: {selectedRide.id}</Text>
-                    <Text style={styles.detailLine}>External Ride ID: {selectedRide.externalRideId || 'Khong co du lieu'}</Text>
-                    <Text style={styles.detailLine}>Booking ID: {selectedRide.bookingId || 'Khong co du lieu'}</Text>
-                    <Text style={styles.detailLine}>Rider ID: {selectedRide.riderId || 'Khong co du lieu'}</Text>
-                    <Text style={styles.detailLine}>Trang thai: {selectedRide.rideStatusRaw || selectedRide.status}</Text>
-                    <Text style={styles.detailLine}>Status update: {formatDateTime(selectedRide.rideStatusUpdatedAt)}</Text>
-                    <Text style={styles.detailLine}>Ngay tao: {formatDateTime(selectedRide.rideCreatedAt || selectedRide.date)}</Text>
-                    <Text style={styles.detailLine}>Cap nhat: {formatDateTime(selectedRide.rideUpdatedAt)}</Text>
+                    <Text style={styles.sectionTitle}>Tổng quan</Text>
+                    <Text style={styles.detailLine}>Mã chuyến đi: {selectedRide.id}</Text>
+                    <Text style={styles.detailLine}>Mã ride ngoài hệ thống: {selectedRide.externalRideId || 'Không có dữ liệu'}</Text>
+                    <Text style={styles.detailLine}>Mã booking: {selectedRide.bookingId || 'Không có dữ liệu'}</Text>
+                    <Text style={styles.detailLine}>Mã khách hàng: {selectedRide.riderId || 'Không có dữ liệu'}</Text>
+                    <Text style={styles.detailLine}>Trạng thái: {selectedRide.rideStatusRaw || selectedRide.status}</Text>
+                    <Text style={styles.detailLine}>Cập nhật trạng thái: {formatDateTime(selectedRide.rideStatusUpdatedAt)}</Text>
+                    <Text style={styles.detailLine}>Ngày tạo: {formatDateTime(selectedRide.rideCreatedAt || selectedRide.date)}</Text>
+                    <Text style={styles.detailLine}>Cập nhật: {formatDateTime(selectedRide.rideUpdatedAt)}</Text>
                   </View>
 
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>Lo trinh</Text>
-                    <Text style={styles.detailLine}>Diem don: {selectedRide.pickup}</Text>
-                    <Text style={styles.detailLine}>Diem den: {selectedRide.destination}</Text>
+                    <Text style={styles.sectionTitle}>Lộ trình</Text>
+                    <Text style={styles.detailLine}>Điểm đón: {selectedRide.pickup}</Text>
+                    <Text style={styles.detailLine}>Điểm đến: {selectedRide.destination}</Text>
                     <Text style={styles.detailLine}>
-                      Toa do don: {selectedRide.pickupLat ?? '-'}, {selectedRide.pickupLng ?? '-'}
+                      Tọa độ đón: {selectedRide.pickupLat ?? '-'}, {selectedRide.pickupLng ?? '-'}
                     </Text>
                     <Text style={styles.detailLine}>
-                      Toa do den: {selectedRide.dropoffLat ?? '-'}, {selectedRide.dropoffLng ?? '-'}
+                      Tọa độ đến: {selectedRide.dropoffLat ?? '-'}, {selectedRide.dropoffLng ?? '-'}
                     </Text>
                   </View>
 
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>Tai xe</Text>
-                    <Text style={styles.detailLine}>Driver ID: {selectedRide.driverId || 'Khong co du lieu'}</Text>
-                    <Text style={styles.detailLine}>Ten tai xe: {selectedRide.driverName || 'Khong co du lieu'}</Text>
-                    <Text style={styles.detailLine}>So dien thoai: {selectedRide.driverPhone || 'Khong co du lieu'}</Text>
-                    <Text style={styles.detailLine}>Loai xe: {selectedRide.vehicleType || 'Khong co du lieu'}</Text>
-                    <Text style={styles.detailLine}>Bien so: {selectedRide.plateNumber || 'Khong co du lieu'}</Text>
+                    <Text style={styles.sectionTitle}>Tài xế</Text>
+                    <Text style={styles.detailLine}>Mã tài xế: {selectedRide.driverId || 'Không có dữ liệu'}</Text>
+                    <Text style={styles.detailLine}>Tên tài xế: {selectedRide.driverName || 'Không có dữ liệu'}</Text>
+                    <Text style={styles.detailLine}>Số điện thoại: {selectedRide.driverPhone || 'Không có dữ liệu'}</Text>
+                    <Text style={styles.detailLine}>Loại xe: {selectedRide.vehicleType || 'Không có dữ liệu'}</Text>
+                    <Text style={styles.detailLine}>Biển số: {selectedRide.plateNumber || 'Không có dữ liệu'}</Text>
                   </View>
 
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>Thanh toan</Text>
-                    <Text style={styles.detailLine}>Payment ID: {selectedRide.paymentId || 'Khong co du lieu'}</Text>
-                    <Text style={styles.detailLine}>Phuong thuc: {paymentMethodLabel(selectedRide.paymentMethod)}</Text>
-                    <Text style={styles.detailLine}>Trang thai: {paymentStatusLabel(selectedRide.paymentStatus)}</Text>
+                    <Text style={styles.sectionTitle}>Thanh toán</Text>
+                    <Text style={styles.detailLine}>Mã thanh toán: {selectedRide.paymentId || 'Không có dữ liệu'}</Text>
+                    <Text style={styles.detailLine}>Phương thức: {paymentMethodLabel(selectedRide.paymentMethod)}</Text>
+                    <Text style={styles.detailLine}>Trạng thái: {paymentStatusLabel(selectedRide.paymentStatus)}</Text>
                     <Text style={styles.detailLine}>
-                      So tien: {formatVnd(selectedRide.paymentAmount)} {selectedRide.paymentCurrency || ''}
+                      Số tiền: {formatVnd(selectedRide.paymentAmount)} {selectedRide.paymentCurrency || ''}
                     </Text>
-                    <Text style={styles.detailLine}>Ngay tao: {formatDateTime(selectedRide.paymentCreatedAt)}</Text>
-                    <Text style={styles.detailLine}>Ngay cap nhat: {formatDateTime(selectedRide.paymentUpdatedAt)}</Text>
+                    <Text style={styles.detailLine}>Ngày tạo: {formatDateTime(selectedRide.paymentCreatedAt)}</Text>
+                    <Text style={styles.detailLine}>Ngày cập nhật: {formatDateTime(selectedRide.paymentUpdatedAt)}</Text>
                   </View>
 
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>Tong tien chuyen di</Text>
+                    <Text style={styles.sectionTitle}>Tổng tiền chuyến đi</Text>
                     <Text style={styles.totalAmount}>{formatVnd(selectedRide.amount)}</Text>
                   </View>
                 </View>
@@ -256,7 +300,7 @@ const HistoryScreen = () => {
       <Modal visible={Boolean(selectTarget)} transparent animationType="fade" onRequestClose={() => setSelectTarget(null)}>
         <Pressable style={styles.selectOverlay} onPress={() => setSelectTarget(null)}>
           <Pressable style={styles.selectPanel} onPress={() => {}}>
-            <Text style={styles.selectTitle}>{selectTarget === 'status' ? 'Chon trang thai' : 'Chon thoi gian'}</Text>
+            <Text style={styles.selectTitle}>{selectTarget === 'status' ? 'Chọn trạng thái' : 'Chọn thời gian'}</Text>
             {(selectTarget === 'status' ? statusOptions : dateOptions).map((option) => (
               <Pressable
                 key={option.value}
@@ -309,7 +353,8 @@ const styles = StyleSheet.create({
   },
   selectValue: { ...typography.body, color: colors.white, fontWeight: '600' },
   selectCaret: { ...typography.caption, color: colors.white, fontWeight: '700' },
-  body: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
+  body: { paddingTop: spacing.md },
+  loadingList: { gap: spacing.sm },
   emptyText: { ...typography.body, color: colors.muted, marginTop: spacing.md },
   monthBlock: { marginTop: spacing.lg, gap: spacing.sm },
   month: { ...typography.body, fontWeight: '700', color: colors.muted, marginTop: spacing.sm },
@@ -401,4 +446,3 @@ const styles = StyleSheet.create({
 });
 
 export default HistoryScreen;
-

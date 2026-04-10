@@ -1,9 +1,10 @@
-import React from 'react';
+﻿import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { RideOption } from '../../mock/data';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import { formatVnd } from '../../utils/format';
 import { IconSymbol } from '../ui/icon-symbol';
+import { useAppPalette } from '../../theme/palette';
 
 type Props = {
   option: RideOption;
@@ -17,18 +18,23 @@ function resolveVehicleIcon(option: RideOption) {
 }
 
 export const RideOptionCard: React.FC<Props> = ({ option, selected, onPress }) => {
+  const palette = useAppPalette();
+
   return (
-    <Pressable onPress={onPress} style={[styles.card, selected ? styles.selectedCard : null]}>
+    <Pressable
+      onPress={onPress}
+      style={[styles.card, { borderColor: palette.border, backgroundColor: palette.card }, selected ? styles.selectedCard : null]}
+      accessibilityRole="button"
+      accessibilityLabel={`Chọn ${option.name}`}
+    >
       <View style={styles.headerRow}>
         <View style={styles.vehicleIconWrap}>
           <IconSymbol name={resolveVehicleIcon(option)} size={22} color={colors.brand700} />
         </View>
 
         <View style={styles.headerText}>
-          <Text style={styles.name}>{option.name}</Text>
-          <Text style={styles.subtext}>
-            ETA {option.etaMinutes} min
-          </Text>
+          <Text style={[styles.name, { color: palette.text }]}>{option.name}</Text>
+          <Text style={[styles.subtext, { color: palette.muted }]}>Dự kiến {option.etaMinutes} phút</Text>
         </View>
 
         <View style={styles.priceBlock}>
@@ -37,14 +43,14 @@ export const RideOptionCard: React.FC<Props> = ({ option, selected, onPress }) =
       </View>
 
       <View style={styles.metricsRow}>
-        <View style={styles.metricChip}>
-          <IconSymbol name="person.fill" size={14} color={colors.muted} />
-          <Text style={styles.metricText}>{option.capacity} cho</Text>
+        <View style={[styles.metricChip, { backgroundColor: palette.surface2 }]}> 
+          <IconSymbol name="person.fill" size={14} color={palette.muted} />
+          <Text style={[styles.metricText, { color: palette.muted }]}>{option.capacity} chỗ</Text>
         </View>
 
-        <View style={styles.metricChip}>
-          <IconSymbol name="clock.fill" size={14} color={colors.muted} />
-          <Text style={styles.metricText}>{option.etaMinutes} min</Text>
+        <View style={[styles.metricChip, { backgroundColor: palette.surface2 }]}> 
+          <IconSymbol name="clock.fill" size={14} color={palette.muted} />
+          <Text style={[styles.metricText, { color: palette.muted }]}>{option.etaMinutes} phút</Text>
         </View>
 
         {option.surgeLabel ? (
@@ -61,11 +67,9 @@ export const RideOptionCard: React.FC<Props> = ({ option, selected, onPress }) =
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.card + 6,
     padding: spacing.md,
-    gap: spacing.sm,
-    backgroundColor: colors.card
+    gap: spacing.sm
   },
   selectedCard: {
     borderColor: colors.brand600,
@@ -89,12 +93,10 @@ const styles = StyleSheet.create({
     gap: 2
   },
   name: {
-    ...typography.h2,
-    color: colors.text
+    ...typography.h2
   },
   subtext: {
-    ...typography.caption,
-    color: colors.muted
+    ...typography.caption
   },
   priceBlock: {
     alignItems: 'flex-end'
@@ -113,14 +115,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.surface2,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5
   },
   metricText: {
     ...typography.caption,
-    color: colors.muted,
     fontWeight: '600'
   },
   surgeChip: {
