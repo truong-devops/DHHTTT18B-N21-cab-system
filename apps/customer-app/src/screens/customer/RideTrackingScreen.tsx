@@ -18,6 +18,7 @@ const RideTrackingScreen = () => {
   const { latestEvent } = useRealtimeStream();
   const [eta, setEta] = useState(activeRide?.etaMinutes || 5);
   const [driverInfoTimeout, setDriverInfoTimeout] = useState(false);
+  const [driverLocation, setDriverLocation] = useState<{ label: string; lat: number; lng: number } | null>(null);
 
   const destinationCoordinate = useMemo(() => {
     if (!activeRide) return null;
@@ -39,10 +40,22 @@ const RideTrackingScreen = () => {
   }, [activeRide, decreaseEta]);
 
   useEffect(() => {
-    if (latestEvent?.type === 'driver_location' && latestEvent.etaMinutes) {
+    if (latestEvent?.type !== 'driver_location') return;
+    if (latestEvent.etaMinutes) {
       setEta(latestEvent.etaMinutes);
     }
-  }, [latestEvent]);
+    if (Number.isFinite(latestEvent.lat) && Number.isFinite(latestEvent.lng)) {
+      setDriverLocation({
+        label: activeRide?.driver?.name ? `Tai xe ${activeRide.driver.name}` : 'Tai xe',
+        lat: latestEvent.lat,
+        lng: latestEvent.lng
+      });
+    }
+  }, [activeRide?.driver?.name, latestEvent]);
+
+  useEffect(() => {
+    setDriverLocation(null);
+  }, [activeRide?.id]);
 
   useEffect(() => {
     if (!activeRide?.id || activeRide.driver) return;
@@ -118,19 +131,34 @@ const RideTrackingScreen = () => {
       <View style={styles.mapArea}>
         <LiveRouteMap
           destination={destinationCoordinate}
+          driverLocation={driverLocation}
           etaMinutes={eta}
           onLocationChange={(coords) => customerApi.setLivePickupLocation(coords.latitude, coords.longitude)}
         />
       </View>
-      <DriverInfoCard driver={activeRide.driver} etaMinutes={eta} />
-      <PrimaryButton title="Hoan tat chuyen di" onPress={() => navigation.replace('Payment')} />
+      <View style={styles.panel}>
+        <DriverInfoCard driver={activeRide.driver} etaMinutes={eta} />
+        <PrimaryButton title="Hoan tat chuyen di" onPress={() => navigation.replace('Payment')} />
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg, gap: spacing.md },
+  container: { flex: 1, backgroundColor: colors.bg },
   mapArea: { flex: 1 },
+  panel: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.xl,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: 'rgba(255,255,255,0.97)',
+    padding: spacing.sm,
+    gap: spacing.sm
+  },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   emptyText: { ...typography.body, color: colors.muted }
 });

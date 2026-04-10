@@ -12,12 +12,19 @@ type Coordinate = {
 type Props = {
   label?: string;
   destination?: Coordinate | null;
+  driverLocation?: Coordinate | null;
   showRoute?: boolean;
   onLocationChange?: (coords: Coordinate) => void;
   showCenterPickupPin?: boolean;
 };
 
-export const CustomerLiveMap: React.FC<Props> = ({ label, destination, onLocationChange, showCenterPickupPin = false }) => {
+export const CustomerLiveMap: React.FC<Props> = ({
+  label,
+  destination,
+  driverLocation,
+  onLocationChange,
+  showCenterPickupPin = false
+}) => {
   const [current, setCurrent] = useState<Coordinate | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +67,11 @@ export const CustomerLiveMap: React.FC<Props> = ({ label, destination, onLocatio
     return destination.label || `${destination.latitude.toFixed(6)}, ${destination.longitude.toFixed(6)}`;
   }, [destination]);
 
+  const driverLabel = useMemo(() => {
+    if (!driverLocation) return 'Chua co vi tri tai xe';
+    return driverLocation.label || `${driverLocation.latitude.toFixed(6)}, ${driverLocation.longitude.toFixed(6)}`;
+  }, [driverLocation]);
+
   return (
     <View style={styles.map}>
       {showCenterPickupPin ? (
@@ -83,6 +95,10 @@ export const CustomerLiveMap: React.FC<Props> = ({ label, destination, onLocatio
             Toa do: {destination.latitude.toFixed(6)}, {destination.longitude.toFixed(6)}
           </Text>
         ) : null}
+      </View>
+      <View style={styles.block}>
+        <Text style={styles.kv}>Tai xe:</Text>
+        <Text style={styles.value}>{driverLabel}</Text>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
