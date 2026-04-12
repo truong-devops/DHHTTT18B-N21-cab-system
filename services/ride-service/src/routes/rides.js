@@ -10,7 +10,8 @@ const {
   findNextRequestedRide,
   updateRideFields,
   updateRideStatus,
-  addStatusHistory
+  addStatusHistory,
+  getRideStatusHistory
 } = require('../repository/rideRepository');
 const { getByKey, createKey, setResponse } = require('../repository/idempotencyRepository');
 const { requireAuth } = require('../middleware/auth');
@@ -29,6 +30,7 @@ const router = express.Router();
 // Auto-assign is OFF by default; set AUTO_ASSIGN_DRIVER=true to force assign to DEFAULT_DRIVER_ID.
 const AUTO_ASSIGN_DRIVER = String(process.env.AUTO_ASSIGN_DRIVER || 'false').toLowerCase() === 'true';
 const DEFAULT_DRIVER_ID = String(process.env.DEFAULT_DRIVER_ID || '').trim();
+const PAYMENT_SERVICE_URL = String(process.env.PAYMENT_SERVICE_URL || 'http://localhost:3007').replace(/\/+$/, '');
 
 router.use(requireAuth);
 
@@ -50,6 +52,90 @@ function toRideResponse(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+function haversineDistanceMeters(aLat, aLng, bLat, bLng) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const lat1 = toRad(aLat);
+  const lat2 = toRad(bLat);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function toSafeDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? null : date;
+}
+
+function computeDurationSeconds(ride, statusHistory) {
+  const createdAt = toSafeDate(ride.created_at);
+  const completedAtFromHistory = statusHistory
+    .map((entry) => ({ status: normalizeStatus(entry.to_status), at: toSafeDate(entry.occurred_at) }))
+    .find((entry) => entry.status === 'COMPLETED' && entry.at)?.at;
+  const startedAtFromHistory = statusHistory
+    .map((entry) => ({ status: normalizeStatus(entry.to_status), at: toSafeDate(entry.occurred_at) }))
+    .find((entry) => entry.status === 'IN_PROGRESS' && entry.at)?.at;
+
+  const completedAt = completedAtFromHistory || toSafeDate(ride.status_updated_at);
+  const startedAt = startedAtFromHistory || createdAt;
+
+  if (!startedAt || !completedAt) return null;
+  const seconds = Math.round((completedAt.getTime() - startedAt.getTime()) / 1000);
+  return seconds > 0 ? seconds : null;
+}
+
+function computeBreakdown({ fareAmount, distanceMeters, durationSeconds }) {
+  if (Number.isFinite(fareAmount) && fareAmount > 0) {
+    const total = Math.round(fareAmount);
+    const base = Math.round(total * 0.35);
+    const distance = Math.round(total * 0.45);
+    const time = Math.max(0, total - base - distance);
+    return { base, distance, time, surge: 0, discount: 0, total };
+  }
+
+  const distanceKm = Number.isFinite(distanceMeters) ? distanceMeters / 1000 : 0;
+  const durationMin = Number.isFinite(durationSeconds) ? durationSeconds / 60 : 0;
+  const base = 12000;
+  const distance = Math.round(distanceKm * 8500);
+  const time = Math.round(durationMin * 1000);
+  const total = base + distance + time;
+  return { base, distance, time, surge: 0, discount: 0, total };
+}
+
+async function fetchPaymentsForRide({ rideId, authorization, traceId, requestId }) {
+  if (!PAYMENT_SERVICE_URL) return [];
+  const url = new URL('/v1/payments', PAYMENT_SERVICE_URL);
+  url.searchParams.set('rideId', rideId);
+  url.searchParams.set('limit', '20');
+  url.searchParams.set('sort', '-createdAt');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3500);
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        ...(authorization ? { Authorization: authorization } : {}),
+        ...(traceId ? { 'x-trace-id': traceId } : {}),
+        ...(requestId ? { 'x-request-id': requestId } : {})
+      },
+      signal: controller.signal
+    });
+    if (!response.ok) return [];
+    const payload = await response.json();
+    return Array.isArray(payload?.data) ? payload.data : [];
+  } catch (_error) {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 router.post(
@@ -288,6 +374,26 @@ router.get(
 );
 
 router.get(
+  '/external/:externalRideId',
+  validateRequest({
+    paramsSchema: {
+      required: ['externalRideId'],
+      properties: {
+        externalRideId: { type: 'string' }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const ride = await getRideByExternalId(req.params.externalRideId);
+    if (!ride) {
+      throw new ApiError(404, 'NOT_FOUND', 'Ride not found');
+    }
+
+    return res.json({ data: toRideResponse(ride) });
+  })
+);
+
+router.get(
   '/:id',
   validateRequest({
     paramsSchema: {
@@ -304,6 +410,66 @@ router.get(
     }
 
     return res.json({ data: toRideResponse(ride) });
+  })
+);
+
+router.get(
+  '/:id/summary',
+  validateRequest({
+    paramsSchema: {
+      required: ['id'],
+      properties: {
+        id: { type: 'string' }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const ride = await getRideById(req.params.id);
+    if (!ride) {
+      throw new ApiError(404, 'NOT_FOUND', 'Ride not found');
+    }
+
+    const currentStatus = normalizeStatus(ride.status);
+    if (currentStatus !== 'COMPLETED') {
+      throw new ApiError(409, 'INVALID_STATE_TRANSITION', 'Ride must be COMPLETED to get summary');
+    }
+
+    const statusHistory = await getRideStatusHistory(ride.id);
+    const distanceMeters =
+      Number.isFinite(ride.pickup_lat) && Number.isFinite(ride.pickup_lng) && Number.isFinite(ride.dropoff_lat) && Number.isFinite(ride.dropoff_lng)
+        ? Math.round(haversineDistanceMeters(ride.pickup_lat, ride.pickup_lng, ride.dropoff_lat, ride.dropoff_lng))
+        : null;
+    const durationSeconds = computeDurationSeconds(ride, statusHistory);
+
+    const payments = await fetchPaymentsForRide({
+      rideId: ride.id,
+      authorization: req.get('authorization') || '',
+      traceId: req.traceId || null,
+      requestId: req.requestId || null
+    });
+    const primaryPayment = payments.find((item) => normalizeStatus(item.status) === 'PAID') || payments[0] || null;
+    const parsedFareAmount = Number(primaryPayment?.amount);
+    const fareAmount = Number.isFinite(parsedFareAmount) ? Math.round(parsedFareAmount) : null;
+    const breakdown = computeBreakdown({ fareAmount, distanceMeters, durationSeconds });
+
+    return res.json({
+      data: {
+        rideId: ride.id,
+        status: currentStatus,
+        distanceMeters,
+        durationSeconds,
+        fare: {
+          amount: fareAmount !== null ? fareAmount : breakdown.total,
+          currency: primaryPayment?.currency || 'VND',
+          paymentStatus: primaryPayment?.status || null,
+          paymentId: primaryPayment?.id || null,
+          method: primaryPayment?.method || null,
+          source: primaryPayment ? 'payment-service' : 'estimated'
+        },
+        breakdown
+      },
+      requestId: req.requestId
+    });
   })
 );
 

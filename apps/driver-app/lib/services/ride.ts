@@ -25,6 +25,33 @@ export type RideListResponse = {
   nextCursor?: string | null;
 };
 
+export type RideSummaryFare = {
+  amount: number;
+  currency: string;
+  paymentStatus?: string | null;
+  paymentId?: string | null;
+  method?: string | null;
+  source?: string | null;
+};
+
+export type RideSummaryBreakdown = {
+  base: number;
+  distance: number;
+  time: number;
+  surge: number;
+  discount: number;
+  total: number;
+};
+
+export type RideSummary = {
+  rideId: string;
+  status: string;
+  distanceMeters: number | null;
+  durationSeconds: number | null;
+  fare: RideSummaryFare;
+  breakdown: RideSummaryBreakdown;
+};
+
 export async function listRequested(limit = 5) {
   return apiRequest<RideListResponse>({
     method: 'GET',
@@ -66,6 +93,13 @@ export async function getRide(id: string) {
   return apiRequest<{ data: Ride }>({
     method: 'GET',
     path: endpoints.ride.detail(id)
+  });
+}
+
+export async function getRideSummary(id: string) {
+  return apiRequest<{ data: RideSummary }>({
+    method: 'GET',
+    path: endpoints.ride.summary(id)
   });
 }
 

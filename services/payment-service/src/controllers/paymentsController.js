@@ -3,6 +3,7 @@ const { withIdempotency, pickIdempotencyHeaders } = require('../services/idempot
 const { hashRequest } = require('../utils/idempotency');
 const { ApiError } = require('../utils/errors');
 const { STATUSES } = require('../domain/paymentStatus');
+const { getDriverWalletSummary, createWithdrawalRequest, fetchWithdrawals, changeWithdrawalStatus } = require('../services/walletService');
 const monitoring = require('../monitoring');
 
 function isDevConfirmEnabled() {
@@ -149,6 +150,51 @@ async function confirmPaymentDevController(req, res) {
   res.json({ data: updated, handled: true });
 }
 
+async function getWalletSummaryController(req, res) {
+  const roleSet = new Set(Array.isArray(req.user?.roles) ? req.user.roles : []);
+  const canViewAll = roleSet.has('admin') || roleSet.has('ops');
+  const driverUserId = canViewAll ? req.validatedQuery.driverUserId || req.user.id : req.user.id;
+  const data = await getDriverWalletSummary({
+    driverUserId,
+    authorization: req.get('authorization') || '',
+    traceId: req.traceId || null,
+    requestId: req.requestId || null
+  });
+  res.json({ data });
+}
+
+async function listWithdrawalsController(req, res) {
+  const result = await fetchWithdrawals({
+    actor: req.user,
+    query: req.validatedQuery || {}
+  });
+  res.json(result);
+}
+
+async function createWithdrawalController(req, res) {
+  const data = await createWithdrawalRequest({
+    driverUserId: req.user.id,
+    amount: req.validatedBody.amount,
+    note: req.validatedBody.note,
+    authorization: req.get('authorization') || '',
+    traceId: req.traceId || null,
+    requestId: req.requestId || null
+  });
+  res.status(201).json({ data });
+}
+
+async function updateWithdrawalStatusController(req, res) {
+  const id = req.validatedParams ? req.validatedParams.id : req.params.id;
+  const body = req.validatedBody || {};
+  const data = await changeWithdrawalStatus({
+    id,
+    status: body.status,
+    rejectionReason: body.rejectionReason,
+    actorId: req.user?.id || null
+  });
+  res.json({ data });
+}
+
 module.exports = {
   listPaymentsController,
   createPaymentController,
@@ -156,5 +202,9 @@ module.exports = {
   getPaymentController,
   updatePaymentStatusController,
   getVietQrController,
-  confirmPaymentDevController
+  confirmPaymentDevController,
+  getWalletSummaryController,
+  listWithdrawalsController,
+  createWithdrawalController,
+  updateWithdrawalStatusController
 };

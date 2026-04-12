@@ -136,6 +136,48 @@ router.get(
   })
 );
 
+router.get(
+  '/v1/driver/me/kyc',
+  asyncHandler(async (req, res) => {
+    const data = await driverService.getDriverKyc(req.userId);
+    return res.json({ data, requestId: req.requestId });
+  })
+);
+
+router.post(
+  '/v1/driver/me/kyc/submissions',
+  validateRequest({
+    bodySchema: {
+      required: ['idNumber', 'licenseNumber', 'idFrontUrl', 'licenseFrontUrl', 'selfieUrl'],
+      properties: {
+        fullName: { type: 'string' },
+        phone: { type: 'string' },
+        idNumber: { type: 'string' },
+        licenseNumber: { type: 'string' },
+        vehicleRegistrationNumber: { type: 'string' },
+        idFrontUrl: { type: 'string' },
+        idBackUrl: { type: 'string' },
+        licenseFrontUrl: { type: 'string' },
+        selfieUrl: { type: 'string' }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const data = await driverService.submitDriverKyc(req.userId, {
+      fullName: req.body.fullName,
+      phone: req.body.phone,
+      idNumber: req.body.idNumber,
+      licenseNumber: req.body.licenseNumber,
+      vehicleRegistrationNumber: req.body.vehicleRegistrationNumber,
+      idFrontUrl: req.body.idFrontUrl,
+      idBackUrl: req.body.idBackUrl,
+      licenseFrontUrl: req.body.licenseFrontUrl,
+      selfieUrl: req.body.selfieUrl
+    });
+    return res.status(201).json({ data, requestId: req.requestId });
+  })
+);
+
 router.put(
   '/v1/driver/me',
   validateRequest({

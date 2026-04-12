@@ -8,10 +8,23 @@ const {
   getPaymentController,
   updatePaymentStatusController,
   getVietQrController,
-  confirmPaymentDevController
+  confirmPaymentDevController,
+  getWalletSummaryController,
+  listWithdrawalsController,
+  createWithdrawalController,
+  updateWithdrawalStatusController
 } = require('../controllers/paymentsController');
 const config = require('../config');
-const { validateCreatePayment, validateListPayments, validateStatusUpdate, validatePaymentParams } = require('../middleware/validatePayments');
+const {
+  validateCreatePayment,
+  validateListPayments,
+  validateStatusUpdate,
+  validatePaymentParams,
+  validateWalletSummary,
+  validateListWithdrawals,
+  validateCreateWithdrawal,
+  validateWithdrawalStatusUpdate
+} = require('../middleware/validatePayments');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { ApiError } = require('../utils/errors');
 
@@ -32,6 +45,14 @@ router.use(requireAuth);
 router.get('/', validateListPayments, asyncHandler(listPaymentsController));
 
 router.post('/', validateCreatePayment, asyncHandler(createPaymentController));
+
+router.get('/wallet/summary', validateWalletSummary, asyncHandler(getWalletSummaryController));
+
+router.get('/withdrawals', validateListWithdrawals, asyncHandler(listWithdrawalsController));
+
+router.post('/withdrawals', validateCreateWithdrawal, asyncHandler(createWithdrawalController));
+
+router.patch('/withdrawals/:id', requireRole('admin', 'ops'), validateWithdrawalStatusUpdate, asyncHandler(updateWithdrawalStatusController));
 
 router.get('/:id', validatePaymentParams, asyncHandler(getPaymentController));
 

@@ -12,6 +12,7 @@ const request = require('supertest');
 const mockCreateBooking = jest.fn();
 const mockGetBookingById = jest.fn();
 const mockListBookings = jest.fn();
+const mockFindActiveByUser = jest.fn();
 const mockGetByIdForUpdate = jest.fn();
 const mockCancelBooking = jest.fn();
 const mockInsertOutboxEvent = jest.fn();
@@ -21,10 +22,36 @@ const mockWithTransaction = jest.fn();
 const mockGetQuote = jest.fn();
 const mockEstimateEta = jest.fn();
 
+jest.mock('../src/middleware/auth', () => ({
+  requireTrustedGateway: (req, _res, next) => {
+    req.gatewayTrusted = true;
+    next();
+  },
+  requireAuth: (req, _res, next) => {
+    const userId = String(req.header('x-user-id') || 'test_user').trim();
+    const role = String(req.header('x-user-role') || 'customer')
+      .trim()
+      .toLowerCase();
+    const rolesHeader = String(req.header('x-user-roles') || role)
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+    req.userId = userId;
+    req.user = {
+      id: userId,
+      role,
+      roles: rolesHeader,
+      scopes: []
+    };
+    next();
+  }
+}));
+
 jest.mock('../src/repositories/bookingRepo', () => ({
   create: (...args) => mockCreateBooking(...args),
   getById: (...args) => mockGetBookingById(...args),
   list: (...args) => mockListBookings(...args),
+  findActiveByUser: (...args) => mockFindActiveByUser(...args),
   getByIdForUpdate: (...args) => mockGetByIdForUpdate(...args),
   cancel: (...args) => mockCancelBooking(...args)
 }));
@@ -113,6 +140,7 @@ describe('Booking P0 rubric integration frame (1-40)', () => {
     mockInsertOutboxEvent.mockResolvedValue(undefined);
     mockCompleteIdempotencyKey.mockResolvedValue(undefined);
     mockListBookings.mockResolvedValue([]);
+    mockFindActiveByUser.mockResolvedValue(null);
     mockGetBookingById.mockResolvedValue(null);
   });
 

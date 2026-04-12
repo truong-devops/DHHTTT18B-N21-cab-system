@@ -10,7 +10,7 @@ describe('cursor utilities', () => {
     expect(decoded.id).toBe(id);
   });
 
-  test('throws on invalid cursor', () => {
-    expect(() => decodeCursor('invalid')).toThrow('Cursor is invalid');
+  test('returns null on invalid cursor', () => {
+    expect(decodeCursor('invalid')).toBeNull();
   });
 });

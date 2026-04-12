@@ -90,4 +90,64 @@ router.get(
   })
 );
 
+router.get(
+  '/v1/admin/kyc/submissions',
+  validateRequest({
+    custom: (req, errors) => {
+      if (req.query.page !== undefined) {
+        const page = Number(req.query.page);
+        if (!Number.isFinite(page)) {
+          errors.push({ path: 'query.page', message: 'must be a number' });
+        }
+      }
+      if (req.query.limit !== undefined) {
+        const limit = Number(req.query.limit);
+        if (!Number.isFinite(limit)) {
+          errors.push({ path: 'query.limit', message: 'must be a number' });
+        }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const data = await driverService.listKycSubmissionsAdmin({
+      status: req.query.status,
+      page: req.query.page,
+      limit: req.query.limit
+    });
+    return res.json({ data, requestId: req.requestId });
+  })
+);
+
+router.patch(
+  '/v1/admin/kyc/:submissionId/approve',
+  validateRequest({
+    paramsSchema: {
+      required: ['submissionId'],
+      properties: { submissionId: { type: 'string' } }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const data = await driverService.approveKycSubmission(req.params.submissionId, req.user?.id || null);
+    return res.json({ data, requestId: req.requestId });
+  })
+);
+
+router.patch(
+  '/v1/admin/kyc/:submissionId/reject',
+  validateRequest({
+    paramsSchema: {
+      required: ['submissionId'],
+      properties: { submissionId: { type: 'string' } }
+    },
+    bodySchema: {
+      required: ['rejectionReason'],
+      properties: { rejectionReason: { type: 'string' } }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const data = await driverService.rejectKycSubmission(req.params.submissionId, req.body.rejectionReason, req.user?.id || null);
+    return res.json({ data, requestId: req.requestId });
+  })
+);
+
 module.exports = router;

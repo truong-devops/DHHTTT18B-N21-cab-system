@@ -340,25 +340,46 @@ export const customerApi = {
   async startRide({ pickupLabel, destinationLabel, vehicleOptionId }: StartRidePayload) {
     const pickup = getPickupPointOrThrow(pickupLabel);
     const destination = getDestinationPointOrThrow(destinationLabel);
+    const bookingPayload = {
+      pickup: { lat: pickup.lat, lng: pickup.lng, address: pickupLabel },
+      dropoff: { lat: destination.lat, lng: destination.lng, address: destinationLabel },
+      vehicleType: mapVehicleTypeFromOption(vehicleOptionId)
+    };
 
     let bookingId: string | null = null;
     let bookingRideId: string | null = null;
     try {
-      const booking = await bookingApi.createBooking({
-        pickup: { lat: pickup.lat, lng: pickup.lng, address: pickupLabel },
-        dropoff: { lat: destination.lat, lng: destination.lng, address: destinationLabel },
-        vehicleType: mapVehicleTypeFromOption(vehicleOptionId)
-      });
+      let booking = await bookingApi.createBooking(bookingPayload);
+      if (!resolveBookingId(booking)) {
+        throw new Error('Dịch vụ booking không trả về mã booking');
+      }
       bookingId = resolveBookingId(booking);
       bookingRideId = resolveBookingRideId(booking);
       if (!bookingId) {
         throw new Error('Dịch vụ booking không trả về mã booking');
       }
     } catch (error) {
+      if (isApiError(error) && error.code === 'ACTIVE_BOOKING_RELEASED_RETRY') {
+        try {
+          const booking = await bookingApi.createBooking(bookingPayload);
+          bookingId = resolveBookingId(booking);
+          bookingRideId = resolveBookingRideId(booking);
+        } catch (retryError) {
+          if (isApiError(retryError) && retryError.code === 'ACTIVE_BOOKING_EXISTS') {
+            throw new Error('Bạn đang có booking đang hoạt động. Vui lòng hoàn tất hoặc hủy chuyến trước.');
+          }
+          throw retryError;
+        }
+        if (!bookingId) {
+          throw new Error('Dịch vụ booking không trả về mã booking');
+        }
+      }
       if (isApiError(error) && error.code === 'ACTIVE_BOOKING_EXISTS') {
         throw new Error('Bạn đang có booking đang hoạt động. Vui lòng hoàn tất hoặc hủy chuyến trước.');
       }
-      throw error;
+      if (!bookingId) {
+        throw error;
+      }
     }
 
     const created = await rideApi.createRide({

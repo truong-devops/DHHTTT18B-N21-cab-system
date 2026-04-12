@@ -33,7 +33,7 @@ describe('PATCH /v1/rides/:id transitions', () => {
   it('rejects invalid transition with 409', async () => {
     rideRepository.getRideById.mockResolvedValue({
       id: 'ride-1',
-      status: 'requested'
+      status: 'assigned'
     });
 
     const response = await request(app).patch('/v1/rides/ride-1').set('Authorization', authHeader()).send({ status: 'COMPLETED' });
@@ -71,7 +71,7 @@ describe('PATCH /v1/rides/:id transitions', () => {
   it('rejects delete when transition is invalid', async () => {
     rideRepository.getRideById.mockResolvedValue({
       id: 'ride-1',
-      status: 'requested'
+      status: 'completed'
     });
 
     const response = await request(app).delete('/v1/rides/ride-1').set('Authorization', authHeader());

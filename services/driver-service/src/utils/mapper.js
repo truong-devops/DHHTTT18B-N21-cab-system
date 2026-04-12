@@ -51,4 +51,38 @@ function mapLocation(row) {
   };
 }
 
-module.exports = { mapDriver, mapVehicle, mapLocation };
+function mapKycSubmission(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    driverId: row.driver_id,
+    status: row.status,
+    fullName: row.full_name,
+    phone: row.phone,
+    idNumber: row.id_number,
+    licenseNumber: row.license_number,
+    vehicleRegistrationNumber: row.vehicle_registration_number,
+    idFrontUrl: row.id_front_url,
+    idBackUrl: row.id_back_url,
+    licenseFrontUrl: row.license_front_url,
+    selfieUrl: row.selfie_url,
+    rejectionReason: row.rejection_reason,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    submittedAt: row.submitted_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    driver:
+      row.user_id || row.driver_full_name || row.driver_status
+        ? {
+            userId: row.user_id || null,
+            fullName: row.driver_full_name || null,
+            phone: row.driver_phone || null,
+            status: row.driver_status || null,
+            onlineStatus: row.driver_online_status || null
+          }
+        : null
+  };
+}
+
+module.exports = { mapDriver, mapVehicle, mapLocation, mapKycSubmission };
