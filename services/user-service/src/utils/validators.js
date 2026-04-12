@@ -1,4 +1,4 @@
-const ROLE_VALUES = ['admin', 'customer', 'driver', 'user'];
+const ROLE_VALUES = ['admin', 'ops', 'customer', 'driver', 'user'];
 const STATUS_VALUES = ['ACTIVE', 'SUSPENDED', 'DELETED'];
 
 function isEmail(value) {

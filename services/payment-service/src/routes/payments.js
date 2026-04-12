@@ -35,10 +35,10 @@ router.post('/', validateCreatePayment, asyncHandler(createPaymentController));
 
 router.get('/:id', validatePaymentParams, asyncHandler(getPaymentController));
 
-router.patch('/:id', requireRole('admin'), validateStatusUpdate, asyncHandler(updatePaymentStatusController));
+router.patch('/:id', requireRole('admin', 'ops'), validateStatusUpdate, asyncHandler(updatePaymentStatusController));
 
 router.get('/:id/vietqr-codes', validatePaymentParams, asyncHandler(getVietQrController));
 
-router.post('/:id/confirm-dev', requireRole('admin'), validatePaymentParams, asyncHandler(confirmPaymentDevController));
+router.post('/:id/confirm-dev', requireRole('admin', 'ops'), validatePaymentParams, asyncHandler(confirmPaymentDevController));
 
 module.exports = router;

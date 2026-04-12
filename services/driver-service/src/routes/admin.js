@@ -6,7 +6,7 @@ const driverService = require('../services/driverService');
 
 const router = express.Router();
 
-router.use('/v1/admin', requireAuth, requireRole('admin', 'service'));
+router.use('/v1/admin', requireAuth, requireRole('admin', 'ops', 'service'));
 
 router.post(
   '/v1/admin/drivers',
