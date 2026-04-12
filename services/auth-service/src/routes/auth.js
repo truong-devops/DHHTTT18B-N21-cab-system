@@ -18,7 +18,7 @@ const monitoring = require('../monitoring');
 
 const router = express.Router();
 
-const DEFAULT_ROLES = (process.env.AUTH_ROLES || 'user,admin,driver')
+const DEFAULT_ROLES = (process.env.AUTH_ROLES || 'user,admin,ops,driver')
   .split(',')
   .map((role) => role.trim())
   .filter(Boolean);

@@ -4,10 +4,12 @@ import Sidebar from './Sidebar.jsx';
 function AdminLayout({ children }) {
   return (
     <div className="app-shell">
-      <Sidebar />
-      <div className="app-main">
-        <Header />
-        <main className="app-content">{children}</main>
+      <Header />
+      <div className="app-body">
+        <Sidebar />
+        <div className="app-main">
+          <main className="app-content">{children}</main>
+        </div>
       </div>
     </div>
   );

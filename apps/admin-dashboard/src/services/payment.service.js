@@ -11,7 +11,14 @@ export const paymentService = {
       return { items: [], total: 0 };
     }
 
-    const query = new URLSearchParams(params).toString();
+    const queryParams = Object.entries(params).reduce((acc, [key, value]) => {
+      if (value === undefined || value === null || value === '') {
+        return acc;
+      }
+      acc[key] = String(value);
+      return acc;
+    }, {});
+    const query = new URLSearchParams(queryParams).toString();
     const headers = {};
     if (authToken) {
       headers.Authorization = `Bearer ${authToken}`;

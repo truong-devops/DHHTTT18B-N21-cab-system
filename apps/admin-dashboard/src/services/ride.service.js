@@ -11,7 +11,14 @@ export const rideService = {
       return { items, total: items.length };
     }
 
-    const query = new URLSearchParams(params).toString();
+    const queryParams = Object.entries(params).reduce((acc, [key, value]) => {
+      if (value === undefined || value === null || value === '') {
+        return acc;
+      }
+      acc[key] = String(value);
+      return acc;
+    }, {});
+    const query = new URLSearchParams(queryParams).toString();
     const payload = await apiRequest(`/v1/rides${query ? `?${query}` : ''}`);
     const items = (payload?.data || []).map((ride) => {
       const createdAt = ride.createdAt || ride.created_at || ride.requestedAt || ride.requested_at || ride.created || null;
@@ -26,6 +33,6 @@ export const rideService = {
         statusUpdatedAt
       };
     });
-    return { items, total: items.length };
+    return { items, total: items.length, nextCursor: payload?.nextCursor || null };
   }
 };

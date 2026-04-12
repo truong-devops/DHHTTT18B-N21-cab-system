@@ -1,6 +1,6 @@
 const express = require('express');
 const { createUser, getUserById, listUsers, updateUser, deleteUser } = require('../controllers/userController');
-const { requireAuth, requireAdmin, requireSelfOrAdmin } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireAdminOrOps, requireSelfOrAdminOrOps } = require('../middleware/auth');
 const { validateRequest } = require('../middleware/validateRequest');
 const { isEmail, isUserId, ROLE_VALUES, STATUS_VALUES, isNonEmptyString, isPhone } = require('../utils/validators');
 
@@ -24,12 +24,12 @@ router.post(
   createUser
 );
 
-router.get('/v1/users/:id', requireAuth, validateRequest({ params: { id: isUserId } }), requireSelfOrAdmin('id'), getUserById);
+router.get('/v1/users/:id', requireAuth, validateRequest({ params: { id: isUserId } }), requireSelfOrAdminOrOps('id'), getUserById);
 
 router.get(
   '/v1/users',
   requireAuth,
-  requireAdmin,
+  requireAdminOrOps,
   validateRequest({
     query: {
       email: optional(isEmail),
@@ -58,7 +58,7 @@ router.patch(
       status: optional((value) => STATUS_VALUES.includes(String(value || '').toUpperCase()))
     }
   }),
-  requireSelfOrAdmin('id'),
+  requireSelfOrAdminOrOps('id'),
   updateUser
 );
 
