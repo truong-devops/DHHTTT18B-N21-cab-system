@@ -57,7 +57,10 @@ describe('POST /v1/rides idempotency', () => {
   });
 
   it('returns 400 when Idempotency-Key is missing', async () => {
-    const response = await request(app).post('/v1/rides').set('Authorization', authHeader()).send({ pickupLat: 10.1, pickupLng: 20.2 });
+    const response = await request(app)
+      .post('/v1/rides')
+      .set('Authorization', authHeader())
+      .send({ pickupLat: 10.1, pickupLng: 20.2, dropoffLat: 10.2, dropoffLng: 20.3 });
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
@@ -72,8 +75,8 @@ describe('POST /v1/rides idempotency', () => {
       driver_id: null,
       pickup_lat: 10.1,
       pickup_lng: 20.2,
-      dropoff_lat: null,
-      dropoff_lng: null,
+      dropoff_lat: 10.2,
+      dropoff_lng: 20.3,
       status: 'requested',
       status_updated_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
@@ -86,7 +89,7 @@ describe('POST /v1/rides idempotency', () => {
       .set('Idempotency-Key', 'idem-123')
       .set('x-trace-id', 'trace-1')
       .set('x-request-id', 'request-1')
-      .send({ pickupLat: 10.1, pickupLng: 20.2 });
+      .send({ pickupLat: 10.1, pickupLng: 20.2, dropoffLat: 10.2, dropoffLng: 20.3 });
 
     const second = await request(app)
       .post('/v1/rides')
@@ -94,7 +97,7 @@ describe('POST /v1/rides idempotency', () => {
       .set('Idempotency-Key', 'idem-123')
       .set('x-trace-id', 'trace-2')
       .set('x-request-id', 'request-2')
-      .send({ pickupLat: 10.1, pickupLng: 20.2 });
+      .send({ pickupLat: 10.1, pickupLng: 20.2, dropoffLat: 10.2, dropoffLng: 20.3 });
 
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
@@ -112,7 +115,7 @@ describe('POST /v1/rides idempotency', () => {
     };
     const requestHash = crypto
       .createHash('sha256')
-      .update(JSON.stringify({ pickupLat: 10.1, pickupLng: 20.2 }))
+      .update(JSON.stringify({ pickupLat: 10.1, pickupLng: 20.2, dropoffLat: 10.2, dropoffLng: 20.3 }))
       .digest('hex');
 
     idempotencyRepository.getByKey.mockResolvedValue({
@@ -132,7 +135,7 @@ describe('POST /v1/rides idempotency', () => {
       .set('Idempotency-Key', 'idem-777')
       .set('x-trace-id', 'trace-now')
       .set('x-request-id', 'request-now')
-      .send({ pickupLat: 10.1, pickupLng: 20.2 });
+      .send({ pickupLat: 10.1, pickupLng: 20.2, dropoffLat: 10.2, dropoffLng: 20.3 });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual(storedResponse);

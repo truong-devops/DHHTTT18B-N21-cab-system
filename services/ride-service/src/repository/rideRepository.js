@@ -300,6 +300,23 @@ async function addStatusHistory({ rideId, fromStatus = null, toStatus, reason = 
   });
 }
 
+async function getRideStatusHistory(rideId) {
+  const db = await getDb();
+  const docs = await db.collection('ride_status_history').find({ ride_id: rideId }).sort({ occurred_at: 1, _id: 1 }).toArray();
+  return docs.map((doc) => ({
+    id: doc._id,
+    ride_id: doc.ride_id,
+    from_status: doc.from_status,
+    to_status: doc.to_status,
+    reason: doc.reason || null,
+    actor_id: doc.actor_id || null,
+    trace_id: doc.trace_id || null,
+    occurred_at: doc.occurred_at,
+    created_at: doc.created_at,
+    updated_at: doc.updated_at
+  }));
+}
+
 async function listRides({ limit = 20, cursor = null, status = null, riderId = null, driverId = null, sort = '-created_at' } = {}) {
   const db = await getDb();
   const isDesc = sort === '-created_at' || sort === '-createdAt';
@@ -440,6 +457,7 @@ module.exports = {
   updateRideStatus,
   updateRideFields,
   addStatusHistory,
+  getRideStatusHistory,
   listRides,
   claimRideForDriver,
   findNextRequestedRide

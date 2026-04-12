@@ -87,6 +87,9 @@ const config = {
     retryJitter: Number(process.env.PAYMENT_GATEWAY_RETRY_JITTER || 0.2),
     timeoutMs: Number(process.env.PAYMENT_GATEWAY_TIMEOUT_MS || 8000)
   },
+  services: {
+    ride: process.env.RIDE_SERVICE_URL || 'http://localhost:3005'
+  },
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379'
   },

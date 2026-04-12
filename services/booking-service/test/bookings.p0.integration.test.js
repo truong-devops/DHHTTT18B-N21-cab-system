@@ -3,6 +3,7 @@ const request = require('supertest');
 const mockCreateBooking = jest.fn();
 const mockGetBookingById = jest.fn();
 const mockListBookings = jest.fn();
+const mockFindActiveByUser = jest.fn();
 const mockGetByIdForUpdate = jest.fn();
 const mockCancelBooking = jest.fn();
 const mockInsertOutboxEvent = jest.fn();
@@ -19,11 +20,38 @@ const mockSendNotification = jest.fn();
 const mockUpdateStatus = jest.fn();
 const mockRecommendDrivers = jest.fn();
 const mockForecastDemand = jest.fn();
+const mockGetRideStatusByExternalRideId = jest.fn();
+
+jest.mock('../src/middleware/auth', () => ({
+  requireTrustedGateway: (req, _res, next) => {
+    req.gatewayTrusted = true;
+    next();
+  },
+  requireAuth: (req, _res, next) => {
+    const userId = String(req.header('x-user-id') || 'test_user').trim();
+    const role = String(req.header('x-user-role') || 'customer')
+      .trim()
+      .toLowerCase();
+    const rolesHeader = String(req.header('x-user-roles') || role)
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+    req.userId = userId;
+    req.user = {
+      id: userId,
+      role,
+      roles: rolesHeader,
+      scopes: []
+    };
+    next();
+  }
+}));
 
 jest.mock('../src/repositories/bookingRepo', () => ({
   create: (...args) => mockCreateBooking(...args),
   getById: (...args) => mockGetBookingById(...args),
   list: (...args) => mockListBookings(...args),
+  findActiveByUser: (...args) => mockFindActiveByUser(...args),
   getByIdForUpdate: (...args) => mockGetByIdForUpdate(...args),
   cancel: (...args) => mockCancelBooking(...args),
   updateStatus: (...args) => mockUpdateStatus(...args)
@@ -82,6 +110,10 @@ jest.mock('../src/clients/aiClient', () => ({
   recommendDrivers: (...args) => mockRecommendDrivers(...args),
   forecastDemand: (...args) => mockForecastDemand(...args),
   logAiFallback: jest.fn()
+}));
+
+jest.mock('../src/clients/rideClient', () => ({
+  getRideStatusByExternalRideId: (...args) => mockGetRideStatusByExternalRideId(...args)
 }));
 
 const app = require('../src/app');
@@ -150,12 +182,14 @@ describe('booking-service P0 integration', () => {
     mockInsertOutboxEvent.mockResolvedValue(undefined);
     mockCompleteIdempotencyKey.mockResolvedValue(undefined);
     mockListBookings.mockResolvedValue([]);
+    mockFindActiveByUser.mockResolvedValue(null);
     mockGetBookingById.mockResolvedValue(null);
     mockGetByIdForUpdate.mockResolvedValue(buildBooking());
     mockUpdateStatus.mockResolvedValue(buildBooking({ status: 'ACCEPTED' }));
     mockCancelBooking.mockResolvedValue(buildBooking({ status: 'CANCELLED' }));
     mockRecommendDrivers.mockRejectedValue(new Error('ai unavailable'));
     mockForecastDemand.mockRejectedValue(new Error('ai unavailable'));
+    mockGetRideStatusByExternalRideId.mockResolvedValue(null);
   });
 
   test('rejects when pickup is missing', async () => {
@@ -329,10 +363,14 @@ describe('booking-service P0 integration', () => {
     mockGetByIdForUpdate.mockResolvedValueOnce(buildBooking({ status: 'REQUESTED' }));
     mockUpdateStatus.mockResolvedValueOnce(buildBooking({ status: 'ACCEPTED' }));
 
-    const response = await request(app).patch('/v1/bookings/bk_1/status').set('authorization', 'Bearer test-token').send({
-      status: 'ACCEPTED',
-      driver_id: 'driver_1'
-    });
+    const response = await request(app)
+      .patch('/v1/bookings/bk_1/status')
+      .set('authorization', 'Bearer test-token')
+      .set('x-user-role', 'admin')
+      .send({
+        status: 'ACCEPTED',
+        driver_id: 'driver_1'
+      });
 
     expect(response.status).toBe(200);
     expect(response.body.booking.status).toBe('ACCEPTED');
@@ -353,7 +391,10 @@ describe('booking-service P0 integration', () => {
       distanceMeters: 200
     });
 
-    const response = await request(app).get('/v1/bookings/bk_ctx/mcp-context').set('authorization', 'Bearer test-token');
+    const response = await request(app)
+      .get('/v1/bookings/bk_ctx/mcp-context')
+      .set('authorization', 'Bearer test-token')
+      .set('x-user-id', 'user_1');
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual(
@@ -384,5 +425,67 @@ describe('booking-service P0 integration', () => {
       vehicleType: 'CAR',
       simulateTimeout: true
     });
+  });
+
+  test('releases stale active booking when ride is terminal and creates new booking', async () => {
+    mockFindActiveByUser.mockResolvedValueOnce(
+      buildBooking({
+        bookingId: 'bk_old',
+        rideId: 'ride_old',
+        status: 'REQUESTED'
+      })
+    );
+    mockGetRideStatusByExternalRideId.mockResolvedValueOnce('COMPLETED');
+    mockGetByIdForUpdate.mockResolvedValueOnce(
+      buildBooking({
+        bookingId: 'bk_old',
+        rideId: 'ride_old',
+        status: 'REQUESTED'
+      })
+    );
+    mockCancelBooking.mockResolvedValueOnce(
+      buildBooking({
+        bookingId: 'bk_old',
+        rideId: 'ride_old',
+        status: 'CANCELLED'
+      })
+    );
+
+    const response = await request(app)
+      .post('/v1/bookings')
+      .set('x-user-id', 'user_stale')
+      .send({
+        pickup: { lat: 10.76, lng: 106.66 },
+        drop: { lat: 10.77, lng: 106.7 },
+        vehicleType: 'CAR'
+      });
+
+    expect(response.status).toBe(201);
+    expect(mockCancelBooking).toHaveBeenCalled();
+    expect(mockCreateBooking).toHaveBeenCalled();
+  });
+
+  test('returns active-booking conflict when active ride is not terminal', async () => {
+    mockFindActiveByUser.mockResolvedValueOnce(
+      buildBooking({
+        bookingId: 'bk_active',
+        rideId: 'ride_active',
+        status: 'REQUESTED'
+      })
+    );
+    mockGetRideStatusByExternalRideId.mockResolvedValueOnce('IN_PROGRESS');
+
+    const response = await request(app)
+      .post('/v1/bookings')
+      .set('x-user-id', 'user_active')
+      .send({
+        pickup: { lat: 10.76, lng: 106.66 },
+        drop: { lat: 10.77, lng: 106.7 },
+        vehicleType: 'CAR'
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('ACTIVE_BOOKING_EXISTS');
+    expect(mockCreateBooking).not.toHaveBeenCalled();
   });
 });

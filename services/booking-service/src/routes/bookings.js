@@ -9,6 +9,7 @@ const config = require('../config');
 const { getQuote, PricingServiceError } = require('../clients/pricingClient');
 const { estimateEta, EtaServiceError } = require('../clients/etaClient');
 const { getDriverAvailability, listAvailableDrivers, selectBestDriver } = require('../clients/driverClient');
+const { getRideStatusByExternalRideId } = require('../clients/rideClient');
 const { recommendDrivers, agentSelectDriver, forecastDemand, logAiFallback } = require('../clients/aiClient');
 const { createPayment } = require('../clients/paymentClient');
 const { sendNotification } = require('../clients/notificationClient');
@@ -20,6 +21,8 @@ const logger = require('../utils/logger');
 
 const router = express.Router();
 const PRIVILEGED_ROLES = new Set(['admin', 'service', 'ops']);
+const ACTIVE_BOOKING_STATUSES = new Set(['PENDING', 'REQUESTED', 'ACCEPTED', 'CONFIRMED']);
+const TERMINAL_RIDE_STATUSES = new Set(['COMPLETED', 'CANCELLED']);
 
 function normalizeRoles(req) {
   const roles = Array.isArray(req.user?.roles) ? req.user.roles : [];
@@ -34,6 +37,55 @@ function hasPrivilegedRole(req) {
 function hasAnyRole(req, allowedRoles) {
   const allowed = new Set((allowedRoles || []).map((r) => String(r || '').toLowerCase()));
   return normalizeRoles(req).some((role) => allowed.has(role));
+}
+
+function normalizeStatus(value) {
+  return String(value || '').toUpperCase();
+}
+
+function isActiveBookingStatus(value) {
+  return ACTIVE_BOOKING_STATUSES.has(normalizeStatus(value));
+}
+
+async function releaseStaleActiveBooking({ activeBooking, authorization, traceId, req }) {
+  if (!activeBooking || !isActiveBookingStatus(activeBooking.status) || !activeBooking.rideId) {
+    return { released: false, activeBooking: activeBooking || null, rideStatus: null };
+  }
+
+  const rideStatus = await getRideStatusByExternalRideId({
+    externalRideId: activeBooking.rideId,
+    authorization,
+    traceId
+  });
+
+  if (!TERMINAL_RIDE_STATUSES.has(normalizeStatus(rideStatus))) {
+    return { released: false, activeBooking, rideStatus };
+  }
+
+  const cancelled = await withTransaction(async (client) => {
+    const current = await bookingRepo.getByIdForUpdate(client, activeBooking.bookingId);
+    if (!current || !isActiveBookingStatus(current.status)) {
+      return null;
+    }
+    return bookingRepo.cancel(client, current.bookingId);
+  });
+
+  if (cancelled) {
+    logger.withTrace(req).info(
+      {
+        bookingId: cancelled.bookingId,
+        rideExternalId: cancelled.rideId,
+        rideStatus
+      },
+      'released stale active booking after terminal ride status'
+    );
+  }
+
+  return {
+    released: Boolean(cancelled),
+    activeBooking: cancelled || activeBooking,
+    rideStatus
+  };
 }
 
 function buildEnvelope({ eventId, type, traceId, payload }) {
@@ -579,6 +631,25 @@ router.post('/', async (req, res) => {
     const requestHash = idempotencyKey ? hashRequest(req.method, routeKey, requestPayload) : null;
     const traceId = req.traceId || req.header('x-trace-id');
     const authorization = req.header('authorization') || '';
+    if (userId && userId !== 'anonymous-user') {
+      const activeBooking = await bookingRepo.findActiveByUser(userId);
+      if (activeBooking) {
+        const released = await releaseStaleActiveBooking({
+          activeBooking,
+          authorization,
+          traceId,
+          req
+        });
+        if (!released.released) {
+          return res.status(409).json({
+            error: 'An active booking already exists for this user',
+            code: 'ACTIVE_BOOKING_EXISTS',
+            booking: mapBookingCompat(released.activeBooking)
+          });
+        }
+      }
+    }
+
     const minimalLoadResponse = shouldUseMinimalLoadResponse(req);
     const bookingFastPathHint = req.header('x-booking-fast-path') || req.header('x-load-test') || '';
     const bookingFastPathEnabled = shouldUseLocalEstimatePath({ authorization, fastPathHint: bookingFastPathHint });
@@ -922,9 +993,24 @@ router.post('/', async (req, res) => {
       const constraint = String(e?.constraint || '');
       if (constraint === 'bookings_one_active_per_user_idx') {
         let activeBooking = null;
+        let releasedStaleBooking = false;
+        const traceId = req.traceId || req.header('x-trace-id');
+        const authorization = req.header('authorization') || '';
         if (currentUserId && currentUserId !== 'anonymous-user') {
           try {
             activeBooking = await bookingRepo.findActiveByUser(currentUserId);
+            if (activeBooking) {
+              const released = await releaseStaleActiveBooking({
+                activeBooking,
+                authorization,
+                traceId,
+                req
+              });
+              if (released.released) {
+                activeBooking = null;
+                releasedStaleBooking = true;
+              }
+            }
           } catch (lookupErr) {
             logger.withTrace(req).warn(
               {
@@ -936,6 +1022,13 @@ router.post('/', async (req, res) => {
               'failed to lookup active booking after unique-constraint conflict'
             );
           }
+        }
+        if (releasedStaleBooking) {
+          return res.status(409).json({
+            error: 'A stale active booking was released. Please retry booking creation.',
+            code: 'ACTIVE_BOOKING_RELEASED_RETRY',
+            booking: null
+          });
         }
         return res.status(409).json({
           error: 'An active booking already exists for this user',

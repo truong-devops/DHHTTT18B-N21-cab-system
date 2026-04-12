@@ -87,10 +87,30 @@ CREATE TABLE IF NOT EXISTS outbox_events (
   published_at timestamptz
 );
 
+CREATE TABLE IF NOT EXISTS driver_withdrawals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  driver_user_id text NOT NULL,
+  amount numeric(12, 2) NOT NULL,
+  currency char(3) NOT NULL DEFAULT 'VND',
+  status text NOT NULL DEFAULT 'REQUESTED',
+  note text,
+  rejection_reason text,
+  requested_at timestamptz NOT NULL DEFAULT now(),
+  processed_at timestamptz,
+  processed_by text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT driver_withdrawals_amount_positive CHECK (amount > 0),
+  CONSTRAINT driver_withdrawals_currency_length CHECK (char_length(currency) = 3),
+  CONSTRAINT driver_withdrawals_status_check CHECK (status IN ('REQUESTED', 'APPROVED', 'REJECTED', 'PAID', 'FAILED', 'CANCELED'))
+);
+
 CREATE INDEX IF NOT EXISTS payments_created_at_id_idx ON payments (created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS payments_status_created_at_id_idx ON payments (status, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS payments_ride_id_created_at_id_idx ON payments (ride_id, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS payment_status_history_payment_id_occurred_at_idx ON payment_status_history (payment_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS driver_withdrawals_driver_requested_idx ON driver_withdrawals (driver_user_id, requested_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS driver_withdrawals_status_requested_idx ON driver_withdrawals (status, requested_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS outbox_events_status_created_at_idx ON outbox_events (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS outbox_events_claim_idx ON outbox_events (status, next_retry_at, created_at);
 CREATE INDEX IF NOT EXISTS outbox_events_processing_idx ON outbox_events (status, processing_started_at);

@@ -105,8 +105,8 @@ describe('ride-service contract', () => {
       driver_id: null,
       pickup_lat: 10.1,
       pickup_lng: 20.2,
-      dropoff_lat: null,
-      dropoff_lng: null,
+      dropoff_lat: 10.2,
+      dropoff_lng: 20.3,
       status: 'requested',
       status_updated_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
@@ -118,7 +118,7 @@ describe('ride-service contract', () => {
       .post('/v1/rides')
       .set('Authorization', authHeader())
       .set('Idempotency-Key', 'idem-1')
-      .send({ pickupLat: 10.1, pickupLng: 20.2 });
+      .send({ pickupLat: 10.1, pickupLng: 20.2, dropoffLat: 10.2, dropoffLng: 20.3 });
 
     expect(response.status).toBe(201);
 
@@ -140,8 +140,8 @@ describe('ride-service contract', () => {
       driver_id: null,
       pickup_lat: 10.1,
       pickup_lng: 20.2,
-      dropoff_lat: null,
-      dropoff_lng: null,
+      dropoff_lat: 10.2,
+      dropoff_lng: 20.3,
       status: 'requested',
       status_updated_at: new Date().toISOString(),
       created_at: new Date().toISOString(),

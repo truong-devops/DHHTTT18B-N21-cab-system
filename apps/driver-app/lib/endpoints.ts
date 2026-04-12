@@ -19,6 +19,7 @@ export const endpoints = {
     list: '/v1/rides',
     assignments: '/v1/rides/assignments',
     detail: (id: string) => `/v1/rides/${id}`,
+    summary: (id: string) => `/v1/rides/${id}/summary`,
     update: (id: string) => `/v1/rides/${id}`,
     cancel: (id: string) => `/v1/rides/${id}`,
     create: '/v1/rides'

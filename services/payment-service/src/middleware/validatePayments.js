@@ -3,6 +3,7 @@ const { ApiError } = require('../utils/errors');
 const { STATUSES } = require('../domain/paymentStatus');
 
 const ajv = createAjv();
+const WITHDRAWAL_STATUSES = ['REQUESTED', 'APPROVED', 'REJECTED', 'PAID', 'FAILED', 'CANCELED'];
 
 const emptyObjectSchema = {
   type: 'object',
@@ -54,12 +55,56 @@ const statusUpdateBodySchema = {
   }
 };
 
+const walletSummaryQuerySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    driverUserId: { type: 'string', minLength: 1 }
+  }
+};
+
+const listWithdrawalsQuerySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+    cursor: { type: 'string', minLength: 1 },
+    sort: { type: 'string', enum: ['requestedAt', '-requestedAt'], default: '-requestedAt' },
+    status: { type: 'string', enum: WITHDRAWAL_STATUSES },
+    driverUserId: { type: 'string', minLength: 1 }
+  }
+};
+
+const createWithdrawalBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['amount'],
+  properties: {
+    amount: { type: 'string', pattern: '^\\d+(\\.\\d{1,2})?$' },
+    note: { type: 'string' }
+  }
+};
+
+const withdrawalStatusUpdateBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['status'],
+  properties: {
+    status: { type: 'string', enum: WITHDRAWAL_STATUSES },
+    rejectionReason: { type: 'string' }
+  }
+};
+
 const validators = {
   emptyObject: ajv.compile(emptyObjectSchema),
   paymentIdParams: ajv.compile(paymentIdParamsSchema),
   listPaymentsQuery: ajv.compile(listPaymentsQuerySchema),
   createPaymentBody: ajv.compile(createPaymentBodySchema),
-  statusUpdateBody: ajv.compile(statusUpdateBodySchema)
+  statusUpdateBody: ajv.compile(statusUpdateBodySchema),
+  walletSummaryQuery: ajv.compile(walletSummaryQuerySchema),
+  listWithdrawalsQuery: ajv.compile(listWithdrawalsQuerySchema),
+  createWithdrawalBody: ajv.compile(createWithdrawalBodySchema),
+  withdrawalStatusUpdateBody: ajv.compile(withdrawalStatusUpdateBodySchema)
 };
 
 function normalizeParams(params) {
@@ -149,6 +194,82 @@ function normalizeStatusUpdate(body) {
   return nextBody;
 }
 
+function normalizeWalletQuery(query) {
+  if (!query || typeof query !== 'object' || Array.isArray(query)) {
+    return {};
+  }
+  const nextQuery = { ...query };
+  delete nextQuery._;
+  delete nextQuery.cacheBust;
+  delete nextQuery.cb;
+  if (typeof nextQuery.driverUserId === 'string') {
+    nextQuery.driverUserId = nextQuery.driverUserId.trim();
+  }
+  return nextQuery;
+}
+
+function normalizeWithdrawalsQuery(query) {
+  if (!query || typeof query !== 'object' || Array.isArray(query)) {
+    return {};
+  }
+  const nextQuery = { ...query };
+  delete nextQuery._;
+  delete nextQuery.cacheBust;
+  delete nextQuery.cb;
+  if (typeof nextQuery.limit === 'string') {
+    const parsedLimit = Number(nextQuery.limit);
+    if (Number.isFinite(parsedLimit)) {
+      nextQuery.limit = parsedLimit;
+    } else {
+      delete nextQuery.limit;
+    }
+  }
+  if (typeof nextQuery.status === 'string') {
+    nextQuery.status = nextQuery.status.trim().toUpperCase();
+  }
+  if (typeof nextQuery.driverUserId === 'string') {
+    nextQuery.driverUserId = nextQuery.driverUserId.trim();
+  }
+  if (typeof nextQuery.cursor === 'string') {
+    nextQuery.cursor = nextQuery.cursor.trim();
+  }
+  if (typeof nextQuery.sort === 'string') {
+    nextQuery.sort = nextQuery.sort.trim();
+  }
+  return nextQuery;
+}
+
+function normalizeCreateWithdrawal(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return {};
+  }
+  const nextBody = { ...body };
+  if (typeof nextBody.amount === 'number') {
+    nextBody.amount = nextBody.amount.toString();
+  }
+  if (typeof nextBody.amount === 'string') {
+    nextBody.amount = nextBody.amount.trim();
+  }
+  if (typeof nextBody.note === 'string') {
+    nextBody.note = nextBody.note.trim();
+  }
+  return nextBody;
+}
+
+function normalizeWithdrawalStatusUpdate(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return {};
+  }
+  const nextBody = { ...body };
+  if (typeof nextBody.status === 'string') {
+    nextBody.status = nextBody.status.trim().toUpperCase();
+  }
+  if (typeof nextBody.rejectionReason === 'string') {
+    nextBody.rejectionReason = nextBody.rejectionReason.trim();
+  }
+  return nextBody;
+}
+
 function buildDetails(errors) {
   return errors.map((err) => `${err.path}: ${err.message}`);
 }
@@ -226,6 +347,27 @@ function validateStatusUpdateCustom(body) {
   return errors;
 }
 
+function validateCreateWithdrawalCustom(body) {
+  const errors = [];
+  const amount = body ? body.amount : null;
+  const numeric = typeof amount === 'number' ? amount : Number(amount);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    errors.push({ path: 'body.amount', message: 'must be greater than zero' });
+  }
+  return errors;
+}
+
+function validateWithdrawalStatusCustom(body) {
+  const errors = [];
+  if (!body || !body.status) {
+    return errors;
+  }
+  if ((body.status === 'REJECTED' || body.status === 'FAILED') && !body.rejectionReason) {
+    errors.push({ path: 'body.rejectionReason', message: 'is required for REJECTED or FAILED status' });
+  }
+  return errors;
+}
+
 function validateListPayments(req, res, next) {
   const middleware = validateRequest({
     paramsValidator: validators.emptyObject,
@@ -284,9 +426,71 @@ function validatePaymentParams(req, res, next) {
   return middleware(req, res, next);
 }
 
+function validateWalletSummary(req, res, next) {
+  const middleware = validateRequest({
+    paramsValidator: validators.emptyObject,
+    queryValidator: validators.walletSummaryQuery,
+    bodyValidator: validators.emptyObject,
+    normalize: ({ params, query, body }) => ({
+      params,
+      query: normalizeWalletQuery(query),
+      body: body || {}
+    })
+  });
+  return middleware(req, res, next);
+}
+
+function validateListWithdrawals(req, res, next) {
+  const middleware = validateRequest({
+    paramsValidator: validators.emptyObject,
+    queryValidator: validators.listWithdrawalsQuery,
+    bodyValidator: validators.emptyObject,
+    normalize: ({ params, query, body }) => ({
+      params,
+      query: normalizeWithdrawalsQuery(query),
+      body: body || {}
+    })
+  });
+  return middleware(req, res, next);
+}
+
+function validateCreateWithdrawal(req, res, next) {
+  const middleware = validateRequest({
+    paramsValidator: validators.emptyObject,
+    queryValidator: validators.emptyObject,
+    bodyValidator: validators.createWithdrawalBody,
+    normalize: ({ params, query, body }) => ({
+      params,
+      query: query || {},
+      body: normalizeCreateWithdrawal(body || {})
+    }),
+    postValidate: ({ body }) => validateCreateWithdrawalCustom(body)
+  });
+  return middleware(req, res, next);
+}
+
+function validateWithdrawalStatusUpdate(req, res, next) {
+  const middleware = validateRequest({
+    paramsValidator: validators.paymentIdParams,
+    queryValidator: validators.emptyObject,
+    bodyValidator: validators.withdrawalStatusUpdateBody,
+    normalize: ({ params, query, body }) => ({
+      params: normalizeParams(params),
+      query: query || {},
+      body: normalizeWithdrawalStatusUpdate(body || {})
+    }),
+    postValidate: ({ body }) => validateWithdrawalStatusCustom(body)
+  });
+  return middleware(req, res, next);
+}
+
 module.exports = {
   validateCreatePayment,
   validateListPayments,
   validateStatusUpdate,
-  validatePaymentParams
+  validatePaymentParams,
+  validateWalletSummary,
+  validateListWithdrawals,
+  validateCreateWithdrawal,
+  validateWithdrawalStatusUpdate
 };
