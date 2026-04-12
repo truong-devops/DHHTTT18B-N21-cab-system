@@ -1,18 +1,25 @@
 .app-shell {
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
   position: relative;
 }
 
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 .sidebar {
   width: 260px;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  padding: 28px 18px;
+  background: var(--brand-600);
+  border-right: 1px solid var(--brand-700);
+  padding: 18px 14px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  box-shadow: 14px 0 30px rgba(140, 74, 0, 0.05);
+  gap: 12px;
+  box-shadow: 14px 0 30px rgba(140, 74, 0, 0.16);
 }
 
 .sidebar-brand {
@@ -21,17 +28,17 @@
   gap: 12px;
   font-weight: 700;
   font-size: 16px;
-  color: var(--text);
+  color: #ffffff;
 }
 
 .brand-mark {
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: var(--brand-600);
+  background: #ffffff;
   display: grid;
   place-items: center;
-  color: #ffffff;
+  color: var(--brand-700);
   font-weight: 700;
   letter-spacing: 0.08em;
 }
@@ -46,7 +53,9 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--muted);
+  color: #ffffff;
+  opacity: 0.84;
+  font-weight: 600;
 }
 
 .sidebar-nav {
@@ -58,11 +67,12 @@
 .sidebar-link {
   padding: 10px 12px;
   border: 1px solid transparent;
-  color: var(--text);
+  color: rgba(255, 255, 255, 0.94);
   display: flex;
   align-items: center;
   gap: 10px;
   font-size: 13px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   border-radius: 12px;
@@ -84,37 +94,46 @@
 }
 
 .sidebar-link:hover {
-  background: var(--brand-50);
-  color: var(--brand-800);
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
 }
 
 .sidebar-link.active {
-  background: var(--brand-600);
-  color: #ffffff;
+  background: #ffffff;
+  color: var(--brand-700);
   border-color: transparent;
   box-shadow: var(--shadow-soft);
 }
 
 .sidebar-link.active::before {
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--brand-700);
 }
 
 .sidebar-footer {
   margin-top: auto;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
   padding-top: 16px;
   font-size: 12px;
-  color: var(--muted);
+  color: #ffffff;
+  opacity: 0.96;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
+.sidebar .badge.info {
+  border-color: rgba(255, 255, 255, 0.44);
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
 .app-main {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .app-header {
@@ -122,9 +141,38 @@
   align-items: center;
   justify-content: space-between;
   padding: 18px 28px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--brand-700);
+  background: var(--brand-600);
+}
+
+.app-header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.system-name {
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+}
+
+.system-tagline {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #ffffff;
+  opacity: 0.88;
+  font-weight: 700;
+}
+
+.account-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
 }
 
 .header-actions {
@@ -135,6 +183,37 @@
 
 .header-search {
   min-width: 260px;
+}
+
+.app-header .header-search .input {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(255, 255, 255, 0.94);
+  color: var(--text);
+}
+
+.app-header .header-search .input::placeholder {
+  color: #7e5c52;
+}
+
+.app-header .btn-outline {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.7);
+  background: transparent;
+}
+
+.app-header .btn-outline:hover {
+  background: #ffffff;
+  color: var(--brand-700);
+  border-color: #ffffff;
+}
+
+.app-header .btn-ghost {
+  color: #ffffff;
+  background: transparent;
+}
+
+.app-header .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .app-content {
@@ -172,7 +251,7 @@
 }
 
 @media (max-width: 768px) {
-  .app-shell {
+  .app-body {
     flex-direction: column;
   }
 
@@ -187,6 +266,10 @@
     flex-direction: column;
     gap: 12px;
     align-items: flex-start;
+  }
+
+  .system-name {
+    font-size: 21px;
   }
 
   .header-search {

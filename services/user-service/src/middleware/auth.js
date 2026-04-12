@@ -25,6 +25,13 @@ function requireAdmin(req, _res, next) {
   return next();
 }
 
+function requireAdminOrOps(req, _res, next) {
+  if (!['admin', 'ops'].includes(req.user?.role)) {
+    return next(new ApiError(403, 'FORBIDDEN', 'Admin or Ops only'));
+  }
+  return next();
+}
+
 function requireSelfOrAdmin(paramKey = 'id') {
   return (req, _res, next) => {
     if (req.user?.role === 'admin') {
@@ -38,4 +45,17 @@ function requireSelfOrAdmin(paramKey = 'id') {
   };
 }
 
-module.exports = { requireAuth, requireAdmin, requireSelfOrAdmin };
+function requireSelfOrAdminOrOps(paramKey = 'id') {
+  return (req, _res, next) => {
+    if (req.user?.role === 'admin' || req.user?.role === 'ops') {
+      return next();
+    }
+    const targetId = req.params[paramKey];
+    if (!targetId || req.user?.id !== targetId) {
+      return next(new ApiError(403, 'FORBIDDEN', 'Forbidden'));
+    }
+    return next();
+  };
+}
+
+module.exports = { requireAuth, requireAdmin, requireAdminOrOps, requireSelfOrAdmin, requireSelfOrAdminOrOps };

@@ -119,7 +119,16 @@ export const authService = {
 
   async register({ email, password, role = 'admin' }) {
     if (isMock) {
-      return { success: true };
+      const id = `mock-${role}-${Date.now()}`;
+      return {
+        data: {
+          id,
+          user_id: id,
+          email,
+          role
+        },
+        success: true
+      };
     }
 
     try {
