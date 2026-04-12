@@ -14,16 +14,6 @@ const navItems = [
 function Sidebar() {
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="brand-mark">RX</div>
-
-        <div>
-          <div className="brand-title">RIDEX</div>
-
-          <div className="brand-subtitle">Bảng điều hành quản trị</div>
-        </div>
-      </div>
-
       <nav className="sidebar-nav">
         {navItems.map((item) => (
           <NavLink key={item.path} to={item.path} className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
@@ -33,7 +23,7 @@ function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <span>Bảng điều hành</span>
+        <span>Hệ thống vận hành</span>
         <span className="badge info">Trực tuyến</span>
       </div>
     </aside>

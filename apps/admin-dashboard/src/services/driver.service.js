@@ -44,5 +44,30 @@ export const driverService = {
     }
 
     return apiRequest(`/v1/admin/drivers/${id}/suspend`, { method: 'PATCH' });
+  },
+
+  async create(payload) {
+    if (isMock) {
+      const now = Date.now();
+      return {
+        driver: {
+          id: `d-${now}`,
+          userId: payload?.userId || `u-${now}`,
+          fullName: payload?.fullName || 'Tai xe moi',
+          phone: payload?.phone || null,
+          status: 'PENDING',
+          onlineStatus: 'OFFLINE',
+          vehicleType: null,
+          plateNumber: null
+        },
+        created: true
+      };
+    }
+
+    const response = await apiRequest('/v1/admin/drivers', {
+      method: 'POST',
+      body: JSON.stringify(payload || {})
+    });
+    return response?.data || response;
   }
 };
