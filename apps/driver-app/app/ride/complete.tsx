@@ -6,6 +6,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { useRideTracking } from '@/hooks/use-ride-tracking';
 import { useRide } from '@/lib/contexts/ride';
+import * as paymentApi from '@/lib/services/payment';
 import * as rideApi from '@/lib/services/ride';
 import { palette } from '@/lib/theme';
 
@@ -48,6 +49,8 @@ export default function RideCompleteScreen() {
   const [summary, setSummary] = useState<rideApi.RideSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [fallbackAmount, setFallbackAmount] = useState<number | null>(null);
+  const [fallbackCurrency, setFallbackCurrency] = useState('VND');
 
   useEffect(() => {
     if (trackedRide) {
@@ -105,14 +108,53 @@ export default function RideCompleteScreen() {
         clearTimeout(retryTimer);
       }
     };
+  }, [ride?.externalRideId, rideId]);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!rideId) {
+      setFallbackAmount(null);
+      setFallbackCurrency('VND');
+      return () => {
+        mounted = false;
+      };
+    }
+
+    paymentApi
+      .getLatestPaymentByRideIds([ride?.externalRideId, rideId])
+      .then((payment) => {
+        if (!mounted) return;
+        const amount = Number(payment?.amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          setFallbackAmount(null);
+          setFallbackCurrency('VND');
+          return;
+        }
+        setFallbackAmount(amount);
+        setFallbackCurrency(String(payment?.currency || 'VND').toUpperCase());
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setFallbackAmount(null);
+        setFallbackCurrency('VND');
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, [rideId]);
 
   const fareAmount = useMemo(() => {
-    if (!summary) return null;
-    if (Number.isFinite(summary.fare?.amount)) return Number(summary.fare.amount);
-    if (Number.isFinite(summary.breakdown?.total)) return Number(summary.breakdown.total);
+    if (summary && Number.isFinite(summary.fare?.amount)) return Number(summary.fare.amount);
+    if (summary && Number.isFinite(summary.breakdown?.total)) return Number(summary.breakdown.total);
+    if (Number.isFinite(fallbackAmount as number)) return Number(fallbackAmount);
     return null;
-  }, [summary]);
+  }, [fallbackAmount, summary]);
+
+  const fareCurrency = useMemo(() => {
+    if (summary?.fare?.currency) return String(summary.fare.currency).toUpperCase();
+    return fallbackCurrency;
+  }, [fallbackCurrency, summary?.fare?.currency]);
 
   const breakdownRows = useMemo(() => {
     if (!summary) return [];
@@ -157,7 +199,7 @@ export default function RideCompleteScreen() {
         <View style={styles.content}>
           <Card style={styles.summaryCard}>
             <Text style={styles.totalLabel}>Tổng tiền</Text>
-            <Text style={styles.totalValue}>{toCurrencyLabel(fareAmount, summary?.fare?.currency || 'VND')}</Text>
+            <Text style={styles.totalValue}>{toCurrencyLabel(fareAmount, fareCurrency)}</Text>
             <View style={styles.metricsRow}>
               <View style={styles.metricItem}>
                 <Text style={styles.metricLabel}>Quãng đường</Text>
@@ -182,7 +224,7 @@ export default function RideCompleteScreen() {
               breakdownRows.map((item) => (
                 <View key={item.label} style={styles.breakdownRow}>
                   <Text style={styles.breakdownLabel}>{item.label}</Text>
-                  <Text style={styles.breakdownValue}>{toCurrencyLabel(item.value, summary?.fare?.currency || 'VND')}</Text>
+                  <Text style={styles.breakdownValue}>{toCurrencyLabel(item.value, fareCurrency)}</Text>
                 </View>
               ))
             )}

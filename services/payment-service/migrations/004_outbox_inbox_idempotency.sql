@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   route_key text NOT NULL,
-  user_id text NOT NULL,
+  user_id char(8) NOT NULL,
   idem_key text NOT NULL,
   request_hash text NOT NULL,
   response_code integer NOT NULL,

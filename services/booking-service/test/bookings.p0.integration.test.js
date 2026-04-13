@@ -28,7 +28,7 @@ jest.mock('../src/middleware/auth', () => ({
     next();
   },
   requireAuth: (req, _res, next) => {
-    const userId = String(req.header('x-user-id') || 'test_user').trim();
+    const userId = String(req.header('x-user-id') || '10000003').trim();
     const role = String(req.header('x-user-role') || 'customer')
       .trim()
       .toLowerCase();
@@ -122,7 +122,7 @@ function buildBooking(overrides = {}) {
   return {
     bookingId: 'bk_1',
     rideId: 'ride_1',
-    userId: 'user_1',
+    userId: '10000003',
     pickup: { lat: 10.76, lng: 106.66 },
     dropoff: { lat: 10.77, lng: 106.7 },
     vehicleType: 'CAR',
@@ -235,7 +235,7 @@ describe('booking-service P0 integration', () => {
 
     const response = await request(app)
       .post('/v1/bookings')
-      .set('x-user-id', 'user_abc')
+      .set('x-user-id', '10000031')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
@@ -280,7 +280,7 @@ describe('booking-service P0 integration', () => {
 
     const response = await request(app)
       .post('/v1/bookings')
-      .set('x-user-id', 'user_replay')
+      .set('x-user-id', '10000032')
       .set('idempotency-key', 'idem_1')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
@@ -299,7 +299,7 @@ describe('booking-service P0 integration', () => {
     const response = await request(app)
       .post('/v1/bookings')
       .set('authorization', 'Bearer test-token')
-      .set('x-user-id', 'user_pay')
+      .set('x-user-id', '10000033')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
@@ -314,7 +314,7 @@ describe('booking-service P0 integration', () => {
   });
 
   test('does not return no-driver message when a selected driver exists', async () => {
-    const selectedDriver = { driverId: 'driver_1', distanceMeters: 120 };
+    const selectedDriver = { driverId: '10000004', distanceMeters: 120 };
     mockGetDriverAvailability.mockResolvedValue({
       checked: true,
       available: false,
@@ -326,7 +326,7 @@ describe('booking-service P0 integration', () => {
     const response = await request(app)
       .post('/v1/bookings')
       .set('authorization', 'Bearer test-token')
-      .set('x-user-id', 'user_driver')
+      .set('x-user-id', '10000034')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
@@ -334,7 +334,7 @@ describe('booking-service P0 integration', () => {
       });
 
     expect(response.status).toBe(201);
-    expect(response.body.ai_driver_decision.selected_driver.driverId).toBe('driver_1');
+    expect(response.body.ai_driver_decision.selected_driver.driverId).toBe('10000004');
     expect(response.body.message).toBeUndefined();
   });
 
@@ -369,7 +369,7 @@ describe('booking-service P0 integration', () => {
       .set('x-user-role', 'admin')
       .send({
         status: 'ACCEPTED',
-        driver_id: 'driver_1'
+        driver_id: '10000004'
       });
 
     expect(response.status).toBe(200);
@@ -382,6 +382,7 @@ describe('booking-service P0 integration', () => {
     mockGetBookingById.mockResolvedValueOnce(
       buildBooking({
         bookingId: 'bk_ctx',
+        rideId: 'ride_ctx',
         status: 'REQUESTED'
       })
     );
@@ -394,12 +395,12 @@ describe('booking-service P0 integration', () => {
     const response = await request(app)
       .get('/v1/bookings/bk_ctx/mcp-context')
       .set('authorization', 'Bearer test-token')
-      .set('x-user-id', 'user_1');
+      .set('x-user-id', '10000003');
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual(
       expect.objectContaining({
-        ride_id: 'bk_ctx',
+        ride_id: 'ride_ctx',
         permission_ok: true
       })
     );
@@ -410,7 +411,7 @@ describe('booking-service P0 integration', () => {
   test('passes simulate pricing timeout flag for retry/fallback flow', async () => {
     const response = await request(app)
       .post('/v1/bookings')
-      .set('x-user-id', 'user_timeout')
+      .set('x-user-id', '10000035')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
@@ -453,7 +454,7 @@ describe('booking-service P0 integration', () => {
 
     const response = await request(app)
       .post('/v1/bookings')
-      .set('x-user-id', 'user_stale')
+      .set('x-user-id', '10000036')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
@@ -477,7 +478,7 @@ describe('booking-service P0 integration', () => {
 
     const response = await request(app)
       .post('/v1/bookings')
-      .set('x-user-id', 'user_active')
+      .set('x-user-id', '10000037')
       .send({
         pickup: { lat: 10.76, lng: 106.66 },
         drop: { lat: 10.77, lng: 106.7 },
@@ -489,3 +490,4 @@ describe('booking-service P0 integration', () => {
     expect(mockCreateBooking).not.toHaveBeenCalled();
   });
 });
+

@@ -5,7 +5,7 @@
   "type": "object",
   "required": ["driverId", "lat", "lng", "timestamp"],
   "properties": {
-    "driverId": { "type": "string" },
+    "driverId": { "type": "string", "pattern": "^[0-9]{8}$" },
     "rideId": { "type": "string" },
     "lat": { "type": "number" },
     "lng": { "type": "number" },

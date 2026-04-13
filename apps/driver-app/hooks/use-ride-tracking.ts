@@ -20,6 +20,10 @@ const STATUS_ALIASES: Record<string, string> = {
   STARTED: 'IN_PROGRESS'
 };
 
+function hasPoint(lat: number | null | undefined, lng: number | null | undefined) {
+  return Number.isFinite(lat as number) && Number.isFinite(lng as number);
+}
+
 function normalizeStatus(status?: string | null) {
   return status ? status.toUpperCase() : '';
 }
@@ -49,11 +53,13 @@ function extractRide(event: any): rideApi.Ride | null {
   if (!event) return null;
   const payload = event.ride ?? event.payload?.ride ?? event.data?.ride ?? event.payload ?? event.data ?? event;
 
-  if (payload?.id) return payload as rideApi.Ride;
+  const normalizedPayload = rideApi.normalizeRide(payload);
+  if (normalizedPayload) return normalizedPayload;
 
   const rideId = event.rideId ?? event.payload?.rideId ?? event.data?.rideId;
   if (rideId) {
-    return { id: rideId } as rideApi.Ride;
+    const fallback = rideApi.normalizeRide({ id: String(rideId) });
+    return fallback || null;
   }
 
   return null;
@@ -88,7 +94,7 @@ export function useRideTracking({ rideId, enabled, intervalMs = DEFAULT_INTERVAL
     setLoading(true);
     try {
       const res = await rideApi.getRide(rideId);
-      setRide(res.data);
+      setRide(rideApi.normalizeRide(res.data) ?? res.data);
       setError(null);
       setIsOffline(false);
       setLastUpdateAt(Date.now());
@@ -133,17 +139,21 @@ export function useRideTracking({ rideId, enabled, intervalMs = DEFAULT_INTERVAL
 
   const handleRideUpdate = useCallback(
     async (incoming: rideApi.Ride) => {
-      if (!incoming?.id) return;
-      if (rideId && incoming.id !== rideId) return;
-      if (!incoming.status || (!incoming.pickupLat && !incoming.dropoffLat)) {
+      const normalizedIncoming = rideApi.normalizeRide(incoming);
+      if (!normalizedIncoming?.id) return;
+      if (rideId && normalizedIncoming.id !== rideId) return;
+
+      const hasPickup = hasPoint(normalizedIncoming.pickupLat, normalizedIncoming.pickupLng);
+      const hasDropoff = hasPoint(normalizedIncoming.dropoffLat, normalizedIncoming.dropoffLng);
+      if (!normalizedIncoming.status || !hasPickup || !hasDropoff) {
         try {
-          const detail = await rideApi.getRide(incoming.id);
-          setRide(detail.data);
+          const detail = await rideApi.getRide(normalizedIncoming.id);
+          setRide(rideApi.normalizeRide(detail.data) ?? detail.data);
         } catch {
-          setRide((prev) => (prev ? { ...prev, ...incoming } : incoming));
+          setRide((prev) => (prev ? { ...prev, ...normalizedIncoming } : normalizedIncoming));
         }
       } else {
-        setRide((prev) => (prev ? { ...prev, ...incoming } : incoming));
+        setRide((prev) => (prev ? { ...prev, ...normalizedIncoming } : normalizedIncoming));
       }
       setLastUpdateAt(Date.now());
       setError(null);
@@ -224,7 +234,7 @@ export function useRideTracking({ rideId, enabled, intervalMs = DEFAULT_INTERVAL
       setIsUpdating(true);
       try {
         const res = await rideApi.updateStatus(rideId, target);
-        setRide(res.data);
+        setRide(rideApi.normalizeRide(res.data) ?? res.data);
         setError(null);
         setIsOffline(false);
         setLastUpdateAt(Date.now());

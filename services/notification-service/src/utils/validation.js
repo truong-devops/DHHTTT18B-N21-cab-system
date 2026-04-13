@@ -1,5 +1,9 @@
 const CHANNEL_VALUES = ['EMAIL', 'SMS', 'PUSH', 'IN_APP'];
 
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
 function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -34,6 +38,7 @@ function parseDate(value) {
 
 module.exports = {
   CHANNEL_VALUES,
+  isEightDigitId,
   isNonEmptyString,
   isObject,
   normalizeChannels,

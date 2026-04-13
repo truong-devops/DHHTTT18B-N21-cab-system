@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { ApiError } = require('../utils/errors');
+const { isEightDigitId } = require('../utils/validation');
 
 function normalizeList(value) {
   if (!value) {
@@ -22,7 +23,8 @@ function buildUser(payload) {
   if (!payload || typeof payload !== 'object') {
     return null;
   }
-  const id = payload.sub || payload.id || payload.userId || null;
+  const rawId = payload.sub || payload.id || payload.userId || null;
+  const id = isEightDigitId(rawId) ? String(rawId).trim() : null;
   const roles = normalizeList(payload.roles || payload.role);
   const scopes = normalizeList(payload.scopes || payload.scope);
   return { id, roles, scopes };

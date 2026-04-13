@@ -24,6 +24,12 @@ const KYC_STATUS = {
   REJECTED: 'REJECTED'
 };
 
+function normalizeEightDigitId(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return /^\d{8}$/.test(normalized) ? normalized : null;
+}
+
 async function getDriverMe(userId) {
   let driver = await driverRepository.getDriverByUserId(userId);
   if (!driver) {
@@ -148,7 +154,7 @@ async function approveKycSubmission(submissionId, reviewerId) {
     id: submissionId,
     status: KYC_STATUS.APPROVED,
     rejectionReason: null,
-    reviewedBy: reviewerId || null
+    reviewedBy: normalizeEightDigitId(reviewerId)
   });
   const driver = await driverRepository.updateDriverStatus(current.driver_id, DRIVER_STATUS.APPROVED);
 
@@ -172,7 +178,7 @@ async function rejectKycSubmission(submissionId, reason, reviewerId) {
     id: submissionId,
     status: KYC_STATUS.REJECTED,
     rejectionReason: String(reason).trim(),
-    reviewedBy: reviewerId || null
+    reviewedBy: normalizeEightDigitId(reviewerId)
   });
   const driver = await driverRepository.updateDriverStatus(current.driver_id, DRIVER_STATUS.PENDING);
 

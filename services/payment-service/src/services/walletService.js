@@ -1,6 +1,7 @@
 const { pool } = require('../db/pool');
 const { insertWithdrawal, getWithdrawalById, updateWithdrawalStatus, listWithdrawals, getWithdrawalStats } = require('../repositories/withdrawalsRepo');
 const { ApiError } = require('../utils/errors');
+const { isEightDigitId } = require('../utils/validation');
 const { encodeCursor, decodeCursor } = require('../../../../libs/http/cursor');
 const config = require('../config');
 
@@ -20,6 +21,13 @@ const TRANSITIONS = {
 
 function normalizeStatus(value) {
   return value ? String(value).trim().toUpperCase() : null;
+}
+
+function normalizeEightDigitId(value) {
+  if (!isEightDigitId(value)) {
+    return null;
+  }
+  return String(value).trim();
 }
 
 async function fetchCompletedRideIdsForDriver({ driverUserId, authorization, traceId, requestId }) {
@@ -89,12 +97,13 @@ async function sumPaidEarningsByRideIds(rideIds) {
 }
 
 async function getDriverWalletSummary({ driverUserId, authorization, traceId, requestId }) {
-  if (!driverUserId) {
+  const normalizedDriverUserId = normalizeEightDigitId(driverUserId);
+  if (!normalizedDriverUserId) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Unauthorized');
   }
 
   const rideIds = await fetchCompletedRideIdsForDriver({
-    driverUserId,
+    driverUserId: normalizedDriverUserId,
     authorization,
     traceId,
     requestId
@@ -104,7 +113,7 @@ async function getDriverWalletSummary({ driverUserId, authorization, traceId, re
   const availableBalance = Math.max(0, earningsTotal - stats.paidOut - stats.pendingOut);
 
   return {
-    driverUserId,
+    driverUserId: normalizedDriverUserId,
     completedRides: rideIds.length,
     earningsTotal: Number(earningsTotal.toFixed(2)),
     paidOutTotal: Number(stats.paidOut.toFixed(2)),
@@ -115,8 +124,13 @@ async function getDriverWalletSummary({ driverUserId, authorization, traceId, re
 }
 
 async function createWithdrawalRequest({ driverUserId, amount, note, authorization, traceId, requestId }) {
+  const normalizedDriverUserId = normalizeEightDigitId(driverUserId);
+  if (!normalizedDriverUserId) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Unauthorized');
+  }
+
   const wallet = await getDriverWalletSummary({
-    driverUserId,
+    driverUserId: normalizedDriverUserId,
     authorization,
     traceId,
     requestId
@@ -131,7 +145,7 @@ async function createWithdrawalRequest({ driverUserId, amount, note, authorizati
   }
 
   const withdrawal = await insertWithdrawal(null, {
-    driverUserId,
+    driverUserId: normalizedDriverUserId,
     amount: normalizedAmount.toFixed(2),
     currency: wallet.currency,
     note: note || null,
@@ -149,14 +163,15 @@ async function fetchWithdrawals({ actor, query }) {
   const canViewAll = roleSet.has('admin') || roleSet.has('ops');
 
   const targetDriverUserId = canViewAll ? query.driverUserId || null : actor?.id;
-  if (!targetDriverUserId) {
+  const normalizedDriverUserId = normalizeEightDigitId(targetDriverUserId);
+  if (!normalizedDriverUserId) {
     throw new ApiError(400, 'VALIDATION_ERROR', 'driverUserId is required');
   }
 
   const parsedCursor = query.cursor ? decodeCursor(query.cursor) : null;
   const status = normalizeStatus(query.status);
   const result = await listWithdrawals({
-    driverUserId: targetDriverUserId,
+    driverUserId: normalizedDriverUserId,
     status,
     limit: query.limit,
     cursor: parsedCursor,
@@ -197,7 +212,7 @@ async function changeWithdrawalStatus({ id, status, rejectionReason, actorId }) 
     id,
     status: targetStatus,
     rejectionReason: targetStatus === WITHDRAWAL_STATUS.REJECTED || targetStatus === WITHDRAWAL_STATUS.FAILED ? String(rejectionReason).trim() : null,
-    processedBy: actorId || null
+    processedBy: normalizeEightDigitId(actorId)
   });
   return updated;
 }

@@ -21,7 +21,37 @@ async function handleRideCreated(row) {
 
   const existing = await getRideByExternalId(externalRideId);
   if (existing) {
-    return { skipped: true, rideId: existing.id };
+    const backfill = {};
+    if (payload.bookingId != null) {
+      backfill.bookingId = payload.bookingId;
+    }
+    if (payload.riderId != null) {
+      backfill.riderId = payload.riderId;
+    }
+    if (typeof payload.pickup?.address === 'string') {
+      backfill.pickupLabel = payload.pickup.address;
+    }
+    if (payload.dropoff?.lat !== undefined) {
+      backfill.dropoffLat = payload.dropoff.lat;
+    }
+    if (payload.dropoff?.lng !== undefined) {
+      backfill.dropoffLng = payload.dropoff.lng;
+    }
+    if (typeof payload.dropoff?.address === 'string') {
+      backfill.dropoffLabel = payload.dropoff.address;
+    }
+    if (Number.isFinite(Number(payload.pricing?.estimatedFare))) {
+      backfill.quoteFareAmount = Math.round(Number(payload.pricing.estimatedFare));
+    }
+    if (typeof payload.pricing?.currency === 'string' && payload.pricing.currency.trim()) {
+      backfill.quoteCurrency = payload.pricing.currency;
+    }
+
+    if (Object.keys(backfill).length > 0) {
+      await updateRideFields(existing.id, backfill);
+    }
+
+    return { skipped: true, rideId: existing.id, backfilled: Object.keys(backfill).length > 0 };
   }
 
   const ride = await createRide({
@@ -31,8 +61,12 @@ async function handleRideCreated(row) {
     driverId: null,
     pickupLat: pickup.lat,
     pickupLng: pickup.lng,
+    pickupLabel: typeof payload.pickup?.address === 'string' ? payload.pickup.address : null,
     dropoffLat: payload.dropoff?.lat ?? null,
     dropoffLng: payload.dropoff?.lng ?? null,
+    dropoffLabel: typeof payload.dropoff?.address === 'string' ? payload.dropoff.address : null,
+    quoteFareAmount: Number.isFinite(Number(payload.pricing?.estimatedFare)) ? Math.round(Number(payload.pricing.estimatedFare)) : null,
+    quoteCurrency: typeof payload.pricing?.currency === 'string' ? payload.pricing.currency : null,
     status: 'requested',
     traceId: row.trace_id || null,
     emitOutbox: false

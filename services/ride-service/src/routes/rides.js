@@ -112,8 +112,8 @@ function computeBreakdown({ fareAmount, distanceMeters, durationSeconds }) {
   return { base, distance, time, surge: 0, discount: 0, total };
 }
 
-async function fetchPaymentsForRide({ rideId, authorization, traceId, requestId }) {
-  if (!PAYMENT_SERVICE_URL) return [];
+async function fetchPaymentsForRideId({ rideId, authorization, traceId, requestId }) {
+  if (!PAYMENT_SERVICE_URL || !rideId) return [];
   const url = new URL('/v1/payments', PAYMENT_SERVICE_URL);
   url.searchParams.set('rideId', rideId);
   url.searchParams.set('limit', '20');
@@ -140,6 +140,54 @@ async function fetchPaymentsForRide({ rideId, authorization, traceId, requestId 
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function toTimestamp(value) {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toRoundedPositiveAmount(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  const rounded = Math.round(parsed);
+  return rounded > 0 ? rounded : null;
+}
+
+async function fetchPaymentsForRide({ rideIds, authorization, traceId, requestId }) {
+  if (!PAYMENT_SERVICE_URL) return [];
+  const normalizedRideIds = Array.from(
+    new Set(
+      (Array.isArray(rideIds) ? rideIds : [rideIds])
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .filter((value) => Boolean(value))
+    )
+  );
+  if (!normalizedRideIds.length) return [];
+
+  const paymentLists = await Promise.all(
+    normalizedRideIds.map((rideId) =>
+      fetchPaymentsForRideId({
+        rideId,
+        authorization,
+        traceId,
+        requestId
+      })
+    )
+  );
+
+  const dedup = new Map();
+  paymentLists.flat().forEach((payment) => {
+    if (!payment || typeof payment !== 'object') return;
+    const key = payment.id || `${payment.rideId || 'ride'}:${payment.createdAt || ''}:${payment.amount || ''}`;
+    const current = dedup.get(key);
+    if (!current || toTimestamp(payment.createdAt) >= toTimestamp(current.createdAt)) {
+      dedup.set(key, payment);
+    }
+  });
+
+  return Array.from(dedup.values()).sort((a, b) => toTimestamp(b?.createdAt) - toTimestamp(a?.createdAt));
 }
 
 router.post(
@@ -455,15 +503,22 @@ router.get(
     const durationSeconds = computeDurationSeconds(ride, statusHistory);
 
     const payments = await fetchPaymentsForRide({
-      rideId: ride.id,
+      rideIds: [ride.external_ride_id, ride.id, ride.booking_id],
       authorization: req.get('authorization') || '',
       traceId: req.traceId || null,
       requestId: req.requestId || null
     });
-    const primaryPayment = payments.find((item) => normalizeStatus(item.status) === 'PAID') || payments[0] || null;
-    const parsedFareAmount = Number(primaryPayment?.amount);
-    const fareAmount = Number.isFinite(parsedFareAmount) ? Math.round(parsedFareAmount) : null;
-    const breakdown = computeBreakdown({ fareAmount, distanceMeters, durationSeconds });
+    const latestPayment = payments[0] || null;
+    const paidPayment = payments.find((item) => normalizeStatus(item.status) === 'PAID') || null;
+    const farePayment =
+      payments.find((item) => normalizeStatus(item.status) === 'PAID' && toRoundedPositiveAmount(item.amount) !== null) ||
+      payments.find((item) => toRoundedPositiveAmount(item.amount) !== null) ||
+      null;
+    const paymentFareAmount = toRoundedPositiveAmount(farePayment?.amount);
+    const quotedFareAmount = toRoundedPositiveAmount(ride.quote_fare_amount);
+    const effectiveFareAmount = paymentFareAmount !== null ? paymentFareAmount : quotedFareAmount;
+    const breakdown = computeBreakdown({ fareAmount: effectiveFareAmount, distanceMeters, durationSeconds });
+    const fareSource = paymentFareAmount !== null ? 'payment-service' : quotedFareAmount !== null ? 'booking-quote' : 'estimated';
 
     return res.json({
       data: {
@@ -472,12 +527,12 @@ router.get(
         distanceMeters,
         durationSeconds,
         fare: {
-          amount: fareAmount !== null ? fareAmount : breakdown.total,
-          currency: primaryPayment?.currency || 'VND',
-          paymentStatus: primaryPayment?.status || null,
-          paymentId: primaryPayment?.id || null,
-          method: primaryPayment?.method || null,
-          source: primaryPayment ? 'payment-service' : 'estimated'
+          amount: effectiveFareAmount !== null ? effectiveFareAmount : breakdown.total,
+          currency: farePayment?.currency || ride.quote_currency || latestPayment?.currency || 'VND',
+          paymentStatus: paidPayment?.status || latestPayment?.status || null,
+          paymentId: paidPayment?.id || latestPayment?.id || null,
+          method: paidPayment?.method || latestPayment?.method || null,
+          source: fareSource
         },
         breakdown
       },

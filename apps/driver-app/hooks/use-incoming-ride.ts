@@ -12,46 +12,13 @@ type Options = {
 const DEFAULT_INTERVAL_MS = 2500;
 const MAX_RECONNECT_DELAY = 10000;
 
-function toFiniteNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return undefined;
-}
-
-function normalizeBookingId(raw: any): string | null {
-  const candidates = [raw?.bookingId, raw?.booking_id];
-  for (const value of candidates) {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-  }
-  return null;
-}
-
 function isRealBookingRide(ride: rideApi.Ride | null | undefined): boolean {
   if (!ride) return false;
   return typeof ride.bookingId === 'string' && ride.bookingId.trim().length > 0;
 }
 
-function normalizeRide(raw: any): rideApi.Ride | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const resolvedId =
-    typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : typeof raw.rideId === 'string' && raw.rideId.trim() ? raw.rideId.trim() : '';
-  if (!resolvedId) return null;
-  const resolvedBookingId = normalizeBookingId(raw);
-
-  return {
-    ...(raw as rideApi.Ride),
-    id: resolvedId,
-    bookingId: resolvedBookingId,
-    pickupLat: toFiniteNumber(raw.pickupLat),
-    pickupLng: toFiniteNumber(raw.pickupLng),
-    dropoffLat: toFiniteNumber(raw.dropoffLat),
-    dropoffLng: toFiniteNumber(raw.dropoffLng)
-  };
+function hasPoint(lat: number | null | undefined, lng: number | null | undefined) {
+  return Number.isFinite(lat as number) && Number.isFinite(lng as number);
 }
 
 function parseEvent(raw: string) {
@@ -66,7 +33,7 @@ function extractRide(event: any): rideApi.Ride | null {
   if (!event) return null;
   const payload = event.ride ?? event.payload?.ride ?? event.data?.ride ?? event.payload ?? event.data ?? event;
 
-  const normalizedPayload = normalizeRide(payload);
+  const normalizedPayload = rideApi.normalizeRide(payload);
   if (normalizedPayload) return normalizedPayload;
 
   const rideId = event.rideId ?? event.payload?.rideId ?? event.data?.rideId;
@@ -101,8 +68,8 @@ export function useIncomingRide({ enabled, intervalMs = DEFAULT_INTERVAL_MS, lim
     setError(null);
     try {
       const res = await rideApi.listAssignments();
-      const list = Array.isArray((res as any)?.data) ? (res as any).data : Array.isArray((res as any)?.data?.data) ? (res as any).data.data : [];
-      const nextRide = normalizeRide(list[0]) ?? null;
+      const list = Array.isArray((res as any)?.data) ? (res as any).data : [];
+      const nextRide = rideApi.normalizeRide(list[0]) ?? null;
       setIncomingRide(isRealBookingRide(nextRide) ? nextRide : null);
       setLastUpdateAt(Date.now());
     } catch (err: any) {
@@ -141,12 +108,14 @@ export function useIncomingRide({ enabled, intervalMs = DEFAULT_INTERVAL_MS, lim
   }, [enabled]);
 
   const handleRide = useCallback(async (ride: rideApi.Ride) => {
-    const normalized = normalizeRide(ride);
+    const normalized = rideApi.normalizeRide(ride);
     if (!normalized?.id) return;
-    if ((!normalized.pickupLat && !normalized.dropoffLat) || !isRealBookingRide(normalized)) {
+    const hasPickup = hasPoint(normalized.pickupLat, normalized.pickupLng);
+    const hasDropoff = hasPoint(normalized.dropoffLat, normalized.dropoffLng);
+    if (!hasPickup || !hasDropoff || !isRealBookingRide(normalized)) {
       try {
         const detail = await rideApi.getRide(normalized.id);
-        const detailed = normalizeRide(detail.data);
+        const detailed = rideApi.normalizeRide(detail.data);
         setIncomingRide(isRealBookingRide(detailed) ? detailed : null);
       } catch {
         setIncomingRide(isRealBookingRide(normalized) ? normalized : null);
