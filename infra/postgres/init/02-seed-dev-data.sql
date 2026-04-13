@@ -608,7 +608,7 @@ CREATE TABLE IF NOT EXISTS payment_status_history (
   from_status text,
   to_status text NOT NULL,
   reason text,
-  actor_id text,
+  actor_id char(8),
   occurred_at timestamptz NOT NULL DEFAULT now(),
   trace_id text,
   CONSTRAINT payment_status_history_from_check CHECK (
@@ -622,7 +622,7 @@ CREATE TABLE IF NOT EXISTS payment_status_history (
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   route_key text NOT NULL,
-  user_id text NOT NULL,
+  user_id char(8) NOT NULL,
   idem_key text NOT NULL,
   request_hash text NOT NULL,
   response_code integer NOT NULL,

@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS driver_kyc_submissions (
   license_front_url text,
   selfie_url text,
   rejection_reason text,
-  reviewed_by text,
+  reviewed_by char(8),
   reviewed_at timestamptz,
   submitted_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now(),

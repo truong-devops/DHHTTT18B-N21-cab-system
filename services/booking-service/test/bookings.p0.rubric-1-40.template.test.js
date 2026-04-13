@@ -28,7 +28,7 @@ jest.mock('../src/middleware/auth', () => ({
     next();
   },
   requireAuth: (req, _res, next) => {
-    const userId = String(req.header('x-user-id') || 'test_user').trim();
+    const userId = String(req.header('x-user-id') || '10000003').trim();
     const role = String(req.header('x-user-role') || 'customer')
       .trim()
       .toLowerCase();
@@ -97,7 +97,7 @@ function buildBooking(overrides = {}) {
   return {
     bookingId: 'bk_1',
     rideId: 'ride_1',
-    userId: 'user_1',
+    userId: '10000003',
     pickup: { lat: 10.76, lng: 106.66 },
     dropoff: { lat: 10.77, lng: 106.7 },
     vehicleType: 'CAR',
@@ -148,7 +148,7 @@ describe('Booking P0 rubric integration frame (1-40)', () => {
     test('Case 1: create booking success with pickup + drop + vehicleType', async () => {
       const response = await request(app)
         .post('/v1/bookings')
-        .set('x-user-id', 'case_1_user')
+        .set('x-user-id', '10000041')
         .send({
           pickup: { lat: 10.76, lng: 106.66 },
           drop: { lat: 10.77, lng: 106.7 },
@@ -168,7 +168,7 @@ describe('Booking P0 rubric integration frame (1-40)', () => {
     test('Case 2: create booking success with pickup + dropoff alias', async () => {
       const response = await request(app)
         .post('/v1/bookings')
-        .set('x-user-id', 'case_2_user')
+        .set('x-user-id', '10000042')
         .send({
           pickup: { lat: 10.76, lng: 106.66 },
           dropoff: { lat: 10.78, lng: 106.71 },
@@ -326,3 +326,4 @@ describe('Booking P0 rubric integration frame (1-40)', () => {
     test.todo('Case 40: both events are queued exactly once on successful create');
   });
 });
+

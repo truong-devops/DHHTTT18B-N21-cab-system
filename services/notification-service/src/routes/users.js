@@ -3,12 +3,21 @@ const { asyncHandler } = require('../utils/asyncHandler');
 const { ApiError } = require('../utils/errors');
 const { listNotificationsByUser, getPreferences, updatePreferences } = require('../services/notificationService');
 const { requireAuth, requireSelfOrRoles } = require('../middleware/auth');
+const { isEightDigitId } = require('../utils/validation');
 
 const router = express.Router();
+
+function requireValidUserIdParam(req, _res, next) {
+  if (!isEightDigitId(req.params?.userId)) {
+    return next(new ApiError(400, 'VALIDATION_ERROR', 'userId must be an 8-digit ID'));
+  }
+  return next();
+}
 
 router.get(
   '/v1/users/:userId/notifications',
   requireAuth,
+  requireValidUserIdParam,
   requireSelfOrRoles('userId', ['admin', 'service']),
   asyncHandler(async (req, res) => {
     const { status, channel, from, to, page, limit } = req.query;
@@ -38,6 +47,7 @@ router.get(
 router.get(
   '/v1/users/:userId/preferences',
   requireAuth,
+  requireValidUserIdParam,
   requireSelfOrRoles('userId', ['admin', 'service']),
   asyncHandler(async (req, res) => {
     const prefs = await getPreferences(req.params.userId);
@@ -48,6 +58,7 @@ router.get(
 router.put(
   '/v1/users/:userId/preferences',
   requireAuth,
+  requireValidUserIdParam,
   requireSelfOrRoles('userId', ['admin', 'service']),
   asyncHandler(async (req, res) => {
     const prefs = await updatePreferences(req.params.userId, req.body?.channels || {});

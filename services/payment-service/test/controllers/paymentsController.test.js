@@ -153,7 +153,7 @@ describe('payments controllers', () => {
       requestId: 'req_2',
       user: { id: '10000003' }
     });
-    req.headers['x-actor'] = 'driver_9';
+    req.headers['x-user-id'] = '10000003';
     const res = buildRes();
 
     await updatePaymentStatusController(req, res);
@@ -163,7 +163,7 @@ describe('payments controllers', () => {
       statusUpdate: { status: 'PAID' },
       traceId: 'trace_2',
       requestId: 'req_2',
-      actor: 'driver_9'
+      actor: '10000003'
     });
     expect(res.json).toHaveBeenCalledWith({ data: { id: 'pay_1', status: 'PAID' } });
   });

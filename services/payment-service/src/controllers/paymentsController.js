@@ -2,6 +2,7 @@ const { createPayment, fetchPayment, fetchPayments, changePaymentStatus, fetchVi
 const { withIdempotency, pickIdempotencyHeaders } = require('../services/idempotencyService');
 const { hashRequest } = require('../utils/idempotency');
 const { ApiError } = require('../utils/errors');
+const { isEightDigitId } = require('../utils/validation');
 const { STATUSES } = require('../domain/paymentStatus');
 const { getDriverWalletSummary, createWithdrawalRequest, fetchWithdrawals, changeWithdrawalStatus } = require('../services/walletService');
 const monitoring = require('../monitoring');
@@ -33,7 +34,10 @@ async function createPaymentController(req, res) {
   if (req.validatedBody.userId && authUserId && req.validatedBody.userId !== authUserId) {
     throw new ApiError(403, 'FORBIDDEN', 'userId does not match token subject');
   }
-  const userId = authUserId || req.validatedBody.userId || 'anonymous';
+  const userId = authUserId || req.validatedBody.userId || null;
+  if (!isEightDigitId(userId)) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Unauthorized');
+  }
   const payload = { ...req.validatedBody, userId };
   const requestHash = hashRequest(req.method, req.originalUrl, payload);
   const responseHeaders = pickIdempotencyHeaders(res.getHeaders()) || {};
@@ -97,7 +101,8 @@ async function getPaymentController(req, res) {
 }
 
 async function updatePaymentStatusController(req, res) {
-  const actor = req.get('x-actor') || req.get('x-user-id') || (req.user ? req.user.id : 'system');
+  const headerActorId = req.get('x-user-id');
+  const actor = isEightDigitId(req.user?.id) ? req.user.id : isEightDigitId(headerActorId) ? String(headerActorId).trim() : null;
   const paymentId = req.validatedParams ? req.validatedParams.id : req.params.id;
   const payment = await changePaymentStatus({
     paymentId,

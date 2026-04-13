@@ -46,7 +46,9 @@ export default function HistoryScreen() {
               ? ride.dropoffLabel
               : `${ride.dropoffLat?.toFixed(3) ?? '--'},${ride.dropoffLng?.toFixed(3) ?? '--'}`;
           const route = `${pickupText} -> ${dropoffText}`;
-          const amountValue = paymentsByRide[ride.id];
+          const amountValue =
+            paymentsByRide[ride.id] ??
+            (typeof ride.externalRideId === 'string' && ride.externalRideId.trim() ? paymentsByRide[ride.externalRideId] : undefined);
           const amountLabel = typeof amountValue === 'number' && Number.isFinite(amountValue) ? `${amountValue.toLocaleString('vi-VN')} d` : '--';
 
           return (

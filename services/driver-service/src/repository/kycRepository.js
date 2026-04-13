@@ -1,9 +1,5 @@
 const pool = require('../db/pool');
 
-function isUuidLike(value) {
-  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-}
-
 async function createSubmission({
   driverId,
   fullName = null,
@@ -55,9 +51,15 @@ async function getLatestByDriverId(driverId) {
 }
 
 async function getById(id) {
-  if (!isUuidLike(id)) return null;
-  const result = await pool.query('SELECT * FROM driver_kyc_submissions WHERE id = $1', [id]);
-  return result.rows[0] || null;
+  try {
+    const result = await pool.query('SELECT * FROM driver_kyc_submissions WHERE id = $1', [id]);
+    return result.rows[0] || null;
+  } catch (error) {
+    if (error?.code === '22P02') {
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function listSubmissions({ status, page = 1, limit = 20 }) {

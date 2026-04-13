@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS payments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ride_id text NOT NULL,
-  user_id text,
+  user_id char(8),
   amount numeric(12, 2) NOT NULL,
   currency char(3) NOT NULL,
   method text,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS payment_status_history (
   from_status text,
   to_status text NOT NULL,
   reason text,
-  actor_id text,
+  actor_id char(8),
   occurred_at timestamptz NOT NULL DEFAULT now(),
   trace_id text,
   CONSTRAINT payment_status_history_from_check CHECK (
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS payment_status_history (
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   route_key text NOT NULL,
-  user_id text NOT NULL,
+  user_id char(8) NOT NULL,
   idem_key text NOT NULL,
   request_hash text NOT NULL,
   response_code integer NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 
 CREATE TABLE IF NOT EXISTS driver_withdrawals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  driver_user_id text NOT NULL,
+  driver_user_id char(8) NOT NULL,
   amount numeric(12, 2) NOT NULL,
   currency char(3) NOT NULL DEFAULT 'VND',
   status text NOT NULL DEFAULT 'REQUESTED',
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS driver_withdrawals (
   rejection_reason text,
   requested_at timestamptz NOT NULL DEFAULT now(),
   processed_at timestamptz,
-  processed_by text,
+  processed_by char(8),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT driver_withdrawals_amount_positive CHECK (amount > 0),

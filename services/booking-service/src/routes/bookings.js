@@ -24,6 +24,21 @@ const PRIVILEGED_ROLES = new Set(['admin', 'service', 'ops']);
 const ACTIVE_BOOKING_STATUSES = new Set(['PENDING', 'REQUESTED', 'ACCEPTED', 'CONFIRMED']);
 const TERMINAL_RIDE_STATUSES = new Set(['COMPLETED', 'CANCELLED']);
 
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
+function normalizeEightDigitId(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const normalized = String(value).trim();
+  if (!normalized) {
+    return null;
+  }
+  return isEightDigitId(normalized) ? normalized : null;
+}
+
 function normalizeRoles(req) {
   const roles = Array.isArray(req.user?.roles) ? req.user.roles : [];
   const role = req.user?.role ? [req.user.role] : [];
@@ -114,21 +129,20 @@ function buildOutboxRecord({ eventId, topic, eventType, aggregateId, partitionKe
 }
 
 function resolveUserId(req, payload) {
-  const privilegedRequestedUserId =
+  const privilegedRequestedUserIdRaw =
     hasPrivilegedRole(req) && (payload?.user_id || req.header('x-user-id'))
       ? String(payload?.user_id || req.header('x-user-id')).trim()
       : '';
+  const privilegedRequestedUserId = normalizeEightDigitId(privilegedRequestedUserIdRaw);
 
   if (privilegedRequestedUserId) {
     return privilegedRequestedUserId;
   }
-  if (req.userId) {
-    return String(req.userId);
+  const actorUserId = normalizeEightDigitId(req.userId);
+  if (actorUserId) {
+    return actorUserId;
   }
-  if (hasPrivilegedRole(req)) {
-    return 'anonymous-user';
-  }
-  return 'anonymous-user';
+  return null;
 }
 
 function hasLatLngTypeIssue(issues) {
@@ -391,16 +405,17 @@ async function buildAiDriverDecision({ pickup, vehicleType, authorization, trace
     });
   }
 
-  const selected = selectBestDriver(drivers);
+  const normalizedDrivers = (drivers || []).filter((driver) => normalizeEightDigitId(driver.driverId || driver.driver_id));
+  const selected = selectBestDriver(normalizedDrivers);
   return {
-    availableDrivers: drivers,
+    availableDrivers: normalizedDrivers,
     selectedDriver: selected
   };
 }
 
 function mapDriversToAiCandidates(drivers) {
   return (drivers || []).map((driver) => ({
-    driver_id: driver.driverId || driver.driver_id || null,
+    driver_id: normalizeEightDigitId(driver.driverId || driver.driver_id),
     distance_m: Number(driver.distanceMeters ?? driver.distance_m ?? Number.MAX_SAFE_INTEGER),
     rating: Number(driver.rating ?? 4.5),
     eta_min: Number(driver.etaMinutes ?? driver.eta_min ?? 8),
@@ -416,7 +431,7 @@ function mapAiDriverToLegacy(driver) {
   }
   return {
     ...driver,
-    driverId: driver.driverId || driver.driver_id || null,
+    driverId: normalizeEightDigitId(driver.driverId || driver.driver_id),
     distanceMeters: driver.distanceMeters != null ? driver.distanceMeters : driver.distance_m != null ? Number(driver.distance_m) : null
   };
 }
@@ -520,8 +535,12 @@ async function compensateBookingAfterPaymentFailure({ bookingId, traceId, reason
 
 router.get('/', async (req, res, next) => {
   try {
-    const actorUserId = req.userId || null;
-    const requestedUserId = req.query.user_id || actorUserId || null;
+    const actorUserId = normalizeEightDigitId(req.userId);
+    const rawRequestedUserId = req.query.user_id ? String(req.query.user_id).trim() : null;
+    if (rawRequestedUserId && !isEightDigitId(rawRequestedUserId)) {
+      return res.status(400).json({ error: 'user_id must be an 8-digit ID' });
+    }
+    const requestedUserId = rawRequestedUserId || actorUserId || null;
     const loadTestRequest = isLoadTestRequest(req);
 
     if (loadTestRequest && hasPrivilegedRole(req) && requestedUserId && isLoadSkipListDbEnabled()) {
@@ -618,6 +637,9 @@ router.post('/', async (req, res) => {
     }
     const normalizedDrop = parsed.data.drop || parsed.data.dropoff;
     const userId = resolveUserId(req, parsed.data);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     currentUserId = userId;
     const idempotencyKey = req.header('idempotency-key') || null;
     const routeKey = '/v1/bookings';
@@ -631,22 +653,20 @@ router.post('/', async (req, res) => {
     const requestHash = idempotencyKey ? hashRequest(req.method, routeKey, requestPayload) : null;
     const traceId = req.traceId || req.header('x-trace-id');
     const authorization = req.header('authorization') || '';
-    if (userId && userId !== 'anonymous-user') {
-      const activeBooking = await bookingRepo.findActiveByUser(userId);
-      if (activeBooking) {
-        const released = await releaseStaleActiveBooking({
-          activeBooking,
-          authorization,
-          traceId,
-          req
+    const activeBooking = await bookingRepo.findActiveByUser(userId);
+    if (activeBooking) {
+      const released = await releaseStaleActiveBooking({
+        activeBooking,
+        authorization,
+        traceId,
+        req
+      });
+      if (!released.released) {
+        return res.status(409).json({
+          error: 'An active booking already exists for this user',
+          code: 'ACTIVE_BOOKING_EXISTS',
+          booking: mapBookingCompat(released.activeBooking)
         });
-        if (!released.released) {
-          return res.status(409).json({
-            error: 'An active booking already exists for this user',
-            code: 'ACTIVE_BOOKING_EXISTS',
-            booking: mapBookingCompat(released.activeBooking)
-          });
-        }
       }
     }
 
@@ -793,23 +813,34 @@ router.post('/', async (req, res) => {
           const rideCreatedEventId = crypto.randomUUID();
           const rideRequestedEventId = crypto.randomUUID();
 
-          const rideCreatedEnvelope = buildEnvelope({
-            eventId: rideCreatedEventId,
-            traceId,
-            type: 'RideCreated',
-            payload: {
-              rideId,
-              bookingId,
-              riderId: userId,
-              pickup: { lat: pickup.lat, lng: pickup.lng },
-              dropoff: {
-                lat: normalizedDrop.lat,
-                lng: normalizedDrop.lng
-              },
-              vehicleType,
-              timestamp: createdAt
-            }
-          });
+	          const rideCreatedEnvelope = buildEnvelope({
+	            eventId: rideCreatedEventId,
+	            traceId,
+	            type: 'RideCreated',
+	            payload: {
+	              rideId,
+	              bookingId,
+	              riderId: userId,
+	              pickup: {
+	                lat: pickup.lat,
+	                lng: pickup.lng,
+	                address: typeof pickup.address === 'string' ? pickup.address : undefined
+	              },
+	              dropoff: {
+	                lat: normalizedDrop.lat,
+	                lng: normalizedDrop.lng,
+	                address: typeof normalizedDrop.address === 'string' ? normalizedDrop.address : undefined
+	              },
+	              pricing: Number.isFinite(Number(persistedQuote?.estimatedFare))
+	                ? {
+	                    estimatedFare: Math.round(Number(persistedQuote.estimatedFare)),
+	                    currency: String(persistedQuote?.currency || 'VND').toUpperCase()
+	                  }
+	                : undefined,
+	              vehicleType,
+	              timestamp: createdAt
+	            }
+	          });
 
           await outboxRepo.insertOutboxEvent(
             client,
@@ -996,7 +1027,7 @@ router.post('/', async (req, res) => {
         let releasedStaleBooking = false;
         const traceId = req.traceId || req.header('x-trace-id');
         const authorization = req.header('authorization') || '';
-        if (currentUserId && currentUserId !== 'anonymous-user') {
+        if (currentUserId) {
           try {
             activeBooking = await bookingRepo.findActiveByUser(currentUserId);
             if (activeBooking) {
@@ -1234,7 +1265,7 @@ router.get('/:id/mcp-context', async (req, res) => {
 
     return res.json({
       data: {
-        ride_id: booking.bookingId,
+        ride_id: booking.rideId,
         pickup: booking.pickup,
         drop: booking.dropoff,
         available_drivers: agentDecision?.top_3?.length
@@ -1300,6 +1331,11 @@ router.patch('/:id/status', async (req, res) => {
     if (!driverId) {
       return res.status(400).json({
         error: 'driver_id is required for ACCEPTED status'
+      });
+    }
+    if (!isEightDigitId(driverId)) {
+      return res.status(400).json({
+        error: 'driver_id must be an 8-digit ID'
       });
     }
     if (hasAnyRole(req, ['driver']) && req.userId && driverId !== req.userId) {

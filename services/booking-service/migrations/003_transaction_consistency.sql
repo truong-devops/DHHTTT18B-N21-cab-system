@@ -28,7 +28,6 @@ WITH ranked_active AS (
     ) AS rn
   FROM bookings
   WHERE user_id IS NOT NULL
-    AND user_id <> 'anonymous-user'
     AND status IN ('PENDING', 'REQUESTED', 'ACCEPTED', 'CONFIRMED')
 )
 UPDATE bookings AS b
@@ -68,7 +67,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS bookings_ride_id_uq
 CREATE UNIQUE INDEX IF NOT EXISTS bookings_one_active_per_user_idx
   ON bookings (user_id)
   WHERE user_id IS NOT NULL
-    AND user_id <> 'anonymous-user'
     AND status IN ('PENDING', 'REQUESTED', 'ACCEPTED', 'CONFIRMED');
 
 DROP TRIGGER IF EXISTS set_inbox_updated_at ON inbox_events;

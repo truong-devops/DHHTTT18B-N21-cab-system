@@ -82,4 +82,4 @@ function parseListQuery(query) {
   return { limit, sort, status, rideId, cursor: query.cursor || null };
 }
 
-module.exports = { parseCreatePayment, parseStatusUpdate, parseListQuery };
+module.exports = { isEightDigitId, parseCreatePayment, parseStatusUpdate, parseListQuery };

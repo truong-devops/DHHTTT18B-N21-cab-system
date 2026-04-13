@@ -49,7 +49,7 @@ describe('driver-service routes (smoke)', () => {
   });
 
   test('driver online + location', async () => {
-    const token = signToken({ sub: 'u1', roles: ['driver'] });
+    const token = signToken({ sub: '10000004', roles: ['driver'] });
 
     const onlineRes = await request(app).post('/v1/driver/me/online').set('Authorization', `Bearer ${token}`).send({ deviceId: 'd1' });
 
@@ -63,7 +63,7 @@ describe('driver-service routes (smoke)', () => {
   });
 
   test('internal available query', async () => {
-    const token = signToken({ sub: 'svc', roles: ['service'] });
+    const token = signToken({ sub: '10000001', roles: ['service'] });
 
     const res = await request(app).get('/v1/internal/drivers/available?lat=10.1&lng=20.2').set('Authorization', `Bearer ${token}`);
 
@@ -72,7 +72,7 @@ describe('driver-service routes (smoke)', () => {
   });
 
   test('customer can fetch driver profile by driverId', async () => {
-    const token = signToken({ sub: 'u-customer-1', roles: ['user'] });
+    const token = signToken({ sub: '10000003', roles: ['user'] });
 
     const res = await request(app).get('/v1/drivers/10000004/profile').set('Authorization', `Bearer ${token}`);
 

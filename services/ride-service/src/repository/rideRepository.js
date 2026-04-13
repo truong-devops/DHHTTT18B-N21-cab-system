@@ -42,6 +42,8 @@ function mapRide(doc) {
     dropoff_lat: doc.dropoff_lat ?? null,
     dropoff_lng: doc.dropoff_lng ?? null,
     dropoff_label: doc.dropoff_label || null,
+    quote_fare_amount: doc.quote_fare_amount ?? null,
+    quote_currency: doc.quote_currency || null,
     status: doc.status,
     status_updated_at: doc.status_updated_at,
     created_at: doc.created_at,
@@ -88,6 +90,8 @@ async function createRide({
   dropoffLat = null,
   dropoffLng = null,
   dropoffLabel = null,
+  quoteFareAmount = null,
+  quoteCurrency = null,
   status,
   traceId = null,
   emitOutbox = true
@@ -107,6 +111,8 @@ async function createRide({
     dropoff_lat: dropoffLat,
     dropoff_lng: dropoffLng,
     dropoff_label: dropoffLabel,
+    quote_fare_amount: Number.isFinite(Number(quoteFareAmount)) ? Math.round(Number(quoteFareAmount)) : null,
+    quote_currency: typeof quoteCurrency === 'string' && quoteCurrency.trim() ? quoteCurrency.trim().toUpperCase() : null,
     status,
     status_updated_at: now,
     created_at: now,
@@ -278,6 +284,14 @@ async function updateRideStatus({ id, status, fromStatus = null, reason = null, 
 async function updateRideFields(id, fields) {
   const updates = {};
 
+  if (fields.bookingId !== undefined) {
+    updates.booking_id = fields.bookingId ? String(fields.bookingId).trim() : null;
+  }
+
+  if (fields.riderId !== undefined) {
+    updates.rider_id = normalizeIdentityId(fields.riderId);
+  }
+
   if (fields.driverId !== undefined) {
     updates.driver_id = normalizeIdentityId(fields.driverId);
   }
@@ -290,12 +304,29 @@ async function updateRideFields(id, fields) {
     updates.pickup_lng = fields.pickupLng;
   }
 
+  if (fields.pickupLabel !== undefined) {
+    updates.pickup_label = typeof fields.pickupLabel === 'string' && fields.pickupLabel.trim() ? fields.pickupLabel.trim() : null;
+  }
+
   if (fields.dropoffLat !== undefined) {
     updates.dropoff_lat = fields.dropoffLat;
   }
 
   if (fields.dropoffLng !== undefined) {
     updates.dropoff_lng = fields.dropoffLng;
+  }
+
+  if (fields.dropoffLabel !== undefined) {
+    updates.dropoff_label = typeof fields.dropoffLabel === 'string' && fields.dropoffLabel.trim() ? fields.dropoffLabel.trim() : null;
+  }
+
+  if (fields.quoteFareAmount !== undefined) {
+    updates.quote_fare_amount = Number.isFinite(Number(fields.quoteFareAmount)) ? Math.round(Number(fields.quoteFareAmount)) : null;
+  }
+
+  if (fields.quoteCurrency !== undefined) {
+    updates.quote_currency =
+      typeof fields.quoteCurrency === 'string' && fields.quoteCurrency.trim() ? fields.quoteCurrency.trim().toUpperCase() : null;
   }
 
   if (!Object.keys(updates).length) {

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { ApiError } = require('../utils/errors');
+const { isEightDigitId } = require('../utils/validation');
 
 function resolveJwtConfig() {
   const publicKey = process.env.AUTH_PUBLIC_KEY;
@@ -47,9 +48,12 @@ function requireAuth(req, _res, next) {
 
   try {
     const payload = jwt.verify(token, key, { algorithms });
-    const id = payload.sub || payload.id;
+    const id = String(payload.sub || payload.id || '').trim();
     if (!id) {
       return next(new ApiError(401, 'UNAUTHORIZED', 'Invalid token subject'));
+    }
+    if (!isEightDigitId(id)) {
+      return next(new ApiError(401, 'UNAUTHORIZED', 'Invalid token subject format'));
     }
 
     const roles = normalizeRoles(payload);

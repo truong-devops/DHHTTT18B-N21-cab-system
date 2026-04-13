@@ -8,6 +8,11 @@ jest.mock('../src/repository/rideRepository', () => ({
   createRide: jest.fn(),
   addStatusHistory: jest.fn(),
   getRideById: jest.fn(),
+  getRideByExternalId: jest.fn(),
+  getRideStatusHistory: jest.fn(),
+  getActiveRideForDriver: jest.fn(),
+  claimRideForDriver: jest.fn(),
+  findNextRequestedRide: jest.fn(),
   listRides: jest.fn(),
   updateRideFields: jest.fn(),
   updateRideStatus: jest.fn()
@@ -95,5 +100,128 @@ describe('ride-service routes integration', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.nextCursor).toBe(Buffer.from(`${row.created_at.toISOString()}|${row.id}`).toString('base64'));
+  });
+
+  it('returns fare summary using payment linked by external ride id', async () => {
+    const completedRide = buildRideRow({
+      id: 'ride-internal-1',
+      external_ride_id: 'ride_external_1',
+      status: 'completed',
+      created_at: new Date('2024-01-01T00:00:00Z'),
+      status_updated_at: new Date('2024-01-01T01:00:00Z')
+    });
+    rideRepository.getRideById.mockResolvedValue(completedRide);
+    rideRepository.getRideStatusHistory.mockResolvedValue([
+      { to_status: 'in_progress', occurred_at: new Date('2024-01-01T00:20:00Z') },
+      { to_status: 'completed', occurred_at: new Date('2024-01-01T01:00:00Z') }
+    ]);
+
+    const originalFetch = global.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            id: 'pay-1',
+            rideId: 'ride_external_1',
+            amount: '123000',
+            currency: 'VND',
+            status: 'PAID',
+            createdAt: '2024-01-01T01:00:00Z'
+          }
+        ]
+      })
+    });
+    global.fetch = fetchMock;
+    try {
+      const response = await request(app).get('/v1/rides/ride-internal-1/summary').set('Authorization', authHeader());
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.fare.amount).toBe(123000);
+      expect(response.body.data.fare.source).toBe('payment-service');
+      expect(fetchMock).toHaveBeenCalled();
+      expect(String(fetchMock.mock.calls[0][0])).toContain('rideId=ride_external_1');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('falls back to booking quote fare when payment is not found', async () => {
+    const completedRide = buildRideRow({
+      id: 'ride-internal-2',
+      external_ride_id: 'ride_external_2',
+      status: 'completed',
+      quote_fare_amount: 88000,
+      quote_currency: 'VND',
+      created_at: new Date('2024-01-01T00:00:00Z'),
+      status_updated_at: new Date('2024-01-01T01:00:00Z')
+    });
+    rideRepository.getRideById.mockResolvedValue(completedRide);
+    rideRepository.getRideStatusHistory.mockResolvedValue([
+      { to_status: 'in_progress', occurred_at: new Date('2024-01-01T00:20:00Z') },
+      { to_status: 'completed', occurred_at: new Date('2024-01-01T01:00:00Z') }
+    ]);
+
+    const originalFetch = global.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [] })
+    });
+    global.fetch = fetchMock;
+    try {
+      const response = await request(app).get('/v1/rides/ride-internal-2/summary').set('Authorization', authHeader());
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.fare.amount).toBe(88000);
+      expect(response.body.data.fare.currency).toBe('VND');
+      expect(response.body.data.fare.source).toBe('booking-quote');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('ignores zero payment amount and uses booking quote in summary', async () => {
+    const completedRide = buildRideRow({
+      id: 'ride-internal-3',
+      external_ride_id: 'ride_external_3',
+      status: 'completed',
+      quote_fare_amount: 99000,
+      quote_currency: 'VND',
+      created_at: new Date('2024-01-01T00:00:00Z'),
+      status_updated_at: new Date('2024-01-01T01:00:00Z')
+    });
+    rideRepository.getRideById.mockResolvedValue(completedRide);
+    rideRepository.getRideStatusHistory.mockResolvedValue([
+      { to_status: 'in_progress', occurred_at: new Date('2024-01-01T00:20:00Z') },
+      { to_status: 'completed', occurred_at: new Date('2024-01-01T01:00:00Z') }
+    ]);
+
+    const originalFetch = global.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            id: 'pay-0',
+            rideId: 'ride_external_3',
+            amount: '0',
+            currency: 'VND',
+            status: 'INITIATED',
+            createdAt: '2024-01-01T01:00:00Z'
+          }
+        ]
+      })
+    });
+    global.fetch = fetchMock;
+    try {
+      const response = await request(app).get('/v1/rides/ride-internal-3/summary').set('Authorization', authHeader());
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.fare.amount).toBe(99000);
+      expect(response.body.data.fare.source).toBe('booking-quote');
+      expect(response.body.data.fare.paymentStatus).toBe('INITIATED');
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });

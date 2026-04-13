@@ -71,7 +71,7 @@ describe('auth middleware', () => {
   });
 
   test('requireSelf rejects different user', async () => {
-    const req = buildReq({}, { id: 'user_2' });
+    const req = buildReq({}, { id: '10000004' });
     req.user = { id: '10000003', roles: [], scopes: [] };
     const err = await runMiddleware(requireSelf, req);
     expect(err).toMatchObject({ status: 403, code: 'FORBIDDEN' });
