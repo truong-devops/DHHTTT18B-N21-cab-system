@@ -10,7 +10,7 @@ const rides = [
     external_ride_id: 'ext-7777',
     booking_id: 'booking-101',
     rider_id: '10000003',
-    driver_id: '99999999-9999-9999-9999-999999999999',
+    driver_id: '10000004',
     pickup_lat: 10.776,
     pickup_lng: 106.701,
     dropoff_lat: 10.783,
@@ -25,7 +25,7 @@ const rides = [
     external_ride_id: 'ext-8888',
     booking_id: 'booking-102',
     rider_id: '10000003',
-    driver_id: '99999999-9999-9999-9999-999999999999',
+    driver_id: '10000004',
     pickup_lat: 10.771,
     pickup_lng: 106.703,
     dropoff_lat: 10.764,
@@ -45,7 +45,7 @@ const rides = [
     pickup_lng: 106.705,
     dropoff_lat: 10.782,
     dropoff_lng: 106.699,
-    status: 'requested',
+    status: 'cancelled',
     status_updated_at: minutesAgo(5),
     created_at: minutesAgo(6),
     updated_at: minutesAgo(5)
@@ -55,12 +55,12 @@ const rides = [
     external_ride_id: 'ext-9997',
     booking_id: 'booking-104',
     rider_id: '10000003',
-    driver_id: '99999999-9999-9999-9999-999999999999',
+    driver_id: '10000004',
     pickup_lat: 10.768,
     pickup_lng: 106.692,
     dropoff_lat: 10.773,
     dropoff_lng: 106.688,
-    status: 'assigned',
+    status: 'cancelled',
     status_updated_at: minutesAgo(12),
     created_at: minutesAgo(18),
     updated_at: minutesAgo(12)
@@ -69,13 +69,13 @@ const rides = [
     _id: '99999999-9999-9999-9999-999999999996',
     external_ride_id: 'ext-9996',
     booking_id: 'booking-105',
-    rider_id: '33333333-3333-3333-3333-333333333333',
-    driver_id: '99999999-9999-9999-9999-999999999999',
+    rider_id: '10000003',
+    driver_id: '10000004',
     pickup_lat: 10.765,
     pickup_lng: 106.69,
     dropoff_lat: 10.759,
     dropoff_lng: 106.683,
-    status: 'in_progress',
+    status: 'completed',
     status_updated_at: minutesAgo(3),
     created_at: minutesAgo(15),
     updated_at: minutesAgo(3)
@@ -93,7 +93,7 @@ const rideHistory = [
     from_status: 'requested',
     to_status: 'completed',
     reason: 'Seeded completion',
-    actor_id: '11111111-1111-1111-1111-111111111111',
+    actor_id: '10000001',
     trace_id: 'seed-trace-1',
     occurred_at: minutesAgo(25),
     created_at: minutesAgo(25),
@@ -105,7 +105,7 @@ const rideHistory = [
     from_status: 'requested',
     to_status: 'cancelled',
     reason: 'Seeded cancellation',
-    actor_id: '11111111-1111-1111-1111-111111111111',
+    actor_id: '10000001',
     trace_id: 'seed-trace-2',
     occurred_at: minutesAgo(30),
     created_at: minutesAgo(30),
@@ -114,14 +114,38 @@ const rideHistory = [
   {
     _id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
     ride_id: '99999999-9999-9999-9999-999999999998',
-    from_status: null,
-    to_status: 'requested',
-    reason: 'Seeded request',
-    actor_id: '66666666-6666-6666-6666-666666666666',
+    from_status: 'requested',
+    to_status: 'cancelled',
+    reason: 'Seeded auto-cancelled request',
+    actor_id: '10000006',
     trace_id: 'seed-trace-3',
     occurred_at: minutesAgo(5),
     created_at: minutesAgo(5),
     updated_at: minutesAgo(5)
+  },
+  {
+    _id: 'abababab-abab-abab-abab-abababababab',
+    ride_id: '99999999-9999-9999-9999-999999999997',
+    from_status: 'assigned',
+    to_status: 'cancelled',
+    reason: 'Seeded cancellation',
+    actor_id: '10000001',
+    trace_id: 'seed-trace-4',
+    occurred_at: minutesAgo(12),
+    created_at: minutesAgo(12),
+    updated_at: minutesAgo(12)
+  },
+  {
+    _id: 'cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd',
+    ride_id: '99999999-9999-9999-9999-999999999996',
+    from_status: 'in_progress',
+    to_status: 'completed',
+    reason: 'Seeded completion',
+    actor_id: '10000001',
+    trace_id: 'seed-trace-5',
+    occurred_at: minutesAgo(3),
+    created_at: minutesAgo(3),
+    updated_at: minutesAgo(3)
   }
 ];
 
@@ -134,7 +158,7 @@ const notificationDb = db.getSiblingDB('notification_service');
 const notifications = [
   {
     _id: ObjectId('64b64c2f1f1f1f1f1f1f1f1f'),
-    userId: '11111111-1111-1111-1111-111111111111',
+    userId: '10000001',
     channels: ['email'],
     recipient: 'admin@cab.local',
     templateKey: 'seed.welcome',
@@ -160,7 +184,7 @@ const notifications = [
   },
   {
     _id: ObjectId('64b64c2f1f1f1f1f1f1f1f20'),
-    userId: '33333333-3333-3333-3333-333333333333',
+    userId: '10000003',
     channels: ['sms'],
     recipient: '0900000001',
     templateKey: 'seed.ride',
@@ -185,7 +209,7 @@ const notifications = [
   },
   {
     _id: ObjectId('64b64c2f1f1f1f1f1f1f1f21'),
-    userId: '33333333-3333-3333-3333-333333333333',
+    userId: '10000003',
     channels: ['push'],
     recipient: 'device-token-1',
     templateKey: 'seed.delay',
@@ -211,7 +235,7 @@ const notifications = [
   },
   {
     _id: ObjectId('64b64c2f1f1f1f1f1f1f1f22'),
-    userId: '11111111-1111-1111-1111-111111111111',
+    userId: '10000001',
     channels: ['email', 'push'],
     recipient: 'admin@cab.local',
     templateKey: 'seed.alert',
@@ -248,19 +272,19 @@ notifications.forEach((notification) => {
 
 const preferences = [
   {
-    userId: '11111111-1111-1111-1111-111111111111',
+    userId: '10000001',
     channels: { email: true, sms: false, push: true },
     createdAt: minutesAgo(60),
     updatedAt: minutesAgo(5)
   },
   {
-    userId: '33333333-3333-3333-3333-333333333333',
+    userId: '10000003',
     channels: { email: true, sms: true, push: false },
     createdAt: minutesAgo(60),
     updatedAt: minutesAgo(10)
   },
   {
-    userId: '66666666-6666-6666-6666-666666666666',
+    userId: '10000006',
     channels: { email: false, sms: true, push: true },
     createdAt: minutesAgo(45),
     updatedAt: minutesAgo(20)

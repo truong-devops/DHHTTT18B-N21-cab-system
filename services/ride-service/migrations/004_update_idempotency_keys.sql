@@ -1,7 +1,7 @@
 -- migrate:up
 ALTER TABLE idempotency_keys
   ADD COLUMN IF NOT EXISTS route_key text,
-  ADD COLUMN IF NOT EXISTS user_id uuid,
+  ADD COLUMN IF NOT EXISTS user_id char(8),
   ADD COLUMN IF NOT EXISTS idem_key text,
   ADD COLUMN IF NOT EXISTS response_headers jsonb;
 

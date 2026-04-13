@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS driver_kyc_submissions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  driver_id uuid NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+  driver_id char(8) NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
   status text NOT NULL DEFAULT 'PENDING',
   full_name text,
   phone text,

@@ -21,15 +21,32 @@ function toFiniteNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+function normalizeBookingId(raw: any): string | null {
+  const candidates = [raw?.bookingId, raw?.booking_id];
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function isRealBookingRide(ride: rideApi.Ride | null | undefined): boolean {
+  if (!ride) return false;
+  return typeof ride.bookingId === 'string' && ride.bookingId.trim().length > 0;
+}
+
 function normalizeRide(raw: any): rideApi.Ride | null {
   if (!raw || typeof raw !== 'object') return null;
   const resolvedId =
     typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : typeof raw.rideId === 'string' && raw.rideId.trim() ? raw.rideId.trim() : '';
   if (!resolvedId) return null;
+  const resolvedBookingId = normalizeBookingId(raw);
 
   return {
     ...(raw as rideApi.Ride),
     id: resolvedId,
+    bookingId: resolvedBookingId,
     pickupLat: toFiniteNumber(raw.pickupLat),
     pickupLng: toFiniteNumber(raw.pickupLng),
     dropoffLat: toFiniteNumber(raw.dropoffLat),
@@ -86,7 +103,7 @@ export function useIncomingRide({ enabled, intervalMs = DEFAULT_INTERVAL_MS, lim
       const res = await rideApi.listAssignments();
       const list = Array.isArray((res as any)?.data) ? (res as any).data : Array.isArray((res as any)?.data?.data) ? (res as any).data.data : [];
       const nextRide = normalizeRide(list[0]) ?? null;
-      setIncomingRide(nextRide);
+      setIncomingRide(isRealBookingRide(nextRide) ? nextRide : null);
       setLastUpdateAt(Date.now());
     } catch (err: any) {
       setError(err?.message ?? 'Không thể tải chuyến mới');
@@ -126,12 +143,13 @@ export function useIncomingRide({ enabled, intervalMs = DEFAULT_INTERVAL_MS, lim
   const handleRide = useCallback(async (ride: rideApi.Ride) => {
     const normalized = normalizeRide(ride);
     if (!normalized?.id) return;
-    if (!normalized.pickupLat && !normalized.dropoffLat) {
+    if ((!normalized.pickupLat && !normalized.dropoffLat) || !isRealBookingRide(normalized)) {
       try {
         const detail = await rideApi.getRide(normalized.id);
-        setIncomingRide(normalizeRide(detail.data));
+        const detailed = normalizeRide(detail.data);
+        setIncomingRide(isRealBookingRide(detailed) ? detailed : null);
       } catch {
-        setIncomingRide(normalized);
+        setIncomingRide(isRealBookingRide(normalized) ? normalized : null);
       }
     } else {
       setIncomingRide(normalized);

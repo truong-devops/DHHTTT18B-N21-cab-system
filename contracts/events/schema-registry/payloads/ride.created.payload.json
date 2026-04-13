@@ -7,7 +7,7 @@
   "properties": {
     "rideId": { "type": "string", "minLength": 1 },
     "bookingId": { "type": "string" },
-    "riderId": { "type": "string" },
+    "riderId": { "type": "string", "pattern": "^[0-9]{8}$" },
     "pickup": {
       "type": "object",
       "required": ["lat", "lng"],

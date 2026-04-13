@@ -67,6 +67,12 @@ paths:
           name: riderId
           schema:
             type: string
+            pattern: '^[0-9]{8}$'
+        - in: query
+          name: driverId
+          schema:
+            type: string
+            pattern: '^[0-9]{8}$'
         - in: query
           name: limit
           schema:
@@ -249,9 +255,11 @@ components:
           nullable: true
         riderId:
           type: string
+          pattern: '^[0-9]{8}$'
           nullable: true
         driverId:
           type: string
+          pattern: '^[0-9]{8}$'
           nullable: true
         pickupLat:
           type: number
@@ -279,6 +287,7 @@ components:
           type: string
         driverId:
           type: string
+          pattern: '^[0-9]{8}$'
         pickupLat:
           type: number
         pickupLng:
@@ -294,6 +303,7 @@ components:
       properties:
         driverId:
           type: string
+          pattern: '^[0-9]{8}$'
         pickupLat:
           type: number
         pickupLng:

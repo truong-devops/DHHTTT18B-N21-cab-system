@@ -2,7 +2,7 @@
 ALTER TABLE ride_status_history
   ADD COLUMN IF NOT EXISTS from_status text,
   ADD COLUMN IF NOT EXISTS to_status text,
-  ADD COLUMN IF NOT EXISTS actor_id uuid,
+  ADD COLUMN IF NOT EXISTS actor_id char(8),
   ADD COLUMN IF NOT EXISTS trace_id text,
   ADD COLUMN IF NOT EXISTS occurred_at timestamptz NOT NULL DEFAULT now();
 

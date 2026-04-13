@@ -67,6 +67,7 @@ paths:
           name: riderId
           schema:
             type: string
+            pattern: '^[0-9]{8}$'
         - in: query
           name: limit
           schema:
@@ -218,8 +219,10 @@ components:
           type: string
         riderId:
           type: string
+          pattern: '^[0-9]{8}$'
         driverId:
           type: string
+          pattern: '^[0-9]{8}$'
         rating:
           type: integer
           minimum: 1
@@ -247,6 +250,7 @@ components:
           type: string
         driverId:
           type: string
+          pattern: '^[0-9]{8}$'
         rating:
           type: integer
           minimum: 1

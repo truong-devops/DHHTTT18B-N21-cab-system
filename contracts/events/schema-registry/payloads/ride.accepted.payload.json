@@ -8,7 +8,7 @@
     "event_type": { "const": "ride_accepted" },
     "booking_id": { "type": "string", "minLength": 1 },
     "ride_id": { "type": "string", "minLength": 1 },
-    "driver_id": { "type": "string", "minLength": 1 },
+    "driver_id": { "type": "string", "pattern": "^[0-9]{8}$" },
     "status": { "const": "ACCEPTED" },
     "timestamp": { "type": "string", "format": "date-time" }
   },

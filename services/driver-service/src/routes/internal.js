@@ -6,6 +6,10 @@ const driverService = require('../services/driverService');
 
 const router = express.Router();
 
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
 router.use('/v1/internal', requireAuth, requireRole('service', 'admin'));
 
 router.get(
@@ -52,6 +56,11 @@ router.get(
     paramsSchema: {
       required: ['driverId'],
       properties: { driverId: { type: 'string' } }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.params?.driverId)) {
+        errors.push({ path: 'params.driverId', message: 'must be an 8-digit ID' });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -66,6 +75,11 @@ router.get(
     paramsSchema: {
       required: ['driverId'],
       properties: { driverId: { type: 'string' } }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.params?.driverId)) {
+        errors.push({ path: 'params.driverId', message: 'must be an 8-digit ID' });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -84,6 +98,11 @@ router.post(
     bodySchema: {
       required: ['rideId'],
       properties: { rideId: { type: 'string' } }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.params?.driverId)) {
+        errors.push({ path: 'params.driverId', message: 'must be an 8-digit ID' });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -101,6 +120,11 @@ router.post(
     },
     bodySchema: {
       properties: { rideId: { type: 'string' } }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.params?.driverId)) {
+        errors.push({ path: 'params.driverId', message: 'must be an 8-digit ID' });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -115,6 +139,9 @@ router.post(
     custom: (req, errors) => {
       if (!Array.isArray(req.body?.driverIds)) {
         errors.push({ path: 'body.driverIds', message: 'must be an array' });
+      }
+      if (Array.isArray(req.body?.driverIds) && req.body.driverIds.some((id) => !isEightDigitId(id))) {
+        errors.push({ path: 'body.driverIds', message: 'must contain only 8-digit IDs' });
       }
       if (req.body?.fields && !Array.isArray(req.body.fields)) {
         errors.push({ path: 'body.fields', message: 'must be an array' });

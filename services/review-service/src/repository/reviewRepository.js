@@ -1,46 +1,12 @@
 const { applyCursorQuery } = require('@libs/http');
 const pool = require('../db/pool');
 
-const COLUMN_TYPE_CACHE = new Map();
-
-function isUuidLike(value) {
-  if (typeof value !== 'string') return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
 function isEightDigitId(value) {
   if (typeof value !== 'string') return false;
   return /^\d{8}$/.test(value);
 }
 
-function mapEightDigitIdToUuid(value) {
-  return `00000000-0000-0000-0000-${value.padStart(12, '0')}`;
-}
-
-async function getColumnType(tableName, columnName) {
-  const cacheKey = `${tableName}.${columnName}`;
-  if (COLUMN_TYPE_CACHE.has(cacheKey)) {
-    return COLUMN_TYPE_CACHE.get(cacheKey);
-  }
-
-  const result = await pool.query(
-    `
-      SELECT udt_name
-      FROM information_schema.columns
-      WHERE table_schema = current_schema()
-        AND table_name = $1
-        AND column_name = $2
-      LIMIT 1
-    `,
-    [tableName, columnName]
-  );
-
-  const udtName = result.rows[0]?.udt_name || null;
-  COLUMN_TYPE_CACHE.set(cacheKey, udtName);
-  return udtName;
-}
-
-async function normalizeIdForColumn(tableName, columnName, value) {
+function normalizeIdentityId(value) {
   if (value === undefined || value === null) {
     return value;
   }
@@ -50,23 +16,22 @@ async function normalizeIdForColumn(tableName, columnName, value) {
     return normalized;
   }
 
-  const columnType = await getColumnType(tableName, columnName);
-  if (columnType === 'uuid') {
-    if (isUuidLike(normalized)) {
-      return normalized;
-    }
-    if (isEightDigitId(normalized)) {
-      return mapEightDigitIdToUuid(normalized);
-    }
+  if (isEightDigitId(normalized)) {
+    return normalized;
+  }
+
+  const legacyBridgeMatch = normalized.match(/^00000000-0000-0000-0000-0*(\d{8})$/i);
+  if (legacyBridgeMatch) {
+    return legacyBridgeMatch[1];
   }
 
   return normalized;
 }
 
 async function createReview({ rideId, riderId, driverId, rating, comment = null, tipAmount = null, status }) {
-  const normalizedRideId = await normalizeIdForColumn('reviews', 'ride_id', rideId);
-  const normalizedRiderId = await normalizeIdForColumn('reviews', 'rider_id', riderId);
-  const normalizedDriverId = await normalizeIdForColumn('reviews', 'driver_id', driverId);
+  const normalizedRideId = rideId === undefined || rideId === null ? null : String(rideId).trim();
+  const normalizedRiderId = normalizeIdentityId(riderId);
+  const normalizedDriverId = normalizeIdentityId(driverId);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -111,14 +76,14 @@ async function getReviewById(id) {
 }
 
 async function getReviewByRideAndRider({ rideId, riderId }) {
-  const normalizedRideId = await normalizeIdForColumn('reviews', 'ride_id', rideId);
-  const normalizedRiderId = await normalizeIdForColumn('reviews', 'rider_id', riderId);
+  const normalizedRideId = rideId === undefined || rideId === null ? null : String(rideId).trim();
+  const normalizedRiderId = normalizeIdentityId(riderId);
   const result = await pool.query(
     `
       SELECT *
       FROM reviews
-      WHERE ride_id::text = $1
-        AND rider_id::text = $2
+      WHERE ride_id = $1
+        AND rider_id = $2
       LIMIT 1
     `,
     [normalizedRideId, normalizedRiderId]
@@ -166,7 +131,7 @@ async function updateReviewFields(id, fields) {
 }
 
 async function updateReviewStatus({ id, status, reason = null, actorId = null, traceId = null }) {
-  const normalizedActorId = await normalizeIdForColumn('reviews_status_history', 'actor_id', actorId);
+  const normalizedActorId = normalizeIdentityId(actorId);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -222,7 +187,7 @@ async function updateReviewStatus({ id, status, reason = null, actorId = null, t
 }
 
 async function addStatusHistory({ reviewId, status, reason = null, actorId = null, traceId = null, fromStatus = null }) {
-  const normalizedActorId = await normalizeIdForColumn('reviews_status_history', 'actor_id', actorId);
+  const normalizedActorId = normalizeIdentityId(actorId);
   await pool.query(
     `
       INSERT INTO reviews_status_history (
@@ -241,7 +206,7 @@ async function addStatusHistory({ reviewId, status, reason = null, actorId = nul
 }
 
 async function listReviews({ limit = 20, cursor = null, status = null, riderId = null, sort = '-created_at' } = {}) {
-  const normalizedRiderId = await normalizeIdForColumn('reviews', 'rider_id', riderId);
+  const normalizedRiderId = normalizeIdentityId(riderId);
   const builder = {
     values: [],
     where: [],
@@ -256,7 +221,7 @@ async function listReviews({ limit = 20, cursor = null, status = null, riderId =
 
   if (normalizedRiderId) {
     builder.values.push(normalizedRiderId);
-    builder.where.push(`rider_id::text = $${builder.values.length}`);
+    builder.where.push(`rider_id = $${builder.values.length}`);
   }
 
   applyCursorQuery(builder, { limit, cursor, sort });

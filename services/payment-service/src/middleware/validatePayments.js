@@ -40,7 +40,7 @@ const createPaymentBodySchema = {
     amount: { type: 'string', pattern: '^\\d+(\\.\\d{1,2})?$' },
     currency: { type: 'string', minLength: 3, maxLength: 3 },
     method: { type: 'string' },
-    userId: { type: 'string' },
+    userId: { type: 'string', pattern: '^[0-9]{8}$' },
     note: { type: 'string' }
   }
 };
@@ -59,7 +59,7 @@ const walletSummaryQuerySchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    driverUserId: { type: 'string', minLength: 1 }
+    driverUserId: { type: 'string', pattern: '^[0-9]{8}$' }
   }
 };
 
@@ -71,7 +71,7 @@ const listWithdrawalsQuerySchema = {
     cursor: { type: 'string', minLength: 1 },
     sort: { type: 'string', enum: ['requestedAt', '-requestedAt'], default: '-requestedAt' },
     status: { type: 'string', enum: WITHDRAWAL_STATUSES },
-    driverUserId: { type: 'string', minLength: 1 }
+    driverUserId: { type: 'string', pattern: '^[0-9]{8}$' }
   }
 };
 

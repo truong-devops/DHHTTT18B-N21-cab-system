@@ -2,20 +2,20 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 
 jest.mock('../src/services/driverService', () => ({
-  setOnline: jest.fn(async () => ({ driver: { id: 'd1' } })),
+  setOnline: jest.fn(async () => ({ driver: { id: '10000004' } })),
   updateDriverLocation: jest.fn(async () => ({ updated: true })),
   listAvailableDrivers: jest.fn(async () => [
     {
-      driverId: 'd1',
+      driverId: '10000004',
       distanceMeters: 120,
       location: { lat: 10.1, lng: 20.2, recordedAt: new Date().toISOString() },
       vehicle: { type: 'CAR', plate: 'ABC-123' }
     }
   ]),
-  getDriverMe: jest.fn(async () => ({ driver: { id: 'd1' } })),
+  getDriverMe: jest.fn(async () => ({ driver: { id: '10000004' } })),
   getDriverProfileForCustomer: jest.fn(async () => ({
     driver: {
-      id: 'd1',
+      id: '10000004',
       fullName: 'Driver One',
       phone: '0900000001',
       status: 'APPROVED',
@@ -23,7 +23,7 @@ jest.mock('../src/services/driverService', () => ({
     },
     vehicle: {
       id: 'veh-1',
-      driverId: 'd1',
+      driverId: '10000004',
       vehicleType: 'CAR',
       plateNumber: 'ABC-123',
       brand: 'Toyota',
@@ -74,11 +74,11 @@ describe('driver-service routes (smoke)', () => {
   test('customer can fetch driver profile by driverId', async () => {
     const token = signToken({ sub: 'u-customer-1', roles: ['user'] });
 
-    const res = await request(app).get('/v1/drivers/d1/profile').set('Authorization', `Bearer ${token}`);
+    const res = await request(app).get('/v1/drivers/10000004/profile').set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.driver.id).toBe('d1');
+    expect(res.body.data.driver.id).toBe('10000004');
     expect(res.body.data.vehicle.plateNumber).toBe('ABC-123');
-    expect(driverService.getDriverProfileForCustomer).toHaveBeenCalledWith('d1');
+    expect(driverService.getDriverProfileForCustomer).toHaveBeenCalledWith('10000004');
   });
 });

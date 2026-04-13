@@ -6,6 +6,10 @@ const driverService = require('../services/driverService');
 
 const router = express.Router();
 
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
 router.use('/v1/admin', requireAuth, requireRole('admin', 'ops', 'service'));
 
 router.post(
@@ -17,6 +21,11 @@ router.post(
         userId: { type: 'string' },
         fullName: { type: 'string' },
         phone: { type: 'string' }
+      }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.body?.userId)) {
+        errors.push({ path: 'body.userId', message: 'must be an 8-digit ID' });
       }
     }
   }),
@@ -39,6 +48,11 @@ router.patch(
     paramsSchema: {
       required: ['driverId'],
       properties: { driverId: { type: 'string' } }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.params?.driverId)) {
+        errors.push({ path: 'params.driverId', message: 'must be an 8-digit ID' });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -53,6 +67,11 @@ router.patch(
     paramsSchema: {
       required: ['driverId'],
       properties: { driverId: { type: 'string' } }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.params?.driverId)) {
+        errors.push({ path: 'params.driverId', message: 'must be an 8-digit ID' });
+      }
     }
   }),
   asyncHandler(async (req, res) => {

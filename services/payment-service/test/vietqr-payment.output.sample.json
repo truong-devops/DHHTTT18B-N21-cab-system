@@ -2,7 +2,7 @@
   "data": {
     "id": "pay_demo_vietqr",
     "rideId": "ride_vietqr_001",
-    "userId": "user_demo_001",
+    "userId": "10000003",
     "amount": "150000",
     "currency": "VND",
     "method": "VIETQR",
