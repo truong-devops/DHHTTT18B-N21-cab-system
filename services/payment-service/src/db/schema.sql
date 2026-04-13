@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS payments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ride_id text NOT NULL,
-  user_id text,
+  user_id char(8),
   amount numeric(12, 2) NOT NULL,
   currency char(3) NOT NULL,
   method text,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS payment_status_history (
   from_status text,
   to_status text NOT NULL,
   reason text,
-  actor_id text,
+  actor_id char(8),
   occurred_at timestamptz NOT NULL DEFAULT now(),
   trace_id text,
   CONSTRAINT payment_status_history_from_check CHECK (
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS payment_status_history (
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   route_key text NOT NULL,
-  user_id text NOT NULL,
+  user_id char(8) NOT NULL,
   idem_key text NOT NULL,
   request_hash text NOT NULL,
   response_code integer NOT NULL,
@@ -87,10 +87,30 @@ CREATE TABLE IF NOT EXISTS outbox_events (
   published_at timestamptz
 );
 
+CREATE TABLE IF NOT EXISTS driver_withdrawals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  driver_user_id char(8) NOT NULL,
+  amount numeric(12, 2) NOT NULL,
+  currency char(3) NOT NULL DEFAULT 'VND',
+  status text NOT NULL DEFAULT 'REQUESTED',
+  note text,
+  rejection_reason text,
+  requested_at timestamptz NOT NULL DEFAULT now(),
+  processed_at timestamptz,
+  processed_by char(8),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT driver_withdrawals_amount_positive CHECK (amount > 0),
+  CONSTRAINT driver_withdrawals_currency_length CHECK (char_length(currency) = 3),
+  CONSTRAINT driver_withdrawals_status_check CHECK (status IN ('REQUESTED', 'APPROVED', 'REJECTED', 'PAID', 'FAILED', 'CANCELED'))
+);
+
 CREATE INDEX IF NOT EXISTS payments_created_at_id_idx ON payments (created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS payments_status_created_at_id_idx ON payments (status, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS payments_ride_id_created_at_id_idx ON payments (ride_id, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS payment_status_history_payment_id_occurred_at_idx ON payment_status_history (payment_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS driver_withdrawals_driver_requested_idx ON driver_withdrawals (driver_user_id, requested_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS driver_withdrawals_status_requested_idx ON driver_withdrawals (status, requested_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS outbox_events_status_created_at_idx ON outbox_events (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS outbox_events_claim_idx ON outbox_events (status, next_retry_at, created_at);
 CREATE INDEX IF NOT EXISTS outbox_events_processing_idx ON outbox_events (status, processing_started_at);

@@ -1,12 +1,12 @@
 -- migrate:up
 ALTER TABLE bookings
-  ADD COLUMN IF NOT EXISTS user_id text,
+  ADD COLUMN IF NOT EXISTS user_id char(8),
   ADD COLUMN IF NOT EXISTS distance_km numeric(10, 3),
   ADD COLUMN IF NOT EXISTS eta_minutes integer;
 
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   route_key text NOT NULL,
-  user_id text NOT NULL,
+  user_id char(8) NOT NULL,
   idem_key text NOT NULL,
   request_hash text NOT NULL,
   response_code integer,

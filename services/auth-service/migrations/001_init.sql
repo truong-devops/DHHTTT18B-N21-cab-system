@@ -1,7 +1,8 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE SEQUENCE IF NOT EXISTS user8_seq START 10000050;
 
 CREATE TABLE IF NOT EXISTS users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id char(8) PRIMARY KEY DEFAULT LPAD(nextval('user8_seq')::text,8,'0'),
   email text UNIQUE,
   username text UNIQUE,
   password_hash text NOT NULL,
@@ -19,7 +20,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_username_uq
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
+  user_id char(8) NOT NULL,
   token text NOT NULL UNIQUE,
   expired_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()

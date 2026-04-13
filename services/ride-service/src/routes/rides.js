@@ -10,7 +10,8 @@ const {
   findNextRequestedRide,
   updateRideFields,
   updateRideStatus,
-  addStatusHistory
+  addStatusHistory,
+  getRideStatusHistory
 } = require('../repository/rideRepository');
 const { getByKey, createKey, setResponse } = require('../repository/idempotencyRepository');
 const { requireAuth } = require('../middleware/auth');
@@ -29,6 +30,7 @@ const router = express.Router();
 // Auto-assign is OFF by default; set AUTO_ASSIGN_DRIVER=true to force assign to DEFAULT_DRIVER_ID.
 const AUTO_ASSIGN_DRIVER = String(process.env.AUTO_ASSIGN_DRIVER || 'false').toLowerCase() === 'true';
 const DEFAULT_DRIVER_ID = String(process.env.DEFAULT_DRIVER_ID || '').trim();
+const PAYMENT_SERVICE_URL = String(process.env.PAYMENT_SERVICE_URL || 'http://localhost:3007').replace(/\/+$/, '');
 
 router.use(requireAuth);
 
@@ -50,6 +52,142 @@ function toRideResponse(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
+function haversineDistanceMeters(aLat, aLng, bLat, bLng) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const lat1 = toRad(aLat);
+  const lat2 = toRad(bLat);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function toSafeDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? null : date;
+}
+
+function computeDurationSeconds(ride, statusHistory) {
+  const createdAt = toSafeDate(ride.created_at);
+  const completedAtFromHistory = statusHistory
+    .map((entry) => ({ status: normalizeStatus(entry.to_status), at: toSafeDate(entry.occurred_at) }))
+    .find((entry) => entry.status === 'COMPLETED' && entry.at)?.at;
+  const startedAtFromHistory = statusHistory
+    .map((entry) => ({ status: normalizeStatus(entry.to_status), at: toSafeDate(entry.occurred_at) }))
+    .find((entry) => entry.status === 'IN_PROGRESS' && entry.at)?.at;
+
+  const completedAt = completedAtFromHistory || toSafeDate(ride.status_updated_at);
+  const startedAt = startedAtFromHistory || createdAt;
+
+  if (!startedAt || !completedAt) return null;
+  const seconds = Math.round((completedAt.getTime() - startedAt.getTime()) / 1000);
+  return seconds > 0 ? seconds : null;
+}
+
+function computeBreakdown({ fareAmount, distanceMeters, durationSeconds }) {
+  if (Number.isFinite(fareAmount) && fareAmount > 0) {
+    const total = Math.round(fareAmount);
+    const base = Math.round(total * 0.35);
+    const distance = Math.round(total * 0.45);
+    const time = Math.max(0, total - base - distance);
+    return { base, distance, time, surge: 0, discount: 0, total };
+  }
+
+  const distanceKm = Number.isFinite(distanceMeters) ? distanceMeters / 1000 : 0;
+  const durationMin = Number.isFinite(durationSeconds) ? durationSeconds / 60 : 0;
+  const base = 12000;
+  const distance = Math.round(distanceKm * 8500);
+  const time = Math.round(durationMin * 1000);
+  const total = base + distance + time;
+  return { base, distance, time, surge: 0, discount: 0, total };
+}
+
+async function fetchPaymentsForRideId({ rideId, authorization, traceId, requestId }) {
+  if (!PAYMENT_SERVICE_URL || !rideId) return [];
+  const url = new URL('/v1/payments', PAYMENT_SERVICE_URL);
+  url.searchParams.set('rideId', rideId);
+  url.searchParams.set('limit', '20');
+  url.searchParams.set('sort', '-createdAt');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3500);
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        ...(authorization ? { Authorization: authorization } : {}),
+        ...(traceId ? { 'x-trace-id': traceId } : {}),
+        ...(requestId ? { 'x-request-id': requestId } : {})
+      },
+      signal: controller.signal
+    });
+    if (!response.ok) return [];
+    const payload = await response.json();
+    return Array.isArray(payload?.data) ? payload.data : [];
+  } catch (_error) {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function toTimestamp(value) {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toRoundedPositiveAmount(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  const rounded = Math.round(parsed);
+  return rounded > 0 ? rounded : null;
+}
+
+async function fetchPaymentsForRide({ rideIds, authorization, traceId, requestId }) {
+  if (!PAYMENT_SERVICE_URL) return [];
+  const normalizedRideIds = Array.from(
+    new Set(
+      (Array.isArray(rideIds) ? rideIds : [rideIds])
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .filter((value) => Boolean(value))
+    )
+  );
+  if (!normalizedRideIds.length) return [];
+
+  const paymentLists = await Promise.all(
+    normalizedRideIds.map((rideId) =>
+      fetchPaymentsForRideId({
+        rideId,
+        authorization,
+        traceId,
+        requestId
+      })
+    )
+  );
+
+  const dedup = new Map();
+  paymentLists.flat().forEach((payment) => {
+    if (!payment || typeof payment !== 'object') return;
+    const key = payment.id || `${payment.rideId || 'ride'}:${payment.createdAt || ''}:${payment.amount || ''}`;
+    const current = dedup.get(key);
+    if (!current || toTimestamp(payment.createdAt) >= toTimestamp(current.createdAt)) {
+      dedup.set(key, payment);
+    }
+  });
+
+  return Array.from(dedup.values()).sort((a, b) => toTimestamp(b?.createdAt) - toTimestamp(a?.createdAt));
 }
 
 router.post(
@@ -77,9 +215,18 @@ router.post(
           message: 'is required'
         });
       }
+      if (req.body?.driverId !== undefined && !isEightDigitId(req.body.driverId)) {
+        errors.push({
+          path: 'body.driverId',
+          message: 'must be an 8-digit ID'
+        });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
+    if (!isEightDigitId(req.userId)) {
+      throw new ApiError(401, 'UNAUTHORIZED', 'Invalid authenticated user ID format');
+    }
     const idempotencyKey = req.header('Idempotency-Key');
 
     const routeKey = 'rides:create';
@@ -203,13 +350,13 @@ router.post(
           return res.status(responseStatus).json(responseBody);
         }
       }
-      const shouldAutoAssign = AUTO_ASSIGN_DRIVER && !req.body?.driverId && DEFAULT_DRIVER_ID.length > 0;
+      const shouldAutoAssign = AUTO_ASSIGN_DRIVER && !req.body?.driverId && isEightDigitId(DEFAULT_DRIVER_ID);
 
       const ride = await createRide({
         externalRideId: requestedExternalRideId || crypto.randomUUID(),
         bookingId: req.body.bookingId,
         riderId: req.userId,
-        driverId: shouldAutoAssign ? DEFAULT_DRIVER_ID : req.body.driverId,
+        driverId: shouldAutoAssign ? DEFAULT_DRIVER_ID : req.body.driverId ? String(req.body.driverId).trim() : null,
         pickupLat: req.body.pickupLat,
         pickupLng: req.body.pickupLng,
         pickupLabel: req.body.pickupLabel || null,
@@ -269,7 +416,7 @@ router.get(
   '/assignments',
   asyncHandler(async (req, res) => {
     const driverId = req.userId;
-    if (!driverId) {
+    if (!driverId || !isEightDigitId(driverId)) {
       throw new ApiError(401, 'UNAUTHORIZED', 'Missing driver identity');
     }
 
@@ -284,6 +431,26 @@ router.get(
       return res.json({ data: [] });
     }
     return res.json({ data: [toRideResponse(pending)] });
+  })
+);
+
+router.get(
+  '/external/:externalRideId',
+  validateRequest({
+    paramsSchema: {
+      required: ['externalRideId'],
+      properties: {
+        externalRideId: { type: 'string' }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const ride = await getRideByExternalId(req.params.externalRideId);
+    if (!ride) {
+      throw new ApiError(404, 'NOT_FOUND', 'Ride not found');
+    }
+
+    return res.json({ data: toRideResponse(ride) });
   })
 );
 
@@ -304,6 +471,73 @@ router.get(
     }
 
     return res.json({ data: toRideResponse(ride) });
+  })
+);
+
+router.get(
+  '/:id/summary',
+  validateRequest({
+    paramsSchema: {
+      required: ['id'],
+      properties: {
+        id: { type: 'string' }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const ride = await getRideById(req.params.id);
+    if (!ride) {
+      throw new ApiError(404, 'NOT_FOUND', 'Ride not found');
+    }
+
+    const currentStatus = normalizeStatus(ride.status);
+    if (currentStatus !== 'COMPLETED') {
+      throw new ApiError(409, 'INVALID_STATE_TRANSITION', 'Ride must be COMPLETED to get summary');
+    }
+
+    const statusHistory = await getRideStatusHistory(ride.id);
+    const distanceMeters =
+      Number.isFinite(ride.pickup_lat) && Number.isFinite(ride.pickup_lng) && Number.isFinite(ride.dropoff_lat) && Number.isFinite(ride.dropoff_lng)
+        ? Math.round(haversineDistanceMeters(ride.pickup_lat, ride.pickup_lng, ride.dropoff_lat, ride.dropoff_lng))
+        : null;
+    const durationSeconds = computeDurationSeconds(ride, statusHistory);
+
+    const payments = await fetchPaymentsForRide({
+      rideIds: [ride.external_ride_id, ride.id, ride.booking_id],
+      authorization: req.get('authorization') || '',
+      traceId: req.traceId || null,
+      requestId: req.requestId || null
+    });
+    const latestPayment = payments[0] || null;
+    const paidPayment = payments.find((item) => normalizeStatus(item.status) === 'PAID') || null;
+    const farePayment =
+      payments.find((item) => normalizeStatus(item.status) === 'PAID' && toRoundedPositiveAmount(item.amount) !== null) ||
+      payments.find((item) => toRoundedPositiveAmount(item.amount) !== null) ||
+      null;
+    const paymentFareAmount = toRoundedPositiveAmount(farePayment?.amount);
+    const quotedFareAmount = toRoundedPositiveAmount(ride.quote_fare_amount);
+    const effectiveFareAmount = paymentFareAmount !== null ? paymentFareAmount : quotedFareAmount;
+    const breakdown = computeBreakdown({ fareAmount: effectiveFareAmount, distanceMeters, durationSeconds });
+    const fareSource = paymentFareAmount !== null ? 'payment-service' : quotedFareAmount !== null ? 'booking-quote' : 'estimated';
+
+    return res.json({
+      data: {
+        rideId: ride.id,
+        status: currentStatus,
+        distanceMeters,
+        durationSeconds,
+        fare: {
+          amount: effectiveFareAmount !== null ? effectiveFareAmount : breakdown.total,
+          currency: farePayment?.currency || ride.quote_currency || latestPayment?.currency || 'VND',
+          paymentStatus: paidPayment?.status || latestPayment?.status || null,
+          paymentId: paidPayment?.id || latestPayment?.id || null,
+          method: paidPayment?.method || latestPayment?.method || null,
+          source: fareSource
+        },
+        breakdown
+      },
+      requestId: req.requestId
+    });
   })
 );
 
@@ -338,6 +572,18 @@ router.get(
             message: 'is invalid'
           });
         }
+      }
+      if (req.query.riderId && !isEightDigitId(req.query.riderId)) {
+        errors.push({
+          path: 'query.riderId',
+          message: 'must be an 8-digit ID'
+        });
+      }
+      if (req.query.driverId && !isEightDigitId(req.query.driverId)) {
+        errors.push({
+          path: 'query.driverId',
+          message: 'must be an 8-digit ID'
+        });
       }
 
       const hasLimit = req.query.limit !== undefined;
@@ -425,6 +671,12 @@ router.patch(
         errors.push({
           path: 'body',
           message: 'at least one field is required'
+        });
+      }
+      if (req.body?.driverId !== undefined && !isEightDigitId(req.body.driverId)) {
+        errors.push({
+          path: 'body.driverId',
+          message: 'must be an 8-digit ID'
         });
       }
     }

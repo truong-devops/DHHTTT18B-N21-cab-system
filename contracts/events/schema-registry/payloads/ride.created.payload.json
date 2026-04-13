@@ -7,13 +7,14 @@
   "properties": {
     "rideId": { "type": "string", "minLength": 1 },
     "bookingId": { "type": "string" },
-    "riderId": { "type": "string" },
+    "riderId": { "type": "string", "pattern": "^[0-9]{8}$" },
     "pickup": {
       "type": "object",
       "required": ["lat", "lng"],
       "properties": {
         "lat": { "type": "number" },
-        "lng": { "type": "number" }
+        "lng": { "type": "number" },
+        "address": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -22,7 +23,17 @@
       "required": ["lat", "lng"],
       "properties": {
         "lat": { "type": "number" },
-        "lng": { "type": "number" }
+        "lng": { "type": "number" },
+        "address": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "pricing": {
+      "type": "object",
+      "required": ["estimatedFare", "currency"],
+      "properties": {
+        "estimatedFare": { "type": "number" },
+        "currency": { "type": "string", "minLength": 3, "maxLength": 3 }
       },
       "additionalProperties": false
     },

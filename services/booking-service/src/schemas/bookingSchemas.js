@@ -7,6 +7,7 @@ const LatLngSchema = z.object({
 });
 
 const VehicleTypeSchema = z.enum(['BIKE', 'CAR', 'SUV']);
+const UserIdSchema = z.string().regex(/^\d{8}$/, 'user_id must be an 8-digit ID');
 
 const CreateBookingSchema = z
   .object({
@@ -18,7 +19,7 @@ const CreateBookingSchema = z
     vehicleType: VehicleTypeSchema.optional(),
     vehicle_type: VehicleTypeSchema.optional(),
     payment_method: z.enum(['CASH', 'VIETQR', 'PAYOS']).optional(),
-    user_id: z.string().optional()
+    user_id: UserIdSchema.optional()
   })
   .superRefine((data, ctx) => {
     if (data.vehicleType && data.vehicle_type && data.vehicleType !== data.vehicle_type) {

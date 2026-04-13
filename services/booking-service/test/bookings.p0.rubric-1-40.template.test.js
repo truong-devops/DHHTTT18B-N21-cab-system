@@ -12,6 +12,7 @@ const request = require('supertest');
 const mockCreateBooking = jest.fn();
 const mockGetBookingById = jest.fn();
 const mockListBookings = jest.fn();
+const mockFindActiveByUser = jest.fn();
 const mockGetByIdForUpdate = jest.fn();
 const mockCancelBooking = jest.fn();
 const mockInsertOutboxEvent = jest.fn();
@@ -21,10 +22,36 @@ const mockWithTransaction = jest.fn();
 const mockGetQuote = jest.fn();
 const mockEstimateEta = jest.fn();
 
+jest.mock('../src/middleware/auth', () => ({
+  requireTrustedGateway: (req, _res, next) => {
+    req.gatewayTrusted = true;
+    next();
+  },
+  requireAuth: (req, _res, next) => {
+    const userId = String(req.header('x-user-id') || '10000003').trim();
+    const role = String(req.header('x-user-role') || 'customer')
+      .trim()
+      .toLowerCase();
+    const rolesHeader = String(req.header('x-user-roles') || role)
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+    req.userId = userId;
+    req.user = {
+      id: userId,
+      role,
+      roles: rolesHeader,
+      scopes: []
+    };
+    next();
+  }
+}));
+
 jest.mock('../src/repositories/bookingRepo', () => ({
   create: (...args) => mockCreateBooking(...args),
   getById: (...args) => mockGetBookingById(...args),
   list: (...args) => mockListBookings(...args),
+  findActiveByUser: (...args) => mockFindActiveByUser(...args),
   getByIdForUpdate: (...args) => mockGetByIdForUpdate(...args),
   cancel: (...args) => mockCancelBooking(...args)
 }));
@@ -70,7 +97,7 @@ function buildBooking(overrides = {}) {
   return {
     bookingId: 'bk_1',
     rideId: 'ride_1',
-    userId: 'user_1',
+    userId: '10000003',
     pickup: { lat: 10.76, lng: 106.66 },
     dropoff: { lat: 10.77, lng: 106.7 },
     vehicleType: 'CAR',
@@ -113,6 +140,7 @@ describe('Booking P0 rubric integration frame (1-40)', () => {
     mockInsertOutboxEvent.mockResolvedValue(undefined);
     mockCompleteIdempotencyKey.mockResolvedValue(undefined);
     mockListBookings.mockResolvedValue([]);
+    mockFindActiveByUser.mockResolvedValue(null);
     mockGetBookingById.mockResolvedValue(null);
   });
 
@@ -120,7 +148,7 @@ describe('Booking P0 rubric integration frame (1-40)', () => {
     test('Case 1: create booking success with pickup + drop + vehicleType', async () => {
       const response = await request(app)
         .post('/v1/bookings')
-        .set('x-user-id', 'case_1_user')
+        .set('x-user-id', '10000041')
         .send({
           pickup: { lat: 10.76, lng: 106.66 },
           drop: { lat: 10.77, lng: 106.7 },
@@ -140,7 +168,7 @@ describe('Booking P0 rubric integration frame (1-40)', () => {
     test('Case 2: create booking success with pickup + dropoff alias', async () => {
       const response = await request(app)
         .post('/v1/bookings')
-        .set('x-user-id', 'case_2_user')
+        .set('x-user-id', '10000042')
         .send({
           pickup: { lat: 10.76, lng: 106.66 },
           dropoff: { lat: 10.78, lng: 106.71 },
@@ -298,3 +326,4 @@ describe('Booking P0 rubric integration frame (1-40)', () => {
     test.todo('Case 40: both events are queued exactly once on successful create');
   });
 });
+

@@ -7,8 +7,9 @@
   "payload": {
     "rideId": "ride_123",
     "bookingId": "bk_123",
-    "pickup": { "lat": 10.7, "lng": 106.6 },
-    "dropoff": { "lat": 10.8, "lng": 106.7 },
+    "pickup": { "lat": 10.7, "lng": 106.6, "address": "District 1, Ho Chi Minh City" },
+    "dropoff": { "lat": 10.8, "lng": 106.7, "address": "District 7, Ho Chi Minh City" },
+    "pricing": { "estimatedFare": 125000, "currency": "VND" },
     "vehicleType": "STANDARD",
     "timestamp": "2026-01-01T10:00:00.000Z"
   }

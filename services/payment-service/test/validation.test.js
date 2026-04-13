@@ -23,7 +23,7 @@ describe('request validation', () => {
         amount: '120.50',
         currency: 'vnd',
         method: 'card',
-        userId: 'user_1'
+        userId: '10000003'
       }
     });
     const err = await runMiddleware(validateCreatePayment, req);

@@ -40,18 +40,18 @@ function normalizeIdentifier(value: string | null | undefined): string | null {
   return normalized || null;
 }
 
-function isUuidLike(value: string | null | undefined): boolean {
+function isEightDigitId(value: string | null | undefined): boolean {
   const normalized = normalizeIdentifier(value);
   if (!normalized) return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized);
+  return /^\d{8}$/.test(normalized);
 }
 
 function resolvePreferredDriverId(...values: Array<string | null | undefined>): string | null {
   const normalizedValues = values.map((value) => normalizeIdentifier(value)).filter((value): value is string => Boolean(value));
   if (!normalizedValues.length) return null;
 
-  const uuidValue = normalizedValues.find((value) => isUuidLike(value));
-  return uuidValue || normalizedValues[0];
+  const eightDigitValue = normalizedValues.find((value) => isEightDigitId(value));
+  return eightDigitValue || normalizedValues[0];
 }
 
 function toFiniteNumber(value: unknown): number | null {
@@ -479,12 +479,12 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         // Keep current id when latest ride fetch fails.
       }
 
-      if (!isUuidLike(reviewDriverId)) {
+      if (!isEightDigitId(reviewDriverId)) {
         try {
           const profile = await getDriverProfileById(reviewDriverId);
           reviewDriverId = resolvePreferredDriverId(profile.data.driver?.id, reviewDriverId);
         } catch {
-          // Keep current id and let backend validate/accept current format.
+          // Keep current id for customerApi normalization fallback.
         }
       }
 

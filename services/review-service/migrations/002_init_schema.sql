@@ -8,9 +8,9 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS reviews (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  ride_id uuid NOT NULL,
-  rider_id uuid NOT NULL,
-  driver_id uuid NOT NULL,
+  ride_id text NOT NULL,
+  rider_id char(8) NOT NULL,
+  driver_id char(8) NOT NULL,
   rating integer NOT NULL,
   comment text,
   status text NOT NULL,
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS reviews_status_history (
   from_status text,
   to_status text NOT NULL,
   reason text,
-  actor_id uuid,
+  actor_id char(8),
   occurred_at timestamptz NOT NULL DEFAULT now(),
   trace_id text
 );
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS review_status_history (
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   route_key text NOT NULL,
-  user_id uuid NOT NULL,
+  user_id char(8) NOT NULL,
   idem_key text NOT NULL,
   request_hash text NOT NULL,
   response_status integer,

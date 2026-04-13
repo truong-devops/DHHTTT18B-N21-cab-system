@@ -3,7 +3,7 @@
 1. MongoDB database: ride_service (override with `MONGODB_DB`).
 2. Collection: `rides` (core ride aggregate).
 3. rides `_id` is a UUID string; `external_ride_id` unique.
-4. rides fields: booking_id, rider_id, driver_id (strings), pickup/dropoff lat/lng (numbers), status (string), status_updated_at, created_at, updated_at (dates).
+4. rides fields: booking_id (string), rider_id/driver_id (8-digit strings), pickup/dropoff lat/lng (numbers), status (string), status_updated_at, created_at, updated_at (dates).
 5. Collection: `ride_status_history` for audit (from_status, to_status, reason, actor_id, trace_id, occurred_at).
 6. Collection: `idempotency_keys` for durable request replay data (unique route_key + user_id + idem_key).
 7. Collection: `inbox_events` for consumer idempotency (unique event_id + consumer).

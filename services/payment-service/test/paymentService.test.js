@@ -106,7 +106,7 @@ describe('payment service transitions', () => {
       statusUpdate: { status: STATUSES.PAID },
       traceId: 'trace-2',
       requestId: 'req-2',
-      actor: 'system'
+      actor: '10000001'
     });
 
     expect(result).toEqual(updated);
@@ -117,7 +117,7 @@ describe('payment service transitions', () => {
         paymentId: 'pay_2',
         fromStatus: STATUSES.PROCESSING,
         toStatus: STATUSES.PAID,
-        actorId: 'system'
+        actorId: '10000001'
       })
     );
     expect(outboxRepo.insertOutboxEvent).toHaveBeenCalledWith(

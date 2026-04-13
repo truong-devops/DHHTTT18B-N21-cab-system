@@ -10,11 +10,25 @@ const {
 const { DRIVER_STATUS, ONLINE_STATUS, canGoOnline, canTransitionOnlineStatus } = require('../domain/driverState');
 const { ApiError } = require('../utils/errors');
 const { driverLocationKey, driverOnlineKey, driverBusyKey, geoKey, locationRateKey } = require('../utils/redisKeys');
-const { mapDriver, mapVehicle, mapLocation } = require('../utils/mapper');
+const { mapDriver, mapVehicle, mapLocation, mapKycSubmission } = require('../utils/mapper');
 const monitoring = require('../monitoring');
 const driverRepository = require('../repository/driverRepository');
 const vehicleRepository = require('../repository/vehicleRepository');
 const locationRepository = require('../repository/locationRepository');
+const kycRepository = require('../repository/kycRepository');
+
+const KYC_STATUS = {
+  NOT_SUBMITTED: 'NOT_SUBMITTED',
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED'
+};
+
+function normalizeEightDigitId(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return /^\d{8}$/.test(normalized) ? normalized : null;
+}
 
 async function getDriverMe(userId) {
   let driver = await driverRepository.getDriverByUserId(userId);
@@ -51,6 +65,126 @@ async function updateDriverProfile(userId, fields) {
     driver: mapDriver(updated),
     vehicle: mapVehicle(vehicle),
     location
+  };
+}
+
+async function getDriverKyc(userId) {
+  const driver = await driverRepository.getDriverByUserId(userId);
+  if (!driver) {
+    return {
+      status: KYC_STATUS.NOT_SUBMITTED,
+      rejectionReason: null,
+      submission: null
+    };
+  }
+
+  const latest = await kycRepository.getLatestByDriverId(driver.id);
+  if (!latest) {
+    return {
+      status: KYC_STATUS.NOT_SUBMITTED,
+      rejectionReason: null,
+      submission: null
+    };
+  }
+
+  return {
+    status: latest.status,
+    rejectionReason: latest.rejection_reason || null,
+    submission: mapKycSubmission(latest)
+  };
+}
+
+async function submitDriverKyc(userId, payload = {}) {
+  let driver = await driverRepository.getDriverByUserId(userId);
+  if (!driver) {
+    driver = await driverRepository.createDriver({
+      userId,
+      fullName: payload.fullName || null,
+      phone: payload.phone || null
+    });
+  }
+
+  const submission = await kycRepository.createSubmission({
+    driverId: driver.id,
+    fullName: payload.fullName || driver.full_name || null,
+    phone: payload.phone || driver.phone || null,
+    idNumber: payload.idNumber || null,
+    licenseNumber: payload.licenseNumber || null,
+    vehicleRegistrationNumber: payload.vehicleRegistrationNumber || null,
+    idFrontUrl: payload.idFrontUrl || null,
+    idBackUrl: payload.idBackUrl || null,
+    licenseFrontUrl: payload.licenseFrontUrl || null,
+    selfieUrl: payload.selfieUrl || null
+  });
+
+  if (driver.status !== DRIVER_STATUS.PENDING) {
+    await driverRepository.updateDriverStatus(driver.id, DRIVER_STATUS.PENDING);
+  }
+
+  return {
+    status: submission.status,
+    submission: mapKycSubmission(submission)
+  };
+}
+
+async function listKycSubmissionsAdmin({ status, page, limit }) {
+  const normalizedStatus = status ? String(status).toUpperCase() : null;
+  if (normalizedStatus && !Object.values(KYC_STATUS).includes(normalizedStatus)) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid KYC status');
+  }
+  const data = await kycRepository.listSubmissions({
+    status: normalizedStatus,
+    page,
+    limit
+  });
+  return {
+    items: data.items.map(mapKycSubmission),
+    page: data.page,
+    limit: data.limit
+  };
+}
+
+async function approveKycSubmission(submissionId, reviewerId) {
+  const current = await kycRepository.getById(submissionId);
+  if (!current) {
+    throw new ApiError(404, 'NOT_FOUND', 'KYC submission not found');
+  }
+
+  const updated = await kycRepository.updateReview({
+    id: submissionId,
+    status: KYC_STATUS.APPROVED,
+    rejectionReason: null,
+    reviewedBy: normalizeEightDigitId(reviewerId)
+  });
+  const driver = await driverRepository.updateDriverStatus(current.driver_id, DRIVER_STATUS.APPROVED);
+
+  return {
+    submission: mapKycSubmission(updated),
+    driver: mapDriver(driver)
+  };
+}
+
+async function rejectKycSubmission(submissionId, reason, reviewerId) {
+  if (!reason || !String(reason).trim()) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'rejectionReason is required');
+  }
+
+  const current = await kycRepository.getById(submissionId);
+  if (!current) {
+    throw new ApiError(404, 'NOT_FOUND', 'KYC submission not found');
+  }
+
+  const updated = await kycRepository.updateReview({
+    id: submissionId,
+    status: KYC_STATUS.REJECTED,
+    rejectionReason: String(reason).trim(),
+    reviewedBy: normalizeEightDigitId(reviewerId)
+  });
+  const driver = await driverRepository.updateDriverStatus(current.driver_id, DRIVER_STATUS.PENDING);
+
+  return {
+    submission: mapKycSubmission(updated),
+    driver: mapDriver(driver)
   };
 }
 
@@ -617,6 +751,8 @@ async function enforceLocationRateLimit(driverId) {
 module.exports = {
   getDriverMe,
   updateDriverProfile,
+  getDriverKyc,
+  submitDriverKyc,
   upsertVehicle,
   setOnline,
   setOnlineByDriverId,
@@ -634,5 +770,8 @@ module.exports = {
   createDriverAdmin,
   approveDriver,
   suspendDriver,
-  listDriversAdmin
+  listDriversAdmin,
+  listKycSubmissionsAdmin,
+  approveKycSubmission,
+  rejectKycSubmission
 };

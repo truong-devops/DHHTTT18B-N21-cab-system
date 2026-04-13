@@ -67,6 +67,12 @@ paths:
           name: riderId
           schema:
             type: string
+            pattern: '^[0-9]{8}$'
+        - in: query
+          name: driverId
+          schema:
+            type: string
+            pattern: '^[0-9]{8}$'
         - in: query
           name: limit
           schema:
@@ -207,6 +213,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/rides/{id}/summary:
+    get:
+      summary: Get completed ride summary
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RideSummaryResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Ride not completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     Ride:
@@ -221,9 +255,11 @@ components:
           nullable: true
         riderId:
           type: string
+          pattern: '^[0-9]{8}$'
           nullable: true
         driverId:
           type: string
+          pattern: '^[0-9]{8}$'
           nullable: true
         pickupLat:
           type: number
@@ -251,6 +287,7 @@ components:
           type: string
         driverId:
           type: string
+          pattern: '^[0-9]{8}$'
         pickupLat:
           type: number
         pickupLng:
@@ -266,6 +303,7 @@ components:
       properties:
         driverId:
           type: string
+          pattern: '^[0-9]{8}$'
         pickupLat:
           type: number
         pickupLng:
@@ -293,6 +331,57 @@ components:
         nextCursor:
           type: string
           nullable: true
+    RideSummary:
+      type: object
+      properties:
+        rideId:
+          type: string
+        status:
+          type: string
+        distanceMeters:
+          type: integer
+          nullable: true
+        durationSeconds:
+          type: integer
+          nullable: true
+        fare:
+          type: object
+          properties:
+            amount:
+              type: number
+            currency:
+              type: string
+            paymentStatus:
+              type: string
+              nullable: true
+            paymentId:
+              type: string
+              nullable: true
+            method:
+              type: string
+              nullable: true
+            source:
+              type: string
+        breakdown:
+          type: object
+          properties:
+            base:
+              type: number
+            distance:
+              type: number
+            time:
+              type: number
+            surge:
+              type: number
+            discount:
+              type: number
+            total:
+              type: number
+    RideSummaryResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/RideSummary'
     ErrorResponse:
       type: object
       properties:

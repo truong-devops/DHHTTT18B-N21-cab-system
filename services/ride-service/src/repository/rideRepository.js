@@ -1,6 +1,30 @@
 const crypto = require('crypto');
 const { getDb, runWithOptionalTransaction } = require('../db/mongo');
 
+const ASSIGNMENT_EXCLUDED_RIDE_IDS = [
+  '99999999-9999-9999-9999-999999999998',
+  '99999999-9999-9999-9999-999999999997',
+  '99999999-9999-9999-9999-999999999996'
+];
+
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
+function normalizeIdentityId(value) {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim();
+  if (!normalized) return null;
+  return isEightDigitId(normalized) ? normalized : null;
+}
+
+function buildRealCustomerRideFilter() {
+  return {
+    booking_id: { $type: 'string', $ne: '' },
+    rider_id: { $regex: /^\d{8}$/ }
+  };
+}
+
 function mapRide(doc) {
   if (!doc) {
     return null;
@@ -18,6 +42,8 @@ function mapRide(doc) {
     dropoff_lat: doc.dropoff_lat ?? null,
     dropoff_lng: doc.dropoff_lng ?? null,
     dropoff_label: doc.dropoff_label || null,
+    quote_fare_amount: doc.quote_fare_amount ?? null,
+    quote_currency: doc.quote_currency || null,
     status: doc.status,
     status_updated_at: doc.status_updated_at,
     created_at: doc.created_at,
@@ -64,6 +90,8 @@ async function createRide({
   dropoffLat = null,
   dropoffLng = null,
   dropoffLabel = null,
+  quoteFareAmount = null,
+  quoteCurrency = null,
   status,
   traceId = null,
   emitOutbox = true
@@ -75,14 +103,16 @@ async function createRide({
     _id: rideId,
     external_ride_id: externalRideId,
     booking_id: bookingId,
-    rider_id: riderId,
-    driver_id: driverId,
+    rider_id: normalizeIdentityId(riderId),
+    driver_id: normalizeIdentityId(driverId),
     pickup_lat: pickupLat,
     pickup_lng: pickupLng,
     pickup_label: pickupLabel,
     dropoff_lat: dropoffLat,
     dropoff_lng: dropoffLng,
     dropoff_label: dropoffLabel,
+    quote_fare_amount: Number.isFinite(Number(quoteFareAmount)) ? Math.round(Number(quoteFareAmount)) : null,
+    quote_currency: typeof quoteCurrency === 'string' && quoteCurrency.trim() ? quoteCurrency.trim().toUpperCase() : null,
     status,
     status_updated_at: now,
     created_at: now,
@@ -146,13 +176,16 @@ async function getRideByExternalId(externalRideId) {
 }
 
 async function getActiveRideForDriver(driverId) {
-  if (!driverId) {
+  const normalizedDriverId = normalizeIdentityId(driverId);
+  if (!normalizedDriverId) {
     return null;
   }
   const db = await getDb();
   const doc = await db.collection('rides').findOne(
     {
-      driver_id: driverId,
+      _id: { $nin: ASSIGNMENT_EXCLUDED_RIDE_IDS },
+      ...buildRealCustomerRideFilter(),
+      driver_id: normalizedDriverId,
       status: { $in: ['assigned', 'arriving', 'in_progress'] }
     },
     { sort: { status_updated_at: -1, created_at: -1 } }
@@ -193,7 +226,7 @@ async function updateRideStatus({ id, status, fromStatus = null, reason = null, 
       from_status: fromStatus ? String(fromStatus).toLowerCase() : null,
       to_status: String(status).toLowerCase(),
       reason,
-      actor_id: actorId,
+      actor_id: normalizeIdentityId(actorId),
       trace_id: traceId,
       occurred_at: now,
       created_at: now,
@@ -251,8 +284,16 @@ async function updateRideStatus({ id, status, fromStatus = null, reason = null, 
 async function updateRideFields(id, fields) {
   const updates = {};
 
+  if (fields.bookingId !== undefined) {
+    updates.booking_id = fields.bookingId ? String(fields.bookingId).trim() : null;
+  }
+
+  if (fields.riderId !== undefined) {
+    updates.rider_id = normalizeIdentityId(fields.riderId);
+  }
+
   if (fields.driverId !== undefined) {
-    updates.driver_id = fields.driverId;
+    updates.driver_id = normalizeIdentityId(fields.driverId);
   }
 
   if (fields.pickupLat !== undefined) {
@@ -263,12 +304,29 @@ async function updateRideFields(id, fields) {
     updates.pickup_lng = fields.pickupLng;
   }
 
+  if (fields.pickupLabel !== undefined) {
+    updates.pickup_label = typeof fields.pickupLabel === 'string' && fields.pickupLabel.trim() ? fields.pickupLabel.trim() : null;
+  }
+
   if (fields.dropoffLat !== undefined) {
     updates.dropoff_lat = fields.dropoffLat;
   }
 
   if (fields.dropoffLng !== undefined) {
     updates.dropoff_lng = fields.dropoffLng;
+  }
+
+  if (fields.dropoffLabel !== undefined) {
+    updates.dropoff_label = typeof fields.dropoffLabel === 'string' && fields.dropoffLabel.trim() ? fields.dropoffLabel.trim() : null;
+  }
+
+  if (fields.quoteFareAmount !== undefined) {
+    updates.quote_fare_amount = Number.isFinite(Number(fields.quoteFareAmount)) ? Math.round(Number(fields.quoteFareAmount)) : null;
+  }
+
+  if (fields.quoteCurrency !== undefined) {
+    updates.quote_currency =
+      typeof fields.quoteCurrency === 'string' && fields.quoteCurrency.trim() ? fields.quoteCurrency.trim().toUpperCase() : null;
   }
 
   if (!Object.keys(updates).length) {
@@ -292,7 +350,7 @@ async function addStatusHistory({ rideId, fromStatus = null, toStatus, reason = 
     from_status: fromStatus ? String(fromStatus).toLowerCase() : null,
     to_status: String(toStatus).toLowerCase(),
     reason,
-    actor_id: actorId,
+    actor_id: normalizeIdentityId(actorId),
     trace_id: traceId,
     occurred_at: occurredAt ? new Date(occurredAt) : now,
     created_at: now,
@@ -300,19 +358,38 @@ async function addStatusHistory({ rideId, fromStatus = null, toStatus, reason = 
   });
 }
 
+async function getRideStatusHistory(rideId) {
+  const db = await getDb();
+  const docs = await db.collection('ride_status_history').find({ ride_id: rideId }).sort({ occurred_at: 1, _id: 1 }).toArray();
+  return docs.map((doc) => ({
+    id: doc._id,
+    ride_id: doc.ride_id,
+    from_status: doc.from_status,
+    to_status: doc.to_status,
+    reason: doc.reason || null,
+    actor_id: doc.actor_id || null,
+    trace_id: doc.trace_id || null,
+    occurred_at: doc.occurred_at,
+    created_at: doc.created_at,
+    updated_at: doc.updated_at
+  }));
+}
+
 async function listRides({ limit = 20, cursor = null, status = null, riderId = null, driverId = null, sort = '-created_at' } = {}) {
   const db = await getDb();
   const isDesc = sort === '-created_at' || sort === '-createdAt';
+  const normalizedRiderId = normalizeIdentityId(riderId);
+  const normalizedDriverId = normalizeIdentityId(driverId);
 
   const filter = {};
   if (status) {
     filter.status = status;
   }
-  if (riderId) {
-    filter.rider_id = riderId;
+  if (normalizedRiderId) {
+    filter.rider_id = normalizedRiderId;
   }
-  if (driverId) {
-    filter.driver_id = driverId;
+  if (normalizedDriverId) {
+    filter.driver_id = normalizedDriverId;
   }
 
   const cursorFilter = buildCursorFilter({
@@ -335,7 +412,8 @@ async function listRides({ limit = 20, cursor = null, status = null, riderId = n
 }
 
 async function claimRideForDriver({ driverId, traceId = null } = {}) {
-  if (!driverId) {
+  const normalizedDriverId = normalizeIdentityId(driverId);
+  if (!normalizedDriverId) {
     return null;
   }
 
@@ -352,10 +430,15 @@ async function claimRideForDriver({ driverId, traceId = null } = {}) {
     }
 
     const rideResult = await db.collection('rides').findOneAndUpdate(
-      { status: 'requested', driver_id: null },
+      {
+        _id: { $nin: ASSIGNMENT_EXCLUDED_RIDE_IDS },
+        ...buildRealCustomerRideFilter(),
+        status: 'requested',
+        driver_id: null
+      },
       {
         $set: {
-          driver_id: driverId,
+          driver_id: normalizedDriverId,
           status: 'assigned',
           status_updated_at: now,
           updated_at: now
@@ -377,7 +460,7 @@ async function claimRideForDriver({ driverId, traceId = null } = {}) {
         from_status: 'requested',
         to_status: 'assigned',
         reason: 'driver_claimed',
-        actor_id: driverId,
+        actor_id: normalizedDriverId,
         trace_id: traceId,
         occurred_at: now,
         created_at: now,
@@ -398,7 +481,7 @@ async function claimRideForDriver({ driverId, traceId = null } = {}) {
         traceId,
         payload: {
           rideId: rideDoc._id,
-          driverId,
+          driverId: normalizedDriverId,
           assignedAt: now
         }
       },
@@ -426,7 +509,12 @@ async function claimRideForDriver({ driverId, traceId = null } = {}) {
 async function findNextRequestedRide() {
   const db = await getDb();
   const doc = await db.collection('rides').findOne(
-    { status: 'requested', driver_id: null },
+    {
+      _id: { $nin: ASSIGNMENT_EXCLUDED_RIDE_IDS },
+      ...buildRealCustomerRideFilter(),
+      status: 'requested',
+      driver_id: null
+    },
     { sort: { created_at: -1, _id: -1 } } // lấy ride mới nhất còn pending
   );
   return doc ? mapRide(doc) : null;
@@ -440,6 +528,7 @@ module.exports = {
   updateRideStatus,
   updateRideFields,
   addStatusHistory,
+  getRideStatusHistory,
   listRides,
   claimRideForDriver,
   findNextRequestedRide

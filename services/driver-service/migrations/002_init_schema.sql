@@ -6,9 +6,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE SEQUENCE IF NOT EXISTS driver8_seq START 10000050;
+
 CREATE TABLE IF NOT EXISTS drivers (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL UNIQUE,
+  id char(8) PRIMARY KEY DEFAULT LPAD(nextval('driver8_seq')::text,8,'0'),
+  user_id char(8) NOT NULL UNIQUE,
   status text NOT NULL DEFAULT 'PENDING',
   online_status text NOT NULL DEFAULT 'OFFLINE',
   full_name text,
@@ -21,7 +23,7 @@ CREATE TABLE IF NOT EXISTS drivers (
 
 CREATE TABLE IF NOT EXISTS driver_vehicles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  driver_id uuid NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+  driver_id char(8) NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
   vehicle_type text NOT NULL,
   plate_number text NOT NULL,
   brand text,
@@ -33,7 +35,7 @@ CREATE TABLE IF NOT EXISTS driver_vehicles (
 );
 
 CREATE TABLE IF NOT EXISTS driver_last_locations (
-  driver_id uuid PRIMARY KEY REFERENCES drivers(id) ON DELETE CASCADE,
+  driver_id char(8) PRIMARY KEY REFERENCES drivers(id) ON DELETE CASCADE,
   lat double precision NOT NULL,
   lng double precision NOT NULL,
   heading double precision,

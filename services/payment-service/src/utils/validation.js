@@ -1,6 +1,10 @@
 const { ApiError } = require('./errors');
 const { STATUSES } = require('../domain/paymentStatus');
 
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
 function parseCreatePayment(body) {
   if (!body || typeof body !== 'object') {
     throw new ApiError(400, 'VALIDATION_ERROR', 'Request body is required');
@@ -29,6 +33,9 @@ function parseCreatePayment(body) {
   const method = typeof body.method === 'string' ? body.method.trim().toUpperCase() : null;
   const userId = typeof body.userId === 'string' ? body.userId.trim() : null;
   const note = typeof body.note === 'string' ? body.note.trim() : null;
+  if (userId && !isEightDigitId(userId)) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'userId must be an 8-digit ID');
+  }
 
   if (method === 'VIETQR' && currency !== 'VND') {
     throw new ApiError(400, 'VALIDATION_ERROR', 'currency must be VND for VIETQR');
@@ -75,4 +82,4 @@ function parseListQuery(query) {
   return { limit, sort, status, rideId, cursor: query.cursor || null };
 }
 
-module.exports = { parseCreatePayment, parseStatusUpdate, parseListQuery };
+module.exports = { isEightDigitId, parseCreatePayment, parseStatusUpdate, parseListQuery };

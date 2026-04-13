@@ -20,8 +20,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE SEQUENCE IF NOT EXISTS user8_seq START 10000050;
+
 CREATE TABLE IF NOT EXISTS users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id char(8) PRIMARY KEY DEFAULT LPAD(nextval('user8_seq')::text,8,'0'),
   email text NOT NULL UNIQUE,
   full_name text NOT NULL,
   phone text,
@@ -35,7 +37,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id text NOT NULL,
   aggregate_type text NOT NULL,
-  aggregate_id uuid NOT NULL,
+  aggregate_id char(8) NOT NULL,
   event_type text NOT NULL,
   payload jsonb NOT NULL,
   status text NOT NULL DEFAULT 'pending',

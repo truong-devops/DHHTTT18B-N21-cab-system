@@ -43,7 +43,7 @@ describe('idempotency service', () => {
     const execute = jest.fn();
     const result = await withIdempotency({
       routeKey: 'payments:create',
-      userId: 'user_1',
+      userId: '10000003',
       idemKey: 'idem_1',
       responseHeaders: {},
       execute
@@ -69,7 +69,7 @@ describe('idempotency service', () => {
     const execute = jest.fn();
     const result = await withIdempotency({
       routeKey: 'payments:create',
-      userId: 'user_1',
+      userId: '10000003',
       idemKey: 'idem_2',
       responseHeaders: {},
       requestHash: 'hash_db',
@@ -94,7 +94,7 @@ describe('idempotency service', () => {
     await expect(
       withIdempotency({
         routeKey: 'payments:create',
-        userId: 'user_1',
+        userId: '10000003',
         idemKey: 'idem_4',
         responseHeaders: {},
         requestHash: 'hash_b',
@@ -119,7 +119,7 @@ describe('idempotency service', () => {
 
     const result = await withIdempotency({
       routeKey: 'payments:create',
-      userId: 'user_1',
+      userId: '10000003',
       idemKey: 'idem_3',
       responseHeaders: { 'content-type': 'application/json' },
       execute
@@ -137,13 +137,13 @@ describe('idempotency service', () => {
     getRedis.mockReturnValue(redis);
     getIdempotencyKey.mockResolvedValueOnce(null);
 
-    const redisKey = buildIdempotencyRedisKey('payments:create', 'user_1', 'idem_4');
+    const redisKey = buildIdempotencyRedisKey('payments:create', '10000003', 'idem_4');
     redis.store.set(`${redisKey}:lock`, 'locked');
 
     await expect(
       withIdempotency({
         routeKey: 'payments:create',
-        userId: 'user_1',
+        userId: '10000003',
         idemKey: 'idem_4',
         responseHeaders: {},
         execute: jest.fn()
