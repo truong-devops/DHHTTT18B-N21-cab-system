@@ -32,6 +32,22 @@ paths:
       responses:
         '200':
           description: OK
+  /v1/driver/me/kyc:
+    get:
+      summary: Get latest driver KYC status
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /v1/driver/me/kyc/submissions:
+    post:
+      summary: Submit driver KYC documents
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Created
     put:
       summary: Update driver profile
       security:
@@ -90,6 +106,7 @@ paths:
           required: true
           schema:
             type: string
+            pattern: '^[0-9]{8}$'
       responses:
         '200':
           description: OK
@@ -116,6 +133,7 @@ paths:
           required: true
           schema:
             type: string
+            pattern: '^[0-9]{8}$'
       responses:
         '200':
           description: OK
@@ -130,6 +148,7 @@ paths:
           required: true
           schema:
             type: string
+            pattern: '^[0-9]{8}$'
       responses:
         '200':
           description: OK
@@ -183,6 +202,30 @@ paths:
   /v1/admin/drivers/{driverId}/suspend:
     patch:
       summary: Suspend driver
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /v1/admin/kyc/submissions:
+    get:
+      summary: List KYC submissions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /v1/admin/kyc/{submissionId}/approve:
+    patch:
+      summary: Approve KYC submission
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /v1/admin/kyc/{submissionId}/reject:
+    patch:
+      summary: Reject KYC submission
       security:
         - bearerAuth: []
       responses:

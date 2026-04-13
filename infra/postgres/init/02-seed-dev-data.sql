@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id text NOT NULL,
   aggregate_type text NOT NULL,
-  aggregate_id uuid NOT NULL,
+  aggregate_id char(8) NOT NULL,
   event_type text NOT NULL,
   payload jsonb NOT NULL,
   status text NOT NULL DEFAULT 'pending',
@@ -164,7 +164,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS drivers (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id char(8) PRIMARY KEY,
   user_id char(8) NOT NULL UNIQUE,
   status text NOT NULL DEFAULT 'PENDING',
   online_status text NOT NULL DEFAULT 'OFFLINE',
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS drivers (
 
 CREATE TABLE IF NOT EXISTS driver_vehicles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  driver_id uuid NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+  driver_id char(8) NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
   vehicle_type text NOT NULL,
   plate_number text NOT NULL,
   brand text,
@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS driver_vehicles (
 );
 
 CREATE TABLE IF NOT EXISTS driver_last_locations (
-  driver_id uuid PRIMARY KEY REFERENCES drivers(id) ON DELETE CASCADE,
+  driver_id char(8) PRIMARY KEY REFERENCES drivers(id) ON DELETE CASCADE,
   lat double precision NOT NULL,
   lng double precision NOT NULL,
   heading double precision,
@@ -236,16 +236,16 @@ CREATE INDEX IF NOT EXISTS idx_driver_last_locations_recorded_at ON driver_last_
 
 INSERT INTO drivers (id, user_id, status, online_status, full_name, phone)
 VALUES
-  ('99999999-9999-9999-9999-999999999999', '10000004', 'APPROVED', 'ONLINE', 'Driver One', '0900000002'),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '10000007', 'PENDING', 'OFFLINE', 'Driver Two', '0900000004'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '10000008', 'SUSPENDED', 'BUSY', 'Driver Three', '0900000005')
+  ('10000004', '10000004', 'APPROVED', 'ONLINE', 'Driver One', '0900000002'),
+  ('10000007', '10000007', 'PENDING', 'OFFLINE', 'Driver Two', '0900000004'),
+  ('10000008', '10000008', 'SUSPENDED', 'BUSY', 'Driver Three', '0900000005')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO driver_vehicles (id, driver_id, vehicle_type, plate_number, brand, model, color, is_active)
 VALUES
   (
     'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    '99999999-9999-9999-9999-999999999999',
+    '10000004',
     'CAR',
     '51A-12345',
     'Toyota',
@@ -255,7 +255,7 @@ VALUES
   ),
   (
     'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    '10000007',
     'BIKE',
     '59X-88888',
     'Honda',
@@ -265,7 +265,7 @@ VALUES
   ),
   (
     'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    '10000008',
     'CAR',
     '30F-54321',
     'Kia',
@@ -278,7 +278,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO driver_last_locations (driver_id, lat, lng, heading, speed, accuracy_m, recorded_at)
 VALUES
   (
-    '99999999-9999-9999-9999-999999999999',
+    '10000004',
     10.7765,
     106.7009,
     120,
@@ -287,7 +287,7 @@ VALUES
     now()
   ),
   (
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    '10000008',
     10.7621,
     106.682,
     45,
@@ -314,16 +314,18 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS reviews (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  ride_id uuid NOT NULL,
-  rider_id uuid NOT NULL,
-  driver_id uuid NOT NULL,
+  ride_id text NOT NULL,
+  rider_id char(8) NOT NULL,
+  driver_id char(8) NOT NULL,
   rating integer NOT NULL,
   comment text,
+  tip_amount integer,
   status text NOT NULL,
   status_updated_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT reviews_rating_check CHECK (rating >= 1 AND rating <= 5)
+  CONSTRAINT reviews_rating_check CHECK (rating >= 1 AND rating <= 5),
+  CONSTRAINT reviews_tip_amount_check CHECK (tip_amount IS NULL OR tip_amount >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS reviews_status_history (
@@ -332,7 +334,7 @@ CREATE TABLE IF NOT EXISTS reviews_status_history (
   from_status text,
   to_status text NOT NULL,
   reason text,
-  actor_id uuid,
+  actor_id char(8),
   occurred_at timestamptz NOT NULL DEFAULT now(),
   trace_id text
 );
@@ -469,8 +471,8 @@ VALUES
   (
     '99999999-9999-9999-9999-999999999999',
     '77777777-7777-7777-7777-777777777777',
-    '33333333-3333-3333-3333-333333333333',
-    '44444444-4444-4444-4444-444444444444',
+    '10000003',
+    '10000004',
     5,
     'Great ride and polite driver.',
     'PUBLISHED',
@@ -479,8 +481,8 @@ VALUES
   (
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     '88888888-8888-8888-8888-888888888888',
-    '33333333-3333-3333-3333-333333333333',
-    '44444444-4444-4444-4444-444444444444',
+    '10000003',
+    '10000004',
     2,
     'Late pickup and long wait.',
     'REJECTED',
@@ -489,8 +491,8 @@ VALUES
   (
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     '99999999-9999-9999-9999-999999999998',
-    '66666666-6666-6666-6666-666666666666',
-    '44444444-4444-4444-4444-444444444444',
+    '10000006',
+    '10000004',
     4,
     'Good ride overall.',
     'SUBMITTED',
@@ -499,8 +501,8 @@ VALUES
   (
     'cccccccc-cccc-cccc-cccc-cccccccccccc',
     '99999999-9999-9999-9999-999999999997',
-    '33333333-3333-3333-3333-333333333333',
-    '44444444-4444-4444-4444-444444444444',
+    '10000003',
+    '10000004',
     3,
     'Removed review for policy reasons.',
     'DELETED',
@@ -516,7 +518,7 @@ VALUES
     'SUBMITTED',
     'PUBLISHED',
     'Auto-approved',
-    '11111111-1111-1111-1111-111111111111'
+    '10000001'
   ),
   (
     'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
@@ -524,7 +526,7 @@ VALUES
     'SUBMITTED',
     'REJECTED',
     'Spam content',
-    '11111111-1111-1111-1111-111111111111'
+    '10000001'
   ),
   (
     'ffffffff-ffff-ffff-ffff-ffffffffffff',
@@ -532,7 +534,7 @@ VALUES
     'PUBLISHED',
     'DELETED',
     'Requested removal',
-    '11111111-1111-1111-1111-111111111111'
+    '10000001'
   )
 ON CONFLICT DO NOTHING;
 
@@ -606,7 +608,7 @@ CREATE TABLE IF NOT EXISTS payment_status_history (
   from_status text,
   to_status text NOT NULL,
   reason text,
-  actor_id text,
+  actor_id char(8),
   occurred_at timestamptz NOT NULL DEFAULT now(),
   trace_id text,
   CONSTRAINT payment_status_history_from_check CHECK (
@@ -620,7 +622,7 @@ CREATE TABLE IF NOT EXISTS payment_status_history (
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   route_key text NOT NULL,
-  user_id text NOT NULL,
+  user_id char(8) NOT NULL,
   idem_key text NOT NULL,
   request_hash text NOT NULL,
   response_code integer NOT NULL,

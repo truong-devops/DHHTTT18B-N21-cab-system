@@ -7,8 +7,8 @@
   "properties": {
     "reviewId": { "type": "string" },
     "rideId": { "type": "string" },
-    "riderId": { "type": "string" },
-    "driverId": { "type": "string" },
+    "riderId": { "type": "string", "pattern": "^[0-9]{8}$" },
+    "driverId": { "type": "string", "pattern": "^[0-9]{8}$" },
     "rating": { "type": "number", "minimum": 1, "maximum": 5 },
     "comment": { "type": "string" },
     "status": { "type": "string" },

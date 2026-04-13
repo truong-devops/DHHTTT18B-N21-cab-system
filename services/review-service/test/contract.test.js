@@ -88,7 +88,7 @@ describe('review-service contract', () => {
   });
 
   function buildToken() {
-    return jwt.sign({ sub: 'user-123', roles: ['rider'] }, process.env.JWT_SECRET, { algorithm: 'HS256' });
+    return jwt.sign({ sub: '10000003', roles: ['rider'] }, process.env.JWT_SECRET, { algorithm: 'HS256' });
   }
 
   it('POST /v1/reviews matches contract schema', async () => {
@@ -98,8 +98,8 @@ describe('review-service contract', () => {
     reviewRepository.createReview.mockResolvedValue({
       id: 'review-1',
       ride_id: 'ride-1',
-      rider_id: 'user-123',
-      driver_id: 'driver-123',
+      rider_id: '10000003',
+      driver_id: '10000004',
       rating: 5,
       comment: 'Great',
       status: 'submitted',
@@ -111,7 +111,7 @@ describe('review-service contract', () => {
 
     const response = await request(app).post('/v1/reviews').set('Authorization', `Bearer ${buildToken()}`).set('Idempotency-Key', 'idem-1').send({
       rideId: 'ride-1',
-      driverId: 'driver-123',
+      driverId: '10000004',
       rating: 5
     });
 
@@ -130,8 +130,8 @@ describe('review-service contract', () => {
     reviewRepository.getReviewById.mockResolvedValue({
       id: 'review-1',
       ride_id: 'ride-1',
-      rider_id: 'user-123',
-      driver_id: 'driver-123',
+      rider_id: '10000003',
+      driver_id: '10000004',
       rating: 5,
       comment: 'Great',
       status: 'submitted',

@@ -12,7 +12,15 @@ const { createPayosPaymentLink } = require('./payosService');
 const { generateVietQrCode } = require('../integrations/vietqrClient');
 const config = require('../config');
 const { withTrace } = require('../utils/logger');
+const { isEightDigitId } = require('../utils/validation');
 const monitoring = require('../monitoring');
+
+function normalizeActorId(value) {
+  if (!isEightDigitId(value)) {
+    return null;
+  }
+  return String(value).trim();
+}
 
 async function resolvePayosQrCode({ payosData, traceId, requestId, authorization }) {
   if (!payosData || !payosData.qrCode) {
@@ -109,7 +117,7 @@ async function createPayment({ payload, idempotency, traceId, requestId, method,
       fromStatus: null,
       toStatus: payment.status,
       reason: null,
-      actorId: payment.userId || null,
+      actorId: normalizeActorId(payment.userId),
       traceId
     });
 
@@ -197,7 +205,7 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
       fromStatus: payment.status,
       toStatus: status,
       reason: failureReason,
-      actorId: actor || null,
+      actorId: normalizeActorId(actor),
       traceId
     });
 

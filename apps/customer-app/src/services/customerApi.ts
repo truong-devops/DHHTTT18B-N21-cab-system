@@ -124,9 +124,13 @@ function toMethodCode(method: string): 'CASH' | 'WALLET' | 'VIETQR' {
   return 'CASH';
 }
 
-function isUuid(value: string | undefined) {
+function isEightDigitId(value: string | undefined) {
   if (!value) return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  return /^\d{8}$/.test(value);
+}
+
+function isNonEmptyString(value: string | undefined) {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function buildUserName(identifier: string, user: authApi.AuthUser) {
@@ -340,25 +344,46 @@ export const customerApi = {
   async startRide({ pickupLabel, destinationLabel, vehicleOptionId }: StartRidePayload) {
     const pickup = getPickupPointOrThrow(pickupLabel);
     const destination = getDestinationPointOrThrow(destinationLabel);
+    const bookingPayload = {
+      pickup: { lat: pickup.lat, lng: pickup.lng, address: pickupLabel },
+      dropoff: { lat: destination.lat, lng: destination.lng, address: destinationLabel },
+      vehicleType: mapVehicleTypeFromOption(vehicleOptionId)
+    };
 
     let bookingId: string | null = null;
     let bookingRideId: string | null = null;
     try {
-      const booking = await bookingApi.createBooking({
-        pickup: { lat: pickup.lat, lng: pickup.lng, address: pickupLabel },
-        dropoff: { lat: destination.lat, lng: destination.lng, address: destinationLabel },
-        vehicleType: mapVehicleTypeFromOption(vehicleOptionId)
-      });
+      let booking = await bookingApi.createBooking(bookingPayload);
+      if (!resolveBookingId(booking)) {
+        throw new Error('Dịch vụ booking không trả về mã booking');
+      }
       bookingId = resolveBookingId(booking);
       bookingRideId = resolveBookingRideId(booking);
       if (!bookingId) {
         throw new Error('Dịch vụ booking không trả về mã booking');
       }
     } catch (error) {
+      if (isApiError(error) && error.code === 'ACTIVE_BOOKING_RELEASED_RETRY') {
+        try {
+          const booking = await bookingApi.createBooking(bookingPayload);
+          bookingId = resolveBookingId(booking);
+          bookingRideId = resolveBookingRideId(booking);
+        } catch (retryError) {
+          if (isApiError(retryError) && retryError.code === 'ACTIVE_BOOKING_EXISTS') {
+            throw new Error('Bạn đang có booking đang hoạt động. Vui lòng hoàn tất hoặc hủy chuyến trước.');
+          }
+          throw retryError;
+        }
+        if (!bookingId) {
+          throw new Error('Dịch vụ booking không trả về mã booking');
+        }
+      }
       if (isApiError(error) && error.code === 'ACTIVE_BOOKING_EXISTS') {
         throw new Error('Bạn đang có booking đang hoạt động. Vui lòng hoàn tất hoặc hủy chuyến trước.');
       }
-      throw error;
+      if (!bookingId) {
+        throw error;
+      }
     }
 
     const created = await rideApi.createRide({
@@ -451,15 +476,16 @@ export const customerApi = {
   },
 
   async submitRating(rideId: string, driverId: string | undefined, stars: number, comment: string, tipAmount?: number | null) {
-    if (!isUuid(rideId)) {
+    const normalizedRideId = String(rideId || '').trim();
+    if (!isNonEmptyString(normalizedRideId)) {
       throw new Error('Mã chuyến đi không hợp lệ');
     }
     const normalizedDriverId = typeof driverId === 'string' ? driverId.trim() : '';
-    if (!normalizedDriverId) {
+    if (!isEightDigitId(normalizedDriverId)) {
       throw new Error('Mã tài xế không hợp lệ');
     }
     return reviewApi.createReview({
-      rideId,
+      rideId: normalizedRideId,
       driverId: normalizedDriverId,
       rating: stars,
       comment: comment.trim() || undefined,

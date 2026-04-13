@@ -1,7 +1,7 @@
 const { ApiError } = require('../utils/errors');
 const logger = require('../utils/logger');
 const { buildDedupeKey } = require('../utils/dedupe');
-const { CHANNEL_VALUES, isNonEmptyString, isObject, normalizeChannels, parseDate } = require('../utils/validation');
+const { CHANNEL_VALUES, isEightDigitId, isNonEmptyString, isObject, normalizeChannels, parseDate } = require('../utils/validation');
 const { getUserById } = require('../clients/userServiceClient');
 const notificationRepository = require('../repository/notificationRepository');
 const preferenceRepository = require('../repository/preferenceRepository');
@@ -24,6 +24,8 @@ function validatePayload(payload) {
   }
   if (!isNonEmptyString(payload.userId)) {
     errors.push({ field: 'userId', message: 'is required' });
+  } else if (!isEightDigitId(payload.userId)) {
+    errors.push({ field: 'userId', message: 'must be an 8-digit ID' });
   }
 
   const channelResult = normalizeChannels(payload.channels);

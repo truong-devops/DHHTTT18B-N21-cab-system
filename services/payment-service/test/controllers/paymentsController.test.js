@@ -98,7 +98,7 @@ describe('payments controllers', () => {
       traceId: 'trace_1',
       requestId: 'req_1',
       authorization: 'Bearer test',
-      user: { id: 'user_1' }
+      user: { id: '10000003' }
     });
     req.headers['idempotency-key'] = 'idem_1';
 
@@ -109,7 +109,7 @@ describe('payments controllers', () => {
     expect(idempotencyService.withIdempotency).toHaveBeenCalledWith(
       expect.objectContaining({
         routeKey: 'payments:create',
-        userId: 'user_1',
+        userId: '10000003',
         idemKey: 'idem_1'
       })
     );
@@ -119,7 +119,7 @@ describe('payments controllers', () => {
           rideId: 'ride_1',
           amount: '100.00',
           currency: 'VND',
-          userId: 'user_1'
+          userId: '10000003'
         },
         traceId: 'trace_1',
         requestId: 'req_1',
@@ -151,9 +151,9 @@ describe('payments controllers', () => {
       validatedBody: { status: 'PAID' },
       traceId: 'trace_2',
       requestId: 'req_2',
-      user: { id: 'user_1' }
+      user: { id: '10000003' }
     });
-    req.headers['x-actor'] = 'driver_9';
+    req.headers['x-user-id'] = '10000003';
     const res = buildRes();
 
     await updatePaymentStatusController(req, res);
@@ -163,7 +163,7 @@ describe('payments controllers', () => {
       statusUpdate: { status: 'PAID' },
       traceId: 'trace_2',
       requestId: 'req_2',
-      actor: 'driver_9'
+      actor: '10000003'
     });
     expect(res.json).toHaveBeenCalledWith({ data: { id: 'pay_1', status: 'PAID' } });
   });

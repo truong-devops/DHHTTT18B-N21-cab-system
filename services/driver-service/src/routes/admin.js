@@ -6,6 +6,10 @@ const driverService = require('../services/driverService');
 
 const router = express.Router();
 
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
 router.use('/v1/admin', requireAuth, requireRole('admin', 'ops', 'service'));
 
 router.post(
@@ -17,6 +21,11 @@ router.post(
         userId: { type: 'string' },
         fullName: { type: 'string' },
         phone: { type: 'string' }
+      }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.body?.userId)) {
+        errors.push({ path: 'body.userId', message: 'must be an 8-digit ID' });
       }
     }
   }),
@@ -39,6 +48,11 @@ router.patch(
     paramsSchema: {
       required: ['driverId'],
       properties: { driverId: { type: 'string' } }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.params?.driverId)) {
+        errors.push({ path: 'params.driverId', message: 'must be an 8-digit ID' });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -53,6 +67,11 @@ router.patch(
     paramsSchema: {
       required: ['driverId'],
       properties: { driverId: { type: 'string' } }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.params?.driverId)) {
+        errors.push({ path: 'params.driverId', message: 'must be an 8-digit ID' });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -86,6 +105,66 @@ router.get(
       page: req.query.page,
       limit: req.query.limit
     });
+    return res.json({ data, requestId: req.requestId });
+  })
+);
+
+router.get(
+  '/v1/admin/kyc/submissions',
+  validateRequest({
+    custom: (req, errors) => {
+      if (req.query.page !== undefined) {
+        const page = Number(req.query.page);
+        if (!Number.isFinite(page)) {
+          errors.push({ path: 'query.page', message: 'must be a number' });
+        }
+      }
+      if (req.query.limit !== undefined) {
+        const limit = Number(req.query.limit);
+        if (!Number.isFinite(limit)) {
+          errors.push({ path: 'query.limit', message: 'must be a number' });
+        }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const data = await driverService.listKycSubmissionsAdmin({
+      status: req.query.status,
+      page: req.query.page,
+      limit: req.query.limit
+    });
+    return res.json({ data, requestId: req.requestId });
+  })
+);
+
+router.patch(
+  '/v1/admin/kyc/:submissionId/approve',
+  validateRequest({
+    paramsSchema: {
+      required: ['submissionId'],
+      properties: { submissionId: { type: 'string' } }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const data = await driverService.approveKycSubmission(req.params.submissionId, req.user?.id || null);
+    return res.json({ data, requestId: req.requestId });
+  })
+);
+
+router.patch(
+  '/v1/admin/kyc/:submissionId/reject',
+  validateRequest({
+    paramsSchema: {
+      required: ['submissionId'],
+      properties: { submissionId: { type: 'string' } }
+    },
+    bodySchema: {
+      required: ['rejectionReason'],
+      properties: { rejectionReason: { type: 'string' } }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const data = await driverService.rejectKycSubmission(req.params.submissionId, req.body.rejectionReason, req.user?.id || null);
     return res.json({ data, requestId: req.requestId });
   })
 );

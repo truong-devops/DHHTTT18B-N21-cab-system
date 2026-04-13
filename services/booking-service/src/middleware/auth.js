@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
 function parseList(raw, fallback = []) {
   if (!raw) {
     return fallback;
@@ -43,7 +47,7 @@ function parseCsvHeader(raw) {
     .filter(Boolean);
 }
 
-function tryAttachTrustedGatewayIdentity(req) {
+function tryAttachTrustedGatewayIdentity(req, res) {
   const enabled = String(process.env.BOOKING_TRUST_GATEWAY_USER_HEADERS || 'true') !== 'false';
   if (!enabled || !req.gatewayTrusted) {
     return false;
@@ -52,6 +56,10 @@ function tryAttachTrustedGatewayIdentity(req) {
   const userId = String(req.header('x-user-id') || '').trim();
   if (!userId) {
     return false;
+  }
+  if (!isEightDigitId(userId)) {
+    sendAuthError(res, req, 400, 'VALIDATION_ERROR', 'x-user-id must be an 8-digit ID');
+    return null;
   }
 
   const rolesFromList = parseCsvHeader(req.header('x-user-roles'));
@@ -71,8 +79,12 @@ function tryAttachTrustedGatewayIdentity(req) {
 }
 
 function requireAuth(req, res, next) {
-  if (tryAttachTrustedGatewayIdentity(req)) {
+  const gatewayIdentity = tryAttachTrustedGatewayIdentity(req, res);
+  if (gatewayIdentity === true) {
     return next();
+  }
+  if (gatewayIdentity === null) {
+    return undefined;
   }
 
   const authHeader = req.header('authorization') || '';
@@ -91,9 +103,12 @@ function requireAuth(req, res, next) {
     const payload = jwt.verify(token, secret, {
       algorithms: parseList(process.env.JWT_ALGORITHMS, ['HS256'])
     });
-    const userId = payload.sub || payload.id;
+    const userId = String(payload.sub || payload.id || '').trim();
     if (!userId) {
       return sendAuthError(res, req, 401, 'UNAUTHORIZED', 'Invalid token subject');
+    }
+    if (!isEightDigitId(userId)) {
+      return sendAuthError(res, req, 401, 'UNAUTHORIZED', 'Invalid token subject format');
     }
 
     const roles = Array.isArray(payload.roles) ? payload.roles.map((r) => String(r).toLowerCase()) : [];

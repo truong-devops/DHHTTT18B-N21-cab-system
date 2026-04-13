@@ -29,7 +29,7 @@ export function useEarnings({ limit = 20 }: Options = {}) {
     setLoading(true);
     setError(null);
     paymentApi
-      .listPayments(limit)
+      .listPayments({ limit })
       .then((res) => {
         if (!mounted) return;
         setPayments(res.data || []);

@@ -10,7 +10,27 @@ import { useRide as useRideState } from '@/hooks/use-ride';
 import { useRoutePolyline } from '@/hooks/use-route-polyline';
 import { useRide } from '@/lib/contexts/ride';
 import { useDriver } from '@/lib/contexts/driver';
+import * as paymentApi from '@/lib/services/payment';
 import { palette } from '@/lib/theme';
+
+function formatCoordinate(value: unknown, digits: number) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value.toFixed(digits);
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed.toFixed(digits);
+  }
+  return '--';
+}
+
+function toCurrencyLabel(amount: number | null | undefined, currency = 'VND') {
+  if (!Number.isFinite(amount as number)) return '--';
+  const safeAmount = Math.round(Number(amount));
+  const safeCurrency = String(currency || 'VND').toUpperCase();
+  if (safeCurrency === 'VND') {
+    return `${safeAmount.toLocaleString('vi-VN')} d`;
+  }
+  return `${safeAmount.toLocaleString('vi-VN')} ${safeCurrency}`;
+}
 
 export default function RideNavigationScreen() {
   const mapRef = useRef<MapView | null>(null);
@@ -36,6 +56,39 @@ export default function RideNavigationScreen() {
   }, [trackedRide, setActiveRide]);
 
   const ride = trackedRide ?? activeRide;
+  const [fareLabel, setFareLabel] = useState('--');
+
+  useEffect(() => {
+    let mounted = true;
+    if (!ride?.id) {
+      setFareLabel('--');
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setFareLabel('--');
+    paymentApi
+      .getLatestPaymentByRideIds([ride.externalRideId, ride.id])
+      .then((payment) => {
+        if (!mounted) return;
+        const amount = Number(payment?.amount);
+        if (!Number.isFinite(amount)) {
+          setFareLabel('--');
+          return;
+        }
+        setFareLabel(toCurrencyLabel(amount, payment?.currency || 'VND'));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setFareLabel('--');
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [ride?.id]);
+
   const status = useMemo(() => (ride?.status ?? '').toUpperCase(), [ride?.status]);
   const canArrive = status === 'ASSIGNED' || status === 'REQUESTED';
   const canStart = status === 'ARRIVING';
@@ -253,15 +306,15 @@ export default function RideNavigationScreen() {
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Điểm đón</Text>
-            <Text style={styles.value}>{ride.pickupLabel || `${ride.pickupLat?.toFixed(5) ?? '--'},${ride.pickupLng?.toFixed(5) ?? '--'}`}</Text>
+            <Text style={styles.value}>{ride.pickupLabel || `${formatCoordinate(ride.pickupLat, 5)},${formatCoordinate(ride.pickupLng, 5)}`}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Điểm đến</Text>
-            <Text style={styles.value}>{ride.dropoffLabel || `${ride.dropoffLat?.toFixed(5) ?? '--'},${ride.dropoffLng?.toFixed(5) ?? '--'}`}</Text>
+            <Text style={styles.value}>{ride.dropoffLabel || `${formatCoordinate(ride.dropoffLat, 5)},${formatCoordinate(ride.dropoffLng, 5)}`}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Thanh toán</Text>
-            <Text style={styles.value}>--</Text>
+            <Text style={styles.value}>{fareLabel}</Text>
           </View>
         </Card>
 

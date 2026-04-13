@@ -6,6 +6,10 @@ const driverService = require('../services/driverService');
 
 const router = express.Router();
 
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
 function validateLatLng(prefix, errors, value) {
   if (!value || typeof value !== 'object') {
     errors.push({ path: prefix, message: 'is required' });
@@ -39,6 +43,9 @@ router.post(
       }
     },
     custom: (req, errors) => {
+      if (!isEightDigitId(req.body?.driver_id)) {
+        errors.push({ path: 'body.driver_id', message: 'must be an 8-digit ID' });
+      }
       if (req.body?.initial_location) {
         validateLatLng('body.initial_location', errors, req.body.initial_location);
       }
@@ -118,6 +125,11 @@ router.get(
     paramsSchema: {
       required: ['driverId'],
       properties: { driverId: { type: 'string' } }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.params?.driverId)) {
+        errors.push({ path: 'params.driverId', message: 'must be an 8-digit ID' });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
@@ -133,6 +145,48 @@ router.get(
   asyncHandler(async (req, res) => {
     const data = await driverService.getDriverMe(req.userId);
     return res.json({ data, requestId: req.requestId });
+  })
+);
+
+router.get(
+  '/v1/driver/me/kyc',
+  asyncHandler(async (req, res) => {
+    const data = await driverService.getDriverKyc(req.userId);
+    return res.json({ data, requestId: req.requestId });
+  })
+);
+
+router.post(
+  '/v1/driver/me/kyc/submissions',
+  validateRequest({
+    bodySchema: {
+      required: ['idNumber', 'licenseNumber', 'idFrontUrl', 'licenseFrontUrl', 'selfieUrl'],
+      properties: {
+        fullName: { type: 'string' },
+        phone: { type: 'string' },
+        idNumber: { type: 'string' },
+        licenseNumber: { type: 'string' },
+        vehicleRegistrationNumber: { type: 'string' },
+        idFrontUrl: { type: 'string' },
+        idBackUrl: { type: 'string' },
+        licenseFrontUrl: { type: 'string' },
+        selfieUrl: { type: 'string' }
+      }
+    }
+  }),
+  asyncHandler(async (req, res) => {
+    const data = await driverService.submitDriverKyc(req.userId, {
+      fullName: req.body.fullName,
+      phone: req.body.phone,
+      idNumber: req.body.idNumber,
+      licenseNumber: req.body.licenseNumber,
+      vehicleRegistrationNumber: req.body.vehicleRegistrationNumber,
+      idFrontUrl: req.body.idFrontUrl,
+      idBackUrl: req.body.idBackUrl,
+      licenseFrontUrl: req.body.licenseFrontUrl,
+      selfieUrl: req.body.selfieUrl
+    });
+    return res.status(201).json({ data, requestId: req.requestId });
   })
 );
 

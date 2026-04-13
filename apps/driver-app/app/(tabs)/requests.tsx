@@ -5,6 +5,7 @@ import { useRequests } from '@/hooks/use-requests';
 import { useDriver } from '@/lib/contexts/driver';
 import { useRide } from '@/lib/contexts/ride';
 import * as rideApi from '@/src/services/rideApi';
+import * as paymentApi from '@/lib/services/payment';
 import { palette } from '@/lib/theme';
 
 const paymentTags = ['Tiền mặt', 'Ví', 'Thẻ'];
@@ -18,10 +19,22 @@ function formatCoordinate(value: unknown, digits: number) {
   return '--';
 }
 
+function toCurrencyLabel(amount: number | null | undefined, currency = 'VND') {
+  if (!Number.isFinite(amount as number)) return '--';
+  const safeAmount = Math.round(Number(amount));
+  const safeCurrency = String(currency || 'VND').toUpperCase();
+  if (safeCurrency === 'VND') {
+    return `${safeAmount.toLocaleString('vi-VN')} d`;
+  }
+  return `${safeAmount.toLocaleString('vi-VN')} ${safeCurrency}`;
+}
+
 export default function RequestsScreen() {
   const [ignoredRideId, setIgnoredRideId] = useState<string | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [fareText, setFareText] = useState('--');
+  const [fareSubText, setFareSubText] = useState('dang cap nhat');
   const lastActionRef = useRef<string | null>(null);
   const { driver } = useDriver();
   const { setActiveRide } = useRide();
@@ -39,8 +52,50 @@ export default function RequestsScreen() {
     }
   }, [incomingRide, ignoredRideId]);
 
+  useEffect(() => {
+    let mounted = true;
+    if (!activeRequest?.id) {
+      setFareText('--');
+      setFareSubText('dang cap nhat');
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setFareText('--');
+    setFareSubText('dang cap nhat');
+
+    paymentApi
+      .getLatestPaymentByRideIds([activeRequest.externalRideId, activeRequest.id])
+      .then((payment) => {
+        if (!mounted) return;
+        const amount = Number(payment?.amount);
+        if (!Number.isFinite(amount)) {
+          setFareText('--');
+          setFareSubText('chua co du lieu');
+          return;
+        }
+        setFareText(toCurrencyLabel(amount, payment?.currency || 'VND'));
+        setFareSubText('tam tinh');
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setFareText('--');
+        setFareSubText('chua co du lieu');
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [activeRequest?.id]);
+
   const requestTitle = useMemo(() => {
-    const requestId = typeof activeRequest?.id === 'string' ? activeRequest.id : '';
+    const requestId =
+      typeof activeRequest?.externalRideId === 'string' && activeRequest.externalRideId.trim()
+        ? activeRequest.externalRideId
+        : typeof activeRequest?.id === 'string'
+          ? activeRequest.id
+          : '';
     if (!requestId) return '--';
     return `Chuyến #${requestId.slice(0, 6)}`;
   }, [activeRequest]);
@@ -153,8 +208,8 @@ export default function RequestsScreen() {
                 <Text style={styles.requestTitle}>{requestTitle}</Text>
               </View>
               <View style={styles.pricePill}>
-                <Text style={styles.priceText}>--</Text>
-                <Text style={styles.priceSub}>đang cập nhật</Text>
+                <Text style={styles.priceText}>{fareText}</Text>
+                <Text style={styles.priceSub}>{fareSubText}</Text>
               </View>
             </View>
 

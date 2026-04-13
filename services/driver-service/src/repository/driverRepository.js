@@ -1,30 +1,50 @@
 const pool = require('../db/pool');
 
-function isUuidLike(value) {
-  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+function normalizeId(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized || null;
 }
 
 async function getDriverByUserId(userId) {
-  const result = await pool.query('SELECT * FROM drivers WHERE user_id = $1', [userId]);
+  const normalizedUserId = normalizeId(userId);
+  if (!normalizedUserId) {
+    return null;
+  }
+  const result = await pool.query('SELECT * FROM drivers WHERE user_id::text = $1 LIMIT 1', [normalizedUserId]);
   return result.rows[0] || null;
 }
 
 async function getDriverById(id) {
-  if (!isUuidLike(id)) {
+  const normalizedId = normalizeId(id);
+  if (!normalizedId) {
     return null;
   }
-  const result = await pool.query('SELECT * FROM drivers WHERE id = $1', [id]);
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM drivers
+      WHERE id::text = $1 OR user_id::text = $1
+      ORDER BY CASE WHEN id::text = $1 THEN 0 ELSE 1 END
+      LIMIT 1
+    `,
+    [normalizedId]
+  );
   return result.rows[0] || null;
 }
 
 async function createDriver({ userId, fullName = null, phone = null }) {
+  const normalizedUserId = normalizeId(userId);
+  if (!normalizedUserId) {
+    return null;
+  }
   const result = await pool.query(
     `
-      INSERT INTO drivers (user_id, full_name, phone)
-      VALUES ($1, $2, $3)
+      INSERT INTO drivers (id, user_id, full_name, phone)
+      VALUES ($1, $1, $2, $3)
       RETURNING *
     `,
-    [userId, fullName, phone]
+    [normalizedUserId, fullName, phone]
   );
   return result.rows[0] || null;
 }
@@ -52,7 +72,13 @@ async function updateDriverProfile(id, fields) {
     `
       UPDATE drivers
       SET ${columns.join(', ')}
-      WHERE id = $${index}
+      WHERE id = (
+        SELECT id
+        FROM drivers
+        WHERE id::text = $${index} OR user_id::text = $${index}
+        ORDER BY CASE WHEN id::text = $${index} THEN 0 ELSE 1 END
+        LIMIT 1
+      )
       RETURNING *
     `,
     values
@@ -65,7 +91,13 @@ async function updateDriverStatus(id, status) {
     `
       UPDATE drivers
       SET status = $2
-      WHERE id = $1
+      WHERE id = (
+        SELECT id
+        FROM drivers
+        WHERE id::text = $1 OR user_id::text = $1
+        ORDER BY CASE WHEN id::text = $1 THEN 0 ELSE 1 END
+        LIMIT 1
+      )
       RETURNING *
     `,
     [id, status]
@@ -78,7 +110,14 @@ async function updateOnlineStatus(id, allowedCurrent, nextStatus) {
     `
       UPDATE drivers
       SET online_status = $2
-      WHERE id = $1 AND online_status = ANY($3)
+      WHERE id = (
+        SELECT id
+        FROM drivers
+        WHERE id::text = $1 OR user_id::text = $1
+        ORDER BY CASE WHEN id::text = $1 THEN 0 ELSE 1 END
+        LIMIT 1
+      )
+        AND online_status = ANY($3)
       RETURNING *
     `,
     [id, nextStatus, allowedCurrent]
