@@ -161,6 +161,7 @@ paths:
           name: driverUserId
           schema:
             type: string
+            pattern: '^[0-9]{8}$'
       responses:
         '200':
           description: Wallet summary
@@ -203,6 +204,7 @@ paths:
           name: driverUserId
           schema:
             type: string
+            pattern: '^[0-9]{8}$'
       responses:
         '200':
           description: Withdrawals list
@@ -304,6 +306,7 @@ components:
           type: string
         userId:
           type: string
+          pattern: '^[0-9]{8}$'
         amount:
           type: string
           pattern: "^\\d+(\\.\\d{1,2})?$"
@@ -377,6 +380,7 @@ components:
           type: string
         userId:
           type: string
+          pattern: '^[0-9]{8}$'
         note:
           type: string
     PaymentStatusUpdate:
@@ -425,6 +429,7 @@ components:
       properties:
         driverUserId:
           type: string
+          pattern: '^[0-9]{8}$'
         completedRides:
           type: integer
         earningsTotal:
@@ -449,6 +454,7 @@ components:
           type: string
         driverUserId:
           type: string
+          pattern: '^[0-9]{8}$'
         amount:
           type: string
         currency:

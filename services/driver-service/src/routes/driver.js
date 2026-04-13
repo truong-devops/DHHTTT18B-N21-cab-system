@@ -6,6 +6,10 @@ const driverService = require('../services/driverService');
 
 const router = express.Router();
 
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
 function validateLatLng(prefix, errors, value) {
   if (!value || typeof value !== 'object') {
     errors.push({ path: prefix, message: 'is required' });
@@ -39,6 +43,9 @@ router.post(
       }
     },
     custom: (req, errors) => {
+      if (!isEightDigitId(req.body?.driver_id)) {
+        errors.push({ path: 'body.driver_id', message: 'must be an 8-digit ID' });
+      }
       if (req.body?.initial_location) {
         validateLatLng('body.initial_location', errors, req.body.initial_location);
       }
@@ -118,6 +125,11 @@ router.get(
     paramsSchema: {
       required: ['driverId'],
       properties: { driverId: { type: 'string' } }
+    },
+    custom: (req, errors) => {
+      if (!isEightDigitId(req.params?.driverId)) {
+        errors.push({ path: 'params.driverId', message: 'must be an 8-digit ID' });
+      }
     }
   }),
   asyncHandler(async (req, res) => {

@@ -104,7 +104,7 @@ function buildPayment(overrides = {}) {
   return {
     id: 'pay_1',
     rideId: 'ride_1',
-    userId: 'user_1',
+    userId: '10000003',
     amount: '100.00',
     currency: 'VND',
     method: 'CARD',
@@ -126,8 +126,8 @@ function buildVietQr() {
 }
 
 describe('payment-service OpenAPI contract', () => {
-  const authHeader = `Bearer ${jwt.sign({ sub: 'user_1', roles: ['user'], scopes: ['payments:write'] }, process.env.JWT_ACCESS_SECRET)}`;
-  const adminAuthHeader = `Bearer ${jwt.sign({ sub: 'admin_1', roles: ['admin'], scopes: ['payments:write'] }, process.env.JWT_ACCESS_SECRET)}`;
+  const authHeader = `Bearer ${jwt.sign({ sub: '10000003', roles: ['user'], scopes: ['payments:write'] }, process.env.JWT_ACCESS_SECRET)}`;
+  const adminAuthHeader = `Bearer ${jwt.sign({ sub: '10000001', roles: ['admin'], scopes: ['payments:write'] }, process.env.JWT_ACCESS_SECRET)}`;
 
   beforeEach(() => {
     jest.resetAllMocks();

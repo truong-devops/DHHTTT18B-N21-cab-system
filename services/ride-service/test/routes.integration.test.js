@@ -2,7 +2,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 
 const TEST_SECRET = 'test-secret';
-const authHeader = (payload = { sub: 'user-123' }) => `Bearer ${jwt.sign(payload, TEST_SECRET)}`;
+const authHeader = (payload = { sub: '10000003' }) => `Bearer ${jwt.sign(payload, TEST_SECRET)}`;
 
 jest.mock('../src/repository/rideRepository', () => ({
   createRide: jest.fn(),
@@ -37,7 +37,7 @@ function buildRideRow(overrides = {}) {
     id: 'ride-1',
     external_ride_id: 'ext-1',
     booking_id: null,
-    rider_id: 'user-123',
+    rider_id: '10000003',
     driver_id: null,
     pickup_lat: 10.1,
     pickup_lng: 20.2,

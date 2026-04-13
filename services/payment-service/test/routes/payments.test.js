@@ -21,8 +21,8 @@ const paymentService = require('../../src/services/paymentService');
 const idempotencyService = require('../../src/services/idempotencyService');
 
 describe('payment routes', () => {
-  const authHeader = `Bearer ${jwt.sign({ sub: 'user_1', roles: ['user'], scopes: ['payments:write'] }, process.env.JWT_ACCESS_SECRET)}`;
-  const adminAuthHeader = `Bearer ${jwt.sign({ sub: 'admin_1', roles: ['admin'], scopes: ['payments:write'] }, process.env.JWT_ACCESS_SECRET)}`;
+  const authHeader = `Bearer ${jwt.sign({ sub: '10000003', roles: ['user'], scopes: ['payments:write'] }, process.env.JWT_ACCESS_SECRET)}`;
+  const adminAuthHeader = `Bearer ${jwt.sign({ sub: '10000001', roles: ['admin'], scopes: ['payments:write'] }, process.env.JWT_ACCESS_SECRET)}`;
 
   afterEach(() => {
     jest.resetAllMocks();

@@ -54,6 +54,10 @@ function toRideResponse(row) {
   };
 }
 
+function isEightDigitId(value) {
+  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
+}
+
 function haversineDistanceMeters(aLat, aLng, bLat, bLng) {
   const toRad = (value) => (value * Math.PI) / 180;
   const R = 6371000;
@@ -163,9 +167,18 @@ router.post(
           message: 'is required'
         });
       }
+      if (req.body?.driverId !== undefined && !isEightDigitId(req.body.driverId)) {
+        errors.push({
+          path: 'body.driverId',
+          message: 'must be an 8-digit ID'
+        });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
+    if (!isEightDigitId(req.userId)) {
+      throw new ApiError(401, 'UNAUTHORIZED', 'Invalid authenticated user ID format');
+    }
     const idempotencyKey = req.header('Idempotency-Key');
 
     const routeKey = 'rides:create';
@@ -289,13 +302,13 @@ router.post(
           return res.status(responseStatus).json(responseBody);
         }
       }
-      const shouldAutoAssign = AUTO_ASSIGN_DRIVER && !req.body?.driverId && DEFAULT_DRIVER_ID.length > 0;
+      const shouldAutoAssign = AUTO_ASSIGN_DRIVER && !req.body?.driverId && isEightDigitId(DEFAULT_DRIVER_ID);
 
       const ride = await createRide({
         externalRideId: requestedExternalRideId || crypto.randomUUID(),
         bookingId: req.body.bookingId,
         riderId: req.userId,
-        driverId: shouldAutoAssign ? DEFAULT_DRIVER_ID : req.body.driverId,
+        driverId: shouldAutoAssign ? DEFAULT_DRIVER_ID : req.body.driverId ? String(req.body.driverId).trim() : null,
         pickupLat: req.body.pickupLat,
         pickupLng: req.body.pickupLng,
         pickupLabel: req.body.pickupLabel || null,
@@ -355,7 +368,7 @@ router.get(
   '/assignments',
   asyncHandler(async (req, res) => {
     const driverId = req.userId;
-    if (!driverId) {
+    if (!driverId || !isEightDigitId(driverId)) {
       throw new ApiError(401, 'UNAUTHORIZED', 'Missing driver identity');
     }
 
@@ -505,6 +518,18 @@ router.get(
           });
         }
       }
+      if (req.query.riderId && !isEightDigitId(req.query.riderId)) {
+        errors.push({
+          path: 'query.riderId',
+          message: 'must be an 8-digit ID'
+        });
+      }
+      if (req.query.driverId && !isEightDigitId(req.query.driverId)) {
+        errors.push({
+          path: 'query.driverId',
+          message: 'must be an 8-digit ID'
+        });
+      }
 
       const hasLimit = req.query.limit !== undefined;
       const limitRaw = Number(req.query.limit || 20);
@@ -591,6 +616,12 @@ router.patch(
         errors.push({
           path: 'body',
           message: 'at least one field is required'
+        });
+      }
+      if (req.body?.driverId !== undefined && !isEightDigitId(req.body.driverId)) {
+        errors.push({
+          path: 'body.driverId',
+          message: 'must be an 8-digit ID'
         });
       }
     }

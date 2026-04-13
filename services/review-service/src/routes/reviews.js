@@ -25,6 +25,11 @@ const router = express.Router();
 
 router.use(requireAuth);
 
+function isEightDigitId(value) {
+  if (typeof value !== 'string') return false;
+  return /^\d{8}$/.test(value.trim());
+}
+
 function toReviewResponse(row) {
   return {
     id: row.id,
@@ -74,9 +79,18 @@ router.post(
           message: 'is required'
         });
       }
+      if (!isEightDigitId(req.body?.driverId)) {
+        errors.push({
+          path: 'body.driverId',
+          message: 'must be an 8-digit ID'
+        });
+      }
     }
   }),
   asyncHandler(async (req, res) => {
+    if (!isEightDigitId(req.userId)) {
+      throw new ApiError(401, 'UNAUTHORIZED', 'Invalid authenticated user ID format');
+    }
     const idempotencyKey = req.header('Idempotency-Key');
 
     const routeKey = 'reviews:create';
@@ -168,7 +182,7 @@ router.post(
         review = await createReview({
           rideId: req.body.rideId,
           riderId: req.userId,
-          driverId: req.body.driverId,
+          driverId: String(req.body.driverId || '').trim(),
           rating: req.body.rating,
           comment: req.body.comment,
           tipAmount: req.body.tipAmount,
@@ -307,6 +321,12 @@ router.get(
             message: 'is invalid'
           });
         }
+      }
+      if (req.query.riderId && !isEightDigitId(req.query.riderId)) {
+        errors.push({
+          path: 'query.riderId',
+          message: 'must be an 8-digit ID'
+        });
       }
 
       const hasLimit = req.query.limit !== undefined;

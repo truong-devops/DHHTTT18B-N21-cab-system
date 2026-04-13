@@ -37,12 +37,12 @@ describe('auth middleware', () => {
   });
 
   test('requireAuth attaches user from JWT', async () => {
-    const token = jwt.sign({ sub: 'user_1', roles: ['driver'], scopes: ['payments:read'] }, secret);
+    const token = jwt.sign({ sub: '10000003', roles: ['driver'], scopes: ['payments:read'] }, secret);
     const req = buildReq({ authorization: `Bearer ${token}` });
     const err = await runMiddleware(requireAuth, req);
     expect(err).toBeUndefined();
     expect(req.user).toEqual({
-      id: 'user_1',
+      id: '10000003',
       roles: ['driver'],
       scopes: ['payments:read']
     });
@@ -50,29 +50,29 @@ describe('auth middleware', () => {
 
   test('requireRole rejects when role missing', async () => {
     const req = buildReq();
-    req.user = { id: 'user_1', roles: ['user'], scopes: [] };
+    req.user = { id: '10000003', roles: ['user'], scopes: [] };
     const err = await runMiddleware(requireRole('admin'), req);
     expect(err).toMatchObject({ status: 403, code: 'FORBIDDEN' });
   });
 
   test('requireRole allows matching role', async () => {
     const req = buildReq();
-    req.user = { id: 'user_1', roles: ['admin'], scopes: [] };
+    req.user = { id: '10000003', roles: ['admin'], scopes: [] };
     const err = await runMiddleware(requireRole('admin'), req);
     expect(err).toBeUndefined();
   });
 
   test('requireSelf maps me to user id', async () => {
     const req = buildReq({}, { id: 'me' });
-    req.user = { id: 'user_1', roles: [], scopes: [] };
+    req.user = { id: '10000003', roles: [], scopes: [] };
     const err = await runMiddleware(requireSelf, req);
     expect(err).toBeUndefined();
-    expect(req.params.id).toBe('user_1');
+    expect(req.params.id).toBe('10000003');
   });
 
   test('requireSelf rejects different user', async () => {
     const req = buildReq({}, { id: 'user_2' });
-    req.user = { id: 'user_1', roles: [], scopes: [] };
+    req.user = { id: '10000003', roles: [], scopes: [] };
     const err = await runMiddleware(requireSelf, req);
     expect(err).toMatchObject({ status: 403, code: 'FORBIDDEN' });
   });

@@ -2,7 +2,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 
 const TEST_SECRET = 'test-secret';
-const authHeader = (payload = { sub: 'user-123' }) => `Bearer ${jwt.sign(payload, TEST_SECRET)}`;
+const authHeader = (payload = { sub: '10000003' }) => `Bearer ${jwt.sign(payload, TEST_SECRET)}`;
 
 const app = require('../src/app');
 
@@ -62,7 +62,7 @@ describe('PATCH /v1/rides/:id transitions', () => {
         status: 'assigned',
         reason: null,
         fromStatus: 'REQUESTED',
-        actorId: 'user-123',
+        actorId: '10000003',
         traceId: expect.any(String)
       })
     );
@@ -99,7 +99,7 @@ describe('PATCH /v1/rides/:id transitions', () => {
         status: 'cancelled',
         reason: null,
         fromStatus: 'ASSIGNED',
-        actorId: 'user-123',
+        actorId: '10000003',
         traceId: expect.any(String)
       })
     );

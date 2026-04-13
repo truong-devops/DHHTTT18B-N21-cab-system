@@ -124,9 +124,13 @@ function toMethodCode(method: string): 'CASH' | 'WALLET' | 'VIETQR' {
   return 'CASH';
 }
 
-function isUuid(value: string | undefined) {
+function isEightDigitId(value: string | undefined) {
   if (!value) return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  return /^\d{8}$/.test(value);
+}
+
+function isNonEmptyString(value: string | undefined) {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function buildUserName(identifier: string, user: authApi.AuthUser) {
@@ -472,15 +476,16 @@ export const customerApi = {
   },
 
   async submitRating(rideId: string, driverId: string | undefined, stars: number, comment: string, tipAmount?: number | null) {
-    if (!isUuid(rideId)) {
+    const normalizedRideId = String(rideId || '').trim();
+    if (!isNonEmptyString(normalizedRideId)) {
       throw new Error('Mã chuyến đi không hợp lệ');
     }
     const normalizedDriverId = typeof driverId === 'string' ? driverId.trim() : '';
-    if (!normalizedDriverId) {
+    if (!isEightDigitId(normalizedDriverId)) {
       throw new Error('Mã tài xế không hợp lệ');
     }
     return reviewApi.createReview({
-      rideId,
+      rideId: normalizedRideId,
       driverId: normalizedDriverId,
       rating: stars,
       comment: comment.trim() || undefined,
