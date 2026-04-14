@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { CreateBookingSchema } = require('../schemas/bookingSchemas');
 const bookingRepo = require('../repositories/bookingRepo');
 const outboxRepo = require('../repositories/outboxRepo');
-const { reserveIdempotencyKey, completeIdempotencyKey } = require('../repositories/idempotencyRepo');
+const { getIdempotencyKey, reserveIdempotencyKey, completeIdempotencyKey } = require('../repositories/idempotencyRepo');
 const { withTransaction } = require('../db/pool');
 const config = require('../config');
 const { getQuote, PricingServiceError } = require('../clients/pricingClient');
@@ -14,6 +14,7 @@ const { recommendDrivers, agentSelectDriver, forecastDemand, logAiFallback } = r
 const { createPayment } = require('../clients/paymentClient');
 const { sendNotification } = require('../clients/notificationClient');
 const { hashRequest } = require('../utils/idempotency');
+const { isEightDigitId, toUser8 } = require('../utils/identity');
 
 const topics = require('../messaging/topics');
 const monitoring = require('../monitoring');
@@ -24,11 +25,7 @@ const PRIVILEGED_ROLES = new Set(['admin', 'service', 'ops']);
 const ACTIVE_BOOKING_STATUSES = new Set(['PENDING', 'REQUESTED', 'ACCEPTED', 'CONFIRMED']);
 const TERMINAL_RIDE_STATUSES = new Set(['COMPLETED', 'CANCELLED']);
 
-function isEightDigitId(value) {
-  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
-}
-
-function normalizeEightDigitId(value) {
+function normalizeUserId(value, { allowCoerce = false } = {}) {
   if (value === undefined || value === null) {
     return null;
   }
@@ -36,7 +33,21 @@ function normalizeEightDigitId(value) {
   if (!normalized) {
     return null;
   }
-  return isEightDigitId(normalized) ? normalized : null;
+  if (isEightDigitId(normalized)) {
+    return normalized;
+  }
+  if (allowCoerce) {
+    return toUser8(normalized);
+  }
+  return null;
+}
+
+function normalizeEightDigitId(value) {
+  return normalizeUserId(value, { allowCoerce: false });
+}
+
+function canCoercePrivilegedUserId(req) {
+  return Boolean(req.gatewayTrusted) && hasPrivilegedRole(req);
 }
 
 function normalizeRoles(req) {
@@ -129,16 +140,17 @@ function buildOutboxRecord({ eventId, topic, eventType, aggregateId, partitionKe
 }
 
 function resolveUserId(req, payload) {
+  const allowCoerce = canCoercePrivilegedUserId(req);
   const privilegedRequestedUserIdRaw =
     hasPrivilegedRole(req) && (payload?.user_id || req.header('x-user-id'))
       ? String(payload?.user_id || req.header('x-user-id')).trim()
       : '';
-  const privilegedRequestedUserId = normalizeEightDigitId(privilegedRequestedUserIdRaw);
+  const privilegedRequestedUserId = normalizeUserId(privilegedRequestedUserIdRaw, { allowCoerce });
 
   if (privilegedRequestedUserId) {
     return privilegedRequestedUserId;
   }
-  const actorUserId = normalizeEightDigitId(req.userId);
+  const actorUserId = normalizeUserId(req.userId, { allowCoerce });
   if (actorUserId) {
     return actorUserId;
   }
@@ -220,11 +232,40 @@ function isLoadTestRequest(req) {
 }
 
 function isLoadSkipPersistEnabled() {
-  return String(process.env.BOOKING_LOAD_SKIP_PERSIST || 'false') === 'true';
+  return String(process.env.BOOKING_LOAD_SKIP_PERSIST || 'true') === 'true';
 }
 
 function isLoadSkipListDbEnabled() {
-  return String(process.env.BOOKING_LOAD_SKIP_LIST_DB || 'false') === 'true';
+  return String(process.env.BOOKING_LOAD_SKIP_LIST_DB || 'true') === 'true';
+}
+
+function isLoadSkipActiveCheckEnabled() {
+  return String(process.env.BOOKING_LOAD_SKIP_ACTIVE_CHECK || 'true') === 'true';
+}
+
+function isLoadUltraFastPathEnabled() {
+  return String(process.env.BOOKING_LOAD_ULTRA_FAST_PATH || 'true') === 'true';
+}
+
+function normalizeLatLngPoint(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const lat = Number(value.lat);
+  const lng = Number(value.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return null;
+  }
+
+  const normalized = { lat, lng };
+  if (typeof value.address === 'string' && value.address.trim()) {
+    normalized.address = value.address.trim();
+  }
+  return normalized;
 }
 
 function compactPriceSnapshotForLoad(quote) {
@@ -535,23 +576,25 @@ async function compensateBookingAfterPaymentFailure({ bookingId, traceId, reason
 
 router.get('/', async (req, res, next) => {
   try {
-    const actorUserId = normalizeEightDigitId(req.userId);
+    const allowCoerce = canCoercePrivilegedUserId(req);
+    const actorUserId = normalizeUserId(req.userId, { allowCoerce });
     const rawRequestedUserId = req.query.user_id ? String(req.query.user_id).trim() : null;
-    if (rawRequestedUserId && !isEightDigitId(rawRequestedUserId)) {
+    const requestedUserId = normalizeUserId(rawRequestedUserId, { allowCoerce });
+    if (rawRequestedUserId && !requestedUserId) {
       return res.status(400).json({ error: 'user_id must be an 8-digit ID' });
     }
-    const requestedUserId = rawRequestedUserId || actorUserId || null;
+    const scopedRequestedUserId = requestedUserId || actorUserId || null;
     const loadTestRequest = isLoadTestRequest(req);
 
-    if (loadTestRequest && hasPrivilegedRole(req) && requestedUserId && isLoadSkipListDbEnabled()) {
+    if (loadTestRequest && hasPrivilegedRole(req) && scopedRequestedUserId && isLoadSkipListDbEnabled()) {
       return res.json({ data: [] });
     }
 
-    if (requestedUserId && actorUserId && requestedUserId !== actorUserId && !hasPrivilegedRole(req)) {
+    if (scopedRequestedUserId && actorUserId && scopedRequestedUserId !== actorUserId && !hasPrivilegedRole(req)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const effectiveUserId = hasPrivilegedRole(req) ? requestedUserId : actorUserId;
+    const effectiveUserId = hasPrivilegedRole(req) ? scopedRequestedUserId : actorUserId;
     const requestedLimit = Number(req.query.limit);
     const listOptions = effectiveUserId
       ? {
@@ -584,8 +627,76 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', async (req, res) => {
   let currentUserId = null;
   try {
+    const allowCoerce = canCoercePrivilegedUserId(req);
     const loadTestRequest = isLoadTestRequest(req);
-    if (!req.body?.pickup) {
+    const normalizedBody = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? { ...req.body } : {};
+    if (allowCoerce && normalizedBody.user_id) {
+      normalizedBody.user_id = normalizeUserId(normalizedBody.user_id, { allowCoerce: true }) || normalizedBody.user_id;
+    }
+    const authorization = req.header('authorization') || '';
+    const bookingFastPathHint = req.header('x-booking-fast-path') || req.header('x-load-test') || '';
+    const bookingFastPathEnabled = shouldUseLocalEstimatePath({ authorization, fastPathHint: bookingFastPathHint });
+    const ultraFastLoadPath =
+      loadTestRequest &&
+      hasPrivilegedRole(req) &&
+      bookingFastPathEnabled &&
+      isLoadUltraFastPathEnabled() &&
+      !req.header('idempotency-key');
+
+    if (ultraFastLoadPath) {
+      const pickup = normalizeLatLngPoint(normalizedBody.pickup);
+      if (!pickup) {
+        return res.status(400).json({ error: 'pickup is required' });
+      }
+      const drop = normalizeLatLngPoint(normalizeDrop(normalizedBody));
+      if (!drop) {
+        return res.status(400).json({ error: 'drop is required' });
+      }
+
+      const userId = resolveUserId(req, { user_id: normalizedBody.user_id });
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      currentUserId = userId;
+
+      const rawVehicleType = String(normalizedBody.vehicleType || normalizedBody.vehicle_type || 'CAR').toUpperCase();
+      const vehicleType = ['BIKE', 'CAR', 'SUV'].includes(rawVehicleType) ? rawVehicleType : 'CAR';
+      const resolvedDistanceKm = Number.isFinite(Number(normalizedBody.distance_km)) ? Number(normalizedBody.distance_km) : null;
+
+      const bookingId = `bk_${crypto.randomUUID()}`;
+      const rideId = `ride_${crypto.randomUUID()}`;
+      const createdAt = new Date().toISOString();
+      const fastBooking = {
+        bookingId,
+        rideId,
+        userId,
+        pickup,
+        dropoff: drop,
+        vehicleType,
+        distanceKm: resolvedDistanceKm,
+        etaMinutes: null,
+        priceSnapshot: null,
+        status: 'REQUESTED',
+        createdAt
+      };
+
+      const skipPersistInLoadMode = isLoadSkipPersistEnabled();
+      if (!skipPersistInLoadMode) {
+        await bookingRepo.createFast(null, fastBooking);
+      }
+
+      return res.status(201).json({
+        booking: shouldUseMinimalLoadResponse(req) ? toMinimalBookingResponse(fastBooking) : mapBookingCompat(fastBooking),
+        publishedEvent: {
+          topic: topics.RideCreated,
+          eventId: null,
+          queued: false
+        },
+        additionalEvents: []
+      });
+    }
+
+    if (!normalizedBody?.pickup) {
       monitoring.recordBookingStatus('created', 'error', {
         reason: 'pickup_required'
       });
@@ -594,7 +705,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const drop = normalizeDrop(req.body || {});
+    const drop = normalizeDrop(normalizedBody);
     if (!drop) {
       monitoring.recordBookingStatus('created', 'error', {
         reason: 'drop_required'
@@ -603,7 +714,7 @@ router.post('/', async (req, res) => {
         error: 'drop is required'
       });
     }
-    if (req.body?.payment_method && !['CASH', 'VIETQR', 'PAYOS'].includes(String(req.body.payment_method).toUpperCase())) {
+    if (normalizedBody?.payment_method && !['CASH', 'VIETQR', 'PAYOS'].includes(String(normalizedBody.payment_method).toUpperCase())) {
       monitoring.recordBookingStatus('created', 'error', {
         reason: 'invalid_payment_method'
       });
@@ -613,7 +724,7 @@ router.post('/', async (req, res) => {
     }
 
     const parsed = CreateBookingSchema.safeParse({
-      ...(req.body || {}),
+      ...normalizedBody,
       drop
     });
     if (!parsed.success) {
@@ -652,31 +763,64 @@ router.post('/', async (req, res) => {
     };
     const requestHash = idempotencyKey ? hashRequest(req.method, routeKey, requestPayload) : null;
     const traceId = req.traceId || req.header('x-trace-id');
-    const authorization = req.header('authorization') || '';
-    const activeBooking = await bookingRepo.findActiveByUser(userId);
-    if (activeBooking) {
-      const released = await releaseStaleActiveBooking({
-        activeBooking,
-        authorization,
-        traceId,
-        req
+    const skipActiveBookingCheckInLoad =
+      loadTestRequest && hasPrivilegedRole(req) && bookingFastPathEnabled && isLoadSkipActiveCheckEnabled();
+
+    if (idempotencyKey && typeof getIdempotencyKey === 'function') {
+      const existingIdempotency = await getIdempotencyKey(null, {
+        routeKey,
+        userId,
+        idemKey: idempotencyKey
       });
-      if (!released.released) {
+
+      if (existingIdempotency) {
+        if (existingIdempotency.requestHash !== requestHash) {
+          return res.status(409).json({
+            error: 'Idempotency-Key payload mismatch',
+            code: 'IDEMPOTENCY_KEY_CONFLICT'
+          });
+        }
+
+        if (existingIdempotency.responseBody) {
+          const replayBody = mapCreateResponseCompat(existingIdempotency.responseBody);
+          if (replayBody?.booking?.priceSnapshot) {
+            const surge = Number(replayBody.booking.priceSnapshot.surge);
+            replayBody.booking.priceSnapshot.surge = Number.isFinite(surge) && surge >= 1 ? surge : 1;
+          }
+          return res.status(existingIdempotency.responseCode || 200).json(replayBody);
+        }
+
         return res.status(409).json({
-          error: 'An active booking already exists for this user',
-          code: 'ACTIVE_BOOKING_EXISTS',
-          booking: mapBookingCompat(released.activeBooking)
+          error: 'Idempotency-Key is being processed',
+          code: 'IDEMPOTENCY_IN_PROGRESS'
         });
       }
     }
 
+    if (!skipActiveBookingCheckInLoad) {
+      const activeBooking = await bookingRepo.findActiveByUser(userId);
+      if (activeBooking) {
+        const released = await releaseStaleActiveBooking({
+          activeBooking,
+          authorization,
+          traceId,
+          req
+        });
+        if (!released.released) {
+          return res.status(409).json({
+            error: 'An active booking already exists for this user',
+            code: 'ACTIVE_BOOKING_EXISTS',
+            booking: mapBookingCompat(released.activeBooking)
+          });
+        }
+      }
+    }
+
     const minimalLoadResponse = shouldUseMinimalLoadResponse(req);
-    const bookingFastPathHint = req.header('x-booking-fast-path') || req.header('x-load-test') || '';
-    const bookingFastPathEnabled = shouldUseLocalEstimatePath({ authorization, fastPathHint: bookingFastPathHint });
-    const simulatePricingTimeout = req.body?.simulate_pricing_timeout === true || req.body?.simulatePricingTimeout === true;
-    const simulatePaymentTimeout = req.body?.simulate_payment_timeout === true || req.body?.simulatePaymentTimeout === true;
+    const simulatePricingTimeout = normalizedBody?.simulate_pricing_timeout === true || normalizedBody?.simulatePricingTimeout === true;
+    const simulatePaymentTimeout = normalizedBody?.simulate_payment_timeout === true || normalizedBody?.simulatePaymentTimeout === true;
     const simulateTxFailureAfterInsert =
-      req.body?.simulate_tx_failure_after_insert === true || req.body?.simulateTransactionFailureAfterInsert === true;
+      normalizedBody?.simulate_tx_failure_after_insert === true || normalizedBody?.simulateTransactionFailureAfterInsert === true;
 
     let noDriversAvailable = false;
     if (!bookingFastPathEnabled) {

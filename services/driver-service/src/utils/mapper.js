@@ -1,8 +1,10 @@
+const { toUser8 } = require('./identity');
+
 function mapDriver(row) {
   if (!row) return null;
   return {
-    id: row.id,
-    userId: row.user_id,
+    id: toUser8(row.id),
+    userId: toUser8(row.user_id),
     status: row.status,
     onlineStatus: row.online_status,
     fullName: row.full_name,
@@ -26,7 +28,7 @@ function mapVehicle(row) {
   if (!row) return null;
   return {
     id: row.id,
-    driverId: row.driver_id,
+    driverId: toUser8(row.driver_id),
     vehicleType: row.vehicle_type,
     plateNumber: row.plate_number,
     brand: row.brand,
@@ -41,7 +43,7 @@ function mapVehicle(row) {
 function mapLocation(row) {
   if (!row) return null;
   return {
-    driverId: row.driver_id,
+    driverId: toUser8(row.driver_id),
     lat: row.lat,
     lng: row.lng,
     heading: row.heading,
@@ -75,7 +77,7 @@ function mapKycSubmission(row) {
     driver:
       row.user_id || row.driver_full_name || row.driver_status
         ? {
-            userId: row.user_id || null,
+            userId: toUser8(row.user_id),
             fullName: row.driver_full_name || null,
             phone: row.driver_phone || null,
             status: row.driver_status || null,

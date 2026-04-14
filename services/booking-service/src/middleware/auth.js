@@ -1,8 +1,5 @@
 const jwt = require('jsonwebtoken');
-
-function isEightDigitId(value) {
-  return typeof value === 'string' && /^\d{8}$/.test(value.trim());
-}
+const { isEightDigitId, toUser8 } = require('../utils/identity');
 
 function parseList(raw, fallback = []) {
   if (!raw) {
@@ -53,13 +50,13 @@ function tryAttachTrustedGatewayIdentity(req, res) {
     return false;
   }
 
-  const userId = String(req.header('x-user-id') || '').trim();
-  if (!userId) {
+  const rawUserId = String(req.header('x-user-id') || '').trim();
+  if (!rawUserId) {
     return false;
   }
-  if (!isEightDigitId(userId)) {
-    sendAuthError(res, req, 400, 'VALIDATION_ERROR', 'x-user-id must be an 8-digit ID');
-    return null;
+  const userId = toUser8(rawUserId);
+  if (!userId) {
+    return false;
   }
 
   const rolesFromList = parseCsvHeader(req.header('x-user-roles'));
