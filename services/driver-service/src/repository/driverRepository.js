@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { isEightDigitId, toLegacyUserUuid } = require('../utils/identity');
 
 function normalizeId(value) {
   if (typeof value !== 'string') return null;
@@ -6,31 +7,73 @@ function normalizeId(value) {
   return normalized || null;
 }
 
-async function getDriverByUserId(userId) {
-  const normalizedUserId = normalizeId(userId);
-  if (!normalizedUserId) {
-    return null;
-  }
-  const result = await pool.query('SELECT * FROM drivers WHERE user_id::text = $1 LIMIT 1', [normalizedUserId]);
-  return result.rows[0] || null;
-}
+const NORMALIZE_TO_USER8_SQL = (columnExpr) => `
+  CASE
+    WHEN btrim((${columnExpr})::text) ~ '^[0-9]{8}$' THEN btrim((${columnExpr})::text)
+    WHEN btrim((${columnExpr})::text) ~ '^00000000-0000-0000-0000-0*[0-9]{8}$' THEN substring(btrim((${columnExpr})::text) FROM '([0-9]{8})$')
+    ELSE lpad((((('x' || substr(md5(btrim((${columnExpr})::text)), 1, 8))::bit(32)::bigint % 90000000) + 10000000))::text, 8, '0')
+  END
+`;
 
-async function getDriverById(id) {
-  const normalizedId = normalizeId(id);
+const DRIVER_ID_TO_USER8_SQL = NORMALIZE_TO_USER8_SQL('id');
+const USER_ID_TO_USER8_SQL = NORMALIZE_TO_USER8_SQL('user_id');
+
+async function findDriverByIdentity(rawId, { prefer = 'id' } = {}) {
+  const normalizedId = normalizeId(rawId);
   if (!normalizedId) {
     return null;
   }
-  const result = await pool.query(
+
+  const exact = await pool.query(
     `
       SELECT *
       FROM drivers
       WHERE id::text = $1 OR user_id::text = $1
-      ORDER BY CASE WHEN id::text = $1 THEN 0 ELSE 1 END
+      ORDER BY
+        CASE WHEN id::text = $1 THEN 0 ELSE 1 END,
+        CASE WHEN user_id::text = $1 THEN 0 ELSE 1 END
       LIMIT 1
     `,
     [normalizedId]
   );
-  return result.rows[0] || null;
+  if (exact.rows[0]) {
+    return exact.rows[0];
+  }
+
+  if (!isEightDigitId(normalizedId)) {
+    return null;
+  }
+
+  const preferOrder =
+    prefer === 'user'
+      ? `
+        CASE WHEN ${USER_ID_TO_USER8_SQL} = $1 THEN 0 ELSE 1 END,
+        CASE WHEN ${DRIVER_ID_TO_USER8_SQL} = $1 THEN 0 ELSE 1 END
+      `
+      : `
+        CASE WHEN ${DRIVER_ID_TO_USER8_SQL} = $1 THEN 0 ELSE 1 END,
+        CASE WHEN ${USER_ID_TO_USER8_SQL} = $1 THEN 0 ELSE 1 END
+      `;
+
+  const mapped = await pool.query(
+    `
+      SELECT *
+      FROM drivers
+      WHERE ${DRIVER_ID_TO_USER8_SQL} = $1 OR ${USER_ID_TO_USER8_SQL} = $1
+      ORDER BY ${preferOrder}
+      LIMIT 1
+    `,
+    [normalizedId]
+  );
+  return mapped.rows[0] || null;
+}
+
+async function getDriverByUserId(userId) {
+  return findDriverByIdentity(userId, { prefer: 'user' });
+}
+
+async function getDriverById(id) {
+  return findDriverByIdentity(id, { prefer: 'id' });
 }
 
 async function createDriver({ userId, fullName = null, phone = null }) {
@@ -38,18 +81,41 @@ async function createDriver({ userId, fullName = null, phone = null }) {
   if (!normalizedUserId) {
     return null;
   }
-  const result = await pool.query(
-    `
-      INSERT INTO drivers (id, user_id, full_name, phone)
-      VALUES ($1, $1, $2, $3)
-      RETURNING *
-    `,
-    [normalizedUserId, fullName, phone]
-  );
-  return result.rows[0] || null;
+
+  try {
+    const result = await pool.query(
+      `
+        INSERT INTO drivers (id, user_id, full_name, phone)
+        VALUES ($1, $1, $2, $3)
+        RETURNING *
+      `,
+      [normalizedUserId, fullName, phone]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    // Backward compatibility for legacy UUID schema.
+    if (error?.code === '22P02' && isEightDigitId(normalizedUserId)) {
+      const legacyUuid = toLegacyUserUuid(normalizedUserId);
+      const fallback = await pool.query(
+        `
+          INSERT INTO drivers (id, user_id, full_name, phone)
+          VALUES ($1, $1, $2, $3)
+          RETURNING *
+        `,
+        [legacyUuid, fullName, phone]
+      );
+      return fallback.rows[0] || null;
+    }
+    throw error;
+  }
 }
 
 async function updateDriverProfile(id, fields) {
+  const current = await findDriverByIdentity(id, { prefer: 'id' });
+  if (!current) {
+    return null;
+  }
+
   const columns = [];
   const values = [];
   let index = 1;
@@ -64,21 +130,15 @@ async function updateDriverProfile(id, fields) {
   }
 
   if (!columns.length) {
-    return getDriverById(id);
+    return current;
   }
 
-  values.push(id);
+  values.push(current.id);
   const result = await pool.query(
     `
       UPDATE drivers
       SET ${columns.join(', ')}
-      WHERE id = (
-        SELECT id
-        FROM drivers
-        WHERE id::text = $${index} OR user_id::text = $${index}
-        ORDER BY CASE WHEN id::text = $${index} THEN 0 ELSE 1 END
-        LIMIT 1
-      )
+      WHERE id = $${index}
       RETURNING *
     `,
     values
@@ -87,40 +147,38 @@ async function updateDriverProfile(id, fields) {
 }
 
 async function updateDriverStatus(id, status) {
+  const current = await findDriverByIdentity(id, { prefer: 'id' });
+  if (!current) {
+    return null;
+  }
+
   const result = await pool.query(
     `
       UPDATE drivers
       SET status = $2
-      WHERE id = (
-        SELECT id
-        FROM drivers
-        WHERE id::text = $1 OR user_id::text = $1
-        ORDER BY CASE WHEN id::text = $1 THEN 0 ELSE 1 END
-        LIMIT 1
-      )
+      WHERE id = $1
       RETURNING *
     `,
-    [id, status]
+    [current.id, status]
   );
   return result.rows[0] || null;
 }
 
 async function updateOnlineStatus(id, allowedCurrent, nextStatus) {
+  const current = await findDriverByIdentity(id, { prefer: 'id' });
+  if (!current) {
+    return null;
+  }
+
   const result = await pool.query(
     `
       UPDATE drivers
       SET online_status = $2
-      WHERE id = (
-        SELECT id
-        FROM drivers
-        WHERE id::text = $1 OR user_id::text = $1
-        ORDER BY CASE WHEN id::text = $1 THEN 0 ELSE 1 END
-        LIMIT 1
-      )
+      WHERE id = $1
         AND online_status = ANY($3)
       RETURNING *
     `,
-    [id, nextStatus, allowedCurrent]
+    [current.id, nextStatus, allowedCurrent]
   );
   return result.rows[0] || null;
 }

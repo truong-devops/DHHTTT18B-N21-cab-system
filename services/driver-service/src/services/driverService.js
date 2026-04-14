@@ -11,6 +11,7 @@ const { DRIVER_STATUS, ONLINE_STATUS, canGoOnline, canTransitionOnlineStatus } =
 const { ApiError } = require('../utils/errors');
 const { driverLocationKey, driverOnlineKey, driverBusyKey, geoKey, locationRateKey } = require('../utils/redisKeys');
 const { mapDriver, mapVehicle, mapLocation, mapKycSubmission } = require('../utils/mapper');
+const { toUser8 } = require('../utils/identity');
 const monitoring = require('../monitoring');
 const driverRepository = require('../repository/driverRepository');
 const vehicleRepository = require('../repository/vehicleRepository');
@@ -325,19 +326,25 @@ async function setOfflineByDriverId(driverId) {
 }
 
 async function updateDriverLocation(driverId, input) {
+  const driver = await driverRepository.getDriverById(driverId);
+  if (!driver) {
+    throw new ApiError(404, 'NOT_FOUND', 'Driver not found');
+  }
+  const internalDriverId = driver.id;
+
   const recordedAt = input.recordedAt ? new Date(input.recordedAt) : new Date();
   if (Number.isNaN(recordedAt.getTime())) {
     throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid recordedAt');
   }
 
-  await enforceLocationRateLimit(driverId);
+  await enforceLocationRateLimit(internalDriverId);
 
-  const redisLocation = await getRedisLocation(driverId);
+  const redisLocation = await getRedisLocation(internalDriverId);
   if (redisLocation && redisLocation.ts && new Date(redisLocation.ts).getTime() >= recordedAt.getTime()) {
     return { ignored: true };
   }
 
-  await setRedisLocation(driverId, {
+  await setRedisLocation(internalDriverId, {
     lat: input.lat,
     lng: input.lng,
     heading: input.heading,
@@ -346,11 +353,11 @@ async function updateDriverLocation(driverId, input) {
     ts: recordedAt.toISOString()
   });
 
-  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
-  await updateGeo(driverId, input.lat, input.lng, vehicle?.vehicle_type);
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(internalDriverId);
+  await updateGeo(internalDriverId, input.lat, input.lng, vehicle?.vehicle_type);
 
   await locationRepository.upsertLastLocation({
-    driverId,
+    driverId: internalDriverId,
     lat: input.lat,
     lng: input.lng,
     heading: input.heading || null,
@@ -394,8 +401,8 @@ async function getDriverProfileForCustomer(driverId) {
 
   return {
     driver: {
-      id: driver.id,
-      userId: driver.user_id,
+      id: toUser8(driver.id),
+      userId: toUser8(driver.user_id),
       fullName: driver.full_name || null,
       phone: driver.phone || null,
       status: driver.status,
@@ -407,7 +414,11 @@ async function getDriverProfileForCustomer(driverId) {
 }
 
 async function getLocationInternal(driverId) {
-  const location = await getLocationSnapshot(driverId);
+  const driver = await driverRepository.getDriverById(driverId);
+  if (!driver) {
+    throw new ApiError(404, 'NOT_FOUND', 'Driver not found');
+  }
+  const location = await getLocationSnapshot(driver.id);
   if (!location) {
     throw new ApiError(404, 'NOT_FOUND', 'Location not found');
   }
@@ -427,7 +438,7 @@ async function listAvailableDrivers({ lat, lng, radiusMeters = DEFAULT_SEARCH_RA
     });
 
     return fallback.map((row) => ({
-      driverId: row.driver_id,
+      driverId: toUser8(row.driver_id),
       distanceMeters: null,
       location: {
         lat: row.lat,
@@ -448,9 +459,9 @@ async function listAvailableDrivers({ lat, lng, radiusMeters = DEFAULT_SEARCH_RA
 
     const filtered = [];
     for (const entry of results) {
-      const [driverId, distance] = entry;
-      const online = await redis.get(driverOnlineKey(driverId));
-      const busy = await redis.get(driverBusyKey(driverId));
+      const [internalDriverId, distance] = entry;
+      const online = await redis.get(driverOnlineKey(internalDriverId));
+      const busy = await redis.get(driverBusyKey(internalDriverId));
       if (online !== ONLINE_STATUS.ONLINE) {
         continue;
       }
@@ -458,10 +469,10 @@ async function listAvailableDrivers({ lat, lng, radiusMeters = DEFAULT_SEARCH_RA
         continue;
       }
 
-      const location = await getRedisLocation(driverId);
-      const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
+      const location = await getRedisLocation(internalDriverId);
+      const vehicle = await vehicleRepository.getActiveVehicleByDriverId(internalDriverId);
       filtered.push({
-        driverId,
+        driverId: toUser8(internalDriverId),
         distanceMeters: distance ? Math.round(Number(distance)) : null,
         location: location
           ? {
@@ -494,23 +505,24 @@ async function markBusy(driverId, rideId) {
   if (!driver) {
     throw new ApiError(404, 'NOT_FOUND', 'Driver not found');
   }
+  const internalDriverId = driver.id;
 
   if (driver.online_status === ONLINE_STATUS.BUSY) {
-    const currentRide = await redis.get(driverBusyKey(driverId));
+    const currentRide = await redis.get(driverBusyKey(internalDriverId));
     if (currentRide && currentRide === rideId) {
       return { driver: mapDriver(driver), rideId };
     }
   }
 
-  const updated = await driverRepository.updateOnlineStatus(driverId, [ONLINE_STATUS.ONLINE], ONLINE_STATUS.BUSY);
+  const updated = await driverRepository.updateOnlineStatus(internalDriverId, [ONLINE_STATUS.ONLINE], ONLINE_STATUS.BUSY);
   if (!updated) {
     throw new ApiError(409, 'CONFLICT', 'Driver not available');
   }
 
-  await redis.set(driverBusyKey(driverId), rideId, 'EX', ONLINE_TTL_SECONDS);
-  await updateOnlineRedis(driverId, ONLINE_STATUS.BUSY);
-  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
-  await removeFromGeo(driverId, vehicle?.vehicle_type);
+  await redis.set(driverBusyKey(internalDriverId), rideId, 'EX', ONLINE_TTL_SECONDS);
+  await updateOnlineRedis(internalDriverId, ONLINE_STATUS.BUSY);
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(internalDriverId);
+  await removeFromGeo(internalDriverId, vehicle?.vehicle_type);
 
   monitoring.recordBusinessEvent({
     domain: 'driver',
@@ -529,25 +541,26 @@ async function markAvailable(driverId, rideId) {
   if (!driver) {
     throw new ApiError(404, 'NOT_FOUND', 'Driver not found');
   }
+  const internalDriverId = driver.id;
 
-  const busyRide = await redis.get(driverBusyKey(driverId));
+  const busyRide = await redis.get(driverBusyKey(internalDriverId));
   if (rideId && busyRide && busyRide !== rideId) {
     throw new ApiError(409, 'CONFLICT', 'Driver busy with another ride');
   }
 
-  const updated = await driverRepository.updateOnlineStatus(driverId, [ONLINE_STATUS.BUSY], ONLINE_STATUS.ONLINE);
+  const updated = await driverRepository.updateOnlineStatus(internalDriverId, [ONLINE_STATUS.BUSY], ONLINE_STATUS.ONLINE);
   if (!updated && driver.online_status === ONLINE_STATUS.ONLINE) {
-    await redis.del(driverBusyKey(driverId));
+    await redis.del(driverBusyKey(internalDriverId));
     return { driver: mapDriver(driver) };
   }
 
-  await redis.del(driverBusyKey(driverId));
-  await updateOnlineRedis(driverId, ONLINE_STATUS.ONLINE);
+  await redis.del(driverBusyKey(internalDriverId));
+  await updateOnlineRedis(internalDriverId, ONLINE_STATUS.ONLINE);
 
-  const location = await getRedisLocation(driverId);
+  const location = await getRedisLocation(internalDriverId);
   if (location) {
-    const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
-    await updateGeo(driverId, location.lat, location.lng, vehicle?.vehicle_type);
+    const vehicle = await vehicleRepository.getActiveVehicleByDriverId(internalDriverId);
+    await updateGeo(internalDriverId, location.lat, location.lng, vehicle?.vehicle_type);
   }
 
   monitoring.recordBusinessEvent({
@@ -570,14 +583,16 @@ async function bulkSnapshot(driverIds, fields) {
       result.push({ driverId, found: false });
       continue;
     }
+    const internalDriverId = driver.id;
+    const externalDriverId = toUser8(driver.id);
 
-    const entry = { driverId, found: true };
+    const entry = { driverId: externalDriverId, found: true };
     if (!fields || fields.includes('status') || fields.includes('online_status')) {
       entry.status = driver.status;
       entry.onlineStatus = driver.online_status;
     }
     if (!fields || fields.includes('vehicle')) {
-      const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
+      const vehicle = await vehicleRepository.getActiveVehicleByDriverId(internalDriverId);
       entry.vehicle = vehicle
         ? {
             type: vehicle.vehicle_type,
@@ -586,7 +601,7 @@ async function bulkSnapshot(driverIds, fields) {
         : null;
     }
     if (!fields || fields.includes('location')) {
-      const location = await getLocationSnapshot(driverId);
+      const location = await getLocationSnapshot(internalDriverId);
       entry.location = location;
     }
     result.push(entry);
@@ -616,8 +631,8 @@ async function suspendDriver(driverId) {
   if (!driver) {
     throw new ApiError(404, 'NOT_FOUND', 'Driver not found');
   }
-  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
-  await clearOnlineRedis(driverId, vehicle?.vehicle_type);
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driver.id);
+  await clearOnlineRedis(driver.id, vehicle?.vehicle_type);
   return { driver: mapDriver(driver) };
 }
 

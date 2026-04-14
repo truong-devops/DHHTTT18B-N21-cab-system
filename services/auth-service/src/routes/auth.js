@@ -14,6 +14,7 @@ const {
 const { revokeAccessToken, isAccessTokenRevoked } = require('../utils/revokedAccessTokenStore');
 const { createUser, findUserByIdentifier, findUserById } = require('../repository/userRepository');
 const { createRefreshToken, findRefreshToken, deleteRefreshToken } = require('../repository/tokenRepository');
+const { toUser8 } = require('../utils/identity');
 const monitoring = require('../monitoring');
 
 const router = express.Router();
@@ -98,7 +99,7 @@ router.post(
     }
 
     const accessToken = signAccessToken({
-      userId: user.id,
+      userId: toUser8(user.id),
       role: user.role
     });
     const refreshToken = generateRefreshToken();
@@ -118,8 +119,8 @@ router.post(
 
     return res.status(201).json({
       data: {
-        id: user.id,
-        user_id: user.id,
+        id: toUser8(user.id),
+        user_id: toUser8(user.id),
         email: user.email,
         username: user.username,
         role: user.role,
@@ -187,7 +188,7 @@ router.post(
     }
 
     const accessToken = signAccessToken({
-      userId: user.id,
+      userId: toUser8(user.id),
       role: user.role
     });
     const refreshToken = generateRefreshToken();
@@ -207,8 +208,8 @@ router.post(
 
     return res.json({
       data: {
-        id: user.id,
-        user_id: user.id,
+        id: toUser8(user.id),
+        user_id: toUser8(user.id),
         email: user.email,
         username: user.username,
         role: user.role,
@@ -281,7 +282,7 @@ router.post(
     await deleteRefreshToken(tokenHash);
 
     const accessToken = signAccessToken({
-      userId: user.id,
+      userId: toUser8(user.id),
       role: user.role
     });
     const nextRefreshToken = generateRefreshToken();
@@ -301,7 +302,8 @@ router.post(
 
     return res.json({
       data: {
-        id: user.id,
+        id: toUser8(user.id),
+        user_id: toUser8(user.id),
         email: user.email,
         username: user.username,
         role: user.role,

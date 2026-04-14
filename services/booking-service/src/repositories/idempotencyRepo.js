@@ -60,6 +60,20 @@ async function reserveIdempotencyKey(client, data) {
   return { state: 'in_progress', record: existing };
 }
 
+async function getIdempotencyKey(client, data) {
+  const db = client || pool;
+  const result = await db.query(
+    `SELECT *
+       FROM idempotency_keys
+      WHERE route_key = $1
+        AND user_id = $2
+        AND idem_key = $3
+      LIMIT 1`,
+    [data.routeKey, data.userId, data.idemKey]
+  );
+  return mapRow(result.rows[0]);
+}
+
 async function completeIdempotencyKey(client, data) {
   const db = client || pool;
   await db.query(
@@ -75,6 +89,7 @@ async function completeIdempotencyKey(client, data) {
 }
 
 module.exports = {
+  getIdempotencyKey,
   reserveIdempotencyKey,
   completeIdempotencyKey
 };
