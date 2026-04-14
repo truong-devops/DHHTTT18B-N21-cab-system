@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { CreateBookingSchema } = require('../schemas/bookingSchemas');
 const bookingRepo = require('../repositories/bookingRepo');
 const outboxRepo = require('../repositories/outboxRepo');
-const { reserveIdempotencyKey, completeIdempotencyKey } = require('../repositories/idempotencyRepo');
+const { getIdempotencyKey, reserveIdempotencyKey, completeIdempotencyKey } = require('../repositories/idempotencyRepo');
 const { withTransaction } = require('../db/pool');
 const config = require('../config');
 const { getQuote, PricingServiceError } = require('../clients/pricingClient');
@@ -653,6 +653,38 @@ router.post('/', async (req, res) => {
     const requestHash = idempotencyKey ? hashRequest(req.method, routeKey, requestPayload) : null;
     const traceId = req.traceId || req.header('x-trace-id');
     const authorization = req.header('authorization') || '';
+
+    if (idempotencyKey && typeof getIdempotencyKey === 'function') {
+      const existingIdempotency = await getIdempotencyKey(null, {
+        routeKey,
+        userId,
+        idemKey: idempotencyKey
+      });
+
+      if (existingIdempotency) {
+        if (existingIdempotency.requestHash !== requestHash) {
+          return res.status(409).json({
+            error: 'Idempotency-Key payload mismatch',
+            code: 'IDEMPOTENCY_KEY_CONFLICT'
+          });
+        }
+
+        if (existingIdempotency.responseBody) {
+          const replayBody = mapCreateResponseCompat(existingIdempotency.responseBody);
+          if (replayBody?.booking?.priceSnapshot) {
+            const surge = Number(replayBody.booking.priceSnapshot.surge);
+            replayBody.booking.priceSnapshot.surge = Number.isFinite(surge) && surge >= 1 ? surge : 1;
+          }
+          return res.status(existingIdempotency.responseCode || 200).json(replayBody);
+        }
+
+        return res.status(409).json({
+          error: 'Idempotency-Key is being processed',
+          code: 'IDEMPOTENCY_IN_PROGRESS'
+        });
+      }
+    }
+
     const activeBooking = await bookingRepo.findActiveByUser(userId);
     if (activeBooking) {
       const released = await releaseStaleActiveBooking({
