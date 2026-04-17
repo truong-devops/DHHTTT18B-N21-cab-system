@@ -65,6 +65,13 @@ export type RideHistoryItem = {
   driverPhone?: string | null;
   vehicleType?: string | null;
   plateNumber?: string | null;
+  reviewId?: string | null;
+  reviewRating?: number | null;
+  reviewComment?: string | null;
+  reviewTipAmount?: number | null;
+  reviewStatus?: string | null;
+  reviewCreatedAt?: string | null;
+  reviewUpdatedAt?: string | null;
 };
 
 export type LocationPoint = {

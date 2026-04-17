@@ -2,7 +2,7 @@ const topics = require('./topics');
 const { publishToDlq } = require('./producer');
 const logger = require('../utils/logger');
 const { claimPendingEvents, countInboxBacklog, markProcessed, markFailed } = require('../repository/inboxEventsRepository');
-const { getRideById, getRideByExternalId, createRide, addStatusHistory, updateRideStatus } = require('../repository/rideRepository');
+const { getRideById, getRideByExternalId, createRide, addStatusHistory, updateRideFields, updateRideStatus } = require('../repository/rideRepository');
 const { normalizeStatus, isValidTransition } = require('../domain/rideStateMachine');
 const monitoring = require('../monitoring');
 

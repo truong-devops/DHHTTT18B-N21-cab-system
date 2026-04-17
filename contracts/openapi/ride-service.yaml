@@ -261,6 +261,12 @@ components:
           type: string
           pattern: '^[0-9]{8}$'
           nullable: true
+        quoteFareAmount:
+          type: number
+          nullable: true
+        quoteCurrency:
+          type: string
+          nullable: true
         pickupLat:
           type: number
         pickupLng:

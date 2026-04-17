@@ -7,6 +7,8 @@ export type Ride = {
   bookingId?: string | null;
   riderId?: string | null;
   driverId?: string | null;
+  quoteFareAmount?: number | null;
+  quoteCurrency?: string | null;
   pickupLat?: number | null;
   pickupLng?: number | null;
   pickupLabel?: string | null;
@@ -116,6 +118,8 @@ export function normalizeRide(raw: any): Ride | null {
     bookingId: pickFirstString([raw.bookingId, raw.booking_id]),
     riderId: pickFirstString([raw.riderId, raw.rider_id]),
     driverId: pickFirstString([raw.driverId, raw.driver_id]),
+    quoteFareAmount: pickFirstNumber([raw.quoteFareAmount, raw.quote_fare_amount]),
+    quoteCurrency: pickFirstString([raw.quoteCurrency, raw.quote_currency]),
     pickupLat: pickFirstNumber([raw.pickupLat, raw.pickup_lat, pickup?.lat]),
     pickupLng: pickFirstNumber([raw.pickupLng, raw.pickup_lng, pickup?.lng]),
     pickupLabel: pickFirstString([raw.pickupLabel, raw.pickup_label, pickup?.label, pickup?.address]),
