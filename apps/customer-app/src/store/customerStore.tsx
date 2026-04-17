@@ -497,7 +497,13 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           pickup: activeRide.pickup,
           destination: activeRide.destination,
           amount: activeRide.option.price,
-          status: 'completed'
+          status: 'completed',
+          reviewRating: stars,
+          reviewComment: comment.trim() || null,
+          reviewTipAmount: typeof tipAmount === 'number' && Number.isFinite(tipAmount) ? Math.max(Math.round(tipAmount), 0) : null,
+          reviewStatus: 'submitted',
+          reviewCreatedAt: new Date().toISOString(),
+          reviewUpdatedAt: new Date().toISOString()
         },
         ...prev.filter((item) => item.id !== activeRide.id)
       ]);

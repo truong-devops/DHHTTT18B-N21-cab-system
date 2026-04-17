@@ -495,13 +495,25 @@ export const customerApi = {
 
   async getHistory(riderId?: string | null): Promise<RideHistoryItem[]> {
     if (!riderId) return [];
-    const [ridesResult, paymentsResult] = await Promise.all([rideApi.listRides({ limit: 50, riderId }), paymentApi.listPayments(100)]);
+    const [ridesResult, paymentsResult, reviewsResult] = await Promise.all([
+      rideApi.listRides({ limit: 50, riderId }),
+      paymentApi.listPayments(100),
+      reviewApi.listReviews(100).catch(() => ({ data: [] as reviewApi.Review[] }))
+    ]);
 
     const paymentsByRideId = (paymentsResult.data || []).reduce<Record<string, paymentApi.Payment[]>>((acc, payment) => {
       if (!acc[payment.rideId]) {
         acc[payment.rideId] = [];
       }
       acc[payment.rideId].push(payment);
+      return acc;
+    }, {});
+    const reviewsByRideId = (reviewsResult.data || []).reduce<Record<string, reviewApi.Review>>((acc, review) => {
+      if (!review?.rideId) return acc;
+      const current = acc[review.rideId];
+      if (!current || parseTimestamp(review.createdAt) >= parseTimestamp(current.createdAt)) {
+        acc[review.rideId] = review;
+      }
       return acc;
     }, {});
 
@@ -534,6 +546,7 @@ export const customerApi = {
 
     return filtered.map((ride) => {
       const ridePayments = paymentsByRideId[ride.id] || [];
+      const rideReview = reviewsByRideId[ride.id] || null;
       const amount = Math.round(
         ridePayments.reduce((sum, payment) => {
           const value = Number(payment.amount || 0);
@@ -574,7 +587,14 @@ export const customerApi = {
         driverName: profile?.name || null,
         driverPhone: profile?.phone || null,
         vehicleType: profile?.vehicleType || null,
-        plateNumber: profile?.plateNumber || null
+        plateNumber: profile?.plateNumber || null,
+        reviewId: rideReview?.id || null,
+        reviewRating: Number.isFinite(Number(rideReview?.rating)) ? Number(rideReview?.rating) : null,
+        reviewComment: rideReview?.comment || null,
+        reviewTipAmount: Number.isFinite(Number(rideReview?.tipAmount)) ? Number(rideReview?.tipAmount) : null,
+        reviewStatus: rideReview?.status || null,
+        reviewCreatedAt: rideReview?.createdAt || null,
+        reviewUpdatedAt: rideReview?.updatedAt || null
       };
     });
   }

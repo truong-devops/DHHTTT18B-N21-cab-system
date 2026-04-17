@@ -44,6 +44,8 @@ function buildRideRow(overrides = {}) {
     booking_id: null,
     rider_id: '10000003',
     driver_id: null,
+    quote_fare_amount: null,
+    quote_currency: null,
     pickup_lat: 10.1,
     pickup_lng: 20.2,
     dropoff_lat: 10.2,
@@ -84,12 +86,19 @@ describe('ride-service routes integration', () => {
   });
 
   it('gets a ride by id', async () => {
-    rideRepository.getRideById.mockResolvedValue(buildRideRow());
+    rideRepository.getRideById.mockResolvedValue(
+      buildRideRow({
+        quote_fare_amount: 125000,
+        quote_currency: 'VND'
+      })
+    );
 
     const response = await request(app).get('/v1/rides/ride-1').set('Authorization', authHeader());
 
     expect(response.status).toBe(200);
     expect(response.body.data.id).toBe('ride-1');
+    expect(response.body.data.quoteFareAmount).toBe(125000);
+    expect(response.body.data.quoteCurrency).toBe('VND');
   });
 
   it('lists rides with cursor', async () => {

@@ -50,20 +50,28 @@ function hasPositiveAmount(payment: Payment | null | undefined) {
   return Number.isFinite(amount) && amount > 0;
 }
 
+function belongsToCandidates(payment: Payment | null | undefined, candidates: Set<string>) {
+  if (!payment || typeof payment.rideId !== 'string') return false;
+  const paymentRideId = payment.rideId.trim();
+  if (!paymentRideId) return false;
+  return candidates.has(paymentRideId);
+}
+
 export async function getLatestPaymentByRideIds(rideIds: Array<string | null | undefined>) {
   const candidates = normalizeRideIds(rideIds);
   if (!candidates.length) return null;
+  const candidateSet = new Set(candidates);
 
   for (const rideId of candidates) {
     const res = await listPayments({ rideId, limit: 1, status: 'PAID' });
     const paid = Array.isArray(res?.data) ? res.data[0] : null;
-    if (hasPositiveAmount(paid)) return paid;
+    if (hasPositiveAmount(paid) && belongsToCandidates(paid, candidateSet)) return paid;
   }
 
   for (const rideId of candidates) {
     const fallback = await listPayments({ rideId, limit: 1 });
     const payment = Array.isArray(fallback?.data) ? fallback.data[0] : null;
-    if (hasPositiveAmount(payment)) return payment;
+    if (hasPositiveAmount(payment) && belongsToCandidates(payment, candidateSet)) return payment;
   }
 
   return null;

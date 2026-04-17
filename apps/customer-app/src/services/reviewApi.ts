@@ -15,6 +15,11 @@ export type Review = {
   updatedAt: string;
 };
 
+export type ReviewListResponse = {
+  data: Review[];
+  nextCursor?: string | null;
+};
+
 type CreateReviewPayload = {
   rideId: string;
   driverId: string;
@@ -33,5 +38,16 @@ export async function createReview(payload: CreateReviewPayload) {
       'Idempotency-Key': idempotencyKey
     },
     body: payload
+  });
+}
+
+export async function listReviews(limit = 100, cursor?: string) {
+  return apiRequest<ReviewListResponse>({
+    method: 'GET',
+    path: endpoints.review.list,
+    params: {
+      limit,
+      cursor: cursor || undefined
+    }
   });
 }

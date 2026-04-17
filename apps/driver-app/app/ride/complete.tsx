@@ -112,9 +112,19 @@ export default function RideCompleteScreen() {
 
   useEffect(() => {
     let mounted = true;
-    if (!rideId) {
+    const quoteAmount = Number(ride?.quoteFareAmount);
+    const hasQuoteAmount = Number.isFinite(quoteAmount) && quoteAmount > 0;
+    const quoteCurrency = String(ride?.quoteCurrency || 'VND').toUpperCase();
+
+    if (hasQuoteAmount) {
+      setFallbackAmount(quoteAmount);
+      setFallbackCurrency(quoteCurrency);
+    } else {
       setFallbackAmount(null);
       setFallbackCurrency('VND');
+    }
+
+    if (!rideId) {
       return () => {
         mounted = false;
       };
@@ -126,8 +136,10 @@ export default function RideCompleteScreen() {
         if (!mounted) return;
         const amount = Number(payment?.amount);
         if (!Number.isFinite(amount) || amount <= 0) {
-          setFallbackAmount(null);
-          setFallbackCurrency('VND');
+          if (!hasQuoteAmount) {
+            setFallbackAmount(null);
+            setFallbackCurrency('VND');
+          }
           return;
         }
         setFallbackAmount(amount);
@@ -135,14 +147,16 @@ export default function RideCompleteScreen() {
       })
       .catch(() => {
         if (!mounted) return;
-        setFallbackAmount(null);
-        setFallbackCurrency('VND');
+        if (!hasQuoteAmount) {
+          setFallbackAmount(null);
+          setFallbackCurrency('VND');
+        }
       });
 
     return () => {
       mounted = false;
     };
-  }, [rideId]);
+  }, [ride?.externalRideId, ride?.quoteCurrency, ride?.quoteFareAmount, rideId]);
 
   const fareAmount = useMemo(() => {
     if (summary && Number.isFinite(summary.fare?.amount)) return Number(summary.fare.amount);
