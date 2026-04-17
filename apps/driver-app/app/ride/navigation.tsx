@@ -68,6 +68,15 @@ export default function RideNavigationScreen() {
     }
 
     setFareLabel('--');
+
+    const quoteAmount = Number(ride.quoteFareAmount);
+    if (Number.isFinite(quoteAmount) && quoteAmount > 0) {
+      setFareLabel(toCurrencyLabel(quoteAmount, ride.quoteCurrency || 'VND'));
+      return () => {
+        mounted = false;
+      };
+    }
+
     paymentApi
       .getLatestPaymentByRideIds([ride.externalRideId, ride.id])
       .then((payment) => {
@@ -87,7 +96,7 @@ export default function RideNavigationScreen() {
     return () => {
       mounted = false;
     };
-  }, [ride?.id]);
+  }, [ride?.externalRideId, ride?.id, ride?.quoteCurrency, ride?.quoteFareAmount]);
 
   const status = useMemo(() => (ride?.status ?? '').toUpperCase(), [ride?.status]);
   const canArrive = status === 'ASSIGNED' || status === 'REQUESTED';

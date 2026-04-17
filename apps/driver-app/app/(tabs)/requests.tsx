@@ -65,6 +65,15 @@ export default function RequestsScreen() {
     setFareText('--');
     setFareSubText('dang cap nhat');
 
+    const quoteAmount = Number(activeRequest.quoteFareAmount);
+    if (Number.isFinite(quoteAmount) && quoteAmount > 0) {
+      setFareText(toCurrencyLabel(quoteAmount, activeRequest.quoteCurrency || 'VND'));
+      setFareSubText('gia dat');
+      return () => {
+        mounted = false;
+      };
+    }
+
     paymentApi
       .getLatestPaymentByRideIds([activeRequest.externalRideId, activeRequest.id])
       .then((payment) => {
@@ -87,7 +96,7 @@ export default function RequestsScreen() {
     return () => {
       mounted = false;
     };
-  }, [activeRequest?.id]);
+  }, [activeRequest?.externalRideId, activeRequest?.id, activeRequest?.quoteCurrency, activeRequest?.quoteFareAmount]);
 
   const requestTitle = useMemo(() => {
     const requestId =
