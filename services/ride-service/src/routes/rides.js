@@ -41,6 +41,8 @@ function toRideResponse(row) {
     bookingId: row.booking_id,
     riderId: row.rider_id,
     driverId: row.driver_id,
+    quoteFareAmount: row.quote_fare_amount,
+    quoteCurrency: row.quote_currency,
     pickupLat: row.pickup_lat,
     pickupLng: row.pickup_lng,
     pickupLabel: row.pickup_label,

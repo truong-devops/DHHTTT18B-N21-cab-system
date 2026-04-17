@@ -58,6 +58,21 @@ function paymentStatusLabel(value: string | null | undefined) {
   return status;
 }
 
+function reviewStatusLabel(value: string | null | undefined) {
+  const status = String(value || '').toUpperCase();
+  if (!status) return 'Không có dữ liệu';
+  if (status === 'SUBMITTED') return 'Đã gửi';
+  if (status === 'PUBLISHED') return 'Đã duyệt';
+  if (status === 'FLAGGED') return 'Đang kiểm duyệt';
+  if (status === 'DELETED') return 'Đã xóa';
+  return status;
+}
+
+function ratingLabel(value: number | null | undefined) {
+  if (!Number.isFinite(value as number)) return 'Chưa đánh giá';
+  return `${Math.round(Number(value))}/5`;
+}
+
 function formatVnd(value: number | null | undefined) {
   const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0;
   return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
@@ -284,6 +299,17 @@ const HistoryScreen = () => {
                     </Text>
                     <Text style={styles.detailLine}>Ngày tạo: {formatDateTime(selectedRide.paymentCreatedAt)}</Text>
                     <Text style={styles.detailLine}>Ngày cập nhật: {formatDateTime(selectedRide.paymentUpdatedAt)}</Text>
+                  </View>
+
+                  <View style={styles.detailSection}>
+                    <Text style={styles.sectionTitle}>Đánh giá</Text>
+                    <Text style={styles.detailLine}>Mã đánh giá: {selectedRide.reviewId || 'Không có dữ liệu'}</Text>
+                    <Text style={styles.detailLine}>Số sao: {ratingLabel(selectedRide.reviewRating)}</Text>
+                    <Text style={styles.detailLine}>Trạng thái: {reviewStatusLabel(selectedRide.reviewStatus)}</Text>
+                    <Text style={styles.detailLine}>Bình luận: {selectedRide.reviewComment || 'Không có dữ liệu'}</Text>
+                    <Text style={styles.detailLine}>Tip: {formatVnd(selectedRide.reviewTipAmount)}</Text>
+                    <Text style={styles.detailLine}>Ngày tạo: {formatDateTime(selectedRide.reviewCreatedAt)}</Text>
+                    <Text style={styles.detailLine}>Ngày cập nhật: {formatDateTime(selectedRide.reviewUpdatedAt)}</Text>
                   </View>
 
                   <View style={styles.detailSection}>
