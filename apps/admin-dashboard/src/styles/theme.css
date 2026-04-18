@@ -21,8 +21,8 @@
   --text: #1a110b;
   --muted: #5a3e2d;
 
-  --shadow-soft: 0 12px 24px rgba(140, 60, 0, 0.12);
-  --shadow-strong: 0 18px 40px rgba(140, 60, 0, 0.18);
+  --shadow-soft: 0 8px 18px rgba(15, 23, 42, 0.06);
+  --shadow-strong: 0 14px 30px rgba(15, 23, 42, 0.1);
   --focus: rgba(242, 92, 42, 0.35);
 
   --radius-lg: 18px;

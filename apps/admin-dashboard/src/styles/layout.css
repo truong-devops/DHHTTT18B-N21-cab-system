@@ -13,13 +13,13 @@
 
 .sidebar {
   width: 260px;
-  background: var(--brand-600);
-  border-right: 1px solid var(--brand-700);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
   padding: 18px 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 14px 0 30px rgba(140, 74, 0, 0.16);
+  box-shadow: 8px 0 18px rgba(15, 23, 42, 0.05);
 }
 
 .sidebar-brand {
@@ -28,17 +28,17 @@
   gap: 12px;
   font-weight: 700;
   font-size: 16px;
-  color: #ffffff;
+  color: var(--brand-900);
 }
 
 .brand-mark {
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--brand-100);
   display: grid;
   place-items: center;
-  color: var(--brand-700);
+  color: var(--brand-800);
   font-weight: 700;
   letter-spacing: 0.08em;
 }
@@ -53,8 +53,8 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #ffffff;
-  opacity: 0.84;
+  color: var(--muted);
+  opacity: 0.92;
   font-weight: 600;
 }
 
@@ -67,7 +67,7 @@
 .sidebar-link {
   padding: 10px 12px;
   border: 1px solid transparent;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--brand-900);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -94,14 +94,15 @@
 }
 
 .sidebar-link:hover {
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
+  background: var(--brand-50);
+  color: var(--brand-800);
+  border-color: var(--brand-200);
 }
 
 .sidebar-link.active {
-  background: #ffffff;
-  color: var(--brand-700);
-  border-color: transparent;
+  background: var(--brand-100);
+  color: var(--brand-800);
+  border-color: var(--brand-300);
   box-shadow: var(--shadow-soft);
 }
 
@@ -111,11 +112,11 @@
 
 .sidebar-footer {
   margin-top: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  border-top: 1px solid var(--border);
   padding-top: 16px;
   font-size: 12px;
-  color: #ffffff;
-  opacity: 0.96;
+  color: var(--muted);
+  opacity: 1;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -124,9 +125,9 @@
 }
 
 .sidebar .badge.info {
-  border-color: rgba(255, 255, 255, 0.44);
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
+  border-color: var(--brand-300);
+  background: var(--brand-50);
+  color: var(--brand-700);
 }
 
 .app-main {
@@ -141,8 +142,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 18px 28px;
-  border-bottom: 1px solid var(--brand-700);
-  background: var(--brand-600);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
 }
 
 .app-header-title {
@@ -157,22 +159,22 @@
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.08em;
-  color: #ffffff;
+  color: var(--brand-800);
 }
 
 .system-tagline {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #ffffff;
-  opacity: 0.88;
+  color: var(--muted);
+  opacity: 0.95;
   font-weight: 700;
 }
 
 .account-name {
   font-size: 14px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--brand-900);
 }
 
 .header-actions {
@@ -186,34 +188,34 @@
 }
 
 .app-header .header-search .input {
-  background: rgba(255, 255, 255, 0.98);
-  border-color: rgba(255, 255, 255, 0.94);
+  background: #ffffff;
+  border-color: var(--brand-200);
   color: var(--text);
 }
 
 .app-header .header-search .input::placeholder {
-  color: #7e5c52;
+  color: var(--muted);
 }
 
 .app-header .btn-outline {
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.7);
-  background: transparent;
+  color: var(--brand-800);
+  border-color: var(--brand-300);
+  background: #ffffff;
 }
 
 .app-header .btn-outline:hover {
-  background: #ffffff;
+  background: var(--brand-50);
   color: var(--brand-700);
-  border-color: #ffffff;
+  border-color: var(--brand-300);
 }
 
 .app-header .btn-ghost {
-  color: #ffffff;
+  color: var(--brand-800);
   background: transparent;
 }
 
 .app-header .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--brand-50);
 }
 
 .app-content {
