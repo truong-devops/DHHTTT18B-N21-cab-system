@@ -1,5 +1,26 @@
 const pool = require('../db/pool');
 
+let kycTableAvailableCache = null;
+
+function isMissingKycTableError(error) {
+  return error?.code === '42P01';
+}
+
+async function isKycTableAvailable() {
+  if (kycTableAvailableCache !== null) {
+    return kycTableAvailableCache;
+  }
+  try {
+    const result = await pool.query("SELECT to_regclass('public.driver_kyc_submissions') AS table_name");
+    const available = Boolean(result.rows?.[0]?.table_name);
+    kycTableAvailableCache = available;
+    return available;
+  } catch (_error) {
+    // If metadata probe fails, do not block requests; fallback to runtime query handling.
+    return true;
+  }
+}
+
 async function createSubmission({
   driverId,
   fullName = null,
@@ -125,10 +146,59 @@ async function updateReview({
   return result.rows[0] || null;
 }
 
+async function getSubmissionStats() {
+  const available = await isKycTableAvailable();
+  if (!available) {
+    return {
+      totalSubmissions: 0,
+      pendingSubmissions: 0,
+      approvedSubmissions: 0,
+      rejectedSubmissions: 0,
+      available: false
+    };
+  }
+
+  let result;
+  try {
+    result = await pool.query(
+      `
+        SELECT
+          count(*)::int AS total_submissions,
+          count(*) FILTER (WHERE status = 'PENDING')::int AS pending_submissions,
+          count(*) FILTER (WHERE status = 'APPROVED')::int AS approved_submissions,
+          count(*) FILTER (WHERE status = 'REJECTED')::int AS rejected_submissions
+        FROM driver_kyc_submissions
+      `
+    );
+  } catch (error) {
+    if (isMissingKycTableError(error)) {
+      kycTableAvailableCache = false;
+      return {
+        totalSubmissions: 0,
+        pendingSubmissions: 0,
+        approvedSubmissions: 0,
+        rejectedSubmissions: 0,
+        available: false
+      };
+    }
+    throw error;
+  }
+
+  const row = result.rows[0] || {};
+  return {
+    totalSubmissions: Number(row.total_submissions || 0),
+    pendingSubmissions: Number(row.pending_submissions || 0),
+    approvedSubmissions: Number(row.approved_submissions || 0),
+    rejectedSubmissions: Number(row.rejected_submissions || 0),
+    available: true
+  };
+}
+
 module.exports = {
   createSubmission,
   getLatestByDriverId,
   getById,
   listSubmissions,
-  updateReview
+  updateReview,
+  getSubmissionStats
 };

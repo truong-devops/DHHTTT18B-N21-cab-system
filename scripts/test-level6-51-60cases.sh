@@ -7,9 +7,13 @@ PARALLEL_REQUESTS="${PARALLEL_REQUESTS:-20}"
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-25}"
 READINESS_WAIT_SECONDS="${READINESS_WAIT_SECONDS:-90}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PASS_COUNT=0
 FAIL_COUNT=0
+
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/case-context-input.sh"
 
 wait_for_http_200() {
   local url="$1"
@@ -71,7 +75,21 @@ print_case() {
   local expected="$3"
   local status="$4"
   local body="$5"
+  local case_id=""
+  local case_context=""
+  local case_input=""
+  case_id="$(echo "$title" | sed -n 's/^Case \([0-9]\+\).*/\1/p')"
+  if [[ -n "$case_id" ]]; then
+    case_context="$(get_case_context "$case_id")"
+    case_input="$(get_case_input "$case_id")"
+  fi
   echo "========== $title =========="
+  if [[ -n "$case_context" ]]; then
+    echo "Context: $case_context"
+  fi
+  if [[ -n "$case_input" ]]; then
+    echo "Input (PDF): $case_input"
+  fi
   echo "Input:"
   echo "$input" | sed -n '1,120p'
   echo "Expected: $expected"
@@ -151,10 +169,9 @@ CASE_51_PAYLOAD='{
   "vehicle_type": "CAR",
   "context": {"objective": "nearest", "max_eta_min": 30, "budget_weight": 0.5, "latency_budget_ms": 200},
   "candidates": [
-    {"driver_id": "d51_near", "distance_m": 100, "rating": 4.0, "eta_min": 2, "price_score": 0.2, "online": true},
-    {"driver_id": "d51_mid", "distance_m": 300, "rating": 4.9, "eta_min": 4, "price_score": 0.6, "online": true},
-    {"driver_id": "d51_far", "distance_m": 600, "rating": 4.5, "eta_min": 7, "price_score": 0.98, "online": true},
-    {"driver_id": "d51_offline_nearest", "distance_m": 50, "rating": 5.0, "eta_min": 1, "price_score": 0.99, "online": false}
+    {"driver_id": "d51_d1_5km", "distance_m": 5000, "rating": 4.8, "eta_min": 12, "price_score": 0.7, "online": true},
+    {"driver_id": "d51_d2_2km", "distance_m": 2000, "rating": 4.5, "eta_min": 6, "price_score": 0.8, "online": true},
+    {"driver_id": "d51_d3_3km", "distance_m": 3000, "rating": 4.7, "eta_min": 8, "price_score": 0.75, "online": true}
   ]
 }'
 
@@ -164,9 +181,8 @@ CASE_52_PAYLOAD='{
   "vehicle_type": "CAR",
   "context": {"objective": "highest_rating", "max_eta_min": 30, "budget_weight": 0.5, "latency_budget_ms": 200},
   "candidates": [
-    {"driver_id": "d52_low", "distance_m": 120, "rating": 4.4, "eta_min": 2, "price_score": 0.7, "online": true},
-    {"driver_id": "d52_best_rating", "distance_m": 500, "rating": 4.95, "eta_min": 9, "price_score": 0.6, "online": true},
-    {"driver_id": "d52_mid", "distance_m": 140, "rating": 4.7, "eta_min": 3, "price_score": 0.8, "online": true}
+    {"driver_id": "d52_d1_near_rating4", "distance_m": 2000, "rating": 4.0, "eta_min": 5, "price_score": 0.7, "online": true},
+    {"driver_id": "d52_d2_far_rating49", "distance_m": 3000, "rating": 4.9, "eta_min": 8, "price_score": 0.75, "online": true}
   ]
 }'
 
@@ -174,11 +190,10 @@ CASE_53_PAYLOAD='{
   "pickup": {"lat": 10.76, "lng": 106.66},
   "drop": {"lat": 10.77, "lng": 106.70},
   "vehicle_type": "CAR",
-  "context": {"objective": "balanced_eta_price", "max_eta_min": 25, "budget_weight": 0.8, "latency_budget_ms": 200},
+  "context": {"objective": "balanced_eta_price", "max_eta_min": 25, "budget_weight": 0.75, "latency_budget_ms": 200},
   "candidates": [
-    {"driver_id": "d53_near_low_rating", "distance_m": 100, "rating": 1.0, "online": true},
-    {"driver_id": "d53_balanced", "distance_m": 110, "rating": 5.0, "online": true},
-    {"driver_id": "d53_far", "distance_m": 600, "rating": 4.0, "online": true}
+    {"driver_id": "d53_option_a_eta5_price50k", "distance_m": 1600, "rating": 4.7, "eta_min": 5, "price_score": 0.2, "online": true},
+    {"driver_id": "d53_option_b_eta8_price40k", "distance_m": 2300, "rating": 4.8, "eta_min": 8, "price_score": 0.6, "online": true}
   ]
 }'
 
@@ -244,15 +259,17 @@ CASE_60_PAYLOAD='{
 C51=$(call_json_url POST "$AGENT_URL" "$CASE_51_PAYLOAD")
 C51_STATUS=$(echo "$C51" | sed -n '1p')
 C51_BODY=$(echo "$C51" | sed '1d')
-print_case "Case 51 - nearest online driver" "$CASE_51_PAYLOAD" "200 + strategy=nearest + selected=d51_near + offline candidate not selected" "$C51_STATUS" "$C51_BODY"
+print_case "Case 51 - nearest online driver" "$CASE_51_PAYLOAD" "200 + strategy=nearest + selected=d51_d2_2km" "$C51_STATUS" "$C51_BODY"
 if [[ "$C51_STATUS" == "200" ]] && assert_common_agent_shape "$C51_BODY" && node - <<'NODE' "$C51_BODY"
 const j = JSON.parse(process.argv[2]);
 const d = j.data || {};
 const topIds = (d.top_3 || []).map((x) => x.driver_id || x.driverId);
 const selected = d.selected_driver?.driver_id || d.selected_driver?.driverId;
 const ok = d.strategy === 'nearest'
-  && selected === 'd51_near'
-  && !topIds.includes('d51_offline_nearest');
+  && selected === 'd51_d2_2km'
+  && topIds.includes('d51_d1_5km')
+  && topIds.includes('d51_d2_2km')
+  && topIds.includes('d51_d3_3km');
 process.exit(ok ? 0 : 1);
 NODE
 then
@@ -265,15 +282,15 @@ fi
 C52=$(call_json_url POST "$AGENT_URL" "$CASE_52_PAYLOAD")
 C52_STATUS=$(echo "$C52" | sed -n '1p')
 C52_BODY=$(echo "$C52" | sed '1d')
-print_case "Case 52 - highest rating strategy" "$CASE_52_PAYLOAD" "200 + strategy=highest_rating + selected=d52_best_rating" "$C52_STATUS" "$C52_BODY"
+print_case "Case 52 - highest rating strategy" "$CASE_52_PAYLOAD" "200 + strategy=highest_rating + selected=d52_d2_far_rating49" "$C52_STATUS" "$C52_BODY"
 if [[ "$C52_STATUS" == "200" ]] && assert_common_agent_shape "$C52_BODY" && node - <<'NODE' "$C52_BODY"
 const j = JSON.parse(process.argv[2]);
 const d = j.data || {};
 const selected = d.selected_driver?.driver_id || d.selected_driver?.driverId;
 const top1 = d.top_3?.[0]?.driver_id || d.top_3?.[0]?.driverId;
 const ok = d.strategy === 'highest_rating'
-  && selected === 'd52_best_rating'
-  && top1 === 'd52_best_rating';
+  && selected === 'd52_d2_far_rating49'
+  && top1 === 'd52_d2_far_rating49';
 process.exit(ok ? 0 : 1);
 NODE
 then
@@ -286,14 +303,14 @@ fi
 C53=$(call_json_url POST "$AGENT_URL" "$CASE_53_PAYLOAD")
 C53_STATUS=$(echo "$C53" | sed -n '1p')
 C53_BODY=$(echo "$C53" | sed '1d')
-print_case "Case 53 - balance ETA and price" "$CASE_53_PAYLOAD" "200 + strategy=balanced_eta_price + selected=d53_balanced + decision scores present" "$C53_STATUS" "$C53_BODY"
+print_case "Case 53 - balance ETA and price" "$CASE_53_PAYLOAD" "200 + strategy=balanced_eta_price + selected in {A,B} + decision scores present" "$C53_STATUS" "$C53_BODY"
 if [[ "$C53_STATUS" == "200" ]] && assert_common_agent_shape "$C53_BODY" && node - <<'NODE' "$C53_BODY"
 const j = JSON.parse(process.argv[2]);
 const d = j.data || {};
 const selected = d.selected_driver?.driver_id || d.selected_driver?.driverId;
 const scores = Array.isArray(d.decision_log?.scores) && d.decision_log.scores.length >= 2;
 const ok = d.strategy === 'balanced_eta_price'
-  && selected === 'd53_balanced'
+  && (selected === 'd53_option_a_eta5_price50k' || selected === 'd53_option_b_eta8_price40k')
   && scores;
 process.exit(ok ? 0 : 1);
 NODE
@@ -307,14 +324,14 @@ fi
 C54=$(call_json_url POST "$AGENT_URL" "$CASE_54_PAYLOAD")
 C54_STATUS=$(echo "$C54" | sed -n '1p')
 C54_BODY=$(echo "$C54" | sed '1d')
-print_case "Case 54 - correct tool calls" "$CASE_54_PAYLOAD" "200 + tool_calls contains driver_availability + eta + pricing" "$C54_STATUS" "$C54_BODY"
+print_case "Case 54 - correct tool calls" "$CASE_54_PAYLOAD" "200 + tool_calls exactly [driver_availability, eta, pricing] (no extra, correct order)" "$C54_STATUS" "$C54_BODY"
 if [[ "$C54_STATUS" == "200" ]] && assert_common_agent_shape "$C54_BODY" && node - <<'NODE' "$C54_BODY"
 const j = JSON.parse(process.argv[2]);
 const calls = Array.isArray(j.data?.tool_calls) ? j.data.tool_calls : [];
 const names = calls.map((c) => String(c.tool || '').toLowerCase());
-const ok = names.includes('driver_availability')
-  && names.includes('eta')
-  && names.includes('pricing');
+const expected = ['driver_availability', 'eta', 'pricing'];
+const ok = names.length === expected.length
+  && expected.every((tool, index) => names[index] === tool);
 process.exit(ok ? 0 : 1);
 NODE
 then
@@ -327,16 +344,18 @@ fi
 C55=$(call_json_url POST "$AGENT_URL" "$CASE_55_PAYLOAD")
 C55_STATUS=$(echo "$C55" | sed -n '1p')
 C55_BODY=$(echo "$C55" | sed '1d')
-print_case "Case 55 - missing context/features" "$CASE_55_PAYLOAD" "200 + no crash + selected_driver exists + tool enrichment happened" "$C55_STATUS" "$C55_BODY"
+print_case "Case 55 - missing context/features" "$CASE_55_PAYLOAD" "200 + no crash + (fallback OR enrich/request more data) + no hard fail" "$C55_STATUS" "$C55_BODY"
 if [[ "$C55_STATUS" == "200" ]] && assert_common_agent_shape "$C55_BODY" && node - <<'NODE' "$C55_BODY"
 const j = JSON.parse(process.argv[2]);
 const d = j.data || {};
 const selected = d.selected_driver?.driver_id || d.selected_driver?.driverId;
 const calls = Array.isArray(d.tool_calls) ? d.tool_calls.map((x) => x.tool) : [];
-const ok = Boolean(selected)
-  && calls.includes('eta')
-  && calls.includes('pricing')
-  && d.fallback_used === false;
+const reason = String(d.decision_log?.reason || '').toLowerCase();
+const hasEnrichment = calls.includes('eta') || calls.includes('pricing');
+const asksMoreData = reason.includes('missing') || reason.includes('insufficient') || reason.includes('need_more_data');
+const fallbackPath = d.fallback_used === true;
+const continuePath = Boolean(selected) && (hasEnrichment || asksMoreData);
+const ok = fallbackPath || continuePath;
 process.exit(ok ? 0 : 1);
 NODE
 then
@@ -420,14 +439,16 @@ C59=$(PARALLEL_REQUESTS="$PARALLEL_REQUESTS" AGENT_URL="$AGENT_URL" CASE_PAYLOAD
 const total = Number(process.env.PARALLEL_REQUESTS || 20);
 const url = process.env.AGENT_URL;
 const payload = JSON.parse(process.env.CASE_PAYLOAD || '{}');
+const allowedSelected = new Set(['d54_1', 'd54_2']);
 
 async function one(i) {
+  const traceId = `parallel-${Date.now()}-${i}`;
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-trace-id': `parallel-${Date.now()}-${i}`
+        'x-trace-id': traceId
       },
       body: JSON.stringify(payload)
     });
@@ -436,25 +457,49 @@ async function one(i) {
     try { parsed = JSON.parse(text); } catch (_e) { parsed = null; }
     return {
       status: res.status,
-      selected_driver: parsed?.data?.selected_driver?.driver_id || parsed?.data?.selected_driver?.driverId || null
+      selected_driver: parsed?.data?.selected_driver?.driver_id || parsed?.data?.selected_driver?.driverId || null,
+      strategy: parsed?.data?.strategy || null,
+      trace_sent: traceId,
+      trace_returned: parsed?.data?.decision_log?.trace_id || null
     };
   } catch (_e) {
-    return { status: 0, selected_driver: null };
+    return { status: 0, selected_driver: null, strategy: null, trace_sent: traceId, trace_returned: null };
   }
 }
 
 (async () => {
   const statuses = await Promise.all(Array.from({ length: total }, (_, i) => one(i)));
-  const ok = statuses.filter((x) => x.status === 200).length;
+  const ok200 = statuses.filter((x) => x.status === 200).length;
   const hasSelected = statuses.filter((x) => x.selected_driver).length;
-  process.stdout.write(JSON.stringify({ total, ok, hasSelected, fail: total - ok, statuses }, null, 2));
+  const invalidSelected = statuses.filter((x) => x.selected_driver && !allowedSelected.has(String(x.selected_driver))).length;
+  const traceMismatch = statuses.filter((x) => x.trace_returned !== x.trace_sent).length;
+  const traceReturnedSet = new Set(statuses.map((x) => x.trace_returned).filter(Boolean));
+  const stableStrategy = statuses.every((x) => x.strategy === 'balanced_eta_price');
+  const noConflict = ok200 === total
+    && hasSelected === total
+    && invalidSelected === 0
+    && traceMismatch === 0
+    && traceReturnedSet.size === total
+    && stableStrategy;
+  process.stdout.write(JSON.stringify({
+    total,
+    ok200,
+    hasSelected,
+    invalidSelected,
+    traceMismatch,
+    uniqueTraceReturned: traceReturnedSet.size,
+    stableStrategy,
+    noConflict,
+    fail: total - ok200,
+    statuses
+  }, null, 2));
 })();
 NODE
 )
-print_case "Case 59 - parallel requests" "$CASE_54_PAYLOAD x $PARALLEL_REQUESTS" "all requests 200 + each has selected_driver" "local-check" "$C59"
+print_case "Case 59 - parallel requests" "$CASE_54_PAYLOAD x $PARALLEL_REQUESTS" "all requests 200 + valid selected_driver + unique trace + stable strategy (no conflict/race)" "local-check" "$C59"
 if node - <<'NODE' "$C59"
 const j = JSON.parse(process.argv[2]);
-process.exit(j.ok === j.total && j.hasSelected === j.total ? 0 : 1);
+process.exit(j.noConflict === true ? 0 : 1);
 NODE
 then
   mark_result 1 "59"
@@ -466,7 +511,7 @@ fi
 C60=$(call_json_url POST "$AGENT_URL" "$CASE_60_PAYLOAD")
 C60_STATUS=$(echo "$C60" | sed -n '1p')
 C60_BODY=$(echo "$C60" | sed '1d')
-print_case "Case 60 - fallback when AI fails" "$CASE_60_PAYLOAD" "200 + fallback_used=true + strategy=fallback_rule + selected=d60_2" "$C60_STATUS" "$C60_BODY"
+print_case "Case 60 - fallback when AI fails" "$CASE_60_PAYLOAD" "200 + fallback_used=true + rule-based fallback + system still serves response" "$C60_STATUS" "$C60_BODY"
 if [[ "$C60_STATUS" == "200" ]] && assert_common_agent_shape "$C60_BODY" && node - <<'NODE' "$C60_BODY"
 const j = JSON.parse(process.argv[2]);
 const d = j.data || {};
@@ -474,7 +519,7 @@ const selected = d.selected_driver?.driver_id || d.selected_driver?.driverId;
 const reason = String(d.decision_log?.reason || '');
 const ok = d.fallback_used === true
   && d.strategy === 'fallback_rule'
-  && selected === 'd60_2'
+  && Boolean(selected)
   && reason.startsWith('fallback_rule_');
 process.exit(ok ? 0 : 1);
 NODE

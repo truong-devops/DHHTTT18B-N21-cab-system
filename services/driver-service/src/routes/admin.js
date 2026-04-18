@@ -12,6 +12,14 @@ function isEightDigitId(value) {
 
 router.use('/v1/admin', requireAuth, requireRole('admin', 'ops', 'service'));
 
+router.get(
+  '/v1/admin/dashboard',
+  asyncHandler(async (req, res) => {
+    const data = await driverService.getAdminDashboardSummary();
+    return res.json({ data, requestId: req.requestId });
+  })
+);
+
 router.post(
   '/v1/admin/drivers',
   validateRequest({
@@ -105,6 +113,17 @@ router.get(
       page: req.query.page,
       limit: req.query.limit
     });
+    const hasFilter = Boolean(req.query.status || req.query.online);
+    if (!hasFilter && Array.isArray(data?.items)) {
+      return res.json({
+        data: data.items,
+        meta: {
+          page: data.page,
+          limit: data.limit
+        },
+        requestId: req.requestId
+      });
+    }
     return res.json({ data, requestId: req.requestId });
   })
 );

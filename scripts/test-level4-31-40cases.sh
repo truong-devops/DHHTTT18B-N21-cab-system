@@ -14,9 +14,13 @@ CURL_MAX_TIME="${CURL_MAX_TIME:-30}"
 BOOKING_POLL_TIMEOUT_SEC="${BOOKING_POLL_TIMEOUT_SEC:-25}"
 PAYMENT_PATCH_CONNECT_TIMEOUT="${PAYMENT_PATCH_CONNECT_TIMEOUT:-3}"
 PAYMENT_PATCH_MAX_TIME="${PAYMENT_PATCH_MAX_TIME:-12}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PASS_COUNT=0
 FAIL_COUNT=0
+
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/case-context-input.sh"
 
 print_usage() {
   cat <<EOF
@@ -83,7 +87,21 @@ print_case() {
   local expected="$2"
   local status="$3"
   local body="$4"
+  local case_id=""
+  local case_context=""
+  local case_input=""
+  case_id="$(echo "$title" | sed -n 's/^Case \([0-9]\+\).*/\1/p')"
+  if [[ -n "$case_id" ]]; then
+    case_context="$(get_case_context "$case_id")"
+    case_input="$(get_case_input "$case_id")"
+  fi
   echo "========== $title =========="
+  if [[ -n "$case_context" ]]; then
+    echo "Context: $case_context"
+  fi
+  if [[ -n "$case_input" ]]; then
+    echo "Input: $case_input"
+  fi
   echo "Expected: $expected"
   echo "Actual status: $status"
   echo "Actual body:"
@@ -329,7 +347,7 @@ ensure_online_driver() {
 }
 
 # shellcheck disable=SC1091
-source "$(dirname "$0")/lib/level4_saga_helpers.sh"
+source "$SCRIPT_DIR/lib/level4_saga_helpers.sh"
 
 echo "== Setup tokens and users for Level 4 =="
 if ! bootstrap_infra_if_needed; then

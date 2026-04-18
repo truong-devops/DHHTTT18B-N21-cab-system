@@ -15,6 +15,43 @@ const { withTrace } = require('../utils/logger');
 const { isEightDigitId } = require('../utils/validation');
 const monitoring = require('../monitoring');
 
+const RECENT_RIDE_CACHE_TTL_MS = Math.max(1000, Number(process.env.PAYMENTS_RECENT_RIDE_CACHE_TTL_MS || 300000));
+const RECENT_RIDE_CACHE_MAX_ITEMS = Math.max(1, Number(process.env.PAYMENTS_RECENT_RIDE_CACHE_MAX_ITEMS || 20));
+const recentPaymentsByRide = new Map();
+
+function setRecentRidePayment(payment) {
+  const rideId = payment?.rideId;
+  if (!rideId) {
+    return;
+  }
+
+  const now = Date.now();
+  const existing = recentPaymentsByRide.get(rideId);
+  const currentItems = Array.isArray(existing?.items) ? existing.items : [];
+  const withoutCurrent = currentItems.filter((item) => item?.id !== payment.id);
+  const nextItems = [payment, ...withoutCurrent].slice(0, RECENT_RIDE_CACHE_MAX_ITEMS);
+  recentPaymentsByRide.set(rideId, {
+    items: nextItems,
+    expiresAt: now + RECENT_RIDE_CACHE_TTL_MS
+  });
+}
+
+function getRecentRidePayments(rideId, limit) {
+  if (!rideId) {
+    return null;
+  }
+  const entry = recentPaymentsByRide.get(rideId);
+  if (!entry) {
+    return null;
+  }
+  if (!Number.isFinite(entry.expiresAt) || entry.expiresAt <= Date.now()) {
+    recentPaymentsByRide.delete(rideId);
+    return null;
+  }
+  const safeLimit = Number(limit) > 0 ? Number(limit) : RECENT_RIDE_CACHE_MAX_ITEMS;
+  return entry.items.slice(0, safeLimit);
+}
+
 function normalizeActorId(value) {
   if (!isEightDigitId(value)) {
     return null;
@@ -122,6 +159,7 @@ async function createPayment({ payload, idempotency, traceId, requestId, method,
     });
 
     const responseBody = { data: payment };
+    setRecentRidePayment(payment);
     monitoring.recordPaymentStatus(payment.status, 'success', {
       method: String(payment.method || payload.method || 'unknown').toLowerCase()
     });
@@ -152,6 +190,12 @@ async function fetchPayment(paymentId) {
 
 async function fetchPayments(parsedQuery) {
   const limit = parsedQuery.limit ? Number(parsedQuery.limit) : 20;
+  if (parsedQuery.rideId && !parsedQuery.cursor) {
+    const cached = getRecentRidePayments(parsedQuery.rideId, limit);
+    if (cached) {
+      return { data: cached };
+    }
+  }
   const cursor = parsedQuery.cursor ? decodeCursor(parsedQuery.cursor) : null;
   const result = await listPayments({
     limit,
@@ -238,6 +282,7 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
     monitoring.recordPaymentStatus(status, 'success', {
       from_status: String(payment.status || 'unknown').toLowerCase()
     });
+    setRecentRidePayment(updated);
 
     return updated;
   });

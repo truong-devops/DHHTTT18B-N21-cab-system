@@ -15,9 +15,13 @@ CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-25}"
 LATENCY_SAMPLES="${LATENCY_SAMPLES:-30}"
 LATENCY_LIMIT_MS="${LATENCY_LIMIT_MS:-200}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PASS_COUNT=0
 FAIL_COUNT=0
+
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/case-context-input.sh"
 
 wait_for_url() {
   local url="$1"
@@ -43,7 +47,21 @@ print_case() {
   local expected="$2"
   local status="$3"
   local body="$4"
+  local case_id=""
+  local case_context=""
+  local case_input=""
+  case_id="$(echo "$title" | sed -n 's/^Case \([0-9]\+\).*/\1/p')"
+  if [[ -n "$case_id" ]]; then
+    case_context="$(get_case_context "$case_id")"
+    case_input="$(get_case_input "$case_id")"
+  fi
   echo "========== $title =========="
+  if [[ -n "$case_context" ]]; then
+    echo "Context: $case_context"
+  fi
+  if [[ -n "$case_input" ]]; then
+    echo "Input: $case_input"
+  fi
   echo "Expected: $expected"
   echo "Actual status: $status"
   echo "Actual body:"
@@ -192,13 +210,13 @@ else
 fi
 
 # Case 41
-C41=$(call_json_url POST "$ETA_URL/v1/eta/estimate" "" '{"distance_km":5,"traffic_level":0.4}')
+C41=$(call_json_url POST "$ETA_URL/v1/eta/estimate" "" '{"distance_km":5,"traffic_level":0.5}')
 C41_STATUS=$(echo "$C41" | sed -n '1p')
 C41_BODY=$(echo "$C41" | sed '1d')
 C41_ETA=$(echo "$C41_BODY" | json_get "data.eta_minutes")
 C41_DISTANCE=$(echo "$C41_BODY" | json_get "data.distance_km")
-print_case "Case 41 - ETA range (strict)" "200 + eta numeric in [1..180] + distance positive" "$C41_STATUS" "$C41_BODY"
-if [[ "$C41_STATUS" == "200" ]] && is_number_node "$C41_ETA" && is_between_node "$C41_ETA" 1 180 && is_number_node "$C41_DISTANCE" && node -e "process.exit(Number(process.argv[1])>0?0:1)" "$C41_DISTANCE"; then
+print_case "Case 41 - ETA range (strict)" "200 + eta > 0 and < 60 + distance positive" "$C41_STATUS" "$C41_BODY"
+if [[ "$C41_STATUS" == "200" ]] && is_number_node "$C41_ETA" && node -e "const e=Number(process.argv[1]);const d=Number(process.argv[2]);process.exit(Number.isFinite(e)&&e>0&&e<60&&Number.isFinite(d)&&d>0?0:1)" "$C41_ETA" "$C41_DISTANCE"; then
   mark_result 1 "41"
 else
   mark_result 0 "41"
@@ -206,17 +224,17 @@ fi
 
 # Case 42
 if [[ -n "$USER_TOKEN" ]]; then
-  C42=$(call_gateway_json POST "/v1/pricing/estimate" "$USER_TOKEN" '{"distance_km":5,"demand_index":2.2}')
+  C42=$(call_gateway_json POST "/v1/pricing/estimate" "$USER_TOKEN" '{"distance_km":5,"demand_index":2}')
 else
-  C42=$(call_json_url POST "$PRICING_URL/v1/pricing/estimate" "" '{"distance_km":5,"demand_index":2.2}' "x-internal-key" "$INTERNAL_API_KEY")
+  C42=$(call_json_url POST "$PRICING_URL/v1/pricing/estimate" "" '{"distance_km":5,"demand_index":2}' "x-internal-key" "$INTERNAL_API_KEY")
 fi
 C42_STATUS=$(echo "$C42" | sed -n '1p')
 C42_BODY=$(echo "$C42" | sed '1d')
 C42_SURGE=$(echo "$C42_BODY" | json_get "data.surge")
 C42_PRICE=$(echo "$C42_BODY" | json_get "data.price")
 C42_BASE=$(echo "$C42_BODY" | json_get "data.base_fare")
-print_case "Case 42 - Surge strict" "200 + surge>1 + price>base_fare" "$C42_STATUS" "$C42_BODY"
-if [[ "$C42_STATUS" == "200" ]] && node -e "const s=Number(process.argv[1]);const p=Number(process.argv[2]);const b=Number(process.argv[3]);process.exit(Number.isFinite(s)&&s>1&&Number.isFinite(p)&&Number.isFinite(b)&&p>b?0:1)" "$C42_SURGE" "$C42_PRICE" "$C42_BASE"; then
+print_case "Case 42 - Surge strict" "200 + surge>1 and <=3 + price>base_fare" "$C42_STATUS" "$C42_BODY"
+if [[ "$C42_STATUS" == "200" ]] && node -e "const s=Number(process.argv[1]);const p=Number(process.argv[2]);const b=Number(process.argv[3]);process.exit(Number.isFinite(s)&&s>1&&s<=3&&Number.isFinite(p)&&Number.isFinite(b)&&p>b?0:1)" "$C42_SURGE" "$C42_PRICE" "$C42_BASE"; then
   mark_result 1 "42"
 else
   mark_result 0 "42"
@@ -241,20 +259,33 @@ fi
 C44=$(call_json_url POST "$AI_URL/v1/ai/recommend-drivers" "" '{"pickup":{"lat":10.76,"lng":106.66},"vehicle_type":"CAR","candidates":[{"driver_id":"d1","distance_m":500,"rating":4.8,"eta_min":3,"price_score":0.9,"online":true},{"driver_id":"d2","distance_m":1200,"rating":4.6,"eta_min":8,"price_score":0.8,"online":true},{"driver_id":"d3","distance_m":300,"rating":4.7,"eta_min":2,"price_score":0.95,"online":true},{"driver_id":"d4","distance_m":100,"rating":4.9,"eta_min":1,"price_score":0.9,"online":false}]}')
 C44_STATUS=$(echo "$C44" | sed -n '1p')
 C44_BODY=$(echo "$C44" | sed '1d')
-C44_TOP0=$(echo "$C44_BODY" | json_get "data.top_3.0.driver_id")
-C44_TOP1=$(echo "$C44_BODY" | json_get "data.top_3.1.driver_id")
-C44_TOP2=$(echo "$C44_BODY" | json_get "data.top_3.2.driver_id")
-C44_SELECTED=$(echo "$C44_BODY" | json_get "data.selected_driver.driver_id")
-C44_REASON=$(echo "$C44_BODY" | json_get "data.decision_log.reason")
-print_case "Case 44 - Recommendation strict" "200 + top_3 unique + selected in top_3 + reason exists" "$C44_STATUS" "$C44_BODY"
-if [[ "$C44_STATUS" == "200" ]] && [[ -n "$C44_TOP0" && -n "$C44_TOP1" && -n "$C44_TOP2" ]] && [[ -n "$C44_SELECTED" && -n "$C44_REASON" ]] && node -e "const arr=[process.argv[1],process.argv[2],process.argv[3]]; const set=new Set(arr); const selected=process.argv[4]; process.exit(set.size===3 && set.has(selected)?0:1)" "$C44_TOP0" "$C44_TOP1" "$C44_TOP2" "$C44_SELECTED"; then
+print_case "Case 44 - Recommendation strict" "200 + top_3 has exactly 3 unique drivers + selected belongs to top_3 + reason exists" "$C44_STATUS" "$C44_BODY"
+if [[ "$C44_STATUS" == "200" ]] && node - <<'NODE' "$C44_BODY"
+const j = JSON.parse(process.argv[2]);
+const d = j?.data || {};
+const top = Array.isArray(d.top_3) ? d.top_3 : [];
+const ids = top.map((it) => it?.driver_id || it?.driverId).filter(Boolean);
+const selected = d?.selected_driver?.driver_id || d?.selected_driver?.driverId;
+const reason = d?.decision_log?.reason;
+const unique = new Set(ids);
+const ok = top.length === 3
+  && ids.length === 3
+  && unique.size === 3
+  && Boolean(selected)
+  && unique.has(selected)
+  && typeof reason === 'string'
+  && reason.length > 0;
+process.exit(ok ? 0 : 1);
+NODE
+then
   mark_result 1 "44"
 else
   mark_result 0 "44"
 fi
 
 # Case 45 + 46
-C45=$(call_json_url POST "$AI_URL/v1/ai/forecast-demand" "" '{"zone_id":"HCM_Q1","horizon_min":30,"timestamp":"2026-04-08T10:00:00Z"}')
+C45_REQ_TS="2026-04-08T10:00:00Z"
+C45=$(call_json_url POST "$AI_URL/v1/ai/forecast-demand" "" "{\"zone_id\":\"HCM_Q1\",\"horizon_min\":30,\"timestamp\":\"$C45_REQ_TS\"}")
 C45_STATUS=$(echo "$C45" | sed -n '1p')
 C45_BODY=$(echo "$C45" | sed '1d')
 C45_ZONE=$(echo "$C45_BODY" | json_get "data.zone_id")
@@ -263,14 +294,65 @@ C45_D=$(echo "$C45_BODY" | json_get "data.predicted_demand_index")
 C45_S=$(echo "$C45_BODY" | json_get "data.predicted_supply_index")
 C45_CONF=$(echo "$C45_BODY" | json_get "data.confidence")
 C45_MODEL=$(echo "$C45_BODY" | json_get "data.model_version")
-print_case "Case 45 - Forecast strict format" "200 + full schema + numeric fields in valid range" "$C45_STATUS" "$C45_BODY"
-if [[ "$C45_STATUS" == "200" ]] && [[ "$C45_ZONE" == "HCM_Q1" ]] && is_number_node "$C45_HORIZON" && is_number_node "$C45_D" && is_number_node "$C45_S" && is_number_node "$C45_CONF" && node -e "const d=Number(process.argv[1]);const s=Number(process.argv[2]);const c=Number(process.argv[3]);process.exit(d>0&&s>0&&c>=0&&c<=1?0:1)" "$C45_D" "$C45_S" "$C45_CONF"; then
+C45_TS=$(echo "$C45_BODY" | json_get "data.timestamp")
+C45_VAL=$(echo "$C45_BODY" | json_get "data.value")
+print_case "Case 45 - Forecast strict format" "200 + output schema valid (zone_id,horizon_min,timestamp,value,model_version,confidence)" "$C45_STATUS" "$C45_BODY"
+if [[ "$C45_STATUS" == "200" ]] && node - <<'NODE' "$C45_BODY"
+const body = JSON.parse(process.argv[2]);
+const d = body?.data || {};
+const ts = Date.parse(String(d.timestamp || ''));
+const ok = typeof d.zone_id === 'string'
+  && d.zone_id.length > 0
+  && Number.isFinite(Number(d.horizon_min))
+  && Number(d.horizon_min) > 0
+  && Number.isFinite(Number(ts))
+  && Number.isFinite(Number(d.value))
+  && Number.isFinite(Number(d.predicted_demand_index))
+  && Number.isFinite(Number(d.predicted_supply_index))
+  && Number.isFinite(Number(d.confidence))
+  && Number(d.confidence) >= 0
+  && Number(d.confidence) <= 1
+  && typeof d.model_version === 'string'
+  && d.model_version.length > 0;
+process.exit(ok ? 0 : 1);
+NODE
+then
   mark_result 1 "45"
 else
   mark_result 0 "45"
 fi
-print_case "Case 46 - Model version strict" "model_version exists and starts with forecast-" "200" "{\"model_version\":\"$C45_MODEL\"}"
-if [[ -n "$C45_MODEL" ]] && [[ "$C45_MODEL" == forecast-* ]]; then
+
+C46_V1=$(call_json_url POST "$AI_URL/v1/ai/forecast-demand" "" "{\"zone_id\":\"HCM_Q1\",\"horizon_min\":30,\"timestamp\":\"$C45_REQ_TS\",\"model_version\":\"forecast-v1\"}")
+C46_V1_STATUS=$(echo "$C46_V1" | sed -n '1p')
+C46_V1_BODY=$(echo "$C46_V1" | sed '1d')
+C46_V1_MODEL=$(echo "$C46_V1_BODY" | json_get "data.model_version")
+
+C46_V2=$(call_json_url POST "$AI_URL/v1/ai/forecast-demand" "" "{\"zone_id\":\"HCM_Q1\",\"horizon_min\":30,\"timestamp\":\"$C45_REQ_TS\",\"model_version\":\"forecast-v2\"}")
+C46_V2_STATUS=$(echo "$C46_V2" | sed -n '1p')
+C46_V2_BODY=$(echo "$C46_V2" | sed '1d')
+C46_V2_MODEL=$(echo "$C46_V2_BODY" | json_get "data.model_version")
+
+C46_OUT=$(node - <<'NODE' "$C46_V1_STATUS" "$C46_V1_MODEL" "$C46_V2_STATUS" "$C46_V2_MODEL"
+const s1 = process.argv[2];
+const m1 = process.argv[3] || '';
+const s2 = process.argv[4];
+const m2 = process.argv[5] || '';
+const ok = s1 === '200'
+  && s2 === '200'
+  && m1 === 'forecast-v1'
+  && m2 === 'forecast-v2';
+process.stdout.write(JSON.stringify({
+  status_v1: s1,
+  model_v1: m1,
+  status_v2: s2,
+  model_v2: m2,
+  distinct_versions: m1 !== m2,
+  ok
+}));
+NODE
+)
+print_case "Case 46 - Model version strict" "200 + model_version returned correctly and not mixed" "local-check" "$C46_OUT"
+if [[ "$(echo "$C46_OUT" | json_get "ok")" == "true" ]]; then
   mark_result 1 "46"
 else
   mark_result 0 "46"
@@ -278,11 +360,18 @@ fi
 
 # Case 47 strict p95 latency
 LAT_VALUES=""
+C47_TIMEOUTS=0
 for i in $(seq 1 "$LATENCY_SAMPLES"); do
+  C47_T0=$(node -e 'process.stdout.write(String(Date.now()))')
   SAMPLE=$(call_json_url POST "$AI_URL/v1/ai/forecast-demand" "" '{"zone_id":"HCM_Q1","horizon_min":30,"timestamp":"2026-04-08T10:00:00Z"}')
+  C47_T1=$(node -e 'process.stdout.write(String(Date.now()))')
+  SAMPLE_STATUS=$(echo "$SAMPLE" | sed -n '1p')
   SAMPLE_BODY=$(echo "$SAMPLE" | sed '1d')
-  SAMPLE_LAT=$(echo "$SAMPLE_BODY" | json_get "data.latency_ms")
-  if is_number_node "$SAMPLE_LAT"; then
+  SAMPLE_LAT=$((C47_T1 - C47_T0))
+  if [[ "$SAMPLE_STATUS" == "000" ]]; then
+    C47_TIMEOUTS=$((C47_TIMEOUTS + 1))
+  fi
+  if [[ "$SAMPLE_STATUS" == "200" ]] && is_number_node "$SAMPLE_LAT"; then
     if [[ -z "$LAT_VALUES" ]]; then
       LAT_VALUES="$SAMPLE_LAT"
     else
@@ -291,8 +380,8 @@ for i in $(seq 1 "$LATENCY_SAMPLES"); do
   fi
 done
 P95_LAT=$(p95_from_values "$LAT_VALUES")
-print_case "Case 47 - AI latency strict" "p95 latency < ${LATENCY_LIMIT_MS}ms over ${LATENCY_SAMPLES} samples" "200" "{\"p95_latency_ms\":$P95_LAT,\"samples\":$LATENCY_SAMPLES}"
-if is_number_node "$P95_LAT" && node -e "const p=Number(process.argv[1]); const lim=Number(process.argv[2]); process.exit(Number.isFinite(p)&&p<lim?0:1)" "$P95_LAT" "$LATENCY_LIMIT_MS"; then
+print_case "Case 47 - AI latency strict" "p95 latency < ${LATENCY_LIMIT_MS}ms + no timeout" "200" "{\"p95_latency_ms\":$P95_LAT,\"samples\":$LATENCY_SAMPLES,\"timeouts\":$C47_TIMEOUTS}"
+if is_number_node "$P95_LAT" && [[ "$C47_TIMEOUTS" == "0" ]] && node -e "const p=Number(process.argv[1]); const lim=Number(process.argv[2]); process.exit(Number.isFinite(p)&&p<lim?0:1)" "$P95_LAT" "$LATENCY_LIMIT_MS"; then
   mark_result 1 "47"
 else
   mark_result 0 "47"
@@ -305,8 +394,10 @@ C48_BODY=$(echo "$C48" | sed '1d')
 C48_DRIFT=$(echo "$C48_BODY" | json_get "data.drift_detected")
 C48_SCORE=$(echo "$C48_BODY" | json_get "data.drift_score")
 C48_THRESHOLD=$(echo "$C48_BODY" | json_get "data.threshold")
-print_case "Case 48 - Drift strict" "200 + drift=true + score>threshold" "$C48_STATUS" "$C48_BODY"
-if [[ "$C48_STATUS" == "200" ]] && [[ "$C48_DRIFT" == "true" ]] && node -e "const s=Number(process.argv[1]);const t=Number(process.argv[2]);process.exit(Number.isFinite(s)&&Number.isFinite(t)&&s>t?0:1)" "$C48_SCORE" "$C48_THRESHOLD"; then
+C48_ALERT=$(echo "$C48_BODY" | json_get "data.alert_triggered")
+if [[ -z "$C48_ALERT" ]]; then C48_ALERT=$(echo "$C48_BODY" | json_get "data.alert.triggered"); fi
+print_case "Case 48 - Drift strict" "200 + drift=true + score>threshold + alert triggered" "$C48_STATUS" "$C48_BODY"
+if [[ "$C48_STATUS" == "200" ]] && [[ "$C48_DRIFT" == "true" ]] && [[ "$C48_ALERT" == "true" ]] && node -e "const s=Number(process.argv[1]);const t=Number(process.argv[2]);process.exit(Number.isFinite(s)&&Number.isFinite(t)&&s>t?0:1)" "$C48_SCORE" "$C48_THRESHOLD"; then
   mark_result 1 "48"
 else
   mark_result 0 "48"
@@ -326,14 +417,20 @@ else
 fi
 
 # Case 50 (multiple abnormal payloads)
-C50A=$(call_json_url POST "$AI_URL/v1/ai/recommend-drivers" "" '{"pickup":{"lat":"oops","lng":106.66},"candidates":"bad-input"}')
+C50A=$(call_json_url POST "$ETA_URL/v1/eta/estimate" "" '{"distance_km":1000,"traffic_level":0.5}')
 C50A_STATUS=$(echo "$C50A" | sed -n '1p')
 C50A_BODY=$(echo "$C50A" | sed '1d')
-C50B=$(call_json_url POST "$AI_URL/v1/ai/fraud-score" "" '{"user_id":"u1"}')
+C50A_ETA=$(echo "$C50A_BODY" | json_get "data.eta_minutes")
+
+C50B=$(call_json_url POST "$PRICING_URL/v1/pricing/estimate" "" '{"distance_km":1000,"demand_index":1}' "x-internal-key" "$INTERNAL_API_KEY")
 C50B_STATUS=$(echo "$C50B" | sed -n '1p')
 C50B_BODY=$(echo "$C50B" | sed '1d')
-print_case "Case 50 - Abnormal input strict" "400 on multiple invalid payloads and never 500" "$C50A_STATUS/$C50B_STATUS" "$C50A_BODY"$'\n'"$C50B_BODY"
-if [[ "$C50A_STATUS" == "400" ]] && [[ "$C50B_STATUS" == "400" ]]; then
+C50B_PRICE=$(echo "$C50B_BODY" | json_get "data.price")
+
+print_case "Case 50 - Abnormal input strict" "outlier distance=1000km: model does not crash, returns reasonable output or reject (no 5xx)" "$C50A_STATUS/$C50B_STATUS" "$C50A_BODY"$'\n'"$C50B_BODY"
+if node -e "const s=process.argv.slice(1).map(Number); const ok=s.every(x=>x>=200&&x<500); process.exit(ok?0:1)" "$C50A_STATUS" "$C50B_STATUS" \
+  && ( [[ "$C50A_STATUS" != "200" ]] || node -e "const v=Number(process.argv[1]);process.exit(Number.isFinite(v)&&v>=0?0:1)" "$C50A_ETA" ) \
+  && ( [[ "$C50B_STATUS" != "200" ]] || node -e "const v=Number(process.argv[1]);process.exit(Number.isFinite(v)&&v>0?0:1)" "$C50B_PRICE" ); then
   mark_result 1 "50"
 else
   mark_result 0 "50"

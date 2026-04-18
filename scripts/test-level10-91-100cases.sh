@@ -7,6 +7,7 @@ BOOKING_URL="${BOOKING_URL:-http://localhost:3003}"
 USER_PASS="${USER_PASS:-123456}"
 JWT_SECRET="${JWT_SECRET:-dev-secret}"
 UNIQ_TAG="$(date +%s)-$RANDOM"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-25}"
@@ -18,10 +19,15 @@ CASE98_MAX_TIME_MS="${CASE98_MAX_TIME_MS:-4000}"
 AUTH_BOOTSTRAP_ATTEMPTS="${AUTH_BOOTSTRAP_ATTEMPTS:-20}"
 AUTH_BOOTSTRAP_RETRY_DELAY_SEC="${AUTH_BOOTSTRAP_RETRY_DELAY_SEC:-3}"
 AUTH_BOOTSTRAP_COOLDOWN_SEC="${AUTH_BOOTSTRAP_COOLDOWN_SEC:-65}"
+LEVEL10_ADMIN_DASHBOARD_PATH="${LEVEL10_ADMIN_DASHBOARD_PATH:-/v1/admin/dashboard}"
+LEVEL10_ADMIN_FALLBACK_PATH="${LEVEL10_ADMIN_FALLBACK_PATH:-/v1/admin/drivers?limit=1}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
 SKIP_COUNT=0
+
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/case-context-input.sh"
 
 print_usage() {
   cat <<USAGE
@@ -75,7 +81,21 @@ print_case() {
   local expected="$3"
   local status="$4"
   local body="$5"
+  local case_id=""
+  local case_context=""
+  local case_input=""
+  case_id="$(echo "$title" | sed -n 's/^Case \([0-9]\+\).*/\1/p')"
+  if [[ -n "$case_id" ]]; then
+    case_context="$(get_case_context "$case_id")"
+    case_input="$(get_case_input "$case_id")"
+  fi
   echo "========== $title =========="
+  if [[ -n "$case_context" ]]; then
+    echo "Context: $case_context"
+  fi
+  if [[ -n "$case_input" ]]; then
+    echo "Input (PDF): $case_input"
+  fi
   echo "Input:"
   echo "$input" | sed -n '1,180p'
   echo "Expected: $expected"
@@ -361,7 +381,7 @@ if [[ -z "$DRIVER_TOKEN" || -z "$DRIVER_ID" ]]; then
   echo "WARN: cannot provision driver token; case 96 may fail or skip."
 fi
 
-create_booking_payload='{"pickup":{"lat":10.7765,"lng":106.7009},"drop":{"lat":10.7821,"lng":106.6980},"vehicle_type":"CAR","distance_km":3.4,"traffic_level":0.45}'
+create_booking_payload='{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70},"vehicle_type":"CAR","distance_km":5,"traffic_level":0.5}'
 
 # Case 91: Missing token
 if ensure_gateway_ready "91"; then
@@ -446,23 +466,38 @@ if ensure_gateway_ready "95"; then
   if [[ -z "$USER_TOKEN" ]]; then
     mark_result_skip "95" "cannot run RBAC deny test without user token"
   else
-    C95_USER=$(call_gateway_json GET "/v1/admin/drivers?limit=1" "$USER_TOKEN")
+    C95_TARGET_PATH="$LEVEL10_ADMIN_DASHBOARD_PATH"
+    C95_USER=$(call_gateway_json GET "$C95_TARGET_PATH" "$USER_TOKEN")
     C95_USER_STATUS=$(echo "$C95_USER" | sed -n '1p')
     C95_USER_BODY=$(echo "$C95_USER" | sed '1d')
+    C95_USER_MSG=$(echo "$C95_USER_BODY" | json_get "error.message")
+    if [[ -z "$C95_USER_MSG" ]]; then C95_USER_MSG=$(echo "$C95_USER_BODY" | json_get "message"); fi
+
+    if [[ "$C95_USER_STATUS" == "404" && "$LEVEL10_ADMIN_FALLBACK_PATH" != "$LEVEL10_ADMIN_DASHBOARD_PATH" ]]; then
+      C95_TARGET_PATH="$LEVEL10_ADMIN_FALLBACK_PATH"
+      C95_USER=$(call_gateway_json GET "$C95_TARGET_PATH" "$USER_TOKEN")
+      C95_USER_STATUS=$(echo "$C95_USER" | sed -n '1p')
+      C95_USER_BODY=$(echo "$C95_USER" | sed '1d')
+      C95_USER_MSG=$(echo "$C95_USER_BODY" | json_get "error.message")
+      if [[ -z "$C95_USER_MSG" ]]; then C95_USER_MSG=$(echo "$C95_USER_BODY" | json_get "message"); fi
+    fi
 
     C95_ADMIN_STATUS="SKIP"
+    C95_ADMIN_BODY=""
     if [[ -n "$ADMIN_TOKEN" ]]; then
-      C95_ADMIN=$(call_gateway_json GET "/v1/admin/drivers?limit=1" "$ADMIN_TOKEN")
+      C95_ADMIN=$(call_gateway_json GET "$C95_TARGET_PATH" "$ADMIN_TOKEN")
       C95_ADMIN_STATUS=$(echo "$C95_ADMIN" | sed -n '1p')
+      C95_ADMIN_BODY=$(echo "$C95_ADMIN" | sed '1d')
     fi
 
     C95_OK=1
     if [[ "$C95_USER_STATUS" != "403" ]]; then C95_OK=0; fi
     if [[ "$C95_ADMIN_STATUS" != "SKIP" && "$C95_ADMIN_STATUS" != "200" ]]; then C95_OK=0; fi
+    if [[ "$C95_USER_MSG" != *"Access denied"* && "$C95_USER_MSG" != *"Forbidden"* && "$C95_USER_MSG" != *"forbidden"* ]]; then C95_OK=0; fi
 
-    C95_ACTUAL="user_status=$C95_USER_STATUS; admin_baseline_status=$C95_ADMIN_STATUS"
+    C95_ACTUAL="target_path=$C95_TARGET_PATH; user_status=$C95_USER_STATUS; user_message=${C95_USER_MSG:-<empty>}; admin_baseline_status=$C95_ADMIN_STATUS"
     print_case "Case 95 - RBAC (user calls admin)" \
-      "GET /v1/admin/drivers?limit=1 with user token (and admin baseline)" \
+      "GET /v1/admin/dashboard with token role=USER (fallback to existing admin endpoint if dashboard route is unavailable)" \
       "User must be denied with 403 Access denied; admin token should be allowed (200)" \
       "local-check" "$C95_ACTUAL"
     mark_result "$C95_OK" "95"
@@ -471,10 +506,10 @@ fi
 
 # Case 96: Least privilege (driver cannot access other user's data)
 if ensure_gateway_ready "96"; then
-  if [[ -z "$DRIVER_TOKEN" ]]; then
-    mark_result_skip "96" "cannot run least-privilege test without driver token"
+  if [[ -z "$DRIVER_TOKEN" || -z "$USER_ID" ]]; then
+    mark_result_skip "96" "cannot run least-privilege test without driver token and target user_id"
   else
-    C96_TARGET_ID="12345678"
+    C96_TARGET_ID="$USER_ID"
     C96=$(call_gateway_json GET "/v1/users/$C96_TARGET_ID" "$DRIVER_TOKEN")
     C96_STATUS=$(echo "$C96" | sed -n '1p')
     C96_BODY=$(echo "$C96" | sed '1d')
@@ -484,7 +519,7 @@ if ensure_gateway_ready "96"; then
     if echo "$C96_BODY" | grep -Eq '"email"|"phone"|"fullName"|"role"'; then C96_OK=0; fi
 
     print_case "Case 96 - Least privilege" \
-      "Driver token calls GET /v1/users/$C96_TARGET_ID (other user)" \
+      "driver_id token calls GET /v1/users/$C96_TARGET_ID (other user's profile)" \
       "HTTP 403; no user data disclosure" \
       "$C96_STATUS" "$C96_BODY"
     mark_result "$C96_OK" "96"
@@ -493,18 +528,28 @@ fi
 
 # Case 97: Bypass gateway
 if ensure_gateway_ready "97"; then
-  C97=$(call_json_url POST "$BOOKING_URL/v1/bookings" "" "$create_booking_payload")
-  C97_STATUS=$(echo "$C97" | sed -n '1p')
-  C97_BODY=$(echo "$C97" | sed '1d')
+  C97_NOAUTH=$(call_json_url POST "$BOOKING_URL/v1/bookings" "" "$create_booking_payload")
+  C97_NOAUTH_STATUS=$(echo "$C97_NOAUTH" | sed -n '1p')
+  C97_NOAUTH_BODY=$(echo "$C97_NOAUTH" | sed '1d')
+
+  C97_USER_STATUS="SKIP"
+  C97_USER_BODY=""
+  if [[ -n "$USER_TOKEN" ]]; then
+    C97_USER=$(call_json_url POST "$BOOKING_URL/v1/bookings" "$USER_TOKEN" "$create_booking_payload")
+    C97_USER_STATUS=$(echo "$C97_USER" | sed -n '1p')
+    C97_USER_BODY=$(echo "$C97_USER" | sed '1d')
+  fi
 
   C97_OK=1
-  if [[ "$C97_STATUS" != "401" && "$C97_STATUS" != "403" ]]; then C97_OK=0; fi
-  if echo "$C97_BODY" | grep -Eq '"booking_id"|"bookingId"|"ride_id"|"rideId"'; then C97_OK=0; fi
+  if [[ "$C97_NOAUTH_STATUS" != "401" && "$C97_NOAUTH_STATUS" != "403" ]]; then C97_OK=0; fi
+  if [[ "$C97_USER_STATUS" != "SKIP" && "$C97_USER_STATUS" != "401" && "$C97_USER_STATUS" != "403" ]]; then C97_OK=0; fi
+  if echo "$C97_NOAUTH_BODY"$'\n'"$C97_USER_BODY" | grep -Eq '"booking_id"|"bookingId"|"ride_id"|"rideId"'; then C97_OK=0; fi
 
+  C97_ACTUAL="internal_booking_url=$BOOKING_URL/v1/bookings; noauth_status=$C97_NOAUTH_STATUS; with_user_token_status=$C97_USER_STATUS"
   print_case "Case 97 - Bypass gateway" \
-    "Direct POST to booking service $BOOKING_URL/v1/bookings without gateway/auth controls" \
+    "Direct POST to internal booking service (without gateway), both without token and with valid user token" \
     "Request must be denied (401/403); only API Gateway path is allowed" \
-    "$C97_STATUS" "$C97_BODY"
+    "local-check" "$C97_ACTUAL"
   mark_result "$C97_OK" "97"
 fi
 
@@ -607,31 +652,38 @@ if ensure_gateway_ready "100"; then
     mark_result_skip "100" "cannot run audit API-call validation without authenticated user token"
   else
   C100_TRACE="level10-audit-${UNIQ_TAG}-${RANDOM}"
-  C100_CALL=$(call_gateway_json GET "/v1/bookings" "$USER_TOKEN" "" "x-trace-id" "$C100_TRACE")
+  C100_CALL=$(call_gateway_json GET "/v1/bookings" "$USER_TOKEN" "" "x-trace-id" "$C100_TRACE" "x-force-audit-log" "1")
   C100_STATUS=$(echo "$C100_CALL" | sed -n '1p')
   C100_BODY=$(echo "$C100_CALL" | sed '1d')
 
   C100_LOG_ACCESS=0
   C100_LOG_FOUND=0
+  C100_LOG_HAS_ACTION=0
+  C100_LOG_HAS_ACTOR=0
+  C100_LOG_HAS_TIMESTAMP=0
   C100_LOG_NOTE="runtime logs not accessible"
 
   if command -v docker >/dev/null 2>&1; then
     if docker ps --format '{{.Names}}' 2>/dev/null | grep -Eq '^infra-api-gateway-1$'; then
       C100_LOG_ACCESS=1
       C100_LOGS=$(docker logs --tail=400 infra-api-gateway-1 2>&1 || true)
-      if echo "$C100_LOGS" | grep -Fq "$C100_TRACE"; then
+      C100_AUDIT_LINE=$(echo "$C100_LOGS" | grep -F "$C100_TRACE" | grep -F '"event":"security_audit"' | tail -n 1 || true)
+      if [[ -n "$C100_AUDIT_LINE" ]]; then
         C100_LOG_FOUND=1
-        C100_LOG_NOTE="trace id found in gateway logs"
+        if echo "$C100_AUDIT_LINE" | grep -Fq '"action":"'; then C100_LOG_HAS_ACTION=1; fi
+        if echo "$C100_AUDIT_LINE" | grep -Eq "\"actorId\":\"?$USER_ID\"?"; then C100_LOG_HAS_ACTOR=1; fi
+        if echo "$C100_AUDIT_LINE" | grep -Fq '"occurredAt":"'; then C100_LOG_HAS_TIMESTAMP=1; fi
+        C100_LOG_NOTE="audit trace found with fields: action=$C100_LOG_HAS_ACTION actorId=$C100_LOG_HAS_ACTOR occurredAt=$C100_LOG_HAS_TIMESTAMP"
       else
         C100_LOG_NOTE="trace id not found in sampled gateway logs"
       fi
     fi
   fi
 
-  C100_ACTUAL="api_status=$C100_STATUS; trace_id=$C100_TRACE; log_access=$C100_LOG_ACCESS; log_found=$C100_LOG_FOUND ($C100_LOG_NOTE)"
+  C100_ACTUAL="api_status=$C100_STATUS; trace_id=$C100_TRACE; log_access=$C100_LOG_ACCESS; log_found=$C100_LOG_FOUND; has_action=$C100_LOG_HAS_ACTION; has_actorId=$C100_LOG_HAS_ACTOR; has_occurredAt=$C100_LOG_HAS_TIMESTAMP ($C100_LOG_NOTE)"
   print_case "Case 100 - Audit logging" \
     "Call protected API with unique x-trace-id, then inspect runtime gateway logs" \
-    "Audit log contains user/action/timestamp(trace); traceable request chain; no missing security log" \
+    "Audit log contains user_id(actorId), action, timestamp(occurredAt), traceId; traceable security event; no missing log" \
     "local-check" "$C100_ACTUAL"
 
   if [[ "$C100_LOG_ACCESS" != "1" ]]; then
@@ -640,6 +692,7 @@ if ensure_gateway_ready "100"; then
     C100_OK=1
     if [[ "$C100_STATUS" != "200" ]]; then C100_OK=0; fi
     if [[ "$C100_LOG_FOUND" != "1" ]]; then C100_OK=0; fi
+    if [[ "$C100_LOG_HAS_ACTION" != "1" || "$C100_LOG_HAS_ACTOR" != "1" || "$C100_LOG_HAS_TIMESTAMP" != "1" ]]; then C100_OK=0; fi
     if contains_security_leak "$C100_BODY"; then C100_OK=0; fi
     mark_result "$C100_OK" "100"
   fi
