@@ -338,14 +338,18 @@ fi
 
 # Case 20
 echo "-- Running Case 20"
-node -e 'const fs=require("fs");const payload={pickup:{lat:10.76,lng:106.66},drop:{lat:10.77,lng:106.70},huge:"x".repeat(1200000)};fs.writeFileSync("/tmp/level2_case20.json",JSON.stringify(payload));'
+TMP_CASE20_DIR="${TMPDIR:-./tmp}"
+mkdir -p "$TMP_CASE20_DIR"
+TMP_CASE20_FILE="$TMP_CASE20_DIR/level2_case20_${UNIQ_TAG}.json"
+node -e 'const fs=require("fs");const payload={pickup:{lat:10.76,lng:106.66},drop:{lat:10.77,lng:106.70},huge:"x".repeat(1200000)};fs.writeFileSync(process.argv[1],JSON.stringify(payload));' "$TMP_CASE20_FILE"
 RESP20=$(curl -s -X POST "$BASE_URL/v1/bookings" \
   --connect-timeout "$CURL_CONNECT_TIMEOUT" \
   --max-time "$CURL_MAX_TIME" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
-  --data-binary @/tmp/level2_case20.json \
+  --data-binary @"$TMP_CASE20_FILE" \
   -w "\nHTTP_STATUS:%{http_code}")
+rm -f "$TMP_CASE20_FILE"
 C20_STATUS="${RESP20##*HTTP_STATUS:}"
 C20_BODY="${RESP20%HTTP_STATUS:*}"
 print_case "Case 20 - payload too large" "413 Payload Too Large" "$C20_STATUS" "$C20_BODY"
