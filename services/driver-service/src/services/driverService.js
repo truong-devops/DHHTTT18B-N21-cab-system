@@ -655,6 +655,34 @@ async function listDriversAdmin({ status, onlineStatus, page = 1, limit = 20 }) 
   };
 }
 
+async function getAdminDashboardSummary() {
+  const [driverStats, kycStats] = await Promise.all([driverRepository.getDashboardStats(), kycRepository.getSubmissionStats()]);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    drivers: {
+      total: driverStats.totalDrivers,
+      status: {
+        approved: driverStats.approvedDrivers,
+        pending: driverStats.pendingDrivers,
+        suspended: driverStats.suspendedDrivers
+      },
+      availability: {
+        online: driverStats.onlineDrivers,
+        offline: driverStats.offlineDrivers,
+        busy: driverStats.busyDrivers
+      }
+    },
+    kyc: {
+      total: kycStats.totalSubmissions,
+      pending: kycStats.pendingSubmissions,
+      approved: kycStats.approvedSubmissions,
+      rejected: kycStats.rejectedSubmissions,
+      available: kycStats.available !== false
+    }
+  };
+}
+
 async function getLocationSnapshot(driverId) {
   const redisLocation = await getRedisLocation(driverId);
   if (redisLocation) {
@@ -786,6 +814,7 @@ module.exports = {
   approveDriver,
   suspendDriver,
   listDriversAdmin,
+  getAdminDashboardSummary,
   listKycSubmissionsAdmin,
   approveKycSubmission,
   rejectKycSubmission

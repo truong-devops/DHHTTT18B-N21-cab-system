@@ -223,6 +223,32 @@ async function listDrivers({ status, onlineStatus, limit = 20, offset = 0 }) {
   return result.rows;
 }
 
+async function getDashboardStats() {
+  const result = await pool.query(
+    `
+      SELECT
+        count(*)::int AS total_drivers,
+        count(*) FILTER (WHERE status = 'APPROVED')::int AS approved_drivers,
+        count(*) FILTER (WHERE status = 'PENDING')::int AS pending_drivers,
+        count(*) FILTER (WHERE status = 'SUSPENDED')::int AS suspended_drivers,
+        count(*) FILTER (WHERE online_status = 'ONLINE')::int AS online_drivers,
+        count(*) FILTER (WHERE online_status = 'OFFLINE')::int AS offline_drivers,
+        count(*) FILTER (WHERE online_status = 'BUSY')::int AS busy_drivers
+      FROM drivers
+    `
+  );
+  const row = result.rows[0] || {};
+  return {
+    totalDrivers: Number(row.total_drivers || 0),
+    approvedDrivers: Number(row.approved_drivers || 0),
+    pendingDrivers: Number(row.pending_drivers || 0),
+    suspendedDrivers: Number(row.suspended_drivers || 0),
+    onlineDrivers: Number(row.online_drivers || 0),
+    offlineDrivers: Number(row.offline_drivers || 0),
+    busyDrivers: Number(row.busy_drivers || 0)
+  };
+}
+
 module.exports = {
   getDriverByUserId,
   getDriverById,
@@ -230,5 +256,6 @@ module.exports = {
   updateDriverProfile,
   updateDriverStatus,
   updateOnlineStatus,
-  listDrivers
+  listDrivers,
+  getDashboardStats
 };

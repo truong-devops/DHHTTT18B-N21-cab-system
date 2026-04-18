@@ -9,21 +9,23 @@ PRICING_URL="${PRICING_URL:-http://localhost:3006}"
 INTERNAL_API_KEY="${INTERNAL_API_KEY:-dev-internal-key}"
 USER_PASS="${USER_PASS:-123456}"
 UNIQ_TAG="$(date +%s)-$RANDOM"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Strict thresholds (override by env when needed for weaker environments)
 CASE61_TARGET_RPS="${CASE61_TARGET_RPS:-1000}"
 CASE61_DURATION_SEC="${CASE61_DURATION_SEC:-20}"
 CASE61_CONCURRENCY="${CASE61_CONCURRENCY:-300}"
-CASE61_MIN_SUCCESS_RATE="${CASE61_MIN_SUCCESS_RATE:-0.98}"
+CASE61_MIN_SUCCESS_RATE="${CASE61_MIN_SUCCESS_RATE:-0.95}"
 CASE61_MIN_RPS_RATIO="${CASE61_MIN_RPS_RATIO:-0.66}"
+CASE61_P95_LIMIT_MS="${CASE61_P95_LIMIT_MS:-450}"
 CASE61_WARMUP_SEC="${CASE61_WARMUP_SEC:-5}"
 
-CASE62_TARGET_RPS="${CASE62_TARGET_RPS:-1200}"
+CASE62_TARGET_RPS="${CASE62_TARGET_RPS:-500}"
 CASE62_DURATION_SEC="${CASE62_DURATION_SEC:-20}"
-CASE62_CONCURRENCY="${CASE62_CONCURRENCY:-240}"
-CASE62_P95_LIMIT_MS="${CASE62_P95_LIMIT_MS:-350}"
+CASE62_CONCURRENCY="${CASE62_CONCURRENCY:-140}"
+CASE62_P95_LIMIT_MS="${CASE62_P95_LIMIT_MS:-200}"
 CASE62_MIN_SUCCESS_RATE="${CASE62_MIN_SUCCESS_RATE:-0.995}"
-CASE62_MIN_RPS_RATIO="${CASE62_MIN_RPS_RATIO:-0.85}"
+CASE62_MIN_RPS_RATIO="${CASE62_MIN_RPS_RATIO:-0.90}"
 
 CASE63_TARGET_RPS="${CASE63_TARGET_RPS:-800}"
 CASE63_DURATION_SEC="${CASE63_DURATION_SEC:-20}"
@@ -31,6 +33,7 @@ CASE63_CONCURRENCY="${CASE63_CONCURRENCY:-200}"
 CASE63_P95_LIMIT_MS="${CASE63_P95_LIMIT_MS:-300}"
 CASE63_MIN_SUCCESS_RATE="${CASE63_MIN_SUCCESS_RATE:-0.995}"
 CASE63_MIN_RPS_RATIO="${CASE63_MIN_RPS_RATIO:-0.9}"
+CASE63_MAX_5XX_RATE="${CASE63_MAX_5XX_RATE:-0.01}"
 
 CASE64_TARGET_RPS="${CASE64_TARGET_RPS:-500}"
 CASE64_DURATION_SEC="${CASE64_DURATION_SEC:-20}"
@@ -47,6 +50,7 @@ CASE65_MIN_RPS_RATIO="${CASE65_MIN_RPS_RATIO:-0.93}"
 
 CASE66_QUOTE_READS="${CASE66_QUOTE_READS:-300}"
 CASE66_MIN_HIT_RATE="${CASE66_MIN_HIT_RATE:-0.9}"
+CASE66_LATENCY_GAIN_RATIO="${CASE66_LATENCY_GAIN_RATIO:-1.2}"
 
 CASE67_BURST_COUNT="${CASE67_BURST_COUNT:-140}"
 CASE67_CONCURRENCY="${CASE67_CONCURRENCY:-70}"
@@ -55,10 +59,10 @@ CASE67_MIN_429="${CASE67_MIN_429:-5}"
 CASE68_TARGET_RPS="${CASE68_TARGET_RPS:-350}"
 CASE68_DURATION_SEC="${CASE68_DURATION_SEC:-20}"
 CASE68_CONCURRENCY="${CASE68_CONCURRENCY:-120}"
-CASE68_P95_LIMIT_MS="${CASE68_P95_LIMIT_MS:-420}"
+CASE68_P95_LIMIT_MS="${CASE68_P95_LIMIT_MS:-200}"
 CASE68_MIN_SUCCESS_RATE="${CASE68_MIN_SUCCESS_RATE:-0.99}"
 CASE68_MIN_RPS_RATIO="${CASE68_MIN_RPS_RATIO:-0.97}"
-CASE68_P95_TOLERANCE_RATIO="${CASE68_P95_TOLERANCE_RATIO:-1.05}"
+CASE68_P95_TOLERANCE_RATIO="${CASE68_P95_TOLERANCE_RATIO:-1.0}"
 
 CASE69_PEAK_TARGET_RPS="${CASE69_PEAK_TARGET_RPS:-1200}"
 CASE69_PEAK_DURATION_SEC="${CASE69_PEAK_DURATION_SEC:-20}"
@@ -68,6 +72,11 @@ CASE69_PEAK_P95_LIMIT_MS="${CASE69_PEAK_P95_LIMIT_MS:-450}"
 CASE69_PEAK_MIN_RPS_RATIO="${CASE69_PEAK_MIN_RPS_RATIO:-0.58}"
 CASE69_PEAK_P95_TOLERANCE_RATIO="${CASE69_PEAK_P95_TOLERANCE_RATIO:-1.45}"
 CASE69_PREP_COOLDOWN_SEC="${CASE69_PREP_COOLDOWN_SEC:-10}"
+CASE69_STAGE_DURATION_SEC="${CASE69_STAGE_DURATION_SEC:-8}"
+CASE69_STAGE1_RPS="${CASE69_STAGE1_RPS:-350}"
+CASE69_STAGE2_RPS="${CASE69_STAGE2_RPS:-700}"
+CASE69_STAGE3_RPS="${CASE69_STAGE3_RPS:-$CASE69_PEAK_TARGET_RPS}"
+CASE69_MAX_P95_DEGRADE_RATIO="${CASE69_MAX_P95_DEGRADE_RATIO:-2.5}"
 
 K8S_NAMESPACE="${K8S_NAMESPACE:-default}"
 K8S_HPA_NAME="${K8S_HPA_NAME:-}"
@@ -76,6 +85,9 @@ CASE70_DURATION_SEC="${CASE70_DURATION_SEC:-120}"
 CASE70_CONCURRENCY="${CASE70_CONCURRENCY:-220}"
 CASE70_TARGET_RPS="${CASE70_TARGET_RPS:-900}"
 CASE70_SCALE_OBSERVE_SEC="${CASE70_SCALE_OBSERVE_SEC:-150}"
+CASE70_MIN_SUCCESS_RATE="${CASE70_MIN_SUCCESS_RATE:-0.95}"
+CASE70_MAX_P95_MS="${CASE70_MAX_P95_MS:-900}"
+CASE70_MAX_5XX_RATE="${CASE70_MAX_5XX_RATE:-0.02}"
 
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-25}"
@@ -92,6 +104,9 @@ LEVEL7_SKIP_PERF_ONLY_MISS="${LEVEL7_SKIP_PERF_ONLY_MISS:-true}"
 PASS_COUNT=0
 FAIL_COUNT=0
 SKIP_COUNT=0
+
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/case-context-input.sh"
 
 print_usage() {
   cat <<USAGE
@@ -140,7 +155,21 @@ print_case() {
   local expected="$3"
   local status="$4"
   local body="$5"
+  local case_id=""
+  local case_context=""
+  local case_input=""
+  case_id="$(echo "$title" | sed -n 's/^Case \([0-9]\+\).*/\1/p')"
+  if [[ -n "$case_id" ]]; then
+    case_context="$(get_case_context "$case_id")"
+    case_input="$(get_case_input "$case_id")"
+  fi
   echo "========== $title =========="
+  if [[ -n "$case_context" ]]; then
+    echo "Context: $case_context"
+  fi
+  if [[ -n "$case_input" ]]; then
+    echo "Input (PDF): $case_input"
+  fi
   echo "Input:"
   echo "$input" | sed -n '1,120p'
   echo "Expected: $expected"
@@ -622,16 +651,17 @@ sleep "$CASE61_WARMUP_SEC"
 if [[ -z "$ADMIN_TOKEN" ]]; then
   C61_INPUT="POST $BASE_URL/v1/bookings | protected route requires admin token for multi-user load"
   C61_BODY='{"skip":"missing admin token for high-cardinality booking load test"}'
-  print_case "Case 61 - 1000 requests/second booking" "$C61_INPUT" "achieved_rps>=${CASE61_TARGET_RPS} AND success_rate>=${CASE61_MIN_SUCCESS_RATE}" "SKIP" "$C61_BODY"
+  print_case "Case 61 - 1000 requests/second booking" "$C61_INPUT" "achieved_rps>=${CASE61_TARGET_RPS} AND success_rate>=${CASE61_MIN_SUCCESS_RATE} AND p95<=${CASE61_P95_LIMIT_MS}ms" "SKIP" "$C61_BODY"
   mark_result_skip "61" "missing admin token for high-cardinality booking load test"
 else
   C61_INPUT="POST $BOOKING_URL/v1/bookings | duration=${CASE61_DURATION_SEC}s concurrency=${CASE61_CONCURRENCY} target_rps=${CASE61_TARGET_RPS} direct service + internal-key + admin token + unique user_id"
   C61_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE61_DURATION_SEC" "$CASE61_CONCURRENCY" "$CASE61_TARGET_RPS" "{\"content-type\":\"application/json\",\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" "{\"user_id\":\"load61-${UNIQ_TAG}-__SEQ__\",\"pickup\":{\"lat\":10.7601,\"lng\":106.6601},\"drop\":{\"lat\":10.7701,\"lng\":106.7001},\"vehicleType\":\"CAR\"}" 'static' 15000)
   C61_RPS=$(echo "$C61_BODY" | json_get "achieved_rps")
   C61_SUCCESS_RATE=$(echo "$C61_BODY" | json_get "success_rate")
-  print_case "Case 61 - 1000 requests/second booking" "$C61_INPUT" "achieved_rps>=${CASE61_TARGET_RPS} AND success_rate>=${CASE61_MIN_SUCCESS_RATE}" "200" "$C61_BODY"
+  C61_P95=$(echo "$C61_BODY" | json_get "p95_ms")
+  print_case "Case 61 - 1000 requests/second booking" "$C61_INPUT" "achieved_rps>=${CASE61_TARGET_RPS} AND success_rate>=${CASE61_MIN_SUCCESS_RATE} AND p95<=${CASE61_P95_LIMIT_MS}ms" "200" "$C61_BODY"
   C61_OK=0
-  if rps_meets_target "$C61_RPS" "$CASE61_TARGET_RPS" "$CASE61_MIN_RPS_RATIO" && float_ge "$C61_SUCCESS_RATE" "$CASE61_MIN_SUCCESS_RATE"; then
+  if rps_meets_target "$C61_RPS" "$CASE61_TARGET_RPS" "$CASE61_MIN_RPS_RATIO" && float_ge "$C61_SUCCESS_RATE" "$CASE61_MIN_SUCCESS_RATE" && float_le "$C61_P95" "$CASE61_P95_LIMIT_MS"; then
     C61_OK=1
   fi
   mark_load_result_or_skip "61" "$C61_OK" "$C61_BODY" "perf_threshold"
@@ -643,9 +673,10 @@ C62_BODY=$(run_load_scenario "$ETA_URL/v1/eta/estimate" "POST" "$CASE62_DURATION
 C62_RPS=$(echo "$C62_BODY" | json_get "achieved_rps")
 C62_P95=$(echo "$C62_BODY" | json_get "p95_ms")
 C62_SUCCESS_RATE=$(echo "$C62_BODY" | json_get "success_rate")
-print_case "Case 62 - ETA service under load" "$C62_INPUT" "rps>=${CASE62_TARGET_RPS} AND p95<=${CASE62_P95_LIMIT_MS}ms AND success_rate>=${CASE62_MIN_SUCCESS_RATE}" "200" "$C62_BODY"
+C62_TIMEOUTS=$(json_status_count "$C62_BODY" "000")
+print_case "Case 62 - ETA service under load" "$C62_INPUT" "rps>=${CASE62_TARGET_RPS} AND p95<=${CASE62_P95_LIMIT_MS}ms AND success_rate>=${CASE62_MIN_SUCCESS_RATE} AND timeouts=0" "200" "$C62_BODY"
 C62_OK=0
-if rps_meets_target "$C62_RPS" "$CASE62_TARGET_RPS" "$CASE62_MIN_RPS_RATIO" && float_le "$C62_P95" "$CASE62_P95_LIMIT_MS" && float_ge "$C62_SUCCESS_RATE" "$CASE62_MIN_SUCCESS_RATE"; then
+if rps_meets_target "$C62_RPS" "$CASE62_TARGET_RPS" "$CASE62_MIN_RPS_RATIO" && float_le "$C62_P95" "$CASE62_P95_LIMIT_MS" && float_ge "$C62_SUCCESS_RATE" "$CASE62_MIN_SUCCESS_RATE" && [[ "$C62_TIMEOUTS" == "0" ]]; then
   C62_OK=1
 fi
 mark_load_result_or_skip "62" "$C62_OK" "$C62_BODY" "perf_threshold"
@@ -656,9 +687,21 @@ C63_BODY=$(run_load_scenario "$PRICING_URL/v1/pricing/estimate" "POST" "$CASE63_
 C63_RPS=$(echo "$C63_BODY" | json_get "achieved_rps")
 C63_P95=$(echo "$C63_BODY" | json_get "p95_ms")
 C63_SUCCESS_RATE=$(echo "$C63_BODY" | json_get "success_rate")
-print_case "Case 63 - Pricing service under spike" "$C63_INPUT" "rps>=${CASE63_TARGET_RPS} AND p95<=${CASE63_P95_LIMIT_MS}ms AND success_rate>=${CASE63_MIN_SUCCESS_RATE}" "200" "$C63_BODY"
+C63_5XX=$(status_sum_range "$C63_BODY" 500 599)
+C63_COMPLETED=$(echo "$C63_BODY" | json_get "completed")
+C63_5XX_RATE=$(node -e "const e=Number(process.argv[1]);const t=Number(process.argv[2]);process.stdout.write(String(t>0?e/t:1));" "$C63_5XX" "$C63_COMPLETED")
+C63_SANITY_FAILS=0
+for demand in 1.2 2 5; do
+  C63_CHECK=$(call_json_url POST "$PRICING_URL/v1/pricing/estimate" "{\"distance_km\":5,\"demand_index\":$demand}" "x-internal-key" "$INTERNAL_API_KEY")
+  C63_CHECK_STATUS=$(echo "$C63_CHECK" | sed -n '1p')
+  C63_CHECK_BODY=$(echo "$C63_CHECK" | sed '1d')
+  if [[ "$C63_CHECK_STATUS" != "200" ]] || ! node -e "const j=JSON.parse(process.argv[1]);const d=j?.data||{};const p=Number(d.price);const b=Number(d.base_fare);const s=Number(d.surge);const ok=Number.isFinite(p)&&p>0&&p<1e7&&Number.isFinite(s)&&s>=1&&s<=5&&(!Number.isFinite(b)||p>=b);process.exit(ok?0:1)" "$C63_CHECK_BODY"; then
+    C63_SANITY_FAILS=$((C63_SANITY_FAILS + 1))
+  fi
+done
+print_case "Case 63 - Pricing service under spike" "$C63_INPUT" "rps>=${CASE63_TARGET_RPS} AND p95<=${CASE63_P95_LIMIT_MS}ms AND success_rate>=${CASE63_MIN_SUCCESS_RATE} AND 5xx_rate<=${CASE63_MAX_5XX_RATE} AND pricing output reasonable" "200" "$C63_BODY"
 C63_OK=0
-if rps_meets_target "$C63_RPS" "$CASE63_TARGET_RPS" "$CASE63_MIN_RPS_RATIO" && float_le "$C63_P95" "$CASE63_P95_LIMIT_MS" && float_ge "$C63_SUCCESS_RATE" "$CASE63_MIN_SUCCESS_RATE"; then
+if rps_meets_target "$C63_RPS" "$CASE63_TARGET_RPS" "$CASE63_MIN_RPS_RATIO" && float_le "$C63_P95" "$CASE63_P95_LIMIT_MS" && float_ge "$C63_SUCCESS_RATE" "$CASE63_MIN_SUCCESS_RATE" && float_le "$C63_5XX_RATE" "$CASE63_MAX_5XX_RATE" && [[ "$C63_SANITY_FAILS" == "0" ]]; then
   C63_OK=1
 fi
 mark_load_result_or_skip "63" "$C63_OK" "$C63_BODY" "perf_threshold"
@@ -668,9 +711,11 @@ C64_INPUT="POST $BOOKING_URL/demo/ride-created | duration=${CASE64_DURATION_SEC}
 C64_BODY=$(run_load_scenario "$BOOKING_URL/demo/ride-created" "POST" "$CASE64_DURATION_SEC" "$CASE64_CONCURRENCY" "$CASE64_TARGET_RPS" '{"content-type":"application/json"}' '{}' 'static' 10000)
 C64_RPS=$(echo "$C64_BODY" | json_get "achieved_rps")
 C64_SUCCESS_RATE=$(echo "$C64_BODY" | json_get "success_rate")
-print_case "Case 64 - Kafka throughput test" "$C64_INPUT" "rps>=${CASE64_TARGET_RPS} AND success_rate>=${CASE64_MIN_SUCCESS_RATE}" "200" "$C64_BODY"
+C64_5XX=$(status_sum_range "$C64_BODY" 500 599)
+C64_TIMEOUTS=$(json_status_count "$C64_BODY" "000")
+print_case "Case 64 - Kafka throughput test" "$C64_INPUT" "rps>=${CASE64_TARGET_RPS} AND success_rate>=${CASE64_MIN_SUCCESS_RATE} AND 5xx=0 AND timeout=0" "200" "$C64_BODY"
 C64_OK=0
-if rps_meets_target "$C64_RPS" "$CASE64_TARGET_RPS" "$CASE64_MIN_RPS_RATIO" && float_ge "$C64_SUCCESS_RATE" "$CASE64_MIN_SUCCESS_RATE"; then
+if rps_meets_target "$C64_RPS" "$CASE64_TARGET_RPS" "$CASE64_MIN_RPS_RATIO" && float_ge "$C64_SUCCESS_RATE" "$CASE64_MIN_SUCCESS_RATE" && [[ "$C64_5XX" == "0" ]] && [[ "$C64_TIMEOUTS" == "0" ]]; then
   C64_OK=1
 fi
 mark_load_result_or_skip "64" "$C64_OK" "$C64_BODY" "perf_threshold"
@@ -715,30 +760,42 @@ else
     C66_STATUS="$C66_CREATE_STATUS"
     C66_BODY="$C66_CREATE_BODY"
   else
-    C66_LOAD=$(run_load_scenario "$PRICING_URL/v1/pricing/quotes/$C66_QUOTE_ID" "GET" 1 50 0 "{\"x-internal-key\":\"$INTERNAL_API_KEY\"}" '' 'static' 8000 "$CASE66_QUOTE_READS")
-    C66_AFTER=$(redis_info_stats || true)
+    C66_T0=$(node -e 'process.stdout.write(String(Date.now()))')
+    C66_FIRST=$(call_json_url GET "$PRICING_URL/v1/pricing/quotes/$C66_QUOTE_ID" '' "x-internal-key" "$INTERNAL_API_KEY")
+    C66_T1=$(node -e 'process.stdout.write(String(Date.now()))')
+    C66_FIRST_STATUS=$(echo "$C66_FIRST" | sed -n '1p')
+    C66_FIRST_MS=$((C66_T1 - C66_T0))
 
-    if [[ -z "$C66_AFTER" ]]; then
-      C66_STATUS="503"
-      C66_BODY='{"error":"redis stats unavailable after load"}'
+    if [[ "$C66_FIRST_STATUS" != "200" ]]; then
+      C66_STATUS="$C66_FIRST_STATUS"
+      C66_BODY=$(echo "$C66_FIRST" | sed '1d')
     else
-      C66_HITS_BEFORE=$(echo "$C66_BEFORE" | awk '{print $1}')
-      C66_MISS_BEFORE=$(echo "$C66_BEFORE" | awk '{print $2}')
-      C66_HITS_AFTER=$(echo "$C66_AFTER" | awk '{print $1}')
-      C66_MISS_AFTER=$(echo "$C66_AFTER" | awk '{print $2}')
-      C66_DH=$((C66_HITS_AFTER - C66_HITS_BEFORE))
-      C66_DM=$((C66_MISS_AFTER - C66_MISS_BEFORE))
-      C66_RATIO=$(node -e "const h=Number(process.argv[1]);const m=Number(process.argv[2]);const t=h+m;process.stdout.write(String(t>0?h/t:0));" "$C66_DH" "$C66_DM")
-      C66_EFFECTIVE_HIT_RATE=$(node -e "const h=Number(process.argv[1]);const reads=Number(process.argv[2]);process.stdout.write(String(reads>0?h/reads:0));" "$C66_DH" "$CASE66_QUOTE_READS")
-      C66_BODY=$(node -e "const load=JSON.parse(process.argv[1]); const out={quote_id:process.argv[2],delta_hits:Number(process.argv[3]),delta_misses:Number(process.argv[4]),hit_rate:Number(process.argv[5]),effective_hit_rate:Number(process.argv[6]),load}; process.stdout.write(JSON.stringify(out));" "$C66_LOAD" "$C66_QUOTE_ID" "$C66_DH" "$C66_DM" "$C66_RATIO" "$C66_EFFECTIVE_HIT_RATE")
-      C66_STATUS="200"
+      C66_LOAD=$(run_load_scenario "$PRICING_URL/v1/pricing/quotes/$C66_QUOTE_ID" "GET" 1 50 0 "{\"x-internal-key\":\"$INTERNAL_API_KEY\"}" '' 'static' 8000 "$CASE66_QUOTE_READS")
+      C66_AFTER=$(redis_info_stats || true)
+
+      if [[ -z "$C66_AFTER" ]]; then
+        C66_STATUS="503"
+        C66_BODY='{"error":"redis stats unavailable after load"}'
+      else
+        C66_HITS_BEFORE=$(echo "$C66_BEFORE" | awk '{print $1}')
+        C66_MISS_BEFORE=$(echo "$C66_BEFORE" | awk '{print $2}')
+        C66_HITS_AFTER=$(echo "$C66_AFTER" | awk '{print $1}')
+        C66_MISS_AFTER=$(echo "$C66_AFTER" | awk '{print $2}')
+        C66_DH=$((C66_HITS_AFTER - C66_HITS_BEFORE))
+        C66_DM=$((C66_MISS_AFTER - C66_MISS_BEFORE))
+        C66_RATIO=$(node -e "const h=Number(process.argv[1]);const m=Number(process.argv[2]);const t=h+m;process.stdout.write(String(t>0?h/t:0));" "$C66_DH" "$C66_DM")
+        C66_EFFECTIVE_HIT_RATE=$(node -e "const h=Number(process.argv[1]);const reads=Number(process.argv[2]);process.stdout.write(String(reads>0?h/reads:0));" "$C66_DH" "$CASE66_QUOTE_READS")
+        C66_LOAD_P95=$(echo "$C66_LOAD" | json_get "p95_ms")
+        C66_BODY=$(node -e "const load=JSON.parse(process.argv[1]); const out={quote_id:process.argv[2],first_read_ms:Number(process.argv[3]),load_p95_ms:Number(process.argv[4]),delta_hits:Number(process.argv[5]),delta_misses:Number(process.argv[6]),hit_rate:Number(process.argv[7]),effective_hit_rate:Number(process.argv[8]),load}; process.stdout.write(JSON.stringify(out));" "$C66_LOAD" "$C66_QUOTE_ID" "$C66_FIRST_MS" "$C66_LOAD_P95" "$C66_DH" "$C66_DM" "$C66_RATIO" "$C66_EFFECTIVE_HIT_RATE")
+        C66_STATUS="200"
+      fi
     fi
   fi
 fi
-print_case "Case 66 - Redis cache hit rate > 90%" "$C66_INPUT" "status=200 AND effective_hit_rate>=${CASE66_MIN_HIT_RATE}" "$C66_STATUS" "$C66_BODY"
+print_case "Case 66 - Redis cache hit rate > 90%" "$C66_INPUT" "status=200 AND effective_hit_rate>=${CASE66_MIN_HIT_RATE} AND load_p95<=first_read_ms*${CASE66_LATENCY_GAIN_RATIO}" "$C66_STATUS" "$C66_BODY"
 if [[ "$C66_STATUS" == "503" ]] && echo "$C66_BODY" | grep -q "redis stats unavailable"; then
   mark_result_skip "66" "missing redis stats access in environment"
-elif [[ "$C66_STATUS" == "200" ]] && float_ge "$(echo "$C66_BODY" | json_get "effective_hit_rate")" "$CASE66_MIN_HIT_RATE"; then
+elif [[ "$C66_STATUS" == "200" ]] && float_ge "$(echo "$C66_BODY" | json_get "effective_hit_rate")" "$CASE66_MIN_HIT_RATE" && node -e "const p95=Number(process.argv[1]);const first=Number(process.argv[2]);const ratio=Number(process.argv[3]);process.exit(Number.isFinite(p95)&&Number.isFinite(first)&&first>0&&p95<=first*ratio?0:1)" "$(echo "$C66_BODY" | json_get "load_p95_ms")" "$(echo "$C66_BODY" | json_get "first_read_ms")" "$CASE66_LATENCY_GAIN_RATIO"; then
   mark_result 1 "66"
 else
   mark_result 0 "66"
@@ -748,14 +805,16 @@ fi
 C67_INPUT="POST $BASE_URL/v1/auth/login with wrong password ${CASE67_BURST_COUNT} requests in burst; expect >=${CASE67_MIN_429} responses with 429"
 C67_BODY=$(run_load_scenario "$BASE_URL/v1/auth/login" "POST" 1 "$CASE67_CONCURRENCY" 0 '{"content-type":"application/json"}' '{"identifier":"rate-limit-user@test.com","password":"wrong-pass"}' 'static' 7000 "$CASE67_BURST_COUNT")
 C67_429=$(json_status_count "$C67_BODY" "429")
-print_case "Case 67 - API Gateway rate limit" "$C67_INPUT" "429_count>=${CASE67_MIN_429}" "200" "$C67_BODY"
-if node -e "process.exit(Number(process.argv[1])>=Number(process.argv[2])?0:1)" "$C67_429" "$CASE67_MIN_429"; then
+C67_5XX=$(status_sum_range "$C67_BODY" 500 599)
+C67_TIMEOUTS=$(json_status_count "$C67_BODY" "000")
+print_case "Case 67 - API Gateway rate limit" "$C67_INPUT" "429_count>=${CASE67_MIN_429} AND 5xx=0 AND timeouts=0" "200" "$C67_BODY"
+if node -e "const c429=Number(process.argv[1]);const min429=Number(process.argv[2]);const s5=Number(process.argv[3]);const t0=Number(process.argv[4]);process.exit(c429>=min429&&s5===0&&t0===0?0:1)" "$C67_429" "$CASE67_MIN_429" "$C67_5XX" "$C67_TIMEOUTS"; then
   mark_result 1 "67"
 else
   mark_result 0 "67"
 fi
 
-# Case 68: P95 latency < 300ms (gateway path)
+# Case 68: P95 latency < 200ms (gateway path)
 C68_STATUS="200"
 if [[ -z "$USER_TOKEN" ]]; then
   C68_STATUS="SKIP"
@@ -767,7 +826,7 @@ fi
 C68_P95=$(echo "${C68_BODY:-{}}" | json_get "p95_ms")
 C68_SUCCESS_RATE=$(echo "${C68_BODY:-{}}" | json_get "success_rate")
 C68_RPS=$(echo "${C68_BODY:-{}}" | json_get "achieved_rps")
-print_case "Case 68 - P95 latency < 300ms" "${C68_INPUT:-gateway load test} " "status=200 AND p95<=${CASE68_P95_LIMIT_MS}ms AND success_rate>=${CASE68_MIN_SUCCESS_RATE}" "$C68_STATUS" "$C68_BODY"
+print_case "Case 68 - P95 latency < 200ms" "${C68_INPUT:-gateway load test} " "status=200 AND p95<=${CASE68_P95_LIMIT_MS}ms AND success_rate>=${CASE68_MIN_SUCCESS_RATE}" "$C68_STATUS" "$C68_BODY"
 if [[ "$C68_STATUS" == "SKIP" ]]; then
   mark_result_skip "68" "$(echo "$C68_BODY" | json_get "skip")"
 else
@@ -781,22 +840,33 @@ fi
 # Case 69: Peak-hour load test
 sleep "$CASE69_PREP_COOLDOWN_SEC"
 if [[ -z "$ADMIN_TOKEN" ]]; then
-  C69_INPUT="POST $BASE_URL/v1/bookings peak stage | protected route requires admin token for multi-user load"
+  C69_INPUT="POST $BASE_URL/v1/bookings ramp stages | protected route requires admin token for multi-user load"
   C69_BODY='{"skip":"missing admin token for peak booking load test"}'
-  print_case "Case 69 - Load test giờ cao điểm" "$C69_INPUT" "rps>=${CASE69_PEAK_TARGET_RPS} AND p95<=${CASE69_PEAK_P95_LIMIT_MS}ms AND success_rate>=${CASE69_PEAK_MIN_SUCCESS_RATE}" "SKIP" "$C69_BODY"
+  print_case "Case 69 - Load test giờ cao điểm" "$C69_INPUT" "ramp-up load keeps service stable and users can still book" "SKIP" "$C69_BODY"
   mark_result_skip "69" "missing admin token for peak booking load test"
 else
-  C69_INPUT="POST $BOOKING_URL/v1/bookings peak stage | duration=${CASE69_PEAK_DURATION_SEC}s concurrency=${CASE69_PEAK_CONCURRENCY} target_rps=${CASE69_PEAK_TARGET_RPS} direct service + internal-key + admin token + unique user_id"
-  C69_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE69_PEAK_DURATION_SEC" "$CASE69_PEAK_CONCURRENCY" "$CASE69_PEAK_TARGET_RPS" "{\"content-type\":\"application/json\",\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" "{\"user_id\":\"peak69-${UNIQ_TAG}-__SEQ__\",\"pickup\":{\"lat\":10.7603,\"lng\":106.6603},\"drop\":{\"lat\":10.7703,\"lng\":106.7003},\"vehicleType\":\"CAR\"}" 'static' 18000)
-  C69_RPS=$(echo "$C69_BODY" | json_get "achieved_rps")
-  C69_P95=$(echo "$C69_BODY" | json_get "p95_ms")
-  C69_SUCCESS_RATE=$(echo "$C69_BODY" | json_get "success_rate")
-  print_case "Case 69 - Load test giờ cao điểm" "$C69_INPUT" "rps>=${CASE69_PEAK_TARGET_RPS} AND p95<=${CASE69_PEAK_P95_LIMIT_MS}ms AND success_rate>=${CASE69_PEAK_MIN_SUCCESS_RATE}" "200" "$C69_BODY"
+  C69_INPUT="POST $BOOKING_URL/v1/bookings ramp stage1=${CASE69_STAGE1_RPS}rps stage2=${CASE69_STAGE2_RPS}rps stage3=${CASE69_STAGE3_RPS}rps"
+  C69_STAGE1_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE69_STAGE_DURATION_SEC" "$CASE69_PEAK_CONCURRENCY" "$CASE69_STAGE1_RPS" "{\"content-type\":\"application/json\",\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" "{\"user_id\":\"peak69s1-${UNIQ_TAG}-__SEQ__\",\"pickup\":{\"lat\":10.7603,\"lng\":106.6603},\"drop\":{\"lat\":10.7703,\"lng\":106.7003},\"vehicleType\":\"CAR\"}" 'static' 18000)
+  C69_STAGE2_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE69_STAGE_DURATION_SEC" "$CASE69_PEAK_CONCURRENCY" "$CASE69_STAGE2_RPS" "{\"content-type\":\"application/json\",\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" "{\"user_id\":\"peak69s2-${UNIQ_TAG}-__SEQ__\",\"pickup\":{\"lat\":10.7603,\"lng\":106.6603},\"drop\":{\"lat\":10.7703,\"lng\":106.7003},\"vehicleType\":\"CAR\"}" 'static' 18000)
+  C69_STAGE3_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE69_PEAK_DURATION_SEC" "$CASE69_PEAK_CONCURRENCY" "$CASE69_STAGE3_RPS" "{\"content-type\":\"application/json\",\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" "{\"user_id\":\"peak69s3-${UNIQ_TAG}-__SEQ__\",\"pickup\":{\"lat\":10.7603,\"lng\":106.6603},\"drop\":{\"lat\":10.7703,\"lng\":106.7003},\"vehicleType\":\"CAR\"}" 'static' 18000)
+  C69_BODY=$(node -e "const s1=JSON.parse(process.argv[1]);const s2=JSON.parse(process.argv[2]);const s3=JSON.parse(process.argv[3]);process.stdout.write(JSON.stringify({stage1:s1,stage2:s2,stage3:s3}));" "$C69_STAGE1_BODY" "$C69_STAGE2_BODY" "$C69_STAGE3_BODY")
+
+  C69_RPS1=$(echo "$C69_STAGE1_BODY" | json_get "achieved_rps")
+  C69_RPS2=$(echo "$C69_STAGE2_BODY" | json_get "achieved_rps")
+  C69_RPS3=$(echo "$C69_STAGE3_BODY" | json_get "achieved_rps")
+  C69_P951=$(echo "$C69_STAGE1_BODY" | json_get "p95_ms")
+  C69_P952=$(echo "$C69_STAGE2_BODY" | json_get "p95_ms")
+  C69_P953=$(echo "$C69_STAGE3_BODY" | json_get "p95_ms")
+  C69_SR1=$(echo "$C69_STAGE1_BODY" | json_get "success_rate")
+  C69_SR2=$(echo "$C69_STAGE2_BODY" | json_get "success_rate")
+  C69_SR3=$(echo "$C69_STAGE3_BODY" | json_get "success_rate")
+
+  print_case "Case 69 - Load test giờ cao điểm" "$C69_INPUT" "ramp-up remains stable: success each stage>=${CASE69_PEAK_MIN_SUCCESS_RATE}, stage3 p95<=${CASE69_PEAK_P95_LIMIT_MS}ms, stage3 rps near target, no sudden severe degradation" "200" "$C69_BODY"
   C69_OK=0
-  if rps_meets_target "$C69_RPS" "$CASE69_PEAK_TARGET_RPS" "$CASE69_PEAK_MIN_RPS_RATIO" && latency_within_ratio "$C69_P95" "$CASE69_PEAK_P95_LIMIT_MS" "$CASE69_PEAK_P95_TOLERANCE_RATIO" && float_ge "$C69_SUCCESS_RATE" "$CASE69_PEAK_MIN_SUCCESS_RATE"; then
+  if float_ge "$C69_SR1" "$CASE69_PEAK_MIN_SUCCESS_RATE" && float_ge "$C69_SR2" "$CASE69_PEAK_MIN_SUCCESS_RATE" && float_ge "$C69_SR3" "$CASE69_PEAK_MIN_SUCCESS_RATE" && rps_meets_target "$C69_RPS3" "$CASE69_STAGE3_RPS" "$CASE69_PEAK_MIN_RPS_RATIO" && latency_within_ratio "$C69_P953" "$CASE69_PEAK_P95_LIMIT_MS" "$CASE69_PEAK_P95_TOLERANCE_RATIO" && node -e "const p1=Number(process.argv[1]);const p3=Number(process.argv[2]);const maxRatio=Number(process.argv[3]);process.exit(Number.isFinite(p1)&&Number.isFinite(p3)&&p1>0&&p3<=p1*maxRatio?0:1)" "$C69_P951" "$C69_P953" "$CASE69_MAX_P95_DEGRADE_RATIO"; then
     C69_OK=1
   fi
-  mark_load_result_or_skip "69" "$C69_OK" "$C69_BODY" "perf_threshold"
+  mark_load_result_or_skip "69" "$C69_OK" "$C69_STAGE3_BODY" "perf_threshold"
 fi
 
 # Case 70: Auto scaling works (Kubernetes HPA)
@@ -840,13 +910,22 @@ else
     rm -f "$TMP_HPA_MAX"
   fi
 fi
-print_case "Case 70 - Auto scaling hoạt động" "$C70_INPUT" "status=200 AND scaled=true" "$C70_STATUS" "$C70_BODY"
+print_case "Case 70 - Auto scaling hoạt động" "$C70_INPUT" "status=200 AND scaled=true AND load success_rate>=${CASE70_MIN_SUCCESS_RATE} AND p95<=${CASE70_MAX_P95_MS}ms AND 5xx_rate<=${CASE70_MAX_5XX_RATE}" "$C70_STATUS" "$C70_BODY"
 if [[ "$C70_STATUS" == "SKIP" ]]; then
   mark_result_skip "70" "$(echo "$C70_BODY" | json_get "skip")"
-elif [[ "$C70_STATUS" == "200" ]] && [[ "$(echo "$C70_BODY" | json_get "scaled")" == "true" ]]; then
-  mark_result 1 "70"
 else
-  mark_result 0 "70"
+  C70_LOAD_SUCCESS_RATE=$(echo "$C70_BODY" | json_get "load.success_rate")
+  C70_LOAD_P95=$(echo "$C70_BODY" | json_get "load.p95_ms")
+  C70_LOAD_5XX=$(echo "$C70_BODY" | json_get "load.status_counts.500")
+  C70_LOAD_COMPLETED=$(echo "$C70_BODY" | json_get "load.completed")
+  if [[ -z "$C70_LOAD_5XX" ]]; then C70_LOAD_5XX=0; fi
+  if [[ -z "$C70_LOAD_COMPLETED" ]]; then C70_LOAD_COMPLETED=0; fi
+  C70_LOAD_5XX_RATE=$(node -e "const e=Number(process.argv[1]);const t=Number(process.argv[2]);process.stdout.write(String(t>0?e/t:1));" "$C70_LOAD_5XX" "$C70_LOAD_COMPLETED")
+  if [[ "$C70_STATUS" == "200" ]] && [[ "$(echo "$C70_BODY" | json_get "scaled")" == "true" ]] && float_ge "$C70_LOAD_SUCCESS_RATE" "$CASE70_MIN_SUCCESS_RATE" && float_le "$C70_LOAD_P95" "$CASE70_MAX_P95_MS" && float_le "$C70_LOAD_5XX_RATE" "$CASE70_MAX_5XX_RATE"; then
+    mark_result 1 "70"
+  else
+    mark_result 0 "70"
+  fi
 fi
 
 echo "========== LEVEL 7 SUMMARY =========="

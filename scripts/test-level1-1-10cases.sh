@@ -10,9 +10,13 @@ ADMIN_EMAIL="${ADMIN_EMAIL:-admin@test.com}"
 ADMIN_PASS="${ADMIN_PASS:-secret123}"
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-30}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PASS_COUNT=0
 FAIL_COUNT=0
+
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/case-context-input.sh"
 
 print_usage() {
   cat <<USAGE
@@ -93,7 +97,21 @@ print_case() {
   local expected="$2"
   local status="$3"
   local body="$4"
+  local case_id=""
+  local case_context=""
+  local case_input=""
+  case_id="$(echo "$title" | sed -n 's/^Case \([0-9]\+\).*/\1/p')"
+  if [[ -n "$case_id" ]]; then
+    case_context="$(get_case_context "$case_id")"
+    case_input="$(get_case_input "$case_id")"
+  fi
   echo "========== $title =========="
+  if [[ -n "$case_context" ]]; then
+    echo "Context: $case_context"
+  fi
+  if [[ -n "$case_input" ]]; then
+    echo "Input: $case_input"
+  fi
   echo "Expected: $expected"
   echo "Actual status: $status"
   echo "Actual body:"

@@ -32,6 +32,15 @@ jest.mock('../src/services/driverService', () => ({
       isActive: true
     },
     location: { lat: 10.1, lng: 20.2, recordedAt: new Date().toISOString() }
+  })),
+  getAdminDashboardSummary: jest.fn(async () => ({
+    generatedAt: new Date().toISOString(),
+    drivers: {
+      total: 3,
+      status: { approved: 2, pending: 1, suspended: 0 },
+      availability: { online: 1, offline: 2, busy: 0 }
+    },
+    kyc: { total: 2, pending: 1, approved: 1, rejected: 0 }
   }))
 }));
 
@@ -80,5 +89,20 @@ describe('driver-service routes (smoke)', () => {
     expect(res.body.data.driver.id).toBe('10000004');
     expect(res.body.data.vehicle.plateNumber).toBe('ABC-123');
     expect(driverService.getDriverProfileForCustomer).toHaveBeenCalledWith('10000004');
+  });
+
+  test('admin dashboard enforces RBAC and returns summary for admin', async () => {
+    const userToken = signToken({ sub: '10000003', roles: ['user'] });
+    const adminToken = signToken({ sub: '10000001', roles: ['admin'] });
+
+    const denyRes = await request(app).get('/v1/admin/dashboard').set('Authorization', `Bearer ${userToken}`);
+    expect(denyRes.status).toBe(403);
+    expect(denyRes.body.error?.message).toMatch(/Access denied/i);
+
+    const okRes = await request(app).get('/v1/admin/dashboard').set('Authorization', `Bearer ${adminToken}`);
+    expect(okRes.status).toBe(200);
+    expect(okRes.body.data).toHaveProperty('drivers.total');
+    expect(okRes.body.data).toHaveProperty('kyc.pending');
+    expect(driverService.getAdminDashboardSummary).toHaveBeenCalled();
   });
 });

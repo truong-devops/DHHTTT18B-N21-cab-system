@@ -49,8 +49,15 @@ function computeDrift({ model, features }) {
 
 function checkDrift(payload) {
   const modelVersion = process.env.AI_DRIFT_MODEL_VERSION || 'drift-monitor-v1';
+  const result = computeDrift(payload || {});
+  const alertTriggered = result.drift_detected && result.drift_score > result.threshold;
   return {
-    ...computeDrift(payload || {}),
+    ...result,
+    alert_triggered: alertTriggered,
+    alert: {
+      triggered: alertTriggered,
+      severity: alertTriggered ? 'high' : 'normal'
+    },
     model_version: modelVersion
   };
 }

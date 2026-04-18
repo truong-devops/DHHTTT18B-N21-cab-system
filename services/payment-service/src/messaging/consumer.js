@@ -6,6 +6,18 @@ const { insertInboxEvent, markInboxProcessed } = require('../repositories/inboxR
 const { logger, withTrace } = require('../utils/logger');
 const monitoring = require('../monitoring');
 
+const CONSUMER_EVENT_LOG_SAMPLE_RATE = (() => {
+  const raw = Number(process.env.CONSUMER_EVENT_LOG_SAMPLE_RATE || 0);
+  if (!Number.isFinite(raw)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(1, raw));
+})();
+
+function shouldLogConsumedEvent() {
+  return CONSUMER_EVENT_LOG_SAMPLE_RATE > 0 && Math.random() < CONSUMER_EVENT_LOG_SAMPLE_RATE;
+}
+
 function headerValueToString(value) {
   if (value == null) {
     return '';
@@ -96,7 +108,9 @@ async function processConsumedMessage({ topic, message }) {
   }
 
   try {
-    log.info({ eventId, topic, type: envelope.type }, 'Received event');
+    if (shouldLogConsumedEvent()) {
+      log.info({ eventId, topic, type: envelope.type }, 'Received event');
+    }
     await markInboxProcessed(eventId);
     monitoring.recordDependencyRequest({
       dependencyType: 'kafka',
