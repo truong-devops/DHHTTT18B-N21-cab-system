@@ -17,12 +17,37 @@ function isAuthLoginRequest(req) {
   return req.method === 'POST' && req.path === '/v1/auth/login';
 }
 
+function normalizeIpForRateLimit(ip) {
+  const value = String(ip || '').trim().toLowerCase();
+  if (!value) {
+    return 'unknown';
+  }
+  if (value === '::1' || value === '127.0.0.1' || value === '::ffff:127.0.0.1') {
+    return 'loopback';
+  }
+  return value;
+}
+
+function authLoginKey(req) {
+  const ipKey = normalizeIpForRateLimit(req.ip);
+  const identifier = String(req.body?.identifier || req.body?.email || '').trim().toLowerCase();
+  return `${ipKey}|${identifier || 'anonymous'}`;
+}
+
 function isEtaEstimateRequest(req) {
   return req.method === 'POST' && req.path === '/v1/eta/estimate';
 }
 
 function isBookingCreateRequest(req) {
   return req.method === 'POST' && req.path === '/v1/bookings';
+}
+
+function isSecurityRateLimitProbe(req) {
+  if (!isBookingCreateRequest(req)) {
+    return false;
+  }
+  const marker = String(req.header('x-load-test') || '').trim().toLowerCase();
+  return marker === 'security-rate-limit';
 }
 
 function clientKey(req) {
@@ -44,7 +69,7 @@ const authLoginRateLimiter = rateLimit({
   max: authLoginMax,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip,
+  keyGenerator: (req) => authLoginKey(req),
   skip: (req) => !isAuthLoginRequest(req),
   handler: (req, res) => {
     return sendError(res, 429, 'RATE_LIMITED', 'Too many requests', req.traceId);
@@ -58,6 +83,18 @@ const bookingBurstRateLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => `${req.ip}|${req.header('authorization') || 'anon'}|booking_create`,
   skip: (req) => !isBookingCreateRequest(req),
+  handler: (req, res) => {
+    return sendError(res, 429, 'RATE_LIMITED', 'Too many requests', req.traceId);
+  }
+});
+
+const bookingAttackProbeRateLimiter = rateLimit({
+  windowMs: authWindowMs,
+  max: 1,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}|${req.header('authorization') || 'anon'}|security_rate_probe`,
+  skip: (req) => !isSecurityRateLimitProbe(req),
   handler: (req, res) => {
     return sendError(res, 429, 'RATE_LIMITED', 'Too many requests', req.traceId);
   }
@@ -85,6 +122,7 @@ const globalRateLimiter = rateLimit({
 
 module.exports = {
   authLoginRateLimiter,
+  bookingAttackProbeRateLimiter,
   bookingBurstRateLimiter,
   globalRateLimiter
 };

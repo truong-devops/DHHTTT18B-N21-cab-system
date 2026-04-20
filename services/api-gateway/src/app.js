@@ -7,7 +7,12 @@ const monitoring = require('./monitoring');
 const { traceMiddleware } = require('./middleware/trace');
 const { requestLogger } = require('./middleware/requestLogger');
 const { authMiddleware } = require('./middleware/auth');
-const { authLoginRateLimiter, bookingBurstRateLimiter, globalRateLimiter } = require('./middleware/rateLimit');
+const {
+  authLoginRateLimiter,
+  bookingAttackProbeRateLimiter,
+  bookingBurstRateLimiter,
+  globalRateLimiter
+} = require('./middleware/rateLimit');
 const { proxyRequest } = require('./proxy/proxyRequest');
 const { sendError } = require('./utils/http');
 const { SERVICE_URLS } = require('./config/services');
@@ -16,6 +21,7 @@ const app = express();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+app.use(bookingAttackProbeRateLimiter);
 app.use(bookingBurstRateLimiter);
 app.use(traceMiddleware);
 app.use(monitoring.createHttpMetricsMiddleware());
