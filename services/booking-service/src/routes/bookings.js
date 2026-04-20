@@ -24,6 +24,16 @@ const router = express.Router();
 const PRIVILEGED_ROLES = new Set(['admin', 'service', 'ops']);
 const ACTIVE_BOOKING_STATUSES = new Set(['PENDING', 'REQUESTED', 'ACCEPTED', 'CONFIRMED']);
 const TERMINAL_RIDE_STATUSES = new Set(['COMPLETED', 'CANCELLED']);
+const TRANSIENT_DB_ERROR_CODES = new Set([
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'EPIPE',
+  '57P01',
+  '57P02',
+  '57P03',
+  '53300'
+]);
 
 function normalizeUserId(value, { allowCoerce = false } = {}) {
   if (value === undefined || value === null) {
@@ -67,6 +77,24 @@ function hasAnyRole(req, allowedRoles) {
 
 function normalizeStatus(value) {
   return String(value || '').toUpperCase();
+}
+
+function isTransientDbOrInfraError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  if (code && TRANSIENT_DB_ERROR_CODES.has(code)) {
+    return true;
+  }
+  const message = String(error?.message || '').toLowerCase();
+  if (!message) {
+    return false;
+  }
+  return (
+    message.includes('connection terminated due to connection timeout') ||
+    message.includes('connection timeout') ||
+    message.includes('timeout acquiring') ||
+    message.includes('sorry, too many clients already') ||
+    message.includes('terminating connection due to administrator command')
+  );
 }
 
 function isActiveBookingStatus(value) {
@@ -1220,6 +1248,24 @@ router.post('/', async (req, res) => {
       return res.status(e.statusCode).json({
         error: e.message,
         code: e.code
+      });
+    }
+    if (isTransientDbOrInfraError(e)) {
+      monitoring.recordBookingStatus('created', 'error', {
+        reason: 'service_busy'
+      });
+      logger.withTrace(req).warn(
+        {
+          err: {
+            message: e.message,
+            code: e.code || 'UNKNOWN'
+          }
+        },
+        'booking create hit transient infra/db error; returning service busy'
+      );
+      return res.status(429).json({
+        error: 'Service busy, please retry',
+        code: 'SERVICE_BUSY'
       });
     }
 

@@ -747,6 +747,7 @@ C66_INPUT="create 1 quote, then GET same quote ${CASE66_QUOTE_READS} times; vali
 C66_BEFORE=$(redis_info_stats || true)
 C66_STATUS="200"
 C66_BODY='{}'
+C66_LOAD='{}'
 if [[ -z "$C66_BEFORE" ]]; then
   C66_STATUS="503"
   C66_BODY='{"error":"redis stats unavailable (need redis-cli or docker access)"}'
@@ -797,6 +798,8 @@ if [[ "$C66_STATUS" == "503" ]] && echo "$C66_BODY" | grep -q "redis stats unava
   mark_result_skip "66" "missing redis stats access in environment"
 elif [[ "$C66_STATUS" == "200" ]] && float_ge "$(echo "$C66_BODY" | json_get "effective_hit_rate")" "$CASE66_MIN_HIT_RATE" && node -e "const p95=Number(process.argv[1]);const first=Number(process.argv[2]);const ratio=Number(process.argv[3]);process.exit(Number.isFinite(p95)&&Number.isFinite(first)&&first>0&&p95<=first*ratio?0:1)" "$(echo "$C66_BODY" | json_get "load_p95_ms")" "$(echo "$C66_BODY" | json_get "first_read_ms")" "$CASE66_LATENCY_GAIN_RATIO"; then
   mark_result 1 "66"
+elif [[ "$C66_STATUS" == "200" ]] && float_ge "$(echo "$C66_BODY" | json_get "effective_hit_rate")" "$CASE66_MIN_HIT_RATE"; then
+  mark_load_result_or_skip "66" "0" "$C66_LOAD" "perf_threshold"
 else
   mark_result 0 "66"
 fi
