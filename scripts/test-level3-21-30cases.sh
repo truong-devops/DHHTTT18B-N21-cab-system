@@ -418,9 +418,9 @@ C23_SELECTED=$(echo "$C23_BODY" | json_get "data.selected_driver.driverId")
 if [[ -z "$C23_SELECTED" ]]; then C23_SELECTED=$(echo "$C23_BODY" | json_get "data.selected_driver.id"); fi
 if [[ -z "$C23_SELECTED" ]]; then C23_SELECTED=$(echo "$C23_BODY" | json_get "data.selected_driver.driver_id"); fi
 C23_DECISION_VALID=$(echo "$C23_BODY" | json_bool "data.decision_valid")
-C23_IN_LIST=$(echo "$C23_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);const s=j?.data?.selected_driver||{};const selected=s.driverId||s.id||s.driver_id||'';const list=Array.isArray(j?.data?.available_drivers)?j.data.available_drivers:[];const ok=!!selected && list.some(it=> ((it?.driverId||it?.id||it?.driver_id||''))===selected);process.stdout.write(ok?'1':'0')}catch(e){process.stdout.write('0')}})")
-print_case "Case 23 - AI selects valid driver" "200 + selected_driver exists and in available list" "$C23_STATUS" "$C23_BODY"
-if [[ "$C23_STATUS" == "200" ]] && [[ "$C23_DECISION_VALID" == "1" ]] && [[ -n "$C23_SELECTED" ]] && [[ "$C23_IN_LIST" == "1" ]]; then
+C23_IN_LIST_AND_ONLINE=$(echo "$C23_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);const s=j?.data?.selected_driver||{};const selected=s.driverId||s.id||s.driver_id||'';const list=Array.isArray(j?.data?.available_drivers)?j.data.available_drivers:[];const found=list.find(it=>((it?.driverId||it?.id||it?.driver_id||''))===selected);if(!selected||!found){process.stdout.write('0');return;}const online=((found.onlineStatus||found.online_status||'ONLINE')+'').toUpperCase();process.stdout.write(online==='ONLINE'?'1':'0')}catch(e){process.stdout.write('0')}})")
+print_case "Case 23 - AI selects valid driver" "200 + selected_driver exists, belongs to driver list, and is online" "$C23_STATUS" "$C23_BODY"
+if [[ "$C23_STATUS" == "200" ]] && [[ "$C23_DECISION_VALID" == "1" ]] && [[ -n "$C23_SELECTED" ]] && [[ "$C23_IN_LIST_AND_ONLINE" == "1" ]]; then
   mark_result 1 "23"
 else
   mark_result 0 "23"
@@ -465,12 +465,8 @@ for _attempt in 1 2 3 4; do
   sleep "$_attempt"
 done
 print_case "Case 24 - Booking -> Payment -> Notification" "201 + flow success" "$C24_STATUS" "$C24_BODY"
-C24_COMP_APPLIED=$(echo "$C24_BODY" | json_bool "integration_flow.compensation.applied")
-C24_BOOKING_STATUS=$(echo "$C24_BODY" | json_get "booking.status")
-if [[ "$C24_STATUS" == "201" ]] && [[ -n "$C24_BOOKING_ID" ]] && (
-  ([[ "$C24_PAYMENT_OK" == "1" ]] && [[ "$C24_NOTI_OK" == "1" ]] && [[ "$C24_FLOW" == "success" ]]) \
-  || ([[ "$C24_FLOW" == "partial" ]] && [[ "$C24_NOTI_OK" == "1" ]] && [[ "$C24_COMP_APPLIED" == "1" ]] && [[ "$C24_BOOKING_STATUS" == "CANCELLED" ]])
-); then
+if [[ "$C24_STATUS" == "201" ]] && [[ -n "$C24_BOOKING_ID" ]] \
+  && [[ "$C24_PAYMENT_OK" == "1" ]] && [[ "$C24_NOTI_OK" == "1" ]] && [[ "$C24_FLOW" == "success" ]]; then
   mark_result 1 "24"
 else
   mark_result 0 "24"
@@ -488,8 +484,11 @@ if [[ -z "$C25_BOOKING_ID" ]]; then C25_BOOKING_ID=$(echo "$C25_BODY" | json_get
 if [[ -n "$C25_BOOKING_ID" ]]; then ACTIVE_BOOKING_ID="$C25_BOOKING_ID"; fi
 C25_TOPIC=$(echo "$C25_BODY" | json_get "additionalEvents.0.topic")
 C25_EVENT=$(echo "$C25_BODY" | json_get "additionalEvents.0.eventType")
-print_case "Case 25 - publish ride_requested" "topic ride_events + eventType ride_requested" "$C25_STATUS" "$C25_BODY"
-if [[ "$C25_STATUS" == "201" ]] && [[ -n "$C25_BOOKING_ID" ]] && [[ "$C25_TOPIC" == "ride_events" ]] && [[ "$C25_EVENT" == "ride_requested" ]]; then
+C25_QUEUED=$(echo "$C25_BODY" | json_bool "additionalEvents.0.queued")
+C25_STATUS_VALUE=$(echo "$C25_BODY" | json_get "booking.status")
+print_case "Case 25 - publish ride_requested" "201 + booking REQUESTED + topic ride_events + eventType ride_requested + queued=true" "$C25_STATUS" "$C25_BODY"
+if [[ "$C25_STATUS" == "201" ]] && [[ -n "$C25_BOOKING_ID" ]] && [[ "$C25_STATUS_VALUE" == "REQUESTED" ]] \
+  && [[ "$C25_TOPIC" == "ride_events" ]] && [[ "$C25_EVENT" == "ride_requested" ]] && [[ "$C25_QUEUED" == "1" ]]; then
   mark_result 1 "25"
 else
   mark_result 0 "25"
@@ -556,18 +555,16 @@ fi
 
 # Case 29
 echo "-- Running Case 29"
-if [[ -z "$C25_BOOKING_ID" ]]; then
-  C29_STATUS="000"
-  C29_BODY='{"error":"missing booking id from case 25"}'
-else
-  C29=$(call_json GET "/v1/bookings/$C25_BOOKING_ID" "$C25_TOKEN")
-  C29_STATUS=$(echo "$C29" | sed -n '1p')
-  C29_BODY=$(echo "$C29" | sed '1d')
-fi
-C29_BOOKING_ID=$(echo "$C29_BODY" | json_get "data.booking_id")
-if [[ -z "$C29_BOOKING_ID" ]]; then C29_BOOKING_ID=$(echo "$C29_BODY" | json_get "data.bookingId"); fi
-print_case "Case 29 - API Gateway routes booking correctly" "GET /v1/bookings/:id returns booking service response" "$C29_STATUS" "$C29_BODY"
-if [[ "$C29_STATUS" == "200" ]] && [[ -n "$C29_BOOKING_ID" ]]; then
+cancel_booking_if_exists "$USER_TOKEN" "$ACTIVE_BOOKING_ID"
+C29_TOKEN="$USER_TOKEN"
+C29=$(call_json POST "/v1/bookings" "$C29_TOKEN" '{"pickup":{"lat":10.7606,"lng":106.6606},"drop":{"lat":10.7706,"lng":106.7006},"vehicleType":"CAR"}')
+C29_STATUS=$(echo "$C29" | sed -n '1p')
+C29_BODY=$(echo "$C29" | sed '1d')
+C29_BOOKING_ID=$(echo "$C29_BODY" | json_get "booking.booking_id")
+if [[ -z "$C29_BOOKING_ID" ]]; then C29_BOOKING_ID=$(echo "$C29_BODY" | json_get "booking.bookingId"); fi
+if [[ -n "$C29_BOOKING_ID" ]]; then ACTIVE_BOOKING_ID="$C29_BOOKING_ID"; fi
+print_case "Case 29 - API Gateway routes booking correctly" "POST /v1/bookings is routed to booking service and returns valid booking response" "$C29_STATUS" "$C29_BODY"
+if [[ "$C29_STATUS" == "201" ]] && [[ -n "$C29_BOOKING_ID" ]]; then
   mark_result 1 "29"
 else
   mark_result 0 "29"

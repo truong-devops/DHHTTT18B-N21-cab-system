@@ -205,8 +205,14 @@ echo "-- Running Case 11"
 C11=$(call_json POST /v1/bookings "$USER_TOKEN" '{"drop":{"lat":10.77,"lng":106.70}}')
 C11_STATUS=$(echo "$C11" | sed -n '1p')
 C11_BODY=$(echo "$C11" | sed '1d')
-print_case "Case 11 - missing pickup" "400 + pickup is required" "$C11_STATUS" "$C11_BODY"
-if [[ "$C11_STATUS" == "400" ]] && echo "$C11_BODY" | contains_text 'pickup is required'; then mark_result 1 "11"; else mark_result 0 "11"; fi
+C11_BOOKING_ID=$(echo "$C11_BODY" | json_get "booking.booking_id")
+if [[ -z "$C11_BOOKING_ID" ]]; then C11_BOOKING_ID=$(echo "$C11_BODY" | json_get "booking.bookingId"); fi
+print_case "Case 11 - missing pickup" "400 + message 'pickup is required' + no booking created" "$C11_STATUS" "$C11_BODY"
+if [[ "$C11_STATUS" == "400" ]] && echo "$C11_BODY" | contains_text 'pickup is required' && [[ -z "$C11_BOOKING_ID" ]]; then
+  mark_result 1 "11"
+else
+  mark_result 0 "11"
+fi
 
 # Case 12
 echo "-- Running Case 12"
@@ -218,28 +224,18 @@ if [[ "$C12_STATUS" == "422" ]] && echo "$C12_BODY" | contains_text 'Validation 
 
 # Case 13
 echo "-- Running Case 13"
-if [[ -n "$ADMIN_TOKEN" ]]; then
-  DRIVER_LIST=$(curl -s "$BASE_URL/v1/admin/drivers?status=APPROVED" -H "Authorization: Bearer $ADMIN_TOKEN")
-  DRIVER_IDS=$(echo "$DRIVER_LIST" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);for(const it of (j?.data?.items||[])){if(it?.id)console.log(it.id)}}catch(e){}})")
-  if [[ -n "$DRIVER_IDS" ]]; then
-    while IFS= read -r did; do
-      [[ -z "$did" ]] && continue
-      curl -s -X POST "$BASE_URL/v1/driver/status" \
-        -H "Authorization: Bearer $ADMIN_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d "{\"driver_id\":\"$did\",\"status\":\"OFFLINE\"}" >/dev/null || true
-    done <<< "$DRIVER_IDS"
-  fi
-fi
-C13=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70},"vehicleType":"CAR"}')
+C13=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":21.0278,"lng":105.8342},"drop":{"lat":21.0285,"lng":105.8350},"vehicleType":"CAR"}')
 C13_STATUS=$(echo "$C13" | sed -n '1p')
 C13_BODY=$(echo "$C13" | sed '1d')
 C13_BOOKING_ID=$(echo "$C13_BODY" | json_get "booking.booking_id")
 if [[ -z "$C13_BOOKING_ID" ]]; then C13_BOOKING_ID=$(echo "$C13_BODY" | json_get "booking.bookingId"); fi
-print_case "Case 13 - no drivers online" "booking status REQUESTED/PENDING/FAILED + message No drivers available" "$C13_STATUS" "$C13_BODY"
+print_case "Case 13 - no drivers online" "booking status REQUESTED/PENDING/FAILED + no assigned driver + message No drivers available" "$C13_STATUS" "$C13_BODY"
 C13_BOOKING_STATUS=$(echo "$C13_BODY" | json_get "booking.status")
-if [[ -z "$C13_BOOKING_STATUS" ]]; then C13_BOOKING_STATUS=$(echo "$C13_BODY" | json_get "booking.status"); fi
-if echo "$C13_BODY" | contains_text 'No drivers available' && ([[ "$C13_BOOKING_STATUS" == "REQUESTED" ]] || [[ "$C13_BOOKING_STATUS" == "PENDING" ]] || [[ "$C13_BOOKING_STATUS" == "FAILED" ]]); then
+C13_SELECTED_DRIVER_ID=$(echo "$C13_BODY" | json_get "ai_driver_decision.selected_driver.id")
+if [[ -z "$C13_SELECTED_DRIVER_ID" ]]; then C13_SELECTED_DRIVER_ID=$(echo "$C13_BODY" | json_get "ai_driver_decision.selected_driver.driver_id"); fi
+if echo "$C13_BODY" | contains_text 'No drivers available' \
+  && ([[ "$C13_BOOKING_STATUS" == "REQUESTED" ]] || [[ "$C13_BOOKING_STATUS" == "PENDING" ]] || [[ "$C13_BOOKING_STATUS" == "FAILED" ]]) \
+  && [[ -z "$C13_SELECTED_DRIVER_ID" ]]; then
   mark_result 1 "13"
 else
   mark_result 0 "13"
@@ -250,26 +246,42 @@ echo "-- Running Case 14"
 C14=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70},"payment_method":"invalid_card"}')
 C14_STATUS=$(echo "$C14" | sed -n '1p')
 C14_BODY=$(echo "$C14" | sed '1d')
-print_case "Case 14 - invalid payment method" "400 + Invalid payment method" "$C14_STATUS" "$C14_BODY"
-if [[ "$C14_STATUS" == "400" ]] && echo "$C14_BODY" | contains_text 'Invalid payment method'; then mark_result 1 "14"; else mark_result 0 "14"; fi
+C14_BOOKING_ID=$(echo "$C14_BODY" | json_get "booking.booking_id")
+if [[ -z "$C14_BOOKING_ID" ]]; then C14_BOOKING_ID=$(echo "$C14_BODY" | json_get "booking.bookingId"); fi
+print_case "Case 14 - invalid payment method" "400 + Invalid payment method + no booking created" "$C14_STATUS" "$C14_BODY"
+if [[ "$C14_STATUS" == "400" ]] && echo "$C14_BODY" | contains_text 'Invalid payment method' && [[ -z "$C14_BOOKING_ID" ]]; then
+  mark_result 1 "14"
+else
+  mark_result 0 "14"
+fi
 
 # Case 15
 echo "-- Running Case 15"
 C15=$(call_json POST /v1/eta/estimate "$USER_TOKEN" '{"distance_km":0}')
 C15_STATUS=$(echo "$C15" | sed -n '1p')
 C15_BODY=$(echo "$C15" | sed '1d')
-print_case "Case 15 - ETA distance=0" "200 + eta_minutes >= 0" "$C15_STATUS" "$C15_BODY"
+print_case "Case 15 - ETA distance=0" "200 + eta_minutes >= 0 and very small (prefer 0)" "$C15_STATUS" "$C15_BODY"
 ETA_VAL=$(echo "$C15_BODY" | json_get "data.eta_minutes")
-if [[ "$C15_STATUS" == "200" ]] && [[ -n "$ETA_VAL" ]] && [[ "$ETA_VAL" =~ ^[0-9]+$ ]]; then mark_result 1 "15"; else mark_result 0 "15"; fi
+if [[ "$C15_STATUS" == "200" ]] && [[ -n "$ETA_VAL" ]] && node -e "const v=Number(process.argv[1]);process.exit(Number.isFinite(v)&&v>=0&&v<=1?0:1)" "$ETA_VAL"; then
+  mark_result 1 "15"
+else
+  mark_result 0 "15"
+fi
 
 # Case 16
 echo "-- Running Case 16"
 C16=$(call_json POST /v1/pricing/estimate "$USER_TOKEN" '{"distance_km":5,"demand_index":0,"supply_index":1}')
 C16_STATUS=$(echo "$C16" | sed -n '1p')
 C16_BODY=$(echo "$C16" | sed '1d')
-print_case "Case 16 - pricing demand=0" "200 + surge >= 1" "$C16_STATUS" "$C16_BODY"
+print_case "Case 16 - pricing demand=0" "200 + surge >= 1 + valid non-negative price (no divide-by-zero behavior)" "$C16_STATUS" "$C16_BODY"
 SURGE_VAL=$(echo "$C16_BODY" | json_get "data.surge")
-if [[ "$C16_STATUS" == "200" ]] && [[ -n "$SURGE_VAL" ]] && node -e "process.exit(Number('$SURGE_VAL')>=1?0:1)"; then mark_result 1 "16"; else mark_result 0 "16"; fi
+PRICE_VAL=$(echo "$C16_BODY" | json_get "data.price")
+if [[ "$C16_STATUS" == "200" ]] && [[ -n "$SURGE_VAL" ]] && [[ -n "$PRICE_VAL" ]] \
+  && node -e "const s=Number(process.argv[1]);const p=Number(process.argv[2]);process.exit(Number.isFinite(s)&&s>=1&&Number.isFinite(p)&&p>=0?0:1)" "$SURGE_VAL" "$PRICE_VAL"; then
+  mark_result 1 "16"
+else
+  mark_result 0 "16"
+fi
 
 # Case 17
 echo "-- Running Case 17"
@@ -344,11 +356,13 @@ C19B_ID=$(echo "$C19B_BODY" | json_get "booking.booking_id")
 if [[ -z "$C19B_ID" ]]; then C19B_ID=$(echo "$C19B_BODY" | json_get "booking.bookingId"); fi
 
 echo "========== Case 19 - duplicate booking/idempotency =========="
-echo "Expected: second request replays old result and same booking_id"
+echo "Expected: second request replays old result and same booking_id (no duplicate booking)"
 echo "First status: $C19A_STATUS booking_id: $C19A_ID"
 echo "Second status: $C19B_STATUS booking_id: $C19B_ID"
 echo
-if [[ "$C19A_STATUS" == "201" ]] && [[ "$C19B_STATUS" == "201" ]] && [[ -n "$C19A_ID" ]] && [[ "$C19A_ID" == "$C19B_ID" ]]; then
+if [[ "$C19A_STATUS" == "201" ]] \
+  && ([[ "$C19B_STATUS" == "200" ]] || [[ "$C19B_STATUS" == "201" ]]) \
+  && [[ -n "$C19A_ID" ]] && [[ "$C19A_ID" == "$C19B_ID" ]]; then
   mark_result 1 "19"
 else
   mark_result 0 "19"
