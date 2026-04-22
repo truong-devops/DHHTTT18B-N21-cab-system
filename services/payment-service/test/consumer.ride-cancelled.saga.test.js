@@ -18,47 +18,55 @@ jest.mock('../src/services/paymentService', () => ({
 
 const { processConsumedMessage } = require('../src/messaging/consumer');
 
-describe('payment consumer contract guard', () => {
+describe('payment consumer saga compensation on ride.cancelled', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCompensateRideCancelled.mockResolvedValue({
-      handled: true,
-      reason: 'refunded'
-    });
+    mockInsertInboxEvent.mockResolvedValue(true);
+    mockMarkInboxProcessed.mockResolvedValue();
   });
 
-  test('topic/type mismatch is routed to DLQ and not inserted', async () => {
+  test('calls compensation handler and marks inbox processed', async () => {
+    mockCompensateRideCancelled.mockResolvedValueOnce({
+      handled: true,
+      reason: 'refunded',
+      paymentId: 'pay_1'
+    });
+
     const result = await processConsumedMessage({
-      topic: 'ride.created',
+      topic: 'ride.cancelled',
       message: {
-        key: Buffer.from('evt_1'),
+        key: Buffer.from('evt_cancel_1'),
+        headers: {
+          'x-request-id': Buffer.from('req_1')
+        },
         value: Buffer.from(
           JSON.stringify({
-            eventId: 'evt_1',
-            traceId: 'trace_1',
+            eventId: 'evt_cancel_1',
+            traceId: 'trace_cancel_1',
             occurredAt: '2026-01-01T00:00:00.000Z',
-            type: 'PaymentCompleted',
+            type: 'RideCancelled',
             version: 1,
             payload: {
-              paymentId: 'pay_1',
               rideId: 'ride_1',
-              amount: '120000',
-              currency: 'VND',
-              status: 'PAID',
-              statusUpdatedAt: '2026-01-01T00:00:00.000Z'
+              reason: 'PAYMENT_INITIALIZATION_FAILED',
+              timestamp: '2026-01-01T00:00:00.000Z'
             }
           })
         )
       }
     });
 
-    expect(result).toEqual({ handled: true, reason: 'invalid_envelope' });
-    expect(mockInsertInboxEvent).not.toHaveBeenCalled();
-    expect(mockMarkInboxProcessed).not.toHaveBeenCalled();
-    expect(mockPublishToDlq).toHaveBeenCalledWith(
+    expect(mockCompensateRideCancelled).toHaveBeenCalledWith({
+      rideId: 'ride_1',
+      reason: 'PAYMENT_INITIALIZATION_FAILED',
+      traceId: 'trace_cancel_1',
+      requestId: 'req_1'
+    });
+    expect(mockMarkInboxProcessed).toHaveBeenCalledWith('evt_cancel_1');
+    expect(result).toEqual(
       expect.objectContaining({
-        sourceTopic: 'ride.created',
-        errorType: 'invalid_envelope'
+        handled: true,
+        reason: 'refunded'
       })
     );
   });

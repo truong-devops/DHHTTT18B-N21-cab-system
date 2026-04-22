@@ -49,6 +49,38 @@ describe('payment routes', () => {
     expect(response.body.error.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
   });
 
+  test('rejects internal init without x-idempotency-key', async () => {
+    const response = await request(app)
+      .post('/v1/payments/internal/init')
+      .set('x-internal-api-key', 'dev-internal-key')
+      .send({ rideId: 'ride_1', amount: 10, currency: 'VND', method: 'CARD', userId: '10000003' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
+  });
+
+  test('creates internal payment with x-idempotency-key', async () => {
+    paymentService.createPayment.mockResolvedValueOnce({
+      responseCode: 201,
+      responseBody: { data: { id: 'pay_internal_1' } }
+    });
+
+    const response = await request(app)
+      .post('/v1/payments/internal/init')
+      .set('x-internal-api-key', 'dev-internal-key')
+      .set('x-idempotency-key', 'internal_idem_1')
+      .send({ rideId: 'ride_1', amount: 10, currency: 'VND', method: 'CARD', userId: '10000003' });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.id).toBe('pay_internal_1');
+    expect(idempotencyService.withIdempotency).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routeKey: 'payments:internal:init',
+        idemKey: 'internal_idem_1'
+      })
+    );
+  });
+
   test('creates payment with idempotency key', async () => {
     paymentService.createPayment.mockResolvedValueOnce({
       responseCode: 201,

@@ -16,6 +16,7 @@ const idempotencyService = require('../../src/services/idempotencyService');
 const {
   listPaymentsController,
   createPaymentController,
+  createPaymentInternalController,
   getPaymentController,
   updatePaymentStatusController,
   getVietQrController
@@ -131,6 +132,56 @@ describe('payments controllers', () => {
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.headers['content-type']).toBe('application/json; charset=utf-8');
     expect(res.json).toHaveBeenCalledWith({ data: { id: 'pay_1' } });
+  });
+
+  test('createPaymentInternalController rejects missing internal idempotency key', async () => {
+    const req = buildReq({
+      method: 'POST',
+      originalUrl: '/v1/payments/internal/init',
+      validatedBody: { rideId: 'ride_1', amount: '100.00', currency: 'VND', userId: '10000003' }
+    });
+    const res = buildRes();
+
+    await expect(createPaymentInternalController(req, res)).rejects.toMatchObject({
+      status: 400,
+      code: 'IDEMPOTENCY_KEY_REQUIRED'
+    });
+  });
+
+  test('createPaymentInternalController executes with idempotency', async () => {
+    paymentService.createPayment.mockResolvedValueOnce({
+      responseCode: 201,
+      responseBody: { data: { id: 'pay_internal_1' } }
+    });
+
+    const req = buildReq({
+      method: 'POST',
+      originalUrl: '/v1/payments/internal/init',
+      validatedBody: { rideId: 'ride_1', amount: '100.00', currency: 'VND', userId: '10000003' },
+      traceId: 'trace_internal_1',
+      requestId: 'req_internal_1'
+    });
+    req.headers['x-idempotency-key'] = 'internal_idem_1';
+
+    const res = buildRes();
+    await createPaymentInternalController(req, res);
+
+    expect(idempotencyService.withIdempotency).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routeKey: 'payments:internal:init',
+        userId: '10000003',
+        idemKey: 'internal_idem_1'
+      })
+    );
+    expect(paymentService.createPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ userId: '10000003' }),
+        traceId: 'trace_internal_1',
+        requestId: 'req_internal_1'
+      })
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({ data: { id: 'pay_internal_1' } });
   });
 
   test('getPaymentController returns payment by id', async () => {
