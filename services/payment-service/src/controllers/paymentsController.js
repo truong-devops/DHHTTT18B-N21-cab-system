@@ -82,16 +82,47 @@ async function createPaymentController(req, res) {
 
 async function createPaymentInternalController(req, res) {
   const payload = req.validatedBody || {};
-  const result = await createPayment({
-    payload,
-    idempotency: null,
-    traceId: req.traceId,
-    requestId: req.requestId,
-    method: req.method,
-    path: req.originalUrl,
-    authorization: req.authorization
+  const rawIdempotencyKey = req.get('x-idempotency-key') || req.get('idempotency-key');
+  const idempotencyKey = typeof rawIdempotencyKey === 'string' ? rawIdempotencyKey.trim() : '';
+  if (!idempotencyKey) {
+    throw new ApiError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'x-idempotency-key header is required');
+  }
+  if (!isEightDigitId(payload.userId)) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'userId is required for internal idempotency');
+  }
+
+  const routeKey = 'payments:internal:init';
+  const userId = payload.userId;
+  const requestHash = hashRequest(req.method, req.originalUrl, payload);
+  const responseHeaders = pickIdempotencyHeaders(res.getHeaders()) || {};
+  if (!responseHeaders['content-type']) {
+    responseHeaders['content-type'] = 'application/json; charset=utf-8';
+  }
+
+  const result = await withIdempotency({
+    routeKey,
+    userId,
+    idemKey: idempotencyKey,
+    responseHeaders,
+    requestHash,
+    execute: () =>
+      createPayment({
+        payload,
+        idempotency: {
+          routeKey,
+          userId,
+          idemKey: idempotencyKey,
+          requestHash,
+          responseHeaders
+        },
+        traceId: req.traceId,
+        requestId: req.requestId,
+        method: req.method,
+        path: req.originalUrl,
+        authorization: req.authorization
+      })
   });
-  res.status(result.responseCode).json(result.responseBody);
+  res.status(result.status).set(result.headers).json(result.body);
 }
 
 async function getPaymentController(req, res) {

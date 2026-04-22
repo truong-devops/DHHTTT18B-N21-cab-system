@@ -1,5 +1,12 @@
 const { withTransaction } = require('../db/pool');
-const { insertPayment, insertStatusHistory, getPaymentById, updatePaymentStatus, listPayments } = require('../repositories/paymentsRepo');
+const {
+  insertPayment,
+  insertStatusHistory,
+  getPaymentById,
+  getLatestPaymentByRideIdForUpdate,
+  updatePaymentStatus,
+  listPayments
+} = require('../repositories/paymentsRepo');
 const { saveIdempotencyKey } = require('../repositories/idempotencyRepo');
 const { insertOutboxEvent } = require('../repositories/outboxRepo');
 const { encodeCursor, decodeCursor } = require('../../../../libs/http/cursor');
@@ -57,6 +64,14 @@ function normalizeActorId(value) {
     return null;
   }
   return String(value).trim();
+}
+
+function normalizeSagaReason(value, fallback) {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return fallback;
+  }
+  return normalized.slice(0, 255);
 }
 
 async function resolvePayosQrCode({ payosData, traceId, requestId, authorization }) {
@@ -288,6 +303,100 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
   });
 }
 
+async function compensatePaymentForRideCancelled({ rideId, reason, traceId, requestId }) {
+  const normalizedRideId = String(rideId || '').trim();
+  if (!normalizedRideId) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'rideId is required for compensation');
+  }
+
+  const log = withTrace(traceId || 'no-trace', requestId || null);
+  const compensationReason = normalizeSagaReason(reason, 'RIDE_CANCELLED');
+
+  return withTransaction(async (client) => {
+    const payment = await getLatestPaymentByRideIdForUpdate(client, normalizedRideId);
+    if (!payment) {
+      log.info({ rideId: normalizedRideId }, 'Saga compensation skipped: payment not found');
+      return {
+        handled: false,
+        reason: 'payment_not_found',
+        rideId: normalizedRideId
+      };
+    }
+
+    const currentStatus = String(payment.status || '').toUpperCase();
+    let targetStatus = null;
+    let updateFailureReason = null;
+
+    if (currentStatus === STATUSES.PAID) {
+      targetStatus = STATUSES.REFUNDED;
+    } else if (currentStatus === STATUSES.INITIATED || currentStatus === STATUSES.PROCESSING) {
+      targetStatus = STATUSES.FAILED;
+      updateFailureReason = compensationReason;
+    } else if (currentStatus === STATUSES.FAILED || currentStatus === STATUSES.REFUNDED) {
+      return {
+        handled: false,
+        reason: 'already_terminal',
+        paymentId: payment.id,
+        status: currentStatus
+      };
+    } else {
+      return {
+        handled: false,
+        reason: 'unsupported_status',
+        paymentId: payment.id,
+        status: currentStatus
+      };
+    }
+
+    if (!canTransition(currentStatus, targetStatus)) {
+      return {
+        handled: false,
+        reason: 'invalid_transition',
+        paymentId: payment.id,
+        fromStatus: currentStatus,
+        toStatus: targetStatus
+      };
+    }
+
+    const updated = await updatePaymentStatus(client, payment.id, targetStatus, updateFailureReason);
+    await insertStatusHistory(client, {
+      paymentId: payment.id,
+      fromStatus: currentStatus,
+      toStatus: targetStatus,
+      reason: compensationReason,
+      actorId: null,
+      traceId
+    });
+
+    if (targetStatus === STATUSES.FAILED) {
+      const { topic, envelope } = buildPaymentFailed(updated, traceId);
+      await insertOutboxEvent(client, {
+        eventId: envelope.eventId,
+        traceId,
+        requestId,
+        type: envelope.type,
+        topic,
+        payload: envelope.payload,
+        occurredAt: envelope.occurredAt
+      });
+    }
+
+    monitoring.recordPaymentStatus(targetStatus, 'success', {
+      reason: 'ride_cancelled_compensation',
+      from_status: currentStatus.toLowerCase()
+    });
+
+    return {
+      handled: true,
+      reason: targetStatus === STATUSES.REFUNDED ? 'refunded' : 'marked_failed',
+      paymentId: updated.id,
+      rideId: normalizedRideId,
+      fromStatus: currentStatus,
+      toStatus: targetStatus
+    };
+  });
+}
+
 async function fetchVietQr(paymentId) {
   const payment = await fetchPayment(paymentId);
   if (!payment.vietqr) {
@@ -307,5 +416,6 @@ module.exports = {
   fetchPayment,
   fetchPayments,
   changePaymentStatus,
+  compensatePaymentForRideCancelled,
   fetchVietQr
 };
