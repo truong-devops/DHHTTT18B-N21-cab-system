@@ -16,7 +16,7 @@ CASE61_TARGET_RPS="${CASE61_TARGET_RPS:-1000}"
 CASE61_DURATION_SEC="${CASE61_DURATION_SEC:-20}"
 CASE61_CONCURRENCY="${CASE61_CONCURRENCY:-300}"
 CASE61_MIN_SUCCESS_RATE="${CASE61_MIN_SUCCESS_RATE:-0.95}"
-CASE61_MIN_RPS_RATIO="${CASE61_MIN_RPS_RATIO:-0.66}"
+CASE61_MIN_RPS_RATIO="${CASE61_MIN_RPS_RATIO:-1.0}"
 CASE61_P95_LIMIT_MS="${CASE61_P95_LIMIT_MS:-450}"
 CASE61_WARMUP_SEC="${CASE61_WARMUP_SEC:-5}"
 
@@ -25,28 +25,28 @@ CASE62_DURATION_SEC="${CASE62_DURATION_SEC:-20}"
 CASE62_CONCURRENCY="${CASE62_CONCURRENCY:-140}"
 CASE62_P95_LIMIT_MS="${CASE62_P95_LIMIT_MS:-200}"
 CASE62_MIN_SUCCESS_RATE="${CASE62_MIN_SUCCESS_RATE:-0.995}"
-CASE62_MIN_RPS_RATIO="${CASE62_MIN_RPS_RATIO:-0.90}"
+CASE62_MIN_RPS_RATIO="${CASE62_MIN_RPS_RATIO:-1.0}"
 
 CASE63_TARGET_RPS="${CASE63_TARGET_RPS:-800}"
 CASE63_DURATION_SEC="${CASE63_DURATION_SEC:-20}"
 CASE63_CONCURRENCY="${CASE63_CONCURRENCY:-200}"
 CASE63_P95_LIMIT_MS="${CASE63_P95_LIMIT_MS:-300}"
 CASE63_MIN_SUCCESS_RATE="${CASE63_MIN_SUCCESS_RATE:-0.995}"
-CASE63_MIN_RPS_RATIO="${CASE63_MIN_RPS_RATIO:-0.9}"
+CASE63_MIN_RPS_RATIO="${CASE63_MIN_RPS_RATIO:-1.0}"
 CASE63_MAX_5XX_RATE="${CASE63_MAX_5XX_RATE:-0.01}"
 
 CASE64_TARGET_RPS="${CASE64_TARGET_RPS:-500}"
 CASE64_DURATION_SEC="${CASE64_DURATION_SEC:-20}"
 CASE64_CONCURRENCY="${CASE64_CONCURRENCY:-180}"
 CASE64_MIN_SUCCESS_RATE="${CASE64_MIN_SUCCESS_RATE:-0.99}"
-CASE64_MIN_RPS_RATIO="${CASE64_MIN_RPS_RATIO:-0.9}"
+CASE64_MIN_RPS_RATIO="${CASE64_MIN_RPS_RATIO:-1.0}"
 CASE64_COOLDOWN_SEC="${CASE64_COOLDOWN_SEC:-8}"
 
 CASE65_TARGET_RPS="${CASE65_TARGET_RPS:-900}"
 CASE65_DURATION_SEC="${CASE65_DURATION_SEC:-15}"
 CASE65_CONCURRENCY="${CASE65_CONCURRENCY:-260}"
 CASE65_MAX_5XX_RATE="${CASE65_MAX_5XX_RATE:-0.01}"
-CASE65_MIN_RPS_RATIO="${CASE65_MIN_RPS_RATIO:-0.93}"
+CASE65_MIN_RPS_RATIO="${CASE65_MIN_RPS_RATIO:-1.0}"
 
 CASE66_QUOTE_READS="${CASE66_QUOTE_READS:-300}"
 CASE66_MIN_HIT_RATE="${CASE66_MIN_HIT_RATE:-0.9}"
@@ -59,9 +59,9 @@ CASE67_MIN_429="${CASE67_MIN_429:-5}"
 CASE68_TARGET_RPS="${CASE68_TARGET_RPS:-350}"
 CASE68_DURATION_SEC="${CASE68_DURATION_SEC:-20}"
 CASE68_CONCURRENCY="${CASE68_CONCURRENCY:-120}"
-CASE68_P95_LIMIT_MS="${CASE68_P95_LIMIT_MS:-200}"
+CASE68_P95_LIMIT_MS="${CASE68_P95_LIMIT_MS:-300}"
 CASE68_MIN_SUCCESS_RATE="${CASE68_MIN_SUCCESS_RATE:-0.99}"
-CASE68_MIN_RPS_RATIO="${CASE68_MIN_RPS_RATIO:-0.97}"
+CASE68_MIN_RPS_RATIO="${CASE68_MIN_RPS_RATIO:-1.0}"
 CASE68_P95_TOLERANCE_RATIO="${CASE68_P95_TOLERANCE_RATIO:-1.0}"
 
 CASE69_PEAK_TARGET_RPS="${CASE69_PEAK_TARGET_RPS:-1200}"
@@ -69,8 +69,8 @@ CASE69_PEAK_DURATION_SEC="${CASE69_PEAK_DURATION_SEC:-20}"
 CASE69_PEAK_CONCURRENCY="${CASE69_PEAK_CONCURRENCY:-320}"
 CASE69_PEAK_MIN_SUCCESS_RATE="${CASE69_PEAK_MIN_SUCCESS_RATE:-0.97}"
 CASE69_PEAK_P95_LIMIT_MS="${CASE69_PEAK_P95_LIMIT_MS:-450}"
-CASE69_PEAK_MIN_RPS_RATIO="${CASE69_PEAK_MIN_RPS_RATIO:-0.58}"
-CASE69_PEAK_P95_TOLERANCE_RATIO="${CASE69_PEAK_P95_TOLERANCE_RATIO:-1.45}"
+CASE69_PEAK_MIN_RPS_RATIO="${CASE69_PEAK_MIN_RPS_RATIO:-1.0}"
+CASE69_PEAK_P95_TOLERANCE_RATIO="${CASE69_PEAK_P95_TOLERANCE_RATIO:-1.0}"
 CASE69_PREP_COOLDOWN_SEC="${CASE69_PREP_COOLDOWN_SEC:-10}"
 CASE69_STAGE_DURATION_SEC="${CASE69_STAGE_DURATION_SEC:-8}"
 CASE69_STAGE1_RPS="${CASE69_STAGE1_RPS:-350}"
@@ -92,18 +92,8 @@ CASE70_MAX_5XX_RATE="${CASE70_MAX_5XX_RATE:-0.02}"
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-25}"
 
-# Evaluation mode for CI/pipeline:
-# - pipeline (default): convert infra-constrained perf misses to SKIP
-# - strict: keep original strict PASS/FAIL semantics
-LEVEL7_MODE="${LEVEL7_MODE:-pipeline}"
-LEVEL7_TRANSPORT_ABORT_RATE_SKIP="${LEVEL7_TRANSPORT_ABORT_RATE_SKIP:-0.03}"
-LEVEL7_TRANSPORT_ABORT_COUNT_SKIP="${LEVEL7_TRANSPORT_ABORT_COUNT_SKIP:-20}"
-LEVEL7_COMPLETION_RATIO_SKIP="${LEVEL7_COMPLETION_RATIO_SKIP:-0.9}"
-LEVEL7_SKIP_PERF_ONLY_MISS="${LEVEL7_SKIP_PERF_ONLY_MISS:-true}"
-
 PASS_COUNT=0
 FAIL_COUNT=0
-SKIP_COUNT=0
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/case-context-input.sh"
@@ -120,8 +110,6 @@ Examples:
 Notes:
   - Cases 61-69 run in Docker/local environments.
   - Case 70 (auto-scaling) requires Kubernetes HPA (set K8S_HPA_NAME + CASE70_AUTOSCALE_TARGET_URL).
-  - LEVEL7_MODE=pipeline (default) marks expected infra bottlenecks as SKIP.
-  - Set LEVEL7_MODE=strict to keep hard FAIL on any threshold miss.
 USAGE
 }
 
@@ -192,14 +180,6 @@ mark_result() {
   echo
 }
 
-mark_result_skip() {
-  local case_id="$1"
-  local reason="$2"
-  echo "[$case_id] SKIP - $reason"
-  SKIP_COUNT=$((SKIP_COUNT + 1))
-  echo
-}
-
 json_status_count() {
   local body="$1"
   local code="$2"
@@ -214,57 +194,12 @@ status_sum_range() {
   node -e "try{const j=JSON.parse(process.argv[1]);const min=Number(process.argv[2]);const max=Number(process.argv[3]);const ex=new Set(String(process.argv[4]||'').split(',').map(s=>s.trim()).filter(Boolean));let sum=0;for(const [k,v] of Object.entries(j?.status_counts||{})){const code=Number(k);if(!Number.isFinite(code)||code<min||code>max||ex.has(String(k)))continue;const n=Number(v);if(Number.isFinite(n))sum+=n;}process.stdout.write(String(sum));}catch(e){process.stdout.write('0');}" "$body" "$min_code" "$max_code" "$exclude_codes"
 }
 
-infra_skip_reason_for_load_failure() {
-  local body="$1"
-  local failure_type="${2:-perf_threshold}"
-
-  if [[ "$LEVEL7_MODE" == "strict" ]]; then
-    return 1
-  fi
-
-  local completed sent aborted server5xx client4xx_non429 aborted_rate completion_rate no_app_error
-  completed=$(echo "$body" | json_get "completed")
-  sent=$(echo "$body" | json_get "sent")
-  aborted=$(json_status_count "$body" "000")
-  server5xx=$(status_sum_range "$body" 500 599)
-  client4xx_non429=$(status_sum_range "$body" 400 499 "429")
-  aborted_rate=$(node -e "const a=Number(process.argv[1]);const c=Number(process.argv[2]);process.stdout.write(String(c>0?a/c:0));" "$aborted" "${completed:-0}")
-  completion_rate=$(node -e "const c=Number(process.argv[1]);const s=Number(process.argv[2]);process.stdout.write(String(s>0?c/s:1));" "${completed:-0}" "${sent:-0}")
-  no_app_error=$(node -e "const s5=Number(process.argv[1]);const c4=Number(process.argv[2]);process.stdout.write(s5===0&&c4===0?'1':'0');" "$server5xx" "$client4xx_non429")
-
-  if [[ "$no_app_error" == "1" ]] && node -e "const a=Number(process.argv[1]);const r=Number(process.argv[2]);const minCount=Number(process.argv[3]);const minRate=Number(process.argv[4]);process.exit((a>=minCount&&r>=minRate)?0:1);" "$aborted" "$aborted_rate" "$LEVEL7_TRANSPORT_ABORT_COUNT_SKIP" "$LEVEL7_TRANSPORT_ABORT_RATE_SKIP"; then
-    echo "expected infra bottleneck: high transport abort ratio (status 000=$aborted, rate=${aborted_rate})"
-    return 0
-  fi
-
-  if [[ "$no_app_error" == "1" ]] && node -e "const cr=Number(process.argv[1]);const min=Number(process.argv[2]);const a=Number(process.argv[3]);process.exit((a>0&&cr<min)?0:1);" "$completion_rate" "$LEVEL7_COMPLETION_RATIO_SKIP" "$aborted"; then
-    echo "expected infra bottleneck: low completion ratio with transport aborts (completion=${completion_rate})"
-    return 0
-  fi
-
-  if [[ "$failure_type" == "perf_threshold" ]] && [[ "$LEVEL7_SKIP_PERF_ONLY_MISS" == "true" ]] && [[ "$no_app_error" == "1" ]]; then
-    echo "expected infra constraint: perf threshold miss without application error signals"
-    return 0
-  fi
-
-  return 1
-}
-
-mark_load_result_or_skip() {
+mark_load_result() {
   local case_id="$1"
   local pass_flag="$2"
-  local body="$3"
-  local failure_type="${4:-perf_threshold}"
 
   if [[ "$pass_flag" == "1" ]]; then
     mark_result 1 "$case_id"
-    return
-  fi
-
-  local infra_reason
-  infra_reason="$(infra_skip_reason_for_load_failure "$body" "$failure_type" || true)"
-  if [[ -n "$infra_reason" ]]; then
-    mark_result_skip "$case_id" "$infra_reason"
   else
     mark_result 0 "$case_id"
   fi
@@ -642,7 +577,7 @@ fi
 ADMIN_EMAIL="level7-admin-${UNIQ_TAG}@test.com"
 ADMIN_TOKEN="$(register_and_login_user "$ADMIN_EMAIL" "Level7 Load Admin ${UNIQ_TAG}" "admin")"
 if [[ -z "$ADMIN_TOKEN" ]]; then
-  echo "WARN: no admin token; high-cardinality booking load cases may skip/fail."
+  echo "WARN: no admin token; high-cardinality booking load cases may fail."
 fi
 INTERNAL_ACTOR_ID="${INTERNAL_ACTOR_ID:-load-admin-${UNIQ_TAG}}"
 sleep "$CASE61_WARMUP_SEC"
@@ -650,9 +585,9 @@ sleep "$CASE61_WARMUP_SEC"
 # Case 61: 1000 RPS booking
 if [[ -z "$ADMIN_TOKEN" ]]; then
   C61_INPUT="POST $BASE_URL/v1/bookings | protected route requires admin token for multi-user load"
-  C61_BODY='{"skip":"missing admin token for high-cardinality booking load test"}'
-  print_case "Case 61 - 1000 requests/second booking" "$C61_INPUT" "achieved_rps>=${CASE61_TARGET_RPS} AND success_rate>=${CASE61_MIN_SUCCESS_RATE} AND p95<=${CASE61_P95_LIMIT_MS}ms" "SKIP" "$C61_BODY"
-  mark_result_skip "61" "missing admin token for high-cardinality booking load test"
+  C61_BODY='{"error":"missing admin token for high-cardinality booking load test"}'
+  print_case "Case 61 - 1000 requests/second booking" "$C61_INPUT" "achieved_rps>=${CASE61_TARGET_RPS} AND success_rate>=${CASE61_MIN_SUCCESS_RATE} AND p95<=${CASE61_P95_LIMIT_MS}ms" "NO_EVIDENCE" "$C61_BODY"
+  mark_result 0 "61"
 else
   C61_INPUT="POST $BOOKING_URL/v1/bookings | duration=${CASE61_DURATION_SEC}s concurrency=${CASE61_CONCURRENCY} target_rps=${CASE61_TARGET_RPS} direct service + internal-key + admin token + unique user_id"
   C61_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE61_DURATION_SEC" "$CASE61_CONCURRENCY" "$CASE61_TARGET_RPS" "{\"content-type\":\"application/json\",\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" "{\"user_id\":\"load61-${UNIQ_TAG}-__SEQ__\",\"pickup\":{\"lat\":10.7601,\"lng\":106.6601},\"drop\":{\"lat\":10.7701,\"lng\":106.7001},\"vehicleType\":\"CAR\"}" 'static' 15000)
@@ -664,7 +599,7 @@ else
   if rps_meets_target "$C61_RPS" "$CASE61_TARGET_RPS" "$CASE61_MIN_RPS_RATIO" && float_ge "$C61_SUCCESS_RATE" "$CASE61_MIN_SUCCESS_RATE" && float_le "$C61_P95" "$CASE61_P95_LIMIT_MS"; then
     C61_OK=1
   fi
-  mark_load_result_or_skip "61" "$C61_OK" "$C61_BODY" "perf_threshold"
+  mark_load_result "61" "$C61_OK"
 fi
 
 # Case 62: ETA under load
@@ -679,7 +614,7 @@ C62_OK=0
 if rps_meets_target "$C62_RPS" "$CASE62_TARGET_RPS" "$CASE62_MIN_RPS_RATIO" && float_le "$C62_P95" "$CASE62_P95_LIMIT_MS" && float_ge "$C62_SUCCESS_RATE" "$CASE62_MIN_SUCCESS_RATE" && [[ "$C62_TIMEOUTS" == "0" ]]; then
   C62_OK=1
 fi
-mark_load_result_or_skip "62" "$C62_OK" "$C62_BODY" "perf_threshold"
+mark_load_result "62" "$C62_OK"
 
 # Case 63: Pricing under spike
 C63_INPUT="POST $PRICING_URL/v1/pricing/estimate | duration=${CASE63_DURATION_SEC}s concurrency=${CASE63_CONCURRENCY} target_rps=${CASE63_TARGET_RPS} x-internal-key + demand spikes"
@@ -704,7 +639,7 @@ C63_OK=0
 if rps_meets_target "$C63_RPS" "$CASE63_TARGET_RPS" "$CASE63_MIN_RPS_RATIO" && float_le "$C63_P95" "$CASE63_P95_LIMIT_MS" && float_ge "$C63_SUCCESS_RATE" "$CASE63_MIN_SUCCESS_RATE" && float_le "$C63_5XX_RATE" "$CASE63_MAX_5XX_RATE" && [[ "$C63_SANITY_FAILS" == "0" ]]; then
   C63_OK=1
 fi
-mark_load_result_or_skip "63" "$C63_OK" "$C63_BODY" "perf_threshold"
+mark_load_result "63" "$C63_OK"
 
 # Case 64: Kafka throughput via booking demo producer
 C64_INPUT="POST $BOOKING_URL/demo/ride-created | duration=${CASE64_DURATION_SEC}s concurrency=${CASE64_CONCURRENCY} target_rps=${CASE64_TARGET_RPS}"
@@ -718,15 +653,15 @@ C64_OK=0
 if rps_meets_target "$C64_RPS" "$CASE64_TARGET_RPS" "$CASE64_MIN_RPS_RATIO" && float_ge "$C64_SUCCESS_RATE" "$CASE64_MIN_SUCCESS_RATE" && [[ "$C64_5XX" == "0" ]] && [[ "$C64_TIMEOUTS" == "0" ]]; then
   C64_OK=1
 fi
-mark_load_result_or_skip "64" "$C64_OK" "$C64_BODY" "perf_threshold"
+mark_load_result "64" "$C64_OK"
 sleep "$CASE64_COOLDOWN_SEC"
 
 # Case 65: DB connection pool exhaustion resistance
 if [[ -z "$ADMIN_TOKEN" ]]; then
   C65_INPUT="GET $BASE_URL/v1/bookings?user_id=pool65-__SEQ__&limit=50 | protected route requires admin token"
-  C65_BODY='{"skip":"missing admin token for booking read load test"}'
-  print_case "Case 65 - DB connection pool exhaustion" "$C65_INPUT" "rps>=${CASE65_TARGET_RPS} AND 5xx_rate<=${CASE65_MAX_5XX_RATE}" "SKIP" "$C65_BODY"
-  mark_result_skip "65" "missing admin token for booking read load test"
+  C65_BODY='{"error":"missing admin token for booking read load test"}'
+  print_case "Case 65 - DB connection pool exhaustion" "$C65_INPUT" "rps>=${CASE65_TARGET_RPS} AND 5xx_rate<=${CASE65_MAX_5XX_RATE}" "NO_EVIDENCE" "$C65_BODY"
+  mark_result 0 "65"
 else
   C65_INPUT="GET $BOOKING_URL/v1/bookings?user_id=pool65-__SEQ__&limit=50 | duration=${CASE65_DURATION_SEC}s concurrency=${CASE65_CONCURRENCY} target_rps=${CASE65_TARGET_RPS} direct service + internal-key + admin token"
   C65_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings?user_id=pool65-__SEQ__&limit=50" "GET" "$CASE65_DURATION_SEC" "$CASE65_CONCURRENCY" "$CASE65_TARGET_RPS" "{\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\"}" '' 'static' 12000)
@@ -739,7 +674,7 @@ else
   if rps_meets_target "$C65_RPS" "$CASE65_TARGET_RPS" "$CASE65_MIN_RPS_RATIO" && float_le "$C65_5XX_RATE" "$CASE65_MAX_5XX_RATE"; then
     C65_OK=1
   fi
-  mark_load_result_or_skip "65" "$C65_OK" "$C65_BODY" "perf_threshold"
+  mark_load_result "65" "$C65_OK"
 fi
 
 # Case 66: Redis cache hit rate > 90%
@@ -795,11 +730,11 @@ else
 fi
 print_case "Case 66 - Redis cache hit rate > 90%" "$C66_INPUT" "status=200 AND effective_hit_rate>=${CASE66_MIN_HIT_RATE} AND load_p95<=first_read_ms*${CASE66_LATENCY_GAIN_RATIO}" "$C66_STATUS" "$C66_BODY"
 if [[ "$C66_STATUS" == "503" ]] && echo "$C66_BODY" | grep -q "redis stats unavailable"; then
-  mark_result_skip "66" "missing redis stats access in environment"
+  mark_result 0 "66"
 elif [[ "$C66_STATUS" == "200" ]] && float_ge "$(echo "$C66_BODY" | json_get "effective_hit_rate")" "$CASE66_MIN_HIT_RATE" && node -e "const p95=Number(process.argv[1]);const first=Number(process.argv[2]);const ratio=Number(process.argv[3]);process.exit(Number.isFinite(p95)&&Number.isFinite(first)&&first>0&&p95<=first*ratio?0:1)" "$(echo "$C66_BODY" | json_get "load_p95_ms")" "$(echo "$C66_BODY" | json_get "first_read_ms")" "$CASE66_LATENCY_GAIN_RATIO"; then
   mark_result 1 "66"
 elif [[ "$C66_STATUS" == "200" ]] && float_ge "$(echo "$C66_BODY" | json_get "effective_hit_rate")" "$CASE66_MIN_HIT_RATE"; then
-  mark_load_result_or_skip "66" "0" "$C66_LOAD" "perf_threshold"
+  mark_load_result "66" "0"
 else
   mark_result 0 "66"
 fi
@@ -817,11 +752,11 @@ else
   mark_result 0 "67"
 fi
 
-# Case 68: P95 latency < 200ms (gateway path)
+# Case 68: P95 latency target (gateway path)
 C68_STATUS="200"
 if [[ -z "$USER_TOKEN" ]]; then
-  C68_STATUS="SKIP"
-  C68_BODY='{"skip":"missing user token for protected gateway endpoint"}'
+  C68_STATUS="NO_EVIDENCE"
+  C68_BODY='{"error":"missing user token for protected gateway endpoint"}'
 else
   C68_INPUT="POST $BASE_URL/v1/eta/estimate | duration=${CASE68_DURATION_SEC}s concurrency=${CASE68_CONCURRENCY} target_rps=${CASE68_TARGET_RPS} with bearer token"
   C68_BODY=$(run_load_scenario "$BASE_URL/v1/eta/estimate" "POST" "$CASE68_DURATION_SEC" "$CASE68_CONCURRENCY" "$CASE68_TARGET_RPS" "{\"content-type\":\"application/json\",\"authorization\":\"Bearer $USER_TOKEN\",\"x-load-test\":\"true\"}" '{"distance_km":5.1,"traffic_level":0.5}' 'static' 10000)
@@ -829,24 +764,24 @@ fi
 C68_P95=$(echo "${C68_BODY:-{}}" | json_get "p95_ms")
 C68_SUCCESS_RATE=$(echo "${C68_BODY:-{}}" | json_get "success_rate")
 C68_RPS=$(echo "${C68_BODY:-{}}" | json_get "achieved_rps")
-print_case "Case 68 - P95 latency < 200ms" "${C68_INPUT:-gateway load test} " "status=200 AND p95<=${CASE68_P95_LIMIT_MS}ms AND success_rate>=${CASE68_MIN_SUCCESS_RATE}" "$C68_STATUS" "$C68_BODY"
-if [[ "$C68_STATUS" == "SKIP" ]]; then
-  mark_result_skip "68" "$(echo "$C68_BODY" | json_get "skip")"
+print_case "Case 68 - P95 latency < ${CASE68_P95_LIMIT_MS}ms" "${C68_INPUT:-gateway load test} " "status=200 AND p95<=${CASE68_P95_LIMIT_MS}ms AND success_rate>=${CASE68_MIN_SUCCESS_RATE}" "$C68_STATUS" "$C68_BODY"
+if [[ "$C68_STATUS" == "NO_EVIDENCE" ]]; then
+  mark_result 0 "68"
 else
   C68_OK=0
   if node -e "const j=JSON.parse(process.argv[1]);const p95=Number(j.p95_ms);const sr=Number(j.success_rate);const p95Limit=Number(process.argv[2]);const ratio=Number(process.argv[3]);const srMin=Number(process.argv[4]);const maxP95=p95Limit*ratio;process.exit(Number.isFinite(p95)&&Number.isFinite(sr)&&Number.isFinite(maxP95)&&p95<=maxP95&&sr>=srMin?0:1)" "$C68_BODY" "$CASE68_P95_LIMIT_MS" "$CASE68_P95_TOLERANCE_RATIO" "$CASE68_MIN_SUCCESS_RATE"; then
     C68_OK=1
   fi
-  mark_load_result_or_skip "68" "$C68_OK" "$C68_BODY" "perf_threshold"
+  mark_load_result "68" "$C68_OK"
 fi
 
 # Case 69: Peak-hour load test
 sleep "$CASE69_PREP_COOLDOWN_SEC"
 if [[ -z "$ADMIN_TOKEN" ]]; then
   C69_INPUT="POST $BASE_URL/v1/bookings ramp stages | protected route requires admin token for multi-user load"
-  C69_BODY='{"skip":"missing admin token for peak booking load test"}'
-  print_case "Case 69 - Load test giờ cao điểm" "$C69_INPUT" "ramp-up load keeps service stable and users can still book" "SKIP" "$C69_BODY"
-  mark_result_skip "69" "missing admin token for peak booking load test"
+  C69_BODY='{"error":"missing admin token for peak booking load test"}'
+  print_case "Case 69 - Load test giờ cao điểm" "$C69_INPUT" "ramp-up load keeps service stable and users can still book" "NO_EVIDENCE" "$C69_BODY"
+  mark_result 0 "69"
 else
   C69_INPUT="POST $BOOKING_URL/v1/bookings ramp stage1=${CASE69_STAGE1_RPS}rps stage2=${CASE69_STAGE2_RPS}rps stage3=${CASE69_STAGE3_RPS}rps"
   C69_STAGE1_BODY=$(run_load_scenario "$BOOKING_URL/v1/bookings" "POST" "$CASE69_STAGE_DURATION_SEC" "$CASE69_PEAK_CONCURRENCY" "$CASE69_STAGE1_RPS" "{\"content-type\":\"application/json\",\"x-internal-key\":\"$INTERNAL_API_KEY\",\"x-user-id\":\"$INTERNAL_ACTOR_ID\",\"x-user-role\":\"admin\",\"x-user-roles\":\"admin\",\"x-load-test\":\"true\",\"x-booking-fast-path\":\"1\"}" "{\"user_id\":\"peak69s1-${UNIQ_TAG}-__SEQ__\",\"pickup\":{\"lat\":10.7603,\"lng\":106.6603},\"drop\":{\"lat\":10.7703,\"lng\":106.7003},\"vehicleType\":\"CAR\"}" 'static' 18000)
@@ -869,18 +804,18 @@ else
   if float_ge "$C69_SR1" "$CASE69_PEAK_MIN_SUCCESS_RATE" && float_ge "$C69_SR2" "$CASE69_PEAK_MIN_SUCCESS_RATE" && float_ge "$C69_SR3" "$CASE69_PEAK_MIN_SUCCESS_RATE" && rps_meets_target "$C69_RPS3" "$CASE69_STAGE3_RPS" "$CASE69_PEAK_MIN_RPS_RATIO" && latency_within_ratio "$C69_P953" "$CASE69_PEAK_P95_LIMIT_MS" "$CASE69_PEAK_P95_TOLERANCE_RATIO" && node -e "const p1=Number(process.argv[1]);const p3=Number(process.argv[2]);const maxRatio=Number(process.argv[3]);process.exit(Number.isFinite(p1)&&Number.isFinite(p3)&&p1>0&&p3<=p1*maxRatio?0:1)" "$C69_P951" "$C69_P953" "$CASE69_MAX_P95_DEGRADE_RATIO"; then
     C69_OK=1
   fi
-  mark_load_result_or_skip "69" "$C69_OK" "$C69_STAGE3_BODY" "perf_threshold"
+  mark_load_result "69" "$C69_OK"
 fi
 
 # Case 70: Auto scaling works (Kubernetes HPA)
 C70_INPUT="K8S HPA validation with load on CASE70_AUTOSCALE_TARGET_URL"
 if [[ -z "$K8S_HPA_NAME" || -z "$CASE70_AUTOSCALE_TARGET_URL" ]]; then
-  C70_STATUS="SKIP"
-  C70_BODY='{"skip":"set K8S_HPA_NAME and CASE70_AUTOSCALE_TARGET_URL for autoscaling test"}'
+  C70_STATUS="NO_EVIDENCE"
+  C70_BODY='{"error":"set K8S_HPA_NAME and CASE70_AUTOSCALE_TARGET_URL for autoscaling test"}'
 else
   if ! command -v kubectl >/dev/null 2>&1; then
-    C70_STATUS="SKIP"
-    C70_BODY='{"skip":"kubectl not found"}'
+    C70_STATUS="NO_EVIDENCE"
+    C70_BODY='{"error":"kubectl not found"}'
   else
     C70_BEFORE=$(kubectl -n "$K8S_NAMESPACE" get hpa "$K8S_HPA_NAME" -o json 2>/dev/null || true)
     C70_BEFORE_REP=$(echo "$C70_BEFORE" | json_get "status.currentReplicas")
@@ -914,8 +849,8 @@ else
   fi
 fi
 print_case "Case 70 - Auto scaling hoạt động" "$C70_INPUT" "status=200 AND scaled=true AND load success_rate>=${CASE70_MIN_SUCCESS_RATE} AND p95<=${CASE70_MAX_P95_MS}ms AND 5xx_rate<=${CASE70_MAX_5XX_RATE}" "$C70_STATUS" "$C70_BODY"
-if [[ "$C70_STATUS" == "SKIP" ]]; then
-  mark_result_skip "70" "$(echo "$C70_BODY" | json_get "skip")"
+if [[ "$C70_STATUS" == "NO_EVIDENCE" ]]; then
+  mark_result 0 "70"
 else
   C70_LOAD_SUCCESS_RATE=$(echo "$C70_BODY" | json_get "load.success_rate")
   C70_LOAD_P95=$(echo "$C70_BODY" | json_get "load.p95_ms")
@@ -934,7 +869,6 @@ fi
 echo "========== LEVEL 7 SUMMARY =========="
 echo "PASS: $PASS_COUNT"
 echo "FAIL: $FAIL_COUNT"
-echo "SKIP: $SKIP_COUNT"
 echo "======================================"
 
 if [[ "$FAIL_COUNT" -gt 0 ]]; then

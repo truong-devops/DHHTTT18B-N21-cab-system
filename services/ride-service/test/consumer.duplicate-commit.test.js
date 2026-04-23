@@ -20,8 +20,12 @@ jest.mock('../src/cache/redis', () => ({
 }));
 
 const mockInsertInboxEvent = jest.fn();
+const mockMarkProcessedByEventId = jest.fn();
+const mockMarkFailedByEventId = jest.fn();
 jest.mock('../src/repository/inboxEventsRepository', () => ({
-  insertInboxEvent: (...args) => mockInsertInboxEvent(...args)
+  insertInboxEvent: (...args) => mockInsertInboxEvent(...args),
+  markProcessedByEventId: (...args) => mockMarkProcessedByEventId(...args),
+  markFailedByEventId: (...args) => mockMarkFailedByEventId(...args)
 }));
 
 jest.mock('../src/messaging/schemaRegistry', () => ({
@@ -31,6 +35,11 @@ jest.mock('../src/messaging/schemaRegistry', () => ({
 const mockPublishToDlq = jest.fn();
 jest.mock('../src/messaging/producer', () => ({
   publishToDlq: (...args) => mockPublishToDlq(...args)
+}));
+
+const mockProcessRow = jest.fn();
+jest.mock('../src/messaging/inboxProcessor', () => ({
+  processRow: (...args) => mockProcessRow(...args)
 }));
 
 const { start } = require('../src/messaging/consumer');
@@ -46,6 +55,9 @@ function buildMessage(envelope, offset = '0') {
 describe('ride consumer duplicate + commit semantics', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockProcessRow.mockResolvedValue({ ok: true });
+    mockMarkProcessedByEventId.mockResolvedValue(true);
+    mockMarkFailedByEventId.mockResolvedValue({ status: 'retry', retryInMs: 1000, attemptCount: 1, maxAttempts: 10 });
   });
 
   test('commits offset for duplicate event from inbox unique check', async () => {

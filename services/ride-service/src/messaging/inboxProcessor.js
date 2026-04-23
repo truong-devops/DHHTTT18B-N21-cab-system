@@ -302,4 +302,4 @@ function startInboxProcessor(intervalMs = DEFAULT_INTERVAL_MS) {
   return () => clearInterval(timer);
 }
 
-module.exports = { startInboxProcessor };
+module.exports = { startInboxProcessor, processRow };

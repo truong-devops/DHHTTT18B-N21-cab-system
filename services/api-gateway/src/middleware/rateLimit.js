@@ -30,8 +30,9 @@ function normalizeIpForRateLimit(ip) {
 
 function authLoginKey(req) {
   const ipKey = normalizeIpForRateLimit(req.ip);
-  const identifier = String(req.body?.identifier || req.body?.email || '').trim().toLowerCase();
-  return `${ipKey}|${identifier || 'anonymous'}`;
+  // Keep login throttling keyed by client IP so identifier rotation
+  // cannot bypass security limits during credential stuffing attacks.
+  return ipKey;
 }
 
 function isEtaEstimateRequest(req) {

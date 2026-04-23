@@ -1,50 +1,50 @@
 #!/usr/bin/env bash
 
-# Shared PDF-aligned metadata for test cases 1..100
-# Source of truth: final_PROJECT_grading-factor.pdf (Context and Input columns)
+# Shared metadata for test cases 1..100.
+# Cases 1..10 are aligned to level1.docx (Context and Input columns).
 
 get_case_context() {
   case "$1" in
-    1) echo "System is healthy; user does not exist yet." ;;
-    2) echo "User already exists in the system." ;;
-    3) echo "User is logged in and driver is available." ;;
-    4) echo "User already has at least one booking." ;;
-    5) echo "Driver exists in system." ;;
-    6) echo "Booking creation flow is successful." ;;
-    7) echo "ETA service is running." ;;
-    8) echo "Pricing service is running." ;;
-    9) echo "Booking already created." ;;
-    10) echo "User is currently logged in." ;;
-    11) echo "Create-booking request misses required field." ;;
-    12) echo "Input type is invalid (string lat/lng)." ;;
-    13) echo "No online driver available in area." ;;
-    14) echo "User selects unsupported payment method." ;;
-    15) echo "Pickup and drop are the same location." ;;
-    16) echo "Off-peak demand; demand_index is 0." ;;
-    17) echo "Fraud check request misses required fields." ;;
-    18) echo "Client uses expired access token." ;;
-    19) echo "Client retries exact same request with same idempotency key." ;;
-    20) echo "Client sends oversized payload." ;;
-    21) echo "Booking service must call ETA service." ;;
-    22) echo "Booking service must call Pricing service." ;;
-    23) echo "AI agent must choose a valid driver from driver list." ;;
-    24) echo "End-to-end booking + payment + notification flow." ;;
-    25) echo "New booking is created and event must be published." ;;
-    26) echo "Booking is assigned to driver." ;;
-    27) echo "Driver accepts ride." ;;
-    28) echo "AI agent needs MCP context." ;;
-    29) echo "Request passes through API gateway booking route." ;;
-    30) echo "Pricing service is slow/timeout." ;;
-    31) echo "Valid booking transaction should commit." ;;
-    32) echo "Error happens after DB insert step." ;;
-    33) echo "Payment fails after booking started." ;;
-    34) echo "Duplicate request with same idempotency key." ;;
-    35) echo "Two concurrent booking requests happen at same time." ;;
-    36) echo "Distributed saga success flow." ;;
-    37) echo "Distributed saga failure with compensation." ;;
-    38) echo "Outbox consistency between DB commit and event publish." ;;
-    39) echo "Network issue when calling payment dependency." ;;
-    40) echo "Complex transaction flow to validate ACID properties." ;;
+    1) echo "Hệ thống hoạt động bình thường, chưa tồn tại user." ;;
+    2) echo "User đã tồn tại trong hệ thống." ;;
+    3) echo "User đã login, driver available." ;;
+    4) echo "User đã có ít nhất 1 booking." ;;
+    5) echo "Driver tồn tại trong hệ thống." ;;
+    6) echo "Tạo booking thành công." ;;
+    7) echo "AI ETA service hoạt động." ;;
+    8) echo "Pricing service hoạt động." ;;
+    9) echo "Booking đã được tạo." ;;
+    10) echo "User đang login." ;;
+    11) echo "User gửi request tạo booking nhưng thiếu field bắt buộc." ;;
+    12) echo "Input sai kiểu dữ liệu (string thay vì float)." ;;
+    13) echo "Không có driver online trong khu vực." ;;
+    14) echo "User chọn phương thức thanh toán không tồn tại." ;;
+    15) echo "Pickup = Drop." ;;
+    16) echo "Không có nhu cầu (off-peak), demand_index = 0, supply_index = 1." ;;
+    17) echo "Gọi Fraud detection thiếu dữ liệu." ;;
+    18) echo "User dùng token hết hạn." ;;
+    19) echo "User gửi request giống nhau 2 lần (same idempotency_key)." ;;
+    20) echo "Client gửi request quá lớn." ;;
+    21) echo "Booking Service gọi AI ETA service." ;;
+    22) echo "Booking cần tính giá." ;;
+    23) echo "AI Agent cần chọn driver." ;;
+    24) echo "Booking hoàn chỉnh." ;;
+    25) echo "Booking mới được tạo." ;;
+    26) echo "Booking đã assign driver." ;;
+    27) echo "Driver accept chuyến." ;;
+    28) echo "AI Agent cần context." ;;
+    29) echo "Request đi qua API Gateway." ;;
+    30) echo "Pricing service chậm (simulate timeout)." ;;
+    31) echo "Transaction tao booking thanh cong." ;;
+    32) echo "Loi xay ra sau khi insert DB." ;;
+    33) echo "Payment fail sau khi booking duoc tao." ;;
+    34) echo "Client retry request trung lap." ;;
+    35) echo "2 request booking chay cung luc." ;;
+    36) echo "Distributed transaction (Booking -> Payment -> Notification)." ;;
+    37) echo "Payment fail sau booking, can compensation." ;;
+    38) echo "DB update + publish event (outbox pattern)." ;;
+    39) echo "Network fail khi goi Payment service." ;;
+    40) echo "Transaction phuc tap voi nhieu buoc DB operation." ;;
     41) echo "ETA model runs normally." ;;
     42) echo "Demand is high for surge scenario." ;;
     43) echo "Suspicious transaction should be flagged by fraud model." ;;
@@ -120,37 +120,37 @@ get_case_input() {
     7) echo '{"distance_km":5,"traffic_level":0.5}' ;;
     8) echo '{"distance_km":5,"demand_index":1.0}' ;;
     9) echo '{"user_id":"USR123","message":"Your ride is confirmed"}' ;;
-    10) echo 'Authorization: Bearer <token>' ;;
+    10) echo 'Header: Authorization Bearer token' ;;
     11) echo '{"drop":{"lat":10.77,"lng":106.70}}' ;;
     12) echo '{"pickup":{"lat":"abc","lng":106.66},"drop":{"lat":10.77,"lng":106.70}}' ;;
-    13) echo 'Valid booking request while no driver online' ;;
+    13) echo 'Booking hợp lệ' ;;
     14) echo '{"payment_method":"invalid_card"}' ;;
     15) echo '{"distance_km":0}' ;;
     16) echo '{"distance_km":5,"demand_index":0,"supply_index":1}' ;;
     17) echo '{"user_id":"USR123"}' ;;
-    18) echo 'Authorization: Bearer <expired_token>' ;;
+    18) echo 'Header: Authorization Bearer expired_token' ;;
     19) echo 'Same booking payload + same idempotency_key sent twice' ;;
     20) echo 'JSON payload > 1MB' ;;
     21) echo '{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70}}' ;;
     22) echo '{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70}}' ;;
-    23) echo 'Driver list from Driver Service for AI selection' ;;
-    24) echo 'Booking request + payment_method' ;;
-    25) echo 'User creates booking via /booking' ;;
-    26) echo 'driver_id for assigned booking notification' ;;
+    23) echo 'danh sách driver từ service' ;;
+    24) echo 'request booking + payment method' ;;
+    25) echo 'Bước 1: User đặt xe; Bước 2: Booking Service tạo booking; Bước 3: Publish event lên Kafka; Bước 4: service khác nhận event' ;;
+    26) echo 'driver_id' ;;
     27) echo '{"booking_id":"BK123","status":"ACCEPTED"}' ;;
-    28) echo 'AI agent context request to MCP gateway' ;;
-    29) echo 'Request to /booking via API gateway' ;;
-    30) echo 'Booking request with simulated pricing timeout' ;;
-    31) echo 'POST /booking (valid transaction)' ;;
-    32) echo 'Booking flow with simulated failure after insert' ;;
-    33) echo 'Booking + payment where payment fails' ;;
-    34) echo 'Same request with same Idempotency-Key' ;;
-    35) echo 'Two concurrent booking requests' ;;
-    36) echo 'Full saga: booking -> payment -> notification' ;;
-    37) echo 'Saga with simulated payment failure' ;;
-    38) echo 'Create booking and verify outbox/event consistency' ;;
-    39) echo 'Booking/payment with simulated network timeout' ;;
-    40) echo 'Complex multi-step transaction flow' ;;
+    28) echo 'request từ AI Agent' ;;
+    29) echo '/booking endpoint' ;;
+    30) echo 'simulate timeout' ;;
+    31) echo 'request /booking' ;;
+    32) echo 'simulate loi sau buoc tao booking' ;;
+    33) echo 'booking + payment' ;;
+    34) echo 'cung Idempotency-Key' ;;
+    35) echo '2 request booking song song' ;;
+    36) echo 'full flow' ;;
+    37) echo 'simulate failure' ;;
+    38) echo 'create booking' ;;
+    39) echo 'simulate timeout' ;;
+    40) echo 'User dat xe -> tao booking -> tinh gia -> thanh toan -> assign driver' ;;
     41) echo 'distance=5km' ;;
     42) echo '{"demand_index":2}' ;;
     43) echo 'Suspicious transaction features for fraud score' ;;
@@ -214,4 +214,3 @@ get_case_input() {
     *) echo "" ;;
   esac
 }
-

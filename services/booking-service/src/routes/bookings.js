@@ -851,6 +851,7 @@ router.post('/', async (req, res) => {
       normalizedBody?.simulate_tx_failure_after_insert === true || normalizedBody?.simulateTransactionFailureAfterInsert === true;
 
     let noDriversAvailable = false;
+    let precomputedAiDecision = null;
     if (!bookingFastPathEnabled) {
       const availability = await getDriverAvailability({
         pickup,
@@ -871,6 +872,20 @@ router.post('/', async (req, res) => {
       authorization,
       fastPathHint: bookingFastPathHint
     });
+    if (!bookingFastPathEnabled) {
+      precomputedAiDecision = await buildAiDriverDecision({
+        pickup,
+        vehicleType,
+        authorization,
+        traceId
+      });
+    }
+    const hasAiSelectedDriver = Boolean(precomputedAiDecision?.selectedDriver);
+    const hasAiAvailableDrivers =
+      Array.isArray(precomputedAiDecision?.availableDrivers) && precomputedAiDecision.availableDrivers.length > 0;
+    const noDriversResolved =
+      !bookingFastPathEnabled && (noDriversAvailable || (!hasAiSelectedDriver && !hasAiAvailableDrivers));
+    const initialBookingStatus = noDriversResolved ? 'PENDING' : 'REQUESTED';
 
     const resolvedDistanceKm = Number.isFinite(distance_km)
       ? distance_km
@@ -895,7 +910,7 @@ router.post('/', async (req, res) => {
         distanceKm: resolvedDistanceKm,
         etaMinutes: eta.etaMinutes,
         priceSnapshot: persistedQuote,
-        status: 'REQUESTED',
+        status: initialBookingStatus,
         createdAt
       };
       const skipPersistInLoadMode = loadTestRequest && hasPrivilegedRole(req) && isLoadSkipPersistEnabled();
@@ -960,7 +975,7 @@ router.post('/', async (req, res) => {
           distanceKm: resolvedDistanceKm,
           etaMinutes: eta.etaMinutes,
           priceSnapshot: persistedQuote,
-          status: 'REQUESTED',
+          status: initialBookingStatus,
           createdAt
         });
 
@@ -1107,12 +1122,12 @@ router.post('/', async (req, res) => {
     }
 
     if (!result.replay && responsePayload?.booking && !bookingFastPathEnabled) {
-      const aiDecision = await buildAiDriverDecision({
+      const aiDecision = precomputedAiDecision || (await buildAiDriverDecision({
         pickup,
         vehicleType,
         authorization,
         traceId
-      });
+      }));
       responsePayload.ai_driver_decision = {
         available_drivers: aiDecision.availableDrivers,
         selected_driver: aiDecision.selectedDriver
@@ -1120,7 +1135,7 @@ router.post('/', async (req, res) => {
 
       const hasSelectedDriver = Boolean(aiDecision?.selectedDriver);
       const hasAvailableDrivers = Array.isArray(aiDecision?.availableDrivers) && aiDecision.availableDrivers.length > 0;
-      if (noDriversAvailable && !hasSelectedDriver && !hasAvailableDrivers) {
+      if (noDriversResolved && !hasSelectedDriver && !hasAvailableDrivers) {
         responsePayload.message = 'No drivers available';
       }
 
@@ -1621,6 +1636,112 @@ router.patch('/:id/status', async (req, res) => {
     }
     logger.withTrace(req).error({ err: { message: error.message, code: error.code || 'UNKNOWN' } }, 'failed to update booking status');
     return res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/internal/payment-failed-compensation', async (req, res) => {
+  try {
+    if (!hasAnyRole(req, ['service', 'admin', 'ops'])) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const traceId = req.traceId || req.header('x-trace-id');
+    const rideId = String(req.body?.rideId || req.body?.ride_id || '').trim();
+    const failureReason = String(req.body?.reason || 'PAYMENT_FAILED').trim().slice(0, 255) || 'PAYMENT_FAILED';
+    if (!rideId) {
+      return res.status(400).json({ error: 'rideId is required' });
+    }
+
+    const result = await withTransaction(async (client) => {
+      const existing = await bookingRepo.getByRideIdForUpdate(client, rideId);
+      if (!existing) {
+        return {
+          status: 'NOT_FOUND',
+          booking: null,
+          publishedEvent: null
+        };
+      }
+
+      const currentStatus = String(existing.status || '').toUpperCase();
+      if (currentStatus === 'CANCELLED') {
+        return {
+          status: 'ALREADY_CANCELLED',
+          booking: existing,
+          publishedEvent: null
+        };
+      }
+      if (!isActiveBookingStatus(currentStatus)) {
+        return {
+          status: 'TERMINAL_STATUS',
+          booking: existing,
+          publishedEvent: null
+        };
+      }
+
+      const cancelled = await bookingRepo.cancel(client, existing.bookingId);
+      const eventId = crypto.randomUUID();
+      const envelope = buildEnvelope({
+        eventId,
+        traceId,
+        type: 'RideCancelled',
+        payload: {
+          rideId: cancelled.rideId,
+          reason: failureReason,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      await outboxRepo.insertOutboxEvent(
+        client,
+        buildOutboxRecord({
+          eventId,
+          topic: topics.RideCancelled,
+          eventType: 'RideCancelled',
+          aggregateId: cancelled.bookingId,
+          partitionKey: cancelled.rideId,
+          envelope
+        })
+      );
+
+      return {
+        status: 'CANCELLED',
+        booking: cancelled,
+        publishedEvent: {
+          topic: topics.RideCancelled,
+          eventId,
+          queued: true
+        }
+      };
+    });
+
+    if (result.status === 'NOT_FOUND') {
+      return res.status(404).json({
+        applied: false,
+        code: 'BOOKING_NOT_FOUND',
+        ride_id: rideId
+      });
+    }
+
+    return res.status(200).json({
+      applied: result.status === 'CANCELLED',
+      code: result.status,
+      booking: result.booking ? mapBookingCompat(result.booking) : null,
+      publishedEvent: result.publishedEvent
+    });
+  } catch (error) {
+    logger.withTrace(req).error(
+      {
+        err: {
+          message: error.message,
+          code: error.code || 'UNKNOWN'
+        }
+      },
+      'failed internal payment-failed compensation'
+    );
+    return res.status(500).json({
+      error: error.message,
+      code: 'INTERNAL_COMPENSATION_FAILED'
+    });
   }
 });
 

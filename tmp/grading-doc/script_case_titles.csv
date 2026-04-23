@@ -1,0 +1,101 @@
+Case,Script,Line,ScriptTitle,SourceType,Entries
+1,test-level1-1-10cases.sh,353,register user,print_case,1
+2,test-level1-1-10cases.sh,381,login + JWT payload,print_case,1
+3,test-level1-1-10cases.sh,415,create booking valid,print_case,1
+4,test-level1-1-10cases.sh,432,list bookings by user_id,print_case,1
+5,test-level1-1-10cases.sh,451,driver online,print_case,1
+6,test-level1-1-10cases.sh,466,booking status requested,print_case,1
+7,test-level1-1-10cases.sh,485,ETA estimate,print_case,1
+8,test-level1-1-10cases.sh,506,pricing estimate,print_case,1
+9,test-level1-1-10cases.sh,520,notification send,print_case,1
+10,test-level1-1-10cases.sh,535,logout invalid token,print_case,1
+11,test-level2-11-20cases.sh,210,missing pickup,print_case,1
+12,test-level2-11-20cases.sh,222,invalid lat/lng type,print_case,1
+13,test-level2-11-20cases.sh,232,no drivers online,print_case,1
+14,test-level2-11-20cases.sh,251,invalid payment method,print_case,1
+15,test-level2-11-20cases.sh,263,ETA distance=0,print_case,1
+16,test-level2-11-20cases.sh,276,pricing demand=0,print_case,1
+17,test-level2-11-20cases.sh,291,fraud missing fields,print_case,1
+18,test-level2-11-20cases.sh,337,expired token,print_case,1
+19,test-level2-11-20cases.sh,358,duplicate booking/idempotency,echo,1
+20,test-level2-11-20cases.sh,387,payload too large,print_case,1
+21,test-level3-21-30cases.sh,384,booking calls ETA,print_case,1
+22,test-level3-21-30cases.sh,404,booking calls pricing,print_case,1
+23,test-level3-21-30cases.sh,422,AI selects valid driver,print_case,1
+24,test-level3-21-30cases.sh,467,Booking -> Payment -> Notification,print_case,1
+25,test-level3-21-30cases.sh,489,publish ride_requested,print_case,1
+26,test-level3-21-30cases.sh,517,driver notification on assign,print_case,1
+27,test-level3-21-30cases.sh,524,status REQUESTED -> ACCEPTED,print_case,1
+28,test-level3-21-30cases.sh,548,MCP context fetch,print_case,1
+29,test-level3-21-30cases.sh,566,API Gateway routes booking correctly,print_case,1
+30,test-level3-21-30cases.sh,583,pricing timeout retry/fallback,print_case,1
+31,test-level4-31-40cases.sh,438,transaction create success,print_case,1
+32,test-level4-31-40cases.sh,460,rollback mid-transaction,print_case,1
+33,test-level4-31-40cases.sh,471,payment failed -> booking cancelled,print_case,2
+34,test-level4-31-40cases.sh,538,idempotent duplicate request,print_case,2
+35,test-level4-31-40cases.sh,571,concurrent booking race,print_case,2
+36,test-level4-31-40cases.sh,647,saga success flow,print_case,1
+37,test-level4-31-40cases.sh,658,saga failure compensation,print_case,2
+38,test-level4-31-40cases.sh,740,outbox consistency,print_case,2
+39,test-level4-31-40cases.sh,770,partial failure payment timeout,print_case,2
+40,test-level4-31-40cases.sh,825,ACID summary,print_case,1
+41,test-level5-41-50cases.sh,218,ETA range (strict),print_case,1
+42,test-level5-41-50cases.sh,236,Surge strict,print_case,1
+43,test-level5-41-50cases.sh,251,Fraud strict,print_case,1
+44,test-level5-41-50cases.sh,262,Recommendation strict,print_case,1
+45,test-level5-41-50cases.sh,299,Forecast strict format,print_case,1
+46,test-level5-41-50cases.sh,354,Model version strict,print_case,1
+47,test-level5-41-50cases.sh,391,AI latency strict,print_case,1
+48,test-level5-41-50cases.sh,407,Drift strict,print_case,1
+49,test-level5-41-50cases.sh,420,Fallback strict,print_case,1
+50,test-level5-41-50cases.sh,438,Abnormal input strict,print_case,1
+51,test-level6-51-60cases.sh,262,nearest online driver,print_case,1
+52,test-level6-51-60cases.sh,285,highest rating strategy,print_case,1
+53,test-level6-51-60cases.sh,306,balance ETA and price,print_case,1
+54,test-level6-51-60cases.sh,327,correct tool calls,print_case,1
+55,test-level6-51-60cases.sh,347,missing context/features,print_case,1
+56,test-level6-51-60cases.sh,371,retry on tool failure,print_case,1
+57,test-level6-51-60cases.sh,390,never select offline,print_case,1
+58,test-level6-51-60cases.sh,413,full decision logging,print_case,1
+59,test-level6-51-60cases.sh,499,parallel requests,print_case,1
+60,test-level6-51-60cases.sh,514,fallback when AI fails,print_case,1
+61,test-level7-61-70cases.sh,654,1000 requests/second booking,print_case,2
+62,test-level7-61-70cases.sh,677,ETA service under load,print_case,1
+63,test-level7-61-70cases.sh,702,Pricing service under spike,print_case,1
+64,test-level7-61-70cases.sh,716,Kafka throughput test,print_case,1
+65,test-level7-61-70cases.sh,728,DB connection pool exhaustion,print_case,2
+66,test-level7-61-70cases.sh,796,Redis cache hit rate > 90%,print_case,1
+67,test-level7-61-70cases.sh,813,API Gateway rate limit,print_case,1
+68,test-level7-61-70cases.sh,832,P95 latency < 200ms,print_case,1
+69,test-level7-61-70cases.sh,848,Load test giờ cao điểm,print_case,2
+70,test-level7-61-70cases.sh,916,Auto scaling hoạt động,print_case,1
+71,test-level8-71-80cases.sh,417,Driver service down -> fallback,print_case,1
+72,test-level8-71-80cases.sh,454,Pricing timeout -> retry + fallback,print_case,1
+73,test-level8-71-80cases.sh,492,Kafka down -> buffer event,print_case,1
+74,test-level8-71-80cases.sh,543,DB restart recovery,print_case,1
+75,test-level8-71-80cases.sh,579,Circuit breaker fail-fast,print_case,1
+76,test-level8-71-80cases.sh,618,Partial failure (driver + eta down),print_case,1
+77,test-level8-71-80cases.sh,651,Exponential backoff policy,print_case,1
+78,test-level8-71-80cases.sh,678,Service mesh routing fail (fallback route),print_case,1
+79,test-level8-71-80cases.sh,722,Network partition simulation,print_case,1
+80,test-level8-71-80cases.sh,786,Graceful degradation,print_case,1
+81,test-level9-81-90cases.sh,388,SQL injection attempt,print_case,1
+82,test-level9-81-90cases.sh,417,XSS input test,print_case,1
+83,test-level9-81-90cases.sh,461,JWT tampering,print_case,1
+84,test-level9-81-90cases.sh,488,Unauthorized API access,print_case,1
+85,test-level9-81-90cases.sh,578,Rate limit attack,print_case,1
+86,test-level9-81-90cases.sh,635,Replay attack (idempotency),print_case,1
+87,test-level9-81-90cases.sh,643,Data encryption at rest,comment,1
+88,test-level9-81-90cases.sh,646,mTLS communication,comment,1
+89,test-level9-81-90cases.sh,670,RBAC enforcement,print_case,1
+90,test-level9-81-90cases.sh,735,Sensitive data masking,print_case,1
+91,test-level10-91-100cases.sh,398,Missing token,print_case,1
+92,test-level10-91-100cases.sh,424,Tampered JWT,print_case,1
+93,test-level10-91-100cases.sh,452,Expired token,print_case,1
+94,test-level10-91-100cases.sh,461,mTLS service-to-service,comment,1
+95,test-level10-91-100cases.sh,499,RBAC (user calls admin),print_case,1
+96,test-level10-91-100cases.sh,521,Least privilege,print_case,1
+97,test-level10-91-100cases.sh,549,Bypass gateway,print_case,1
+98,test-level10-91-100cases.sh,608,Rate limiting,print_case,1
+99,test-level10-91-100cases.sh,625,Encryption in transit (HTTPS only),print_case,3
+100,test-level10-91-100cases.sh,684,Audit logging,print_case,1

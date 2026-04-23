@@ -74,6 +74,104 @@ function normalizeSagaReason(value, fallback) {
   return normalized.slice(0, 255);
 }
 
+function resolveCompensationActorId(actor) {
+  if (isEightDigitId(actor)) {
+    return String(actor).trim();
+  }
+  return '10000000';
+}
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function compensateBookingForPaymentFailure({ payment, traceId, requestId, actor }) {
+  const sagaConfig = config.saga?.bookingCompensationOnPaymentFailed || {};
+  if (!sagaConfig.enabled) {
+    return { attempted: false, ok: true, skipped: 'disabled' };
+  }
+
+  const rideId = String(payment?.rideId || '').trim();
+  const baseUrl = String(config.services?.booking || '').replace(/\/+$/, '');
+  const path = String(sagaConfig.path || '/v1/bookings/internal/payment-failed-compensation').trim();
+  if (!rideId || !baseUrl || !path) {
+    return { attempted: false, ok: false, skipped: 'missing_config_or_ride' };
+  }
+
+  const actorId = resolveCompensationActorId(actor);
+  const maxAttempts = Math.max(1, Number(sagaConfig.maxAttempts || 1));
+  const timeoutMs = Math.max(300, Number(sagaConfig.timeoutMs || 2500));
+  const retryBackoffMs = Math.max(0, Number(sagaConfig.retryBackoffMs || 200));
+
+  const url = `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+  const payload = {
+    rideId,
+    paymentId: payment.id,
+    reason: normalizeSagaReason(payment.failureReason, 'PAYMENT_FAILED')
+  };
+
+  let lastStatus = 0;
+  let lastBody = '';
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-key': String(config.internalApiKey || ''),
+          'x-user-id': actorId,
+          'x-user-role': 'service',
+          'x-user-roles': 'service',
+          ...(traceId ? { 'x-trace-id': traceId } : {}),
+          ...(requestId ? { 'x-request-id': requestId } : {})
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+
+      lastStatus = response.status;
+      lastBody = await response.text();
+      if (response.ok) {
+        return {
+          attempted: true,
+          ok: true,
+          status: response.status,
+          body: lastBody
+        };
+      }
+
+      const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+      if (!retryable || attempt >= maxAttempts) {
+        break;
+      }
+      if (retryBackoffMs > 0) {
+        await sleep(retryBackoffMs);
+      }
+    } catch (error) {
+      clearTimeout(timeout);
+      lastStatus = 0;
+      lastBody = error?.message || 'compensation_request_failed';
+      if (attempt >= maxAttempts) {
+        break;
+      }
+      if (retryBackoffMs > 0) {
+        await sleep(retryBackoffMs);
+      }
+    }
+  }
+
+  return {
+    attempted: true,
+    ok: false,
+    status: lastStatus,
+    body: lastBody
+  };
+}
+
 async function resolvePayosQrCode({ payosData, traceId, requestId, authorization }) {
   if (!payosData || !payosData.qrCode) {
     return payosData;
@@ -254,10 +352,29 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
   }
 
   if (payment.status === status) {
+    if (status === STATUSES.FAILED) {
+      const compensation = await compensateBookingForPaymentFailure({
+        payment,
+        traceId,
+        requestId,
+        actor
+      });
+      if (!compensation.ok) {
+        log.warn(
+          {
+            paymentId: payment.id,
+            rideId: payment.rideId,
+            compensationStatus: compensation.status || 0,
+            compensationBody: compensation.body || null
+          },
+          'Booking compensation call failed after repeated FAILED status'
+        );
+      }
+    }
     return payment;
   }
 
-  return withTransaction(async (client) => {
+  const updated = await withTransaction(async (client) => {
     const updated = await updatePaymentStatus(client, paymentId, status, failureReason);
     await insertStatusHistory(client, {
       paymentId,
@@ -301,6 +418,28 @@ async function changePaymentStatus({ paymentId, statusUpdate, traceId, requestId
 
     return updated;
   });
+
+  if (status === STATUSES.FAILED) {
+    const compensation = await compensateBookingForPaymentFailure({
+      payment: updated,
+      traceId,
+      requestId,
+      actor
+    });
+    if (!compensation.ok) {
+      log.warn(
+        {
+          paymentId: updated.id,
+          rideId: updated.rideId,
+          compensationStatus: compensation.status || 0,
+          compensationBody: compensation.body || null
+        },
+        'Booking compensation call failed for payment FAILED transition'
+      );
+    }
+  }
+
+  return updated;
 }
 
 async function compensatePaymentForRideCancelled({ rideId, reason, traceId, requestId }) {

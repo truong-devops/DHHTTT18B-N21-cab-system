@@ -4,7 +4,9 @@ const config = require('../config');
 const kafka = new Kafka({
   clientId: config.kafka.clientId,
   brokers: config.kafka.brokers,
-  retry: config.kafka.producerRetry
+  retry: config.kafka.producerRetry,
+  requestTimeout: config.kafka.requestTimeoutMs,
+  connectionTimeout: config.kafka.connectionTimeoutMs
 });
 
 let producerPromise = null;
