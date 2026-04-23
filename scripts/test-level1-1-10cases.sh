@@ -177,7 +177,23 @@ call_json() {
 register_user() {
   local email="$1"
   local name="$2"
-  call_json POST "/v1/auth/register" "" "{\"email\":\"$email\",\"password\":\"$USER_PASS\",\"name\":\"$name\"}"
+  local username_base
+  username_base=$(echo "$email" | sed 's/[^a-zA-Z0-9]/_/g' | cut -c1-40)
+  local out='000
+{"error":"register_not_attempted"}'
+  local attempt=1
+  while [[ "$attempt" -le 4 ]]; do
+    local candidate_username="${username_base}_$RANDOM"
+    out=$(call_json POST "/v1/auth/register" "" "{\"email\":\"$email\",\"username\":\"$candidate_username\",\"password\":\"$USER_PASS\",\"name\":\"$name\"}")
+    local status
+    status=$(echo "$out" | sed -n '1p')
+    if [[ "$status" == "201" || "$status" == "200" || "$status" == "409" ]]; then
+      break
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+  printf '%s' "$out"
 }
 
 login_user() {
@@ -308,7 +324,7 @@ ensure_online_driver() {
 new_case_user_token() {
   local case_label="$1"
   local email="l1-${case_label}-${UNIQ_TAG}-${RANDOM}@test.com"
-  register_and_login_user "$email" "Level1 ${case_label}"
+  register_and_login_user "$email" "Level1 ${case_label} ${UNIQ_TAG} ${RANDOM}"
 }
 
 echo "== Setup tokens and baseline users for Level 1 =="
