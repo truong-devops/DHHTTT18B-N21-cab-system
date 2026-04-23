@@ -131,7 +131,7 @@ RIDE_JSON=$(curl -s -X POST "$BASE_URL/v1/rides" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Idempotency-Key: ride-test-$NOW_TS" \
   -H "Content-Type: application/json" \
-  -d '{"pickupLat":10.76,"pickupLng":106.66}')
+  -d '{"pickupLat":10.76,"pickupLng":106.66,"dropoffLat":10.78,"dropoffLng":106.68}')
 echo "$RIDE_JSON"
 RIDE_ID=$(echo "$RIDE_JSON" | json_get "data.id")
 if [[ -n "$RIDE_ID" ]]; then
@@ -162,8 +162,14 @@ fi
 curl -s "$BASE_URL/v1/rides" -H "Authorization: Bearer $USER_TOKEN"
 echo
 
-echo "-- Driver-service: run full script"
-./scripts/test-driver-service.sh
+echo "-- Driver-service: smoke (list admin drivers)"
+if [[ -x "./scripts/test-driver-service.sh" ]]; then
+  ./scripts/test-driver-service.sh
+else
+  curl -s "$BASE_URL/v1/admin/drivers?limit=3" \
+    -H "Authorization: Bearer $ADMIN_TOKEN"
+  echo
+fi
 
 echo "-- Notification-service: create/get/retry/cancel/list"
 NOTI_JSON=$(curl -s -X POST "$BASE_URL/v1/notifications" \
@@ -226,7 +232,37 @@ if [[ -n "$RIDE_ID" ]]; then
   fi
 fi
 
-echo "-- Payment-service: run full script"
-./scripts/test-payment-service.sh
+echo "-- Payment-service: create/get/list/update smoke"
+if [[ -x "./scripts/test-payment-service.sh" ]]; then
+  ./scripts/test-payment-service.sh
+else
+  PAYMENT_RIDE_ID="$RIDE_ID"
+  if [[ -z "$PAYMENT_RIDE_ID" ]]; then
+    PAYMENT_RIDE_ID=$(node -e "console.log(require('crypto').randomUUID())")
+  fi
+
+  PAYMENT_JSON=$(curl -s -X POST "$BASE_URL/v1/payments" \
+    -H "Authorization: Bearer $USER_TOKEN" \
+    -H "Idempotency-Key: payment-test-$NOW_TS" \
+    -H "Content-Type: application/json" \
+    -d "{\"rideId\":\"$PAYMENT_RIDE_ID\",\"amount\":85000,\"currency\":\"VND\",\"method\":\"VIETQR\"}")
+  echo "$PAYMENT_JSON"
+  PAYMENT_ID=$(echo "$PAYMENT_JSON" | json_get "data.id")
+  if [[ -n "$PAYMENT_ID" ]]; then
+    curl -s "$BASE_URL/v1/payments/$PAYMENT_ID" -H "Authorization: Bearer $USER_TOKEN"
+    echo
+    curl -s -X PATCH "$BASE_URL/v1/payments/$PAYMENT_ID" \
+      -H "Authorization: Bearer $ADMIN_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"status":"PROCESSING"}'
+    echo
+    curl -s "$BASE_URL/v1/payments/$PAYMENT_ID/vietqr-codes" \
+      -H "Authorization: Bearer $USER_TOKEN"
+    echo
+  fi
+  curl -s "$BASE_URL/v1/payments?limit=5" \
+    -H "Authorization: Bearer $USER_TOKEN"
+  echo
+fi
 
 echo "== Done =="
