@@ -208,6 +208,14 @@ async function upsertVehicle(userId, vehicleInput) {
   return { vehicle: mapVehicle(vehicle) };
 }
 
+async function assertOnlinePrerequisites(driverId) {
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
+  if (!vehicle) {
+    throw new ApiError(409, 'VEHICLE_REQUIRED', 'Driver must register an active vehicle before going online');
+  }
+  return vehicle;
+}
+
 async function setOnline(userId, initialLocation) {
   const driver = await driverRepository.getDriverByUserId(userId);
   if (!driver) {
@@ -220,6 +228,8 @@ async function setOnline(userId, initialLocation) {
   if (!canTransitionOnlineStatus(driver.online_status, ONLINE_STATUS.ONLINE)) {
     throw new ApiError(409, 'CONFLICT', 'Invalid online status transition');
   }
+
+  await assertOnlinePrerequisites(driver.id);
 
   const updated = await driverRepository.updateOnlineStatus(driver.id, [ONLINE_STATUS.OFFLINE], ONLINE_STATUS.ONLINE);
   if (!updated) {
@@ -256,6 +266,8 @@ async function setOnlineByDriverId(driverId, initialLocation) {
   if (!canTransitionOnlineStatus(driver.online_status, ONLINE_STATUS.ONLINE)) {
     throw new ApiError(409, 'CONFLICT', 'Invalid online status transition');
   }
+
+  await assertOnlinePrerequisites(driver.id);
 
   const updated = await driverRepository.updateOnlineStatus(driver.id, [ONLINE_STATUS.OFFLINE], ONLINE_STATUS.ONLINE);
   if (!updated) {

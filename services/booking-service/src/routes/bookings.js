@@ -325,6 +325,13 @@ function normalizePaymentMethod(paymentMethod) {
   return 'CASH';
 }
 
+function shouldDeferCashPaymentInit(paymentMethod) {
+  const mode = String(process.env.BOOKING_CASH_PAYMENT_INIT_MODE || 'deferred')
+    .trim()
+    .toLowerCase();
+  return normalizePaymentMethod(paymentMethod) === 'CASH' && mode !== 'strict';
+}
+
 function resolveAmountFromQuote(quote) {
   const amount = Number(quote?.estimatedFare);
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -454,7 +461,7 @@ async function resolveQuoteAndEta({
   return { quote, eta };
 }
 
-async function buildAiDriverDecision({ pickup, vehicleType, authorization, traceId }) {
+async function buildAiDriverDecision({ pickup, vehicleType, authorization, traceId, allowVehicleTypeFallback = true }) {
   let drivers = await listAvailableDrivers({
     pickup,
     vehicleType,
@@ -464,7 +471,7 @@ async function buildAiDriverDecision({ pickup, vehicleType, authorization, trace
   });
 
   // Fallback for partially onboarded drivers that are ONLINE but missing vehicle metadata.
-  if (!drivers.length && vehicleType) {
+  if (!drivers.length && vehicleType && allowVehicleTypeFallback) {
     drivers = await listAvailableDrivers({
       pickup,
       vehicleType: null,
@@ -515,22 +522,37 @@ async function runBookingIntegrationFlow({ booking, quote, paymentMethod, author
     notification: null,
     flow: 'skipped'
   };
+  const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
+  const deferCashPaymentInit = shouldDeferCashPaymentInit(normalizedPaymentMethod);
 
-  const paymentResult = await createPayment({
-    rideId: booking.rideId,
-    amount: resolveAmountFromQuote(quote),
-    currency: quote?.currency || 'VND',
-    method: normalizePaymentMethod(paymentMethod),
-    userId: booking.userId,
-    authorization,
-    traceId,
-    idempotencyKey: `booking-payment-${booking.bookingId}`,
-    simulateTimeout: simulatePaymentTimeout
-  });
+  const paymentResult = deferCashPaymentInit
+    ? {
+      ok: true,
+      statusCode: 202,
+      data: {
+        status: 'DEFERRED',
+        method: normalizedPaymentMethod,
+        deferred: true,
+        reason: 'CASH_COLLECT_ON_RIDE_COMPLETION'
+      }
+    }
+    : await createPayment({
+      rideId: booking.rideId,
+      amount: resolveAmountFromQuote(quote),
+      currency: quote?.currency || 'VND',
+      method: normalizedPaymentMethod,
+      userId: booking.userId,
+      authorization,
+      traceId,
+      idempotencyKey: `booking-payment-${booking.bookingId}`,
+      simulateTimeout: simulatePaymentTimeout
+    });
   integrations.payment = paymentResult;
 
-  const notificationMessage = paymentResult.ok
-    ? `Booking ${booking.bookingId} created. Payment initialized`
+  const notificationMessage = paymentResult.ok && paymentResult?.data?.deferred
+    ? `Booking ${booking.bookingId} created. Cash payment is deferred until ride completion`
+    : paymentResult.ok
+      ? `Booking ${booking.bookingId} created. Payment initialized`
     : `Booking ${booking.bookingId} created. Payment initialization pending`;
 
   const notificationResult = await sendNotification({
@@ -851,6 +873,7 @@ router.post('/', async (req, res) => {
       normalizedBody?.simulate_tx_failure_after_insert === true || normalizedBody?.simulateTransactionFailureAfterInsert === true;
 
     let noDriversAvailable = false;
+    let noDriversReason = null;
     let precomputedAiDecision = null;
     if (!bookingFastPathEnabled) {
       const availability = await getDriverAvailability({
@@ -877,14 +900,22 @@ router.post('/', async (req, res) => {
         pickup,
         vehicleType,
         authorization,
-        traceId
+        traceId,
+        allowVehicleTypeFallback: false
       });
     }
     const hasAiSelectedDriver = Boolean(precomputedAiDecision?.selectedDriver);
     const hasAiAvailableDrivers =
       Array.isArray(precomputedAiDecision?.availableDrivers) && precomputedAiDecision.availableDrivers.length > 0;
-    const noDriversResolved =
-      !bookingFastPathEnabled && (noDriversAvailable || (!hasAiSelectedDriver && !hasAiAvailableDrivers));
+    const noMatchedDrivers = !hasAiSelectedDriver && !hasAiAvailableDrivers;
+    const noDriversResolved = !bookingFastPathEnabled && (noDriversAvailable || noMatchedDrivers);
+    if (!bookingFastPathEnabled && noDriversResolved) {
+      if (noDriversAvailable) {
+        noDriversReason = 'NO_MATCHING_DRIVER_FOR_VEHICLE_TYPE';
+      } else {
+        noDriversReason = 'NO_AVAILABLE_DRIVER';
+      }
+    }
     const initialBookingStatus = noDriversResolved ? 'PENDING' : 'REQUESTED';
 
     const resolvedDistanceKm = Number.isFinite(distance_km)
@@ -1126,7 +1157,8 @@ router.post('/', async (req, res) => {
         pickup,
         vehicleType,
         authorization,
-        traceId
+        traceId,
+        allowVehicleTypeFallback: false
       }));
       responsePayload.ai_driver_decision = {
         available_drivers: aiDecision.availableDrivers,
@@ -1137,6 +1169,9 @@ router.post('/', async (req, res) => {
       const hasAvailableDrivers = Array.isArray(aiDecision?.availableDrivers) && aiDecision.availableDrivers.length > 0;
       if (noDriversResolved && !hasSelectedDriver && !hasAvailableDrivers) {
         responsePayload.message = 'No drivers available';
+      }
+      if (noDriversResolved && noDriversReason) {
+        responsePayload.no_drivers_reason = noDriversReason;
       }
 
       if (parsed.data.payment_method) {

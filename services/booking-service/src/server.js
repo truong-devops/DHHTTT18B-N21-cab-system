@@ -48,15 +48,73 @@ async function runWithRetry(taskName, task) {
 async function start() {
   await runWithRetry('database init', initDb);
   const stopOutbox = startOutboxPublisher();
-  const stopConsumer = await runWithRetry('kafka consumer startup', startConsumer);
+  let stopConsumer = null;
+  let shuttingDown = false;
+  let consumerReady = false;
+
+  const startConsumerInBackground = async () => {
+    const maxRetries = Math.max(0, Number(config.startup.maxRetries || 0));
+    const baseDelay = Math.max(100, Number(config.startup.retryInitialDelayMs || 1000));
+    const maxDelay = Math.max(baseDelay, Number(config.startup.retryMaxDelayMs || 15000));
+    let attempt = 0;
+
+    while (!shuttingDown) {
+      try {
+        stopConsumer = await startConsumer();
+        consumerReady = true;
+        logger.info('[booking-service] kafka consumer started');
+        return;
+      } catch (error) {
+        attempt += 1;
+        if (maxRetries > 0 && attempt > maxRetries) {
+          logger.error(
+            {
+              err: {
+                message: error.message,
+                code: error.code || 'UNKNOWN'
+              }
+            },
+            '[booking-service] kafka consumer startup exhausted retries'
+          );
+          return;
+        }
+
+        const delay = Math.min(maxDelay, baseDelay * 2 ** Math.min(attempt - 1, 8));
+        logger.warn(
+          {
+            attempt,
+            retry_in_ms: delay,
+            err: {
+              message: error.message,
+              code: error.code || 'UNKNOWN'
+            }
+          },
+          '[booking-service] kafka consumer startup failed, retrying in background'
+        );
+        await sleep(delay);
+      }
+    }
+  };
 
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port }, '[booking-service] listening');
+    startConsumerInBackground().catch((error) => {
+      logger.error(
+        {
+          err: {
+            message: error.message,
+            code: error.code || 'UNKNOWN'
+          }
+        },
+        '[booking-service] kafka consumer background loop crashed'
+      );
+    });
   });
 
   const shutdown = async () => {
+    shuttingDown = true;
     stopOutbox();
-    if (stopConsumer) {
+    if (consumerReady && stopConsumer) {
       await stopConsumer();
     }
     server.close();

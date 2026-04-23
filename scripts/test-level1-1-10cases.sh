@@ -252,56 +252,42 @@ register_and_login_user() {
 
 ensure_online_driver() {
   local admin_token="$1"
-  local fallback_user_token="$2"
+  local _fallback_user_token="${2:-}"
   local driver_id=""
-  local list_json=""
+  local drv_email="l1-driver-${UNIQ_TAG}-${RANDOM}@test.com"
+  local drv_name="Level1 Driver ${UNIQ_TAG}"
+  local drv_login=""
+  local drv_login_body=""
+  local drv_token=""
+  local drv_user_id=""
+  local create_resp=""
+  local plate_number="L1-${UNIQ_TAG}-${RANDOM}"
 
-  list_json=$(curl -s "$BASE_URL/v1/admin/drivers?status=APPROVED&online=ONLINE&limit=1" \
-    -H "Authorization: Bearer $admin_token" || true)
-  driver_id=$(echo "$list_json" | json_get "data.items.0.id")
+  # Always bootstrap a dedicated driver for this run:
+  # register -> create/approve driver profile -> attach vehicle -> go ONLINE.
+  call_json POST "/v1/auth/register" "" "{\"email\":\"$drv_email\",\"password\":\"$USER_PASS\",\"name\":\"$drv_name\",\"role\":\"driver\"}" >/dev/null || true
 
-  if [[ -z "$driver_id" ]]; then
-    list_json=$(curl -s "$BASE_URL/v1/admin/drivers?status=APPROVED&limit=1" \
-      -H "Authorization: Bearer $admin_token" || true)
-    driver_id=$(echo "$list_json" | json_get "data.items.0.id")
-  fi
+  drv_login=$(login_user "$drv_email" 8)
+  drv_login_body=$(echo "$drv_login" | sed '1d')
+  drv_token=$(extract_access_token "$drv_login_body")
 
-  if [[ -z "$driver_id" ]]; then
-    local drv_email="l1-driver-${UNIQ_TAG}@test.com"
-    local drv_name="Level1 Driver ${UNIQ_TAG}"
+  drv_user_id=$(echo "$drv_login_body" | json_get "data.id")
+  if [[ -z "$drv_user_id" ]]; then drv_user_id=$(echo "$drv_login_body" | json_get "user.id"); fi
+  if [[ -z "$drv_user_id" ]]; then drv_user_id=$(echo "$drv_login_body" | json_get "id"); fi
+  if [[ -z "$drv_user_id" ]]; then drv_user_id=$(echo "$drv_login_body" | json_get "sub"); fi
 
-    curl -s -X POST "$BASE_URL/v1/auth/register" \
+  if [[ -n "$drv_user_id" ]]; then
+    create_resp=$(curl -s -X POST "$BASE_URL/v1/admin/drivers" \
+      -H "Authorization: Bearer $admin_token" \
       -H "Content-Type: application/json" \
-      -d "{\"email\":\"$drv_email\",\"password\":\"$USER_PASS\",\"name\":\"$drv_name\",\"role\":\"driver\"}" >/dev/null || true
-
-    local drv_login
-    drv_login=$(curl -s -X POST "$BASE_URL/v1/auth/login" \
-      -H "Content-Type: application/json" \
-      -d "{\"identifier\":\"$drv_email\",\"password\":\"$USER_PASS\"}" || true)
-    if [[ -z "$drv_login" ]]; then
-      drv_login=$(curl -s -X POST "$BASE_URL/v1/auth/login" \
-        -H "Content-Type: application/json" \
-        -d "{\"email\":\"$drv_email\",\"password\":\"$USER_PASS\"}" || true)
-    fi
-
-    local drv_user_id=""
-    drv_user_id=$(echo "$drv_login" | json_get "data.id")
-    if [[ -z "$drv_user_id" ]]; then drv_user_id=$(echo "$drv_login" | json_get "user.id"); fi
-    if [[ -z "$drv_user_id" ]]; then drv_user_id=$(echo "$drv_login" | json_get "id"); fi
-
-    if [[ -n "$drv_user_id" ]]; then
-      local create_resp
-      create_resp=$(curl -s -X POST "$BASE_URL/v1/admin/drivers" \
+      -d "{\"userId\":\"$drv_user_id\",\"fullName\":\"$drv_name\",\"phone\":\"0900000000\"}" || true)
+    driver_id=$(echo "$create_resp" | json_get "data.driver.id")
+    if [[ -z "$driver_id" ]]; then driver_id=$(echo "$create_resp" | json_get "data.id"); fi
+    if [[ -n "$driver_id" ]]; then
+      curl -s -X PATCH "$BASE_URL/v1/admin/drivers/$driver_id/approve" \
         -H "Authorization: Bearer $admin_token" \
         -H "Content-Type: application/json" \
-        -d "{\"userId\":\"$drv_user_id\",\"fullName\":\"$drv_name\",\"phone\":\"0900000000\"}" || true)
-      driver_id=$(echo "$create_resp" | json_get "data.driver.id")
-      if [[ -n "$driver_id" ]]; then
-        curl -s -X PATCH "$BASE_URL/v1/admin/drivers/$driver_id/approve" \
-          -H "Authorization: Bearer $admin_token" \
-          -H "Content-Type: application/json" \
-          -d '{}' >/dev/null || true
-      fi
+        -d '{}' >/dev/null || true
     fi
   fi
 
@@ -310,13 +296,15 @@ ensure_online_driver() {
     return
   fi
 
+  if [[ -n "$drv_token" ]]; then
+    # Enforce production prerequisite before ONLINE.
+    call_json PUT "/v1/driver/me/vehicle" "$drv_token" "{\"vehicleType\":\"CAR\",\"plateNumber\":\"$plate_number\"}" >/dev/null || true
+  fi
+
   local online_resp
   online_resp=$(call_json POST "/v1/driver/status" "$admin_token" "{\"driver_id\":\"$driver_id\",\"status\":\"ONLINE\",\"initial_location\":{\"lat\":10.76,\"lng\":106.66}}")
   local online_status
   online_status=$(echo "$online_resp" | sed -n '1p')
-  if [[ "$online_status" != "200" && "$online_status" != "409" ]]; then
-    call_json POST "/v1/driver/status" "$fallback_user_token" "{\"driver_id\":\"$driver_id\",\"status\":\"ONLINE\",\"initial_location\":{\"lat\":10.76,\"lng\":106.66}}" >/dev/null || true
-  fi
 
   echo "$driver_id"
 }
