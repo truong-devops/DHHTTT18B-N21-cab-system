@@ -144,11 +144,16 @@ call_json() {
   local method="$1"
   local path="$2"
   local token="$3"
-  local payload="$4"
+  local payload="${4:-}"
   local idem_key="${5:-}"
 
+  local is_body_method=1
+  if [[ "$method" == "GET" || "$method" == "HEAD" ]]; then
+    is_body_method=0
+  fi
+
   local resp
-  if [[ -n "$idem_key" ]]; then
+  if [[ "$is_body_method" == "1" && -n "$idem_key" ]]; then
     if ! resp=$(curl -s -X "$method" "$BASE_URL$path" \
       --connect-timeout "$CURL_CONNECT_TIMEOUT" \
       --max-time "$CURL_MAX_TIME" \
@@ -160,13 +165,22 @@ call_json() {
       resp='{"error":"transport error"}'
       resp="$resp"$'\nHTTP_STATUS:000'
     fi
-  else
+  elif [[ "$is_body_method" == "1" ]]; then
     if ! resp=$(curl -s -X "$method" "$BASE_URL$path" \
       --connect-timeout "$CURL_CONNECT_TIMEOUT" \
       --max-time "$CURL_MAX_TIME" \
       -H "Authorization: Bearer $token" \
       -H "Content-Type: application/json" \
       -d "$payload" \
+      -w "\nHTTP_STATUS:%{http_code}"); then
+      resp='{"error":"transport error"}'
+      resp="$resp"$'\nHTTP_STATUS:000'
+    fi
+  else
+    if ! resp=$(curl -s -X "$method" "$BASE_URL$path" \
+      --connect-timeout "$CURL_CONNECT_TIMEOUT" \
+      --max-time "$CURL_MAX_TIME" \
+      -H "Authorization: Bearer $token" \
       -w "\nHTTP_STATUS:%{http_code}"); then
       resp='{"error":"transport error"}'
       resp="$resp"$'\nHTTP_STATUS:000'
@@ -333,11 +347,11 @@ echo "-- Running Case 16"
 C16=$(call_json POST /v1/pricing/estimate "$USER_TOKEN" '{"distance_km":5,"demand_index":0,"supply_index":1}')
 C16_STATUS=$(echo "$C16" | sed -n '1p')
 C16_BODY=$(echo "$C16" | sed '1d')
-print_case "Case 16 - pricing demand=0" "200 + surge >= 1 + valid non-negative price (no divide-by-zero behavior)" "$C16_STATUS" "$C16_BODY"
+print_case "Case 16 - pricing demand=0" "200 + surge >= 1 + valid price > 0 (no divide-by-zero behavior)" "$C16_STATUS" "$C16_BODY"
 SURGE_VAL=$(echo "$C16_BODY" | json_get "data.surge")
 PRICE_VAL=$(echo "$C16_BODY" | json_get "data.price")
 if [[ "$C16_STATUS" == "200" ]] && [[ -n "$SURGE_VAL" ]] && [[ -n "$PRICE_VAL" ]] \
-  && node -e "const s=Number(process.argv[1]);const p=Number(process.argv[2]);process.exit(Number.isFinite(s)&&s>=1&&Number.isFinite(p)&&p>=0?0:1)" "$SURGE_VAL" "$PRICE_VAL"; then
+  && node -e "const s=Number(process.argv[1]);const p=Number(process.argv[2]);process.exit(Number.isFinite(s)&&s>=1&&Number.isFinite(p)&&p>0?0:1)" "$SURGE_VAL" "$PRICE_VAL"; then
   mark_result 1 "16"
 else
   mark_result 0 "16"
@@ -432,11 +446,12 @@ if [[ -z "$C19A_ID" ]]; then C19A_ID=$(echo "$C19A_BODY" | json_get "booking.boo
 C19B_ID=$(echo "$C19B_BODY" | json_get "booking.booking_id")
 if [[ -z "$C19B_ID" ]]; then C19B_ID=$(echo "$C19B_BODY" | json_get "booking.bookingId"); fi
 
-echo "========== Case 19 - duplicate booking/idempotency =========="
-echo "Expected: second request replays old result and same booking_id (no duplicate booking)"
-echo "First status: $C19A_STATUS booking_id: $C19A_ID"
-echo "Second status: $C19B_STATUS booking_id: $C19B_ID"
-echo
+C19_DETAIL=$(cat <<EOF
+First status: $C19A_STATUS booking_id: $C19A_ID
+Second status: $C19B_STATUS booking_id: $C19B_ID
+EOF
+)
+print_case "Case 19 - duplicate booking/idempotency" "Only 1 booking is created; second request returns replayed result; no duplicate" "$C19A_STATUS/$C19B_STATUS" "$C19_DETAIL"
 if [[ "$C19A_STATUS" == "201" ]] \
   && ([[ "$C19B_STATUS" == "200" ]] || [[ "$C19B_STATUS" == "201" ]]) \
   && [[ -n "$C19A_ID" ]] && [[ "$C19A_ID" == "$C19B_ID" ]]; then
