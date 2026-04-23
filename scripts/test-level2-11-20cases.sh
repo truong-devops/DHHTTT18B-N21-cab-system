@@ -64,6 +64,33 @@ json_get() {
   node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);let v=j;for(const k of '$path'.split('.')){if(!k)continue;v=v?.[k]}process.stdout.write(v==null?'':String(v))}catch(e){process.stdout.write('')}})"
 }
 
+json_arr_len() {
+  local path="$1"
+  node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);let v=j;for(const k of '$path'.split('.')){if(!k)continue;v=v?.[k]}process.stdout.write(Array.isArray(v)?String(v.length):'0')}catch(e){process.stdout.write('0')}})"
+}
+
+get_booking_count_for_user() {
+  local token="$1"
+  local resp
+  if ! resp=$(curl -s -X GET "$BASE_URL/v1/bookings" \
+    --connect-timeout "$CURL_CONNECT_TIMEOUT" \
+    --max-time "$CURL_MAX_TIME" \
+    -H "Authorization: Bearer $token" \
+    -w "\nHTTP_STATUS:%{http_code}"); then
+    echo "-1"
+    return
+  fi
+  local status="${resp##*HTTP_STATUS:}"
+  local body="${resp%HTTP_STATUS:*}"
+  if [[ "$status" != "200" ]]; then
+    echo "-1"
+    return
+  fi
+  local cnt
+  cnt=$(echo "$body" | json_arr_len "data")
+  echo "${cnt:-0}"
+}
+
 contains_text() {
   local needle="$1"
   if command -v rg >/dev/null 2>&1; then
@@ -219,8 +246,21 @@ echo "-- Running Case 12"
 C12=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":"abc","lng":106.66},"drop":{"lat":10.77,"lng":106.70}}')
 C12_STATUS=$(echo "$C12" | sed -n '1p')
 C12_BODY=$(echo "$C12" | sed '1d')
+C12_BOOKING_ID=$(echo "$C12_BODY" | json_get "booking.booking_id")
+if [[ -z "$C12_BOOKING_ID" ]]; then C12_BOOKING_ID=$(echo "$C12_BODY" | json_get "booking.bookingId"); fi
+C12_HAS_AI_SIGNALS=0
+if echo "$C12_BODY" | grep -Eiq '"ai_driver_decision"|"eta(_minutes)?"|"price(Snapshot)?"|"integration_flow"|"publishedEvent"|"selected_driver"'; then
+  C12_HAS_AI_SIGNALS=1
+fi
 print_case "Case 12 - invalid lat/lng type" "422 + Validation error from schema" "$C12_STATUS" "$C12_BODY"
-if [[ "$C12_STATUS" == "422" ]] && echo "$C12_BODY" | contains_text 'Validation error from schema'; then mark_result 1 "12"; else mark_result 0 "12"; fi
+if [[ "$C12_STATUS" == "422" ]] \
+  && echo "$C12_BODY" | contains_text 'Validation error from schema' \
+  && [[ -z "$C12_BOOKING_ID" ]] \
+  && [[ "$C12_HAS_AI_SIGNALS" == "0" ]]; then
+  mark_result 1 "12"
+else
+  mark_result 0 "12"
+fi
 
 # Case 13
 echo "-- Running Case 13"
@@ -229,12 +269,12 @@ C13_STATUS=$(echo "$C13" | sed -n '1p')
 C13_BODY=$(echo "$C13" | sed '1d')
 C13_BOOKING_ID=$(echo "$C13_BODY" | json_get "booking.booking_id")
 if [[ -z "$C13_BOOKING_ID" ]]; then C13_BOOKING_ID=$(echo "$C13_BODY" | json_get "booking.bookingId"); fi
-print_case "Case 13 - no drivers online" "booking status REQUESTED/PENDING/FAILED + no assigned driver + message No drivers available" "$C13_STATUS" "$C13_BODY"
+print_case "Case 13 - no drivers online" "booking status PENDING/FAILED + no assigned driver + message No drivers available" "$C13_STATUS" "$C13_BODY"
 C13_BOOKING_STATUS=$(echo "$C13_BODY" | json_get "booking.status")
 C13_SELECTED_DRIVER_ID=$(echo "$C13_BODY" | json_get "ai_driver_decision.selected_driver.id")
 if [[ -z "$C13_SELECTED_DRIVER_ID" ]]; then C13_SELECTED_DRIVER_ID=$(echo "$C13_BODY" | json_get "ai_driver_decision.selected_driver.driver_id"); fi
 if echo "$C13_BODY" | contains_text 'No drivers available' \
-  && ([[ "$C13_BOOKING_STATUS" == "REQUESTED" ]] || [[ "$C13_BOOKING_STATUS" == "PENDING" ]] || [[ "$C13_BOOKING_STATUS" == "FAILED" ]]) \
+  && ([[ "$C13_BOOKING_STATUS" == "PENDING" ]] || [[ "$C13_BOOKING_STATUS" == "FAILED" ]]) \
   && [[ -z "$C13_SELECTED_DRIVER_ID" ]]; then
   mark_result 1 "13"
 else
@@ -248,8 +288,17 @@ C14_STATUS=$(echo "$C14" | sed -n '1p')
 C14_BODY=$(echo "$C14" | sed '1d')
 C14_BOOKING_ID=$(echo "$C14_BODY" | json_get "booking.booking_id")
 if [[ -z "$C14_BOOKING_ID" ]]; then C14_BOOKING_ID=$(echo "$C14_BODY" | json_get "booking.bookingId"); fi
-print_case "Case 14 - invalid payment method" "400 + Invalid payment method + no booking created" "$C14_STATUS" "$C14_BODY"
-if [[ "$C14_STATUS" == "400" ]] && echo "$C14_BODY" | contains_text 'Invalid payment method' && [[ -z "$C14_BOOKING_ID" ]]; then
+C14_PAYMENT_ID=$(echo "$C14_BODY" | json_get "integration_flow.payment.data.data.id")
+if [[ -z "$C14_PAYMENT_ID" ]]; then C14_PAYMENT_ID=$(echo "$C14_BODY" | json_get "payment.id"); fi
+C14_HAS_PAYMENT_SIGNALS=0
+if echo "$C14_BODY" | grep -Eiq '"integration_flow"[[:space:]]*:[[:space:]]*{[^}]*"payment"|"payment(_status|Id|_id)?"'; then
+  C14_HAS_PAYMENT_SIGNALS=1
+fi
+print_case "Case 14 - invalid payment method" "400 + Invalid payment method + Payment Service not called" "$C14_STATUS" "$C14_BODY"
+if [[ "$C14_STATUS" == "400" ]] \
+  && echo "$C14_BODY" | contains_text 'Invalid payment method' \
+  && [[ -z "$C14_PAYMENT_ID" ]] \
+  && [[ "$C14_HAS_PAYMENT_SIGNALS" == "0" ]]; then
   mark_result 1 "14"
 else
   mark_result 0 "14"
@@ -288,8 +337,20 @@ echo "-- Running Case 17"
 C17=$(call_json POST /v1/fraud/check "$USER_TOKEN" '{"user_id":"USR123"}')
 C17_STATUS=$(echo "$C17" | sed -n '1p')
 C17_BODY=$(echo "$C17" | sed '1d')
-print_case "Case 17 - fraud missing fields" "400 + missing required fields" "$C17_STATUS" "$C17_BODY"
-if [[ "$C17_STATUS" == "400" ]] && echo "$C17_BODY" | contains_text 'missing required fields'; then mark_result 1 "17"; else mark_result 0 "17"; fi
+C17_SCORE=$(echo "$C17_BODY" | json_get "data.score")
+if [[ -z "$C17_SCORE" ]]; then C17_SCORE=$(echo "$C17_BODY" | json_get "data.risk_score"); fi
+C17_FLAGGED=$(echo "$C17_BODY" | json_get "data.flagged")
+C17_MODEL_VERSION=$(echo "$C17_BODY" | json_get "data.model_version")
+print_case "Case 17 - fraud missing fields" "400 + missing required fields + model not run" "$C17_STATUS" "$C17_BODY"
+if [[ "$C17_STATUS" == "400" ]] \
+  && echo "$C17_BODY" | contains_text 'missing required fields' \
+  && [[ -z "$C17_SCORE" ]] \
+  && [[ -z "$C17_FLAGGED" ]] \
+  && [[ -z "$C17_MODEL_VERSION" ]]; then
+  mark_result 1 "17"
+else
+  mark_result 0 "17"
+fi
 
 # Case 18
 echo "-- Running Case 18"
@@ -370,6 +431,7 @@ fi
 
 # Case 20
 echo "-- Running Case 20"
+C20_BEFORE_COUNT=$(get_booking_count_for_user "$USER_TOKEN")
 TMP_CASE20_DIR="${TMPDIR:-./tmp}"
 mkdir -p "$TMP_CASE20_DIR"
 TMP_CASE20_FILE="$TMP_CASE20_DIR/level2_case20_${UNIQ_TAG}.json"
@@ -384,8 +446,19 @@ RESP20=$(curl -s -X POST "$BASE_URL/v1/bookings" \
 rm -f "$TMP_CASE20_FILE"
 C20_STATUS="${RESP20##*HTTP_STATUS:}"
 C20_BODY="${RESP20%HTTP_STATUS:*}"
+C20_AFTER_COUNT=$(get_booking_count_for_user "$USER_TOKEN")
+C20_BOOKING_ID=$(echo "$C20_BODY" | json_get "booking.booking_id")
+if [[ -z "$C20_BOOKING_ID" ]]; then C20_BOOKING_ID=$(echo "$C20_BODY" | json_get "booking.bookingId"); fi
 print_case "Case 20 - payload too large" "413 Payload Too Large" "$C20_STATUS" "$C20_BODY"
-if [[ "$C20_STATUS" == "413" ]]; then mark_result 1 "20"; else mark_result 0 "20"; fi
+if [[ "$C20_STATUS" == "413" ]] \
+  && [[ -z "$C20_BOOKING_ID" ]] \
+  && [[ "$C20_BEFORE_COUNT" != "-1" ]] \
+  && [[ "$C20_AFTER_COUNT" != "-1" ]] \
+  && [[ "$C20_BEFORE_COUNT" == "$C20_AFTER_COUNT" ]]; then
+  mark_result 1 "20"
+else
+  mark_result 0 "20"
+fi
 
 echo "========== LEVEL 2 SUMMARY =========="
 echo "PASS: $PASS_COUNT"

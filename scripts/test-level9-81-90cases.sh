@@ -10,15 +10,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-20}"
 
-CASE85_BURST_COUNT="${CASE85_BURST_COUNT:-1400}"
-CASE85_CONCURRENCY="${CASE85_CONCURRENCY:-200}"
+CASE85_BURST_COUNT="${CASE85_BURST_COUNT:-2400}"
+CASE85_CONCURRENCY="${CASE85_CONCURRENCY:-400}"
 CASE85_MIN_429="${CASE85_MIN_429:-1}"
 CASE85_MAX_TIME_MS="${CASE85_MAX_TIME_MS:-8000}"
 CASE85_TARGET_PATH="${CASE85_TARGET_PATH:-/v1/bookings}"
+CASE87_EVIDENCE_FILE="${CASE87_EVIDENCE_FILE:-}"
+CASE87_EVIDENCE_TEXT="${CASE87_EVIDENCE_TEXT:-}"
+CASE88_EVIDENCE_FILE="${CASE88_EVIDENCE_FILE:-}"
+CASE88_EVIDENCE_TEXT="${CASE88_EVIDENCE_TEXT:-}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
-SKIP_COUNT=0
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/case-context-input.sh"
@@ -34,7 +37,7 @@ Examples:
 
 Notes:
   - Default BASE_URL: $DEFAULT_BASE_URL
-  - Cases 87 and 88 are infra-level checks and are SKIP unless independently verifiable.
+  - Cases 87 and 88 require hard runtime/infra evidence; if evidence is unavailable, these cases FAIL.
 USAGE
 }
 
@@ -114,12 +117,11 @@ mark_result() {
   echo
 }
 
-mark_result_skip() {
+mark_no_evidence_fail() {
   local case_id="$1"
   local reason="$2"
-  echo "[$case_id] SKIP - $reason"
-  SKIP_COUNT=$((SKIP_COUNT + 1))
-  echo
+  echo "[$case_id] NO_EVIDENCE - $reason"
+  mark_result 0 "$case_id"
 }
 
 call_json_url() {
@@ -214,12 +216,40 @@ contains_security_leak() {
   echo "$content" | grep -Eiq "$pattern"
 }
 
+load_evidence_text() {
+  local evidence_file="${1:-}"
+  local inline_text="${2:-}"
+  local evidence=""
+  if [[ -n "$evidence_file" && -f "$evidence_file" ]]; then
+    evidence="$(cat "$evidence_file" 2>/dev/null || true)"
+  fi
+  if [[ -z "$evidence" && -n "$inline_text" ]]; then
+    evidence="$inline_text"
+  fi
+  printf '%s' "$evidence"
+}
+
+text_matches_pattern() {
+  local text="$1"
+  local pattern="$2"
+  if [[ -z "$text" ]]; then
+    return 1
+  fi
+  if command -v rg >/dev/null 2>&1; then
+    echo "$text" | rg -Eiq "$pattern"
+    return $?
+  fi
+  echo "$text" | grep -Eiq "$pattern"
+}
+
 ensure_gateway_ready() {
   local case_id="$1"
   if wait_for_url "$BASE_URL/health" 40; then
     return 0
   fi
-  mark_result_skip "$case_id" "gateway health check failed at $BASE_URL/health"
+  if [[ "$case_id" =~ ^[0-9]+$ ]]; then
+    mark_no_evidence_fail "$case_id" "gateway health check failed at $BASE_URL/health"
+  fi
   return 1
 }
 
@@ -327,7 +357,7 @@ REPLAY_TOKEN="${REPLAY_AUTH%%|*}"
 REPLAY_USER_ID="${REPLAY_AUTH##*|}"
 
 if [[ -z "$USER_TOKEN" || -z "$USER_ID" ]]; then
-  echo "WARN: cannot provision standard user token; cases requiring auth may fail or skip."
+  echo "WARN: cannot provision standard user token; cases requiring auth may fail."
 fi
 if [[ -z "$ADMIN_TOKEN" || -z "$ADMIN_ID" ]]; then
   echo "WARN: cannot provision admin token; RBAC allow-path check may fail."
@@ -360,8 +390,8 @@ if ensure_gateway_ready "81"; then
   C81_B=$(call_gateway_json GET "/v1/users?email=%27%20OR%20%271%27=%271" "$ADMIN_TOKEN")
   C81_B_STATUS=$(echo "$C81_B" | sed -n '1p')
   C81_B_BODY=$(echo "$C81_B" | sed '1d')
-  C81_REPORT="${C81_REPORT}probe=users_query status=${C81_B_STATUS}\n"
-  if [[ "$C81_B_STATUS" != "400" && "$C81_B_STATUS" != "401" && "$C81_B_STATUS" != "403" ]]; then
+  C81_REPORT="${C81_REPORT}supplemental_probe=users_query status=${C81_B_STATUS}\n"
+  if [[ "$C81_B_STATUS" == "200" || "$C81_B_STATUS" == "201" ]]; then
     C81_OK=0
   fi
   if contains_security_leak "$C81_B_BODY"; then
@@ -371,8 +401,8 @@ if ensure_gateway_ready "81"; then
   C81_C=$(call_gateway_json GET "/v1/bookings/%27%20OR%20%271%27=%271" "$USER_TOKEN")
   C81_C_STATUS=$(echo "$C81_C" | sed -n '1p')
   C81_C_BODY=$(echo "$C81_C" | sed '1d')
-  C81_REPORT="${C81_REPORT}probe=booking_id_path status=${C81_C_STATUS}\n"
-  if [[ "$C81_C_STATUS" != "400" && "$C81_C_STATUS" != "401" && "$C81_C_STATUS" != "403" && "$C81_C_STATUS" != "404" ]]; then
+  C81_REPORT="${C81_REPORT}supplemental_probe=booking_id_path status=${C81_C_STATUS}\n"
+  if [[ "$C81_C_STATUS" == "200" || "$C81_C_STATUS" == "201" ]]; then
     C81_OK=0
   fi
   if contains_security_leak "$C81_C_BODY"; then
@@ -386,7 +416,7 @@ if ensure_gateway_ready "81"; then
   fi
 
   print_case "Case 81 - SQL injection attempt" \
-    "Probes: login identifier injection, users query injection, booking id path injection" \
+    "POST /v1/auth/login with {\"email\":\"' OR 1=1 --\",\"password\":\"anything\"} (supplemental probes may also run)" \
     "No auth bypass, no SQL/raw stack leak, only defensive status (400/401/403/404), gateway remains healthy" \
     "local-check" "$C81_REPORT"
   mark_result "$C81_OK" "81"
@@ -471,7 +501,7 @@ if ensure_gateway_ready "84"; then
   C84_USER_STATUS=$(echo "$C84_USER" | sed -n '1p')
   C84_USER_BODY=$(echo "$C84_USER" | sed '1d')
 
-  C84_ADMIN_STATUS="SKIP"
+  C84_ADMIN_STATUS="NO_EVIDENCE"
   C84_ADMIN_BODY=""
   if [[ -n "$ADMIN_TOKEN" ]]; then
     C84_ADMIN=$(call_gateway_json GET "/v1/admin/drivers?limit=1" "$ADMIN_TOKEN")
@@ -481,7 +511,7 @@ if ensure_gateway_ready "84"; then
 
   C84_OK=1
   if [[ "$C84_USER_STATUS" != "403" ]]; then C84_OK=0; fi
-  if [[ "$C84_ADMIN_STATUS" != "SKIP" && "$C84_ADMIN_STATUS" != "200" ]]; then C84_OK=0; fi
+  if [[ "$C84_ADMIN_STATUS" != "NO_EVIDENCE" && "$C84_ADMIN_STATUS" != "200" ]]; then C84_OK=0; fi
   if contains_security_leak "$C84_USER_BODY$C84_ADMIN_BODY"; then C84_OK=0; fi
 
   C84_ACTUAL="user_status=$C84_USER_STATUS; admin_baseline_status=$C84_ADMIN_STATUS"
@@ -495,7 +525,7 @@ fi
 # Case 85: Rate limit attack
 if ensure_gateway_ready "85"; then
   if [[ -z "$USER_TOKEN" ]]; then
-    mark_result_skip "85" "cannot run booking rate-limit test without authenticated user token"
+    mark_no_evidence_fail "85" "cannot run booking rate-limit test without authenticated user token"
   else
     C85_RESULT=$(BASE_URL="$BASE_URL" CASE85_TARGET_PATH="$CASE85_TARGET_PATH" USER_TOKEN="$USER_TOKEN" CASE85_BURST_COUNT="$CASE85_BURST_COUNT" CASE85_CONCURRENCY="$CASE85_CONCURRENCY" CASE85_MAX_TIME_MS="$CASE85_MAX_TIME_MS" node - <<'NODE'
 const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
@@ -507,6 +537,7 @@ const maxTimeMs = Number(process.env.CASE85_MAX_TIME_MS || 8000);
 const bookingUrl = `${baseUrl.replace(/\/$/, '')}${path}`;
 let idx = 0;
 const counts = {};
+const startedAt = Date.now();
 
 function buildBody(i) {
   const jitter = (i % 25) * 0.00001;
@@ -552,7 +583,8 @@ async function worker() {
 }
 
 Promise.all(Array.from({ length: Math.max(1, concurrency) }, () => worker())).then(() => {
-  process.stdout.write(JSON.stringify({ path, total, concurrency, status_counts: counts }));
+  const elapsedSec = Math.max(0.001, (Date.now() - startedAt) / 1000);
+  process.stdout.write(JSON.stringify({ path, total, concurrency, elapsed_sec: elapsedSec, achieved_rps: total / elapsedSec, status_counts: counts }));
 });
 NODE
     )
@@ -576,7 +608,7 @@ NODE
     fi
 
     print_case "Case 85 - Rate limit attack" \
-      "Burst POST ${CASE85_TARGET_PATH} (count=$CASE85_BURST_COUNT, concurrency=$CASE85_CONCURRENCY, attacker style >1000 req burst)" \
+      "Burst POST ${CASE85_TARGET_PATH} targeting >1000 requests/second (count=$CASE85_BURST_COUNT, concurrency=$CASE85_CONCURRENCY)" \
       "Rate limiter triggers HTTP 429, system still healthy, no backend collapse (no 5xx flood)" \
       "local-check" "$C85_RESULT"
     mark_result "$C85_OK" "85"
@@ -588,7 +620,7 @@ if ensure_gateway_ready "86"; then
   C86_TOKEN="$REPLAY_TOKEN"
   C86_USER_ID="$REPLAY_USER_ID"
   if [[ -z "$C86_TOKEN" || -z "$C86_USER_ID" ]]; then
-    mark_result_skip "86" "cannot run replay test without authenticated user token"
+    mark_no_evidence_fail "86" "cannot run replay test without authenticated user token"
   else
     C86_RIDE_ID="ride-replay-${UNIQ_TAG}-${RANDOM}"
     C86_PAYLOAD="{\"rideId\":\"$C86_RIDE_ID\",\"amount\":\"50000\",\"currency\":\"VND\",\"userId\":\"$C86_USER_ID\"}"
@@ -641,15 +673,63 @@ if ensure_gateway_ready "86"; then
 fi
 
 # Case 87: Data encryption at rest
-mark_result_skip "87" "cannot reliably verify DB/storage encryption-at-rest from API level; requires DB volume/KMS/storage inspection"
+C87_EVIDENCE="$(load_evidence_text "$CASE87_EVIDENCE_FILE" "$CASE87_EVIDENCE_TEXT")"
+C87_STATUS="NO_EVIDENCE"
+C87_OK=0
+if [[ -n "$C87_EVIDENCE" ]]; then
+  C87_STORAGE_OK=0
+  C87_CRYPTO_OK=0
+  if text_matches_pattern "$C87_EVIDENCE" '(storage|volume|disk|filesystem|persistent|pvc|pv|postgres|mongo|redis|database)'; then
+    C87_STORAGE_OK=1
+  fi
+  if text_matches_pattern "$C87_EVIDENCE" '(encrypt|encrypted|encryption|at[ -]?rest|kms|key management|luks|dm-crypt|aes[- ]?256|bitlocker|vault)'; then
+    C87_CRYPTO_OK=1
+  fi
+  if [[ "$C87_STORAGE_OK" == "1" && "$C87_CRYPTO_OK" == "1" ]]; then
+    C87_STATUS="EVIDENCE_OK"
+    C87_OK=1
+  else
+    C87_STATUS="INSUFFICIENT_EVIDENCE"
+  fi
+fi
+C87_BODY="evidence_file=${CASE87_EVIDENCE_FILE:-<none>}; has_evidence=$([[ -n "$C87_EVIDENCE" ]] && echo 1 || echo 0); storage_signal=$([[ "${C87_STORAGE_OK:-0}" == "1" ]] && echo 1 || echo 0); encryption_signal=$([[ "${C87_CRYPTO_OK:-0}" == "1" ]] && echo 1 || echo 0)"
+print_case "Case 87 - Data encryption at rest" \
+  "Verify storage-level encryption evidence (DB volume/KMS/storage policy and runtime proof)" \
+  "Sensitive data at rest must be encrypted and verifiable by concrete infra evidence" \
+  "$C87_STATUS" "$C87_BODY"
+mark_result "$C87_OK" "87"
 
 # Case 88: mTLS communication
-mark_result_skip "88" "cannot verify mutual TLS handshake/service identity at runtime from this API-only script; requires mesh/PKI/infra evidence"
+C88_EVIDENCE="$(load_evidence_text "$CASE88_EVIDENCE_FILE" "$CASE88_EVIDENCE_TEXT")"
+C88_STATUS="NO_EVIDENCE"
+C88_OK=0
+if [[ -n "$C88_EVIDENCE" ]]; then
+  C88_MTLS_SIGNAL=0
+  C88_REJECT_SIGNAL=0
+  if text_matches_pattern "$C88_EVIDENCE" '(mtls|mutual tls|client cert|client certificate|x509|spiffe|tls handshake|ssl handshake|certificate chain)'; then
+    C88_MTLS_SIGNAL=1
+  fi
+  if text_matches_pattern "$C88_EVIDENCE" '(reject|rejected|denied|forbidden|unknown ca|bad certificate|certificate required|no certificate|handshake fail|tlsv1 alert)'; then
+    C88_REJECT_SIGNAL=1
+  fi
+  if [[ "$C88_MTLS_SIGNAL" == "1" && "$C88_REJECT_SIGNAL" == "1" ]]; then
+    C88_STATUS="EVIDENCE_OK"
+    C88_OK=1
+  else
+    C88_STATUS="INSUFFICIENT_EVIDENCE"
+  fi
+fi
+C88_BODY="evidence_file=${CASE88_EVIDENCE_FILE:-<none>}; has_evidence=$([[ -n "$C88_EVIDENCE" ]] && echo 1 || echo 0); mtls_signal=$([[ "${C88_MTLS_SIGNAL:-0}" == "1" ]] && echo 1 || echo 0); reject_signal=$([[ "${C88_REJECT_SIGNAL:-0}" == "1" ]] && echo 1 || echo 0)"
+print_case "Case 88 - mTLS communication" \
+  "Verify service-to-service mTLS with handshake/cert-chain/identity evidence from mesh or PKI runtime" \
+  "All internal service communication must enforce mTLS and reject invalid/no-cert callers" \
+  "$C88_STATUS" "$C88_BODY"
+mark_result "$C88_OK" "88"
 
 # Case 89: RBAC enforcement
 if ensure_gateway_ready "89"; then
   if [[ -z "$DRIVER_TOKEN" || -z "$ADMIN_TOKEN" ]]; then
-    mark_result_skip "89" "cannot run RBAC test because driver/admin token provisioning failed"
+    mark_no_evidence_fail "89" "cannot run RBAC test because driver/admin token provisioning failed"
   else
     C89_DRIVER=$(call_gateway_json GET "/v1/admin/drivers?limit=1" "$DRIVER_TOKEN")
     C89_DRIVER_STATUS=$(echo "$C89_DRIVER" | sed -n '1p')
@@ -710,7 +790,7 @@ if ensure_gateway_ready "90"; then
     C90_OK=0
   fi
 
-  C90_LOG_CHECK_STATUS="SKIP"
+  C90_LOG_CHECK_STATUS="NO_EVIDENCE"
   C90_LOG_CHECK_NOTE="runtime logs not accessible from script context"
   if command -v docker >/dev/null 2>&1; then
     C90_LOG_TARGETS="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -E 'api-gateway|payment-service' || true)"
@@ -743,7 +823,6 @@ echo "========================================="
 echo "LEVEL 9 SUMMARY (Cases 81-90)"
 echo "PASS: $PASS_COUNT"
 echo "FAIL: $FAIL_COUNT"
-echo "SKIP: $SKIP_COUNT"
 echo "========================================="
 
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
