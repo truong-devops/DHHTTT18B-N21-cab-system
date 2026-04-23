@@ -40,6 +40,7 @@ services:
       dockerfile: services/api-gateway/Dockerfile
     ports:
       - '3000:3000'
+      - '3443:3443'
     environment:
       SERVICE_NAME: api-gateway
       OTEL_SERVICE_NAME: api-gateway
@@ -58,6 +59,10 @@ services:
       USER_SERVICE_URL: http://user-service:4004
       PROXY_TIMEOUT_MS: 30000
       PROXY_RETRY_BACKOFF_MS: 100
+      GATEWAY_HTTPS_ENABLED: ${GATEWAY_HTTPS_ENABLED:-true}
+      HTTPS_PORT: ${HTTPS_PORT:-3443}
+      HTTPS_CERT_PATH: ${HTTPS_CERT_PATH:-/app/src/certs/dev-gateway.crt}
+      HTTPS_KEY_PATH: ${HTTPS_KEY_PATH:-/app/src/certs/dev-gateway.key}
     depends_on:
       - auth-service
       - booking-service

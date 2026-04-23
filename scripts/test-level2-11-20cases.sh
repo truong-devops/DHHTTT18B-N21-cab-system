@@ -283,6 +283,10 @@ fi
 
 # Case 14
 echo "-- Running Case 14"
+C14_PAYMENTS_BEFORE=$(call_json GET "/v1/payments?limit=5&sort=-createdAt" "$ADMIN_TOKEN")
+C14_PAYMENTS_BEFORE_STATUS=$(echo "$C14_PAYMENTS_BEFORE" | sed -n '1p')
+C14_PAYMENTS_BEFORE_BODY=$(echo "$C14_PAYMENTS_BEFORE" | sed '1d')
+C14_PAYMENT_SNAPSHOT_BEFORE=$(echo "$C14_PAYMENTS_BEFORE_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);const items=Array.isArray(j?.data)?j.data:[];process.stdout.write(items.map((it)=>it?.id||'').filter(Boolean).join(','))}catch(e){process.stdout.write('')}})")
 C14=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70},"payment_method":"invalid_card"}')
 C14_STATUS=$(echo "$C14" | sed -n '1p')
 C14_BODY=$(echo "$C14" | sed '1d')
@@ -290,6 +294,10 @@ C14_BOOKING_ID=$(echo "$C14_BODY" | json_get "booking.booking_id")
 if [[ -z "$C14_BOOKING_ID" ]]; then C14_BOOKING_ID=$(echo "$C14_BODY" | json_get "booking.bookingId"); fi
 C14_PAYMENT_ID=$(echo "$C14_BODY" | json_get "integration_flow.payment.data.data.id")
 if [[ -z "$C14_PAYMENT_ID" ]]; then C14_PAYMENT_ID=$(echo "$C14_BODY" | json_get "payment.id"); fi
+C14_PAYMENTS_AFTER=$(call_json GET "/v1/payments?limit=5&sort=-createdAt" "$ADMIN_TOKEN")
+C14_PAYMENTS_AFTER_STATUS=$(echo "$C14_PAYMENTS_AFTER" | sed -n '1p')
+C14_PAYMENTS_AFTER_BODY=$(echo "$C14_PAYMENTS_AFTER" | sed '1d')
+C14_PAYMENT_SNAPSHOT_AFTER=$(echo "$C14_PAYMENTS_AFTER_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);const items=Array.isArray(j?.data)?j.data:[];process.stdout.write(items.map((it)=>it?.id||'').filter(Boolean).join(','))}catch(e){process.stdout.write('')}})")
 C14_HAS_PAYMENT_SIGNALS=0
 if echo "$C14_BODY" | grep -Eiq '"integration_flow"[[:space:]]*:[[:space:]]*{[^}]*"payment"|"payment(_status|Id|_id)?"'; then
   C14_HAS_PAYMENT_SIGNALS=1
@@ -298,7 +306,10 @@ print_case "Case 14 - invalid payment method" "400 + Invalid payment method + Pa
 if [[ "$C14_STATUS" == "400" ]] \
   && echo "$C14_BODY" | contains_text 'Invalid payment method' \
   && [[ -z "$C14_PAYMENT_ID" ]] \
-  && [[ "$C14_HAS_PAYMENT_SIGNALS" == "0" ]]; then
+  && [[ "$C14_HAS_PAYMENT_SIGNALS" == "0" ]] \
+  && [[ "$C14_PAYMENTS_BEFORE_STATUS" == "200" ]] \
+  && [[ "$C14_PAYMENTS_AFTER_STATUS" == "200" ]] \
+  && [[ "$C14_PAYMENT_SNAPSHOT_BEFORE" == "$C14_PAYMENT_SNAPSHOT_AFTER" ]]; then
   mark_result 1 "14"
 else
   mark_result 0 "14"
@@ -341,12 +352,17 @@ C17_SCORE=$(echo "$C17_BODY" | json_get "data.score")
 if [[ -z "$C17_SCORE" ]]; then C17_SCORE=$(echo "$C17_BODY" | json_get "data.risk_score"); fi
 C17_FLAGGED=$(echo "$C17_BODY" | json_get "data.flagged")
 C17_MODEL_VERSION=$(echo "$C17_BODY" | json_get "data.model_version")
+C17_HAS_MODEL_SIGNALS=0
+if echo "$C17_BODY" | grep -Eiq '"(score|risk_score|flagged|model_version|modelVersion|decision_log|tool_calls|latency_ms)"'; then
+  C17_HAS_MODEL_SIGNALS=1
+fi
 print_case "Case 17 - fraud missing fields" "400 + missing required fields + model not run" "$C17_STATUS" "$C17_BODY"
 if [[ "$C17_STATUS" == "400" ]] \
   && echo "$C17_BODY" | contains_text 'missing required fields' \
   && [[ -z "$C17_SCORE" ]] \
   && [[ -z "$C17_FLAGGED" ]] \
-  && [[ -z "$C17_MODEL_VERSION" ]]; then
+  && [[ -z "$C17_MODEL_VERSION" ]] \
+  && [[ "$C17_HAS_MODEL_SIGNALS" == "0" ]]; then
   mark_result 1 "17"
 else
   mark_result 0 "17"

@@ -208,6 +208,28 @@ CASE_54_PAYLOAD='{
   ]
 }'
 
+CASE_54_ETA_ONLY_PAYLOAD='{
+  "pickup": {"lat": 10.76, "lng": 106.66},
+  "drop": {"lat": 10.77, "lng": 106.70},
+  "vehicle_type": "CAR",
+  "context": {"objective": "nearest", "budget_weight": 0.2, "latency_budget_ms": 200},
+  "candidates": [
+    {"driver_id": "d54_eta_1", "distance_m": 220, "rating": 4.5, "price_score": 0.82, "estimated_fare": 18500, "online": true},
+    {"driver_id": "d54_eta_2", "distance_m": 420, "rating": 4.9, "price_score": 0.79, "estimated_fare": 19200, "online": true}
+  ]
+}'
+
+CASE_54_PRICING_ONLY_PAYLOAD='{
+  "pickup": {"lat": 10.76, "lng": 106.66},
+  "drop": {"lat": 10.77, "lng": 106.70},
+  "vehicle_type": "CAR",
+  "context": {"objective": "highest_rating", "budget_weight": 0.7, "latency_budget_ms": 200},
+  "candidates": [
+    {"driver_id": "d54_price_1", "distance_m": 260, "rating": 4.8, "eta_min": 4, "online": true},
+    {"driver_id": "d54_price_2", "distance_m": 340, "rating": 4.9, "eta_min": 5, "online": true}
+  ]
+}'
+
 CASE_55_PAYLOAD='{
   "pickup": {"lat": 10.76, "lng": 106.66},
   "drop": {"lat": 10.77, "lng": 106.70},
@@ -321,16 +343,44 @@ else
 fi
 
 # Case 54
-C54=$(call_json_url POST "$AGENT_URL" "$CASE_54_PAYLOAD")
-C54_STATUS=$(echo "$C54" | sed -n '1p')
-C54_BODY=$(echo "$C54" | sed '1d')
-print_case "Case 54 - correct tool calls" "$CASE_54_PAYLOAD" "200 + tool_calls include ETA and Pricing" "$C54_STATUS" "$C54_BODY"
-if [[ "$C54_STATUS" == "200" ]] && assert_common_agent_shape "$C54_BODY" && node - <<'NODE' "$C54_BODY"
-const j = JSON.parse(process.argv[2]);
-const calls = Array.isArray(j.data?.tool_calls) ? j.data.tool_calls : [];
-const names = calls.map((c) => String(c.tool || '').toLowerCase());
-const ok = names.includes('eta') && names.includes('pricing');
-process.exit(ok ? 0 : 1);
+C54_ETA=$(call_json_url POST "$AGENT_URL" "$CASE_54_ETA_ONLY_PAYLOAD")
+C54_ETA_STATUS=$(echo "$C54_ETA" | sed -n '1p')
+C54_ETA_BODY=$(echo "$C54_ETA" | sed '1d')
+C54_PRICING=$(call_json_url POST "$AGENT_URL" "$CASE_54_PRICING_ONLY_PAYLOAD")
+C54_PRICING_STATUS=$(echo "$C54_PRICING" | sed -n '1p')
+C54_PRICING_BODY=$(echo "$C54_PRICING" | sed '1d')
+C54_SUMMARY=$(node - <<'NODE' "$C54_ETA_BODY" "$C54_PRICING_BODY"
+const etaBody = process.argv[2];
+const pricingBody = process.argv[3];
+function namesOf(body) {
+  try {
+    const j = JSON.parse(body);
+    return Array.isArray(j?.data?.tool_calls) ? j.data.tool_calls.map((item) => item?.tool || null).filter(Boolean) : [];
+  } catch (_e) {
+    return [];
+  }
+}
+process.stdout.write(JSON.stringify({
+  eta_probe_tools: namesOf(etaBody),
+  pricing_probe_tools: namesOf(pricingBody)
+}));
+NODE
+)
+print_case "Case 54 - correct tool calls" "{\"eta_probe\":$CASE_54_ETA_ONLY_PAYLOAD,\"pricing_probe\":$CASE_54_PRICING_ONLY_PAYLOAD}" "ETA-focused probe uses ETA tool only; pricing-focused probe uses Pricing tool only" "$C54_ETA_STATUS/$C54_PRICING_STATUS" "$C54_SUMMARY"
+if [[ "$C54_ETA_STATUS" == "200" ]] && [[ "$C54_PRICING_STATUS" == "200" ]] \
+  && assert_common_agent_shape "$C54_ETA_BODY" \
+  && assert_common_agent_shape "$C54_PRICING_BODY" \
+  && node - <<'NODE' "$C54_ETA_BODY" "$C54_PRICING_BODY"
+function toolNames(body) {
+  const j = JSON.parse(body);
+  const calls = Array.isArray(j.data?.tool_calls) ? j.data.tool_calls : [];
+  return calls.map((c) => String(c.tool || '').toLowerCase());
+}
+const etaNames = toolNames(process.argv[2]);
+const pricingNames = toolNames(process.argv[3]);
+const etaOnlyOk = etaNames.includes('eta') && !etaNames.includes('pricing');
+const pricingOnlyOk = pricingNames.includes('pricing') && !pricingNames.includes('eta');
+process.exit(etaOnlyOk && pricingOnlyOk ? 0 : 1);
 NODE
 then
   mark_result 1 "54"

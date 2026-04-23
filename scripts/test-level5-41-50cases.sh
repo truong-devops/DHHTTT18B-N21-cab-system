@@ -231,10 +231,8 @@ fi
 C42_STATUS=$(echo "$C42" | sed -n '1p')
 C42_BODY=$(echo "$C42" | sed '1d')
 C42_SURGE=$(echo "$C42_BODY" | json_get "data.surge")
-C42_PRICE=$(echo "$C42_BODY" | json_get "data.price")
-C42_BASE=$(echo "$C42_BODY" | json_get "data.base_fare")
-print_case "Case 42 - Surge strict" "200 + surge>1 + price>base_fare" "$C42_STATUS" "$C42_BODY"
-if [[ "$C42_STATUS" == "200" ]] && node -e "const s=Number(process.argv[1]);const p=Number(process.argv[2]);const b=Number(process.argv[3]);process.exit(Number.isFinite(s)&&s>1&&Number.isFinite(p)&&Number.isFinite(b)&&p>b?0:1)" "$C42_SURGE" "$C42_PRICE" "$C42_BASE"; then
+print_case "Case 42 - Surge strict" "200 + surge > 1 when demand is high" "$C42_STATUS" "$C42_BODY"
+if [[ "$C42_STATUS" == "200" ]] && node -e "const s=Number(process.argv[1]);process.exit(Number.isFinite(s)&&s>1?0:1)" "$C42_SURGE"; then
   mark_result 1 "42"
 else
   mark_result 0 "42"

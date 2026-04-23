@@ -138,6 +138,9 @@ async function createPayment({
   }
   if (INTERNAL_API_KEY) {
     headers['x-internal-api-key'] = INTERNAL_API_KEY;
+    if (idempotencyKey) {
+      headers['x-idempotency-key'] = idempotencyKey;
+    }
   }
 
   const numericAmount = Number(amount);

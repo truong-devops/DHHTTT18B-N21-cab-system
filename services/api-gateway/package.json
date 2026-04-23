@@ -23,7 +23,8 @@
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "selfsigned": "^3.0.1"
   },
   "devDependencies": {
     "jest": "^29.7.0",

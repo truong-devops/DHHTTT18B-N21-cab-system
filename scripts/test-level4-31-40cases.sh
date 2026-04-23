@@ -745,6 +745,8 @@ else
   C38_BODY=$(echo "$C38" | sed '1d')
   C38_BOOKING_ID=$(echo "$C38_BODY" | json_get "booking.booking_id")
   if [[ -z "$C38_BOOKING_ID" ]]; then C38_BOOKING_ID=$(echo "$C38_BODY" | json_get "booking.bookingId"); fi
+  C38_RIDE_EXTERNAL_ID=$(echo "$C38_BODY" | json_get "booking.ride_id")
+  if [[ -z "$C38_RIDE_EXTERNAL_ID" ]]; then C38_RIDE_EXTERNAL_ID=$(echo "$C38_BODY" | json_get "booking.rideId"); fi
   C38_BOOKING_STATUS=$(echo "$C38_BODY" | json_get "booking.status")
   C38_MAIN_QUEUED=$(echo "$C38_BODY" | json_get "publishedEvent.queued")
   C38_ADD_QUEUED=$(echo "$C38_BODY" | json_get "additionalEvents.0.queued")
@@ -752,12 +754,29 @@ else
   C38_ADD_EVENT=$(echo "$C38_BODY" | json_get "additionalEvents.0.eventType")
   C38_MAIN_EVENT_ID=$(echo "$C38_BODY" | json_get "publishedEvent.eventId")
   C38_ADD_EVENT_ID=$(echo "$C38_BODY" | json_get "additionalEvents.0.eventId")
+  C38_RIDE_STATUS="000"
+  C38_RIDE_BODY='{"error":"ride lookup not attempted"}'
+  C38_RIDE_FOUND=0
+  if [[ -n "$C38_RIDE_EXTERNAL_ID" ]]; then
+    for _attempt in 1 2 3 4 5 6 7 8; do
+      C38_RIDE=$(call_json GET "/v1/rides/external/$C38_RIDE_EXTERNAL_ID" "$C38_TOKEN")
+      C38_RIDE_STATUS=$(echo "$C38_RIDE" | sed -n '1p')
+      C38_RIDE_BODY=$(echo "$C38_RIDE" | sed '1d')
+      C38_RIDE_RETURNED_EXTERNAL_ID=$(echo "$C38_RIDE_BODY" | json_get "data.externalRideId")
+      if [[ "$C38_RIDE_STATUS" == "200" ]] && [[ "$C38_RIDE_RETURNED_EXTERNAL_ID" == "$C38_RIDE_EXTERNAL_ID" ]]; then
+        C38_RIDE_FOUND=1
+        break
+      fi
+      sleep 1
+    done
+  fi
   print_case "Case 38 - outbox consistency" "DB commit and event publish stay consistent; no event loss/duplicate" "$C38_STATUS" "$C38_BODY"
   if [[ "$C38_STATUS" == "201" ]] && [[ -n "$C38_BOOKING_ID" ]] && [[ "$C38_BOOKING_STATUS" == "REQUESTED" ]] \
     && [[ "$C38_MAIN_QUEUED" == "true" ]] && [[ "$C38_ADD_QUEUED" == "true" ]] \
     && [[ "$C38_ADD_TOPIC" == "ride_events" ]] && [[ "$C38_ADD_EVENT" == "ride_requested" ]] \
     && [[ -n "$C38_MAIN_EVENT_ID" ]] && [[ -n "$C38_ADD_EVENT_ID" ]] \
-    && [[ "$C38_MAIN_EVENT_ID" != "$C38_ADD_EVENT_ID" ]]; then
+    && [[ "$C38_MAIN_EVENT_ID" != "$C38_ADD_EVENT_ID" ]] \
+    && [[ "$C38_RIDE_FOUND" == "1" ]]; then
     mark_result 1 "38"
   else
     mark_result 0 "38"
@@ -822,8 +841,8 @@ if [[ -n "$C31_BOOKING_ID" ]]; then
   fi
 fi
 
-ACID_BODY="{\"atomic\":$C40_ATOMIC,\"consistent\":$C40_CONSISTENT,\"isolated\":$C40_ISOLATED,\"durable\":$C40_DURABLE,\"durable_status\":\"$C40_DURABLE_STATUS\"}"
-print_case "Case 40 - ACID summary" "Atomic + Consistent + Isolated + Durable must all hold" "200" "$ACID_BODY"
+ACID_BODY="{\"atomic\":{\"ok\":$C40_ATOMIC,\"scenario\":\"payment fail -> booking rollback/no dangling record\"},\"consistent\":{\"ok\":$C40_CONSISTENT,\"scenario\":\"invalid data rejected and not committed\"},\"isolated\":{\"ok\":$C40_ISOLATED,\"scenario\":\"concurrent requests do not create duplicate booking\"},\"durable\":{\"ok\":$C40_DURABLE,\"scenario\":\"committed booking can be read back\",\"status\":\"$C40_DURABLE_STATUS\"}}"
+print_case "Case 40 - ACID scenarios" "Atomic(payment fail rollback) + Consistent(invalid data rejected) + Isolated(concurrent no duplicate) + Durable(committed data persists)" "200" "$ACID_BODY"
 if [[ "$C40_ATOMIC" == "1" ]] && [[ "$C40_CONSISTENT" == "1" ]] && [[ "$C40_ISOLATED" == "1" ]] && [[ "$C40_DURABLE" == "1" ]]; then
   mark_result 1 "40"
 else

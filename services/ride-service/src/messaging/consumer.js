@@ -3,7 +3,8 @@ const topics = require('./topics');
 const { validateEnvelope } = require('./schemaRegistry');
 const { publishToDlq } = require('./producer');
 const redis = require('../cache/redis');
-const { insertInboxEvent } = require('../repository/inboxEventsRepository');
+const { insertInboxEvent, markProcessedByEventId, markFailedByEventId } = require('../repository/inboxEventsRepository');
+const { processRow } = require('./inboxProcessor');
 const logger = require('../utils/logger');
 const monitoring = require('../monitoring');
 
@@ -45,6 +46,108 @@ const consumer = kafka.consumer({
   maxBytes: Number(process.env.KAFKA_CONSUMER_MAX_BYTES || 10485760),
   maxWaitTimeInMs: Number(process.env.KAFKA_CONSUMER_MAX_WAIT_MS || 5000)
 });
+
+async function processInboxEventInline({ topic, envelope, traceId, startedAt }) {
+  const row = {
+    topic,
+    event_id: envelope.eventId,
+    event_type: envelope.type,
+    trace_id: traceId,
+    payload: envelope.payload || null
+  };
+
+  const result = await processRow(row);
+  await markProcessedByEventId({
+    eventId: envelope.eventId,
+    consumer: CONSUMER_NAME
+  });
+
+  monitoring.recordDependencyRequest({
+    dependencyType: 'kafka',
+    dependencyName: topic,
+    operation: 'consume',
+    outcome: 'success',
+    durationMs: Date.now() - startedAt,
+    attributes: { result: 'processed_inline' }
+  });
+
+  return {
+    handled: true,
+    reason: 'processed_inline',
+    result
+  };
+}
+
+async function handleInlineProcessingError({ topic, envelope, traceId, startedAt, error }) {
+  const retry = await markFailedByEventId({
+    eventId: envelope.eventId,
+    consumer: CONSUMER_NAME,
+    errorMessage: error?.message || 'inline_process_failed'
+  });
+
+  monitoring.recordKafkaRetry({
+    scope: 'inbox',
+    topic,
+    status: String(retry?.status || 'unknown').toLowerCase(),
+    reason: error?.message || 'inline_process_failed'
+  });
+
+  monitoring.recordDependencyRequest({
+    dependencyType: 'kafka',
+    dependencyName: topic,
+    operation: 'consume',
+    outcome: 'error',
+    durationMs: Date.now() - startedAt,
+    attributes: {
+      error_type: String(error?.name || 'inline_process_error'),
+      result: retry?.status === 'dead' ? 'inline_failed_dead' : 'inline_failed_retry'
+    }
+  });
+
+  logger.withTrace(traceId).warn(
+    {
+      topic,
+      eventId: envelope.eventId,
+      status: retry?.status || 'unknown',
+      err: {
+        message: error?.message || 'inline_process_failed',
+        code: error?.code || 'INLINE_PROCESS_ERROR'
+      }
+    },
+    '[ride-service] inline inbox processing failed, queued for retry/dead-letter'
+  );
+
+  if (retry?.status === 'dead') {
+    await publishToDlq({
+      topic,
+      envelope: {
+        eventId: envelope.eventId,
+        traceId: traceId || null,
+        occurredAt: envelope.occurredAt || new Date().toISOString(),
+        type: envelope.type || 'UnknownEvent',
+        version: envelope.version || 1,
+        payload: envelope.payload || null
+      },
+      errorMessage: error?.message || 'inline_process_failed',
+      metadata: {
+        source: 'ride-service.consumer',
+        attemptCount: retry.attemptCount,
+        maxAttempts: retry.maxAttempts
+      }
+    });
+    return {
+      handled: true,
+      reason: 'inline_failed_dead',
+      retry
+    };
+  }
+
+  return {
+    handled: true,
+    reason: 'inline_failed_retry',
+    retry
+  };
+}
 
 async function processConsumedMessage({ topic, message }) {
   const startedAt = Date.now();
@@ -147,16 +250,25 @@ async function processConsumedMessage({ topic, message }) {
   }
 
   await redis.set(cacheKey, '1', 'EX', CACHE_TTL_SECONDS);
-  logger.withTrace(traceId).info({ topic, eventId }, '[ride-service] consumed event');
-  monitoring.recordDependencyRequest({
-    dependencyType: 'kafka',
-    dependencyName: topic,
-    operation: 'consume',
-    outcome: 'success',
-    durationMs: Date.now() - startedAt,
-    attributes: { result: 'inserted_inbox' }
-  });
-  return { handled: true, reason: 'inserted_inbox' };
+
+  try {
+    const inlineResult = await processInboxEventInline({
+      topic,
+      envelope,
+      traceId,
+      startedAt
+    });
+    logger.withTrace(traceId).info({ topic, eventId, result: inlineResult.result }, '[ride-service] consumed + processed event inline');
+    return inlineResult;
+  } catch (error) {
+    return handleInlineProcessingError({
+      topic,
+      envelope,
+      traceId,
+      startedAt,
+      error
+    });
+  }
 }
 
 async function start() {

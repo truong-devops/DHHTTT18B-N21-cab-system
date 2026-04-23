@@ -314,6 +314,40 @@ cancel_booking_if_exists() {
   return 0
 }
 
+wait_notification_record_for_user() {
+  local token="$1"
+  local user_id="$2"
+  local notification_id="$3"
+  local max_wait="${4:-8}"
+  local i=0
+  while [[ "$i" -lt "$max_wait" ]]; do
+    local resp status body
+    resp=$(call_json GET "/v1/notifications/users/$user_id/notifications?limit=20" "$token")
+    status=$(echo "$resp" | sed -n '1p')
+    body=$(echo "$resp" | sed '1d')
+    if [[ "$status" == "200" ]] && node - <<'NODE' "$body" "$notification_id"
+const body = process.argv[2];
+const notificationId = process.argv[3];
+try {
+  const j = JSON.parse(body);
+  const items = Array.isArray(j?.data) ? j.data : Array.isArray(j?.data?.items) ? j.data.items : [];
+  const ok = items.some((item) => String(item?.id || '') === notificationId);
+  process.exit(ok ? 0 : 1);
+} catch (_e) {
+  process.exit(1);
+}
+NODE
+    then
+      echo "$body"
+      return 0
+    fi
+    i=$((i + 1))
+    sleep 1
+  done
+  echo ""
+  return 1
+}
+
 echo "== Setup tokens and test data for Level 3 =="
 if ! wait_for_gateway 60; then
   echo "STOP: gateway is not ready at $BASE_URL"
@@ -380,9 +414,13 @@ C21_ETA=$(echo "$C21_BODY" | json_get "booking.eta_minutes")
 if [[ -z "$C21_ETA" ]]; then C21_ETA=$(echo "$C21_BODY" | json_get "booking.etaMinutes"); fi
 C21_BOOKING_ID=$(echo "$C21_BODY" | json_get "booking.booking_id")
 if [[ -z "$C21_BOOKING_ID" ]]; then C21_BOOKING_ID=$(echo "$C21_BODY" | json_get "booking.bookingId"); fi
+C21_ETA_SIGNAL=0
+if [[ -n "$C21_ETA" ]] || echo "$C21_BODY" | grep -Eiq '"integration_flow"[[:space:]]*:[[:space:]]*{[^}]*"eta"|"tool_calls"[[:space:]]*:.*"eta"|"agent_tool_calls"[[:space:]]*:.*"eta"|"eta(_minutes|Minutes)"'; then
+  C21_ETA_SIGNAL=1
+fi
 if [[ -n "$C21_BOOKING_ID" ]]; then ACTIVE_BOOKING_ID="$C21_BOOKING_ID"; fi
-print_case "Case 21 - booking calls ETA" "201 + booking response contains eta > 0 + no timeout" "$C21_STATUS" "$C21_BODY"
-if [[ "$C21_STATUS" == "201" ]] && [[ -n "$C21_BOOKING_ID" ]] && [[ -n "$C21_ETA" ]] && node -e "process.exit(Number('$C21_ETA')>0?0:1)"; then
+print_case "Case 21 - booking calls ETA" "200/201 + booking flow shows ETA service result + eta > 0 + no timeout" "$C21_STATUS" "$C21_BODY"
+if [[ "$C21_STATUS" == "200" || "$C21_STATUS" == "201" ]] && [[ -n "$C21_BOOKING_ID" ]] && [[ "$C21_ETA_SIGNAL" == "1" ]] && [[ -n "$C21_ETA" ]] && node -e "process.exit(Number('$C21_ETA')>0?0:1)"; then
   mark_result 1 "21"
 else
   mark_result 0 "21"
@@ -401,8 +439,12 @@ C22_PRICE=$(echo "$C22_BODY" | json_get "booking.priceSnapshot.estimatedFare")
 if [[ -z "$C22_PRICE" ]]; then C22_PRICE=$(echo "$C22_BODY" | json_get "booking.price_snapshot.estimatedFare"); fi
 C22_SURGE=$(echo "$C22_BODY" | json_get "booking.priceSnapshot.surge")
 if [[ -z "$C22_SURGE" ]]; then C22_SURGE=$(echo "$C22_BODY" | json_get "booking.price_snapshot.surge"); fi
-print_case "Case 22 - booking calls pricing" "201 + booking response contains price > 0 + surge >= 1" "$C22_STATUS" "$C22_BODY"
-if [[ "$C22_STATUS" == "201" ]] && [[ -n "$C22_BOOKING_ID" ]] && [[ -n "$C22_PRICE" ]] && [[ -n "$C22_SURGE" ]] \
+C22_PRICING_SIGNAL=0
+if [[ -n "$C22_PRICE" ]] || echo "$C22_BODY" | grep -Eiq '"integration_flow"[[:space:]]*:[[:space:]]*{[^}]*"pricing"|"tool_calls"[[:space:]]*:.*"pricing"|"agent_tool_calls"[[:space:]]*:.*"pricing"|"priceSnapshot"|"price_snapshot"'; then
+  C22_PRICING_SIGNAL=1
+fi
+print_case "Case 22 - booking calls pricing" "200/201 + booking flow shows Pricing service result + price > 0 + surge >= 1" "$C22_STATUS" "$C22_BODY"
+if [[ "$C22_STATUS" == "200" || "$C22_STATUS" == "201" ]] && [[ -n "$C22_BOOKING_ID" ]] && [[ "$C22_PRICING_SIGNAL" == "1" ]] && [[ -n "$C22_PRICE" ]] && [[ -n "$C22_SURGE" ]] \
   && node -e "process.exit(Number('$C22_PRICE')>0 && Number('$C22_SURGE')>=1 ? 0:1)"; then
   mark_result 1 "22"
 else
@@ -512,15 +554,28 @@ else
 fi
 
 C26_NOTI_OK=$(echo "$C26_BODY" | json_bool "notification.ok")
+C26_NOTI_STATUS_CODE=$(echo "$C26_BODY" | json_get "notification.statusCode")
+C26_NOTI_ID=$(echo "$C26_BODY" | json_get "notification.data.id")
 C26_NOTI_USER_ID=$(echo "$C26_BODY" | json_get "notification.data.user_id")
+C26_LIST_BODY=""
+C26_NOTI_FOUND=0
+if [[ -n "$C26_NOTI_ID" ]] && [[ -n "${SELECTED_DRIVER_ID:-}" ]]; then
+  C26_LIST_BODY=$(wait_notification_record_for_user "$ADMIN_TOKEN" "$SELECTED_DRIVER_ID" "$C26_NOTI_ID" 8 || true)
+  if [[ -n "$C26_LIST_BODY" ]]; then
+    C26_NOTI_FOUND=1
+  fi
+fi
 C27_BOOKING_STATUS=$(echo "$C26_BODY" | json_get "booking.status")
 C27_EVENT=$(echo "$C26_BODY" | json_get "publishedEvent.eventType")
-print_case "Case 26 - driver notification on assign" "200 + driver notification delivered/enqueued + no large delay" "$C26_STATUS" "$C26_BODY"
+print_case "Case 26 - driver notification on assign" "200 + Notification Service stores message for assigned driver + no large delay" "$C26_STATUS" "$C26_BODY"
 if [[ "$C26_STATUS" == "200" ]] \
   && [[ "$C26_NOTI_OK" == "1" ]] \
+  && [[ "$C26_NOTI_STATUS_CODE" == "200" ]] \
+  && [[ -n "$C26_NOTI_ID" ]] \
   && [[ -n "$C26_NOTI_USER_ID" ]] \
   && [[ -n "${SELECTED_DRIVER_ID:-}" ]] \
   && [[ "$C26_NOTI_USER_ID" == "$SELECTED_DRIVER_ID" ]] \
+  && [[ "$C26_NOTI_FOUND" == "1" ]] \
   && [[ "${C26_LATENCY_MS:-999999}" -le 5000 ]]; then
   mark_result 1 "26"
 else

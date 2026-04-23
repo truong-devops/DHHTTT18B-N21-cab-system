@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 
-# Shared PDF-aligned metadata for test cases 1..100
-# Source of truth: final_PROJECT_grading-factor.pdf (Context and Input columns)
+# Shared metadata for test cases 1..100.
+# Cases 1..10 are aligned to level1.docx (Context and Input columns).
 
 get_case_context() {
   case "$1" in
-    1) echo "System is healthy; user does not exist yet." ;;
-    2) echo "User already exists in the system." ;;
-    3) echo "User is logged in and driver is available." ;;
-    4) echo "User already has at least one booking." ;;
-    5) echo "Driver exists in system." ;;
-    6) echo "Booking creation flow is successful." ;;
-    7) echo "ETA service is running." ;;
-    8) echo "Pricing service is running." ;;
-    9) echo "Booking already created." ;;
-    10) echo "User is currently logged in." ;;
+    1) echo "Hệ thống hoạt động bình thường, chưa tồn tại user." ;;
+    2) echo "User đã tồn tại trong hệ thống." ;;
+    3) echo "User đã login, driver available." ;;
+    4) echo "User đã có ít nhất 1 booking." ;;
+    5) echo "Driver tồn tại trong hệ thống." ;;
+    6) echo "Tạo booking thành công." ;;
+    7) echo "AI ETA service hoạt động." ;;
+    8) echo "Pricing service hoạt động." ;;
+    9) echo "Booking đã được tạo." ;;
+    10) echo "User đang login." ;;
     11) echo "Create-booking request misses required field." ;;
     12) echo "Input type is invalid (string lat/lng)." ;;
     13) echo "No online driver available in area." ;;
@@ -120,7 +120,7 @@ get_case_input() {
     7) echo '{"distance_km":5,"traffic_level":0.5}' ;;
     8) echo '{"distance_km":5,"demand_index":1.0}' ;;
     9) echo '{"user_id":"USR123","message":"Your ride is confirmed"}' ;;
-    10) echo 'Authorization: Bearer <token>' ;;
+    10) echo 'Header: Authorization Bearer token' ;;
     11) echo '{"drop":{"lat":10.77,"lng":106.70}}' ;;
     12) echo '{"pickup":{"lat":"abc","lng":106.66},"drop":{"lat":10.77,"lng":106.70}}' ;;
     13) echo 'Valid booking request while no driver online' ;;
@@ -214,4 +214,3 @@ get_case_input() {
     *) echo "" ;;
   esac
 }
-
