@@ -325,11 +325,19 @@ function normalizePaymentMethod(paymentMethod) {
   return 'CASH';
 }
 
-function shouldDeferCashPaymentInit(paymentMethod) {
-  const mode = String(process.env.BOOKING_CASH_PAYMENT_INIT_MODE || 'deferred')
+function shouldDeferCashPaymentInit(paymentMethod, { simulatePaymentTimeout = false } = {}) {
+  if (normalizePaymentMethod(paymentMethod) !== 'CASH') {
+    return false;
+  }
+  // Explicit timeout simulation must always exercise real payment init path.
+  if (simulatePaymentTimeout) {
+    return false;
+  }
+
+  const mode = String(process.env.BOOKING_CASH_PAYMENT_INIT_MODE || 'strict')
     .trim()
     .toLowerCase();
-  return normalizePaymentMethod(paymentMethod) === 'CASH' && mode !== 'strict';
+  return mode === 'deferred';
 }
 
 function resolveAmountFromQuote(quote) {
@@ -523,7 +531,9 @@ async function runBookingIntegrationFlow({ booking, quote, paymentMethod, author
     flow: 'skipped'
   };
   const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
-  const deferCashPaymentInit = shouldDeferCashPaymentInit(normalizedPaymentMethod);
+  const deferCashPaymentInit = shouldDeferCashPaymentInit(normalizedPaymentMethod, {
+    simulatePaymentTimeout
+  });
 
   const paymentResult = deferCashPaymentInit
     ? {
