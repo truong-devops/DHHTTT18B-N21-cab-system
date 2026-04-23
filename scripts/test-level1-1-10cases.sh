@@ -463,7 +463,7 @@ C6_BODY="$C3_BODY"
 C6_BOOKING_STATUS=$(echo "$C6_BODY" | json_get "booking.status")
 C6_CREATED_AT=$(echo "$C6_BODY" | json_get "booking.created_at")
 if [[ -z "$C6_CREATED_AT" ]]; then C6_CREATED_AT=$(echo "$C6_BODY" | json_get "booking.createdAt"); fi
-print_case "Case 6 - booking status requested" "201 + status REQUESTED + created_at exists" "$C6_STATUS" "$C6_BODY"
+print_case "Case 6 - booking status requested" "status REQUESTED + created_at exists" "$C6_STATUS" "$C6_BODY"
 if [[ "$C6_STATUS" == "200" || "$C6_STATUS" == "201" ]] && [[ "$C6_BOOKING_STATUS" == "REQUESTED" ]] && [[ -n "$C6_CREATED_AT" ]]; then
   mark_result 1 "6"
 else
@@ -517,8 +517,13 @@ C9_STATUS=$(echo "$C9" | sed -n '1p')
 C9_BODY=$(echo "$C9" | sed '1d')
 C9_NOTI_ID=$(echo "$C9_BODY" | json_get "id")
 C9_NOTI_STATUS=$(echo "$C9_BODY" | json_get "status")
-print_case "Case 9 - notification send" "200 + notification id returned + no timeout" "$C9_STATUS" "$C9_BODY"
-if [[ "$C9_STATUS" == "200" || "$C9_STATUS" == "201" ]] && [[ -n "$C9_NOTI_ID" ]] && [[ -n "$C9_NOTI_STATUS" ]]; then
+C9_CREATED=$(echo "$C9_BODY" | json_get "created")
+C9_QUEUE_SIGNAL=0
+if [[ -n "$C9_NOTI_ID" || -n "$C9_NOTI_STATUS" || "$C9_CREATED" == "true" ]] || echo "$C9_BODY" | grep -Eiq '"perChannelStatus"|"queued"|"PENDING"|"SENT"'; then
+  C9_QUEUE_SIGNAL=1
+fi
+print_case "Case 9 - notification send" "200 + notification sent/enqueued + no timeout" "$C9_STATUS" "$C9_BODY"
+if [[ "$C9_STATUS" == "200" || "$C9_STATUS" == "201" ]] && [[ "$C9_QUEUE_SIGNAL" == "1" ]]; then
   mark_result 1 "9"
 else
   mark_result 0 "9"

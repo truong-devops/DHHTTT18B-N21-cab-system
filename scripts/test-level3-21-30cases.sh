@@ -381,8 +381,8 @@ if [[ -z "$C21_ETA" ]]; then C21_ETA=$(echo "$C21_BODY" | json_get "booking.etaM
 C21_BOOKING_ID=$(echo "$C21_BODY" | json_get "booking.booking_id")
 if [[ -z "$C21_BOOKING_ID" ]]; then C21_BOOKING_ID=$(echo "$C21_BODY" | json_get "booking.bookingId"); fi
 if [[ -n "$C21_BOOKING_ID" ]]; then ACTIVE_BOOKING_ID="$C21_BOOKING_ID"; fi
-print_case "Case 21 - booking calls ETA" "201 + eta > 0 + no timeout" "$C21_STATUS" "$C21_BODY"
-if [[ "$C21_STATUS" == "201" ]] && [[ -n "$C21_ETA" ]] && node -e "process.exit(Number('$C21_ETA')>0?0:1)"; then
+print_case "Case 21 - booking calls ETA" "201 + booking response contains eta > 0 + no timeout" "$C21_STATUS" "$C21_BODY"
+if [[ "$C21_STATUS" == "201" ]] && [[ -n "$C21_BOOKING_ID" ]] && [[ -n "$C21_ETA" ]] && node -e "process.exit(Number('$C21_ETA')>0?0:1)"; then
   mark_result 1 "21"
 else
   mark_result 0 "21"
@@ -401,8 +401,8 @@ C22_PRICE=$(echo "$C22_BODY" | json_get "booking.priceSnapshot.estimatedFare")
 if [[ -z "$C22_PRICE" ]]; then C22_PRICE=$(echo "$C22_BODY" | json_get "booking.price_snapshot.estimatedFare"); fi
 C22_SURGE=$(echo "$C22_BODY" | json_get "booking.priceSnapshot.surge")
 if [[ -z "$C22_SURGE" ]]; then C22_SURGE=$(echo "$C22_BODY" | json_get "booking.price_snapshot.surge"); fi
-print_case "Case 22 - booking calls pricing" "201 + price > 0 + surge >= 1" "$C22_STATUS" "$C22_BODY"
-if [[ "$C22_STATUS" == "201" ]] && [[ -n "$C22_PRICE" ]] && [[ -n "$C22_SURGE" ]] \
+print_case "Case 22 - booking calls pricing" "201 + booking response contains price > 0 + surge >= 1" "$C22_STATUS" "$C22_BODY"
+if [[ "$C22_STATUS" == "201" ]] && [[ -n "$C22_BOOKING_ID" ]] && [[ -n "$C22_PRICE" ]] && [[ -n "$C22_SURGE" ]] \
   && node -e "process.exit(Number('$C22_PRICE')>0 && Number('$C22_SURGE')>=1 ? 0:1)"; then
   mark_result 1 "22"
 else
@@ -512,10 +512,16 @@ else
 fi
 
 C26_NOTI_OK=$(echo "$C26_BODY" | json_bool "notification.ok")
+C26_NOTI_USER_ID=$(echo "$C26_BODY" | json_get "notification.data.user_id")
 C27_BOOKING_STATUS=$(echo "$C26_BODY" | json_get "booking.status")
 C27_EVENT=$(echo "$C26_BODY" | json_get "publishedEvent.eventType")
-print_case "Case 26 - driver notification on assign" "200 + notification sent quickly" "$C26_STATUS" "$C26_BODY"
-if [[ "$C26_STATUS" == "200" ]] && [[ "$C26_NOTI_OK" == "1" ]] && [[ "${C26_LATENCY_MS:-999999}" -le 5000 ]]; then
+print_case "Case 26 - driver notification on assign" "200 + driver notification delivered/enqueued + no large delay" "$C26_STATUS" "$C26_BODY"
+if [[ "$C26_STATUS" == "200" ]] \
+  && [[ "$C26_NOTI_OK" == "1" ]] \
+  && [[ -n "$C26_NOTI_USER_ID" ]] \
+  && [[ -n "${SELECTED_DRIVER_ID:-}" ]] \
+  && [[ "$C26_NOTI_USER_ID" == "$SELECTED_DRIVER_ID" ]] \
+  && [[ "${C26_LATENCY_MS:-999999}" -le 5000 ]]; then
   mark_result 1 "26"
 else
   mark_result 0 "26"

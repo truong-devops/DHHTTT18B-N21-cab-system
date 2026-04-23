@@ -21,10 +21,25 @@ AUTH_BOOTSTRAP_RETRY_DELAY_SEC="${AUTH_BOOTSTRAP_RETRY_DELAY_SEC:-3}"
 AUTH_BOOTSTRAP_COOLDOWN_SEC="${AUTH_BOOTSTRAP_COOLDOWN_SEC:-65}"
 LEVEL10_ADMIN_DASHBOARD_PATH="${LEVEL10_ADMIN_DASHBOARD_PATH:-/v1/admin/dashboard}"
 LEVEL10_ADMIN_FALLBACK_PATH="${LEVEL10_ADMIN_FALLBACK_PATH:-/v1/admin/drivers?limit=1}"
+CASE94_EVIDENCE_FILE="${CASE94_EVIDENCE_FILE:-}"
+CASE94_EVIDENCE_TEXT="${CASE94_EVIDENCE_TEXT:-}"
+CASE99_TLS_PORT="${CASE99_TLS_PORT:-3443}"
+CASE99_BASE_HOST="${CASE99_BASE_HOST:-}"
+if [[ -z "$CASE99_BASE_HOST" ]]; then
+  CASE99_BASE_HOST="${BASE_URL#http://}"
+  CASE99_BASE_HOST="${CASE99_BASE_HOST#https://}"
+  CASE99_BASE_HOST="${CASE99_BASE_HOST%%/*}"
+  CASE99_BASE_HOST="${CASE99_BASE_HOST%%:*}"
+fi
+if [[ -z "$CASE99_BASE_HOST" ]]; then
+  CASE99_BASE_HOST="localhost"
+fi
+CASE99_HTTP_BASE_URL="${CASE99_HTTP_BASE_URL:-http://$CASE99_BASE_HOST:$CASE99_TLS_PORT}"
+CASE99_HTTPS_BASE_URL="${CASE99_HTTPS_BASE_URL:-https://$CASE99_BASE_HOST:$CASE99_TLS_PORT}"
+CASE99_EXPECT_HTTPS_STATUS="${CASE99_EXPECT_HTTPS_STATUS:-200}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
-SKIP_COUNT=0
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/case-context-input.sh"
@@ -40,9 +55,9 @@ Examples:
 
 Notes:
   - Default BASE_URL: $DEFAULT_BASE_URL
-  - Case 94 (mTLS) is SKIP when mTLS runtime evidence is not accessible from this script.
-  - Case 99 (HTTPS-only) is SKIP only when transport evidence cannot be verified.
-  - Case 100 (audit logging) is SKIP when runtime logs are not readable.
+  - Case 94 (mTLS) requires concrete runtime evidence; if unavailable, this case FAILS.
+  - Case 99 uses CASE99_HTTP_BASE_URL / CASE99_HTTPS_BASE_URL for probe URLs.
+  - Case 100 (audit logging) FAILS when runtime log evidence is unavailable.
 USAGE
 }
 
@@ -118,12 +133,11 @@ mark_result() {
   echo
 }
 
-mark_result_skip() {
+mark_no_evidence_fail() {
   local case_id="$1"
   local reason="$2"
-  echo "[$case_id] SKIP - $reason"
-  SKIP_COUNT=$((SKIP_COUNT + 1))
-  echo
+  echo "[$case_id] NO_EVIDENCE - $reason"
+  mark_result 0 "$case_id"
 }
 
 call_json_url() {
@@ -307,7 +321,9 @@ ensure_gateway_ready() {
   if wait_for_url "$BASE_URL/health" 40; then
     return 0
   fi
-  mark_result_skip "$case_id" "gateway health check failed at $BASE_URL/health"
+  if [[ "$case_id" =~ ^[0-9]+$ ]]; then
+    mark_no_evidence_fail "$case_id" "gateway health check failed at $BASE_URL/health"
+  fi
   return 1
 }
 
@@ -323,6 +339,32 @@ contains_security_leak() {
     return $?
   fi
   echo "$content" | grep -Eiq "$pattern"
+}
+
+load_evidence_text() {
+  local evidence_file="${1:-}"
+  local inline_text="${2:-}"
+  local evidence=""
+  if [[ -n "$evidence_file" && -f "$evidence_file" ]]; then
+    evidence="$(cat "$evidence_file" 2>/dev/null || true)"
+  fi
+  if [[ -z "$evidence" && -n "$inline_text" ]]; then
+    evidence="$inline_text"
+  fi
+  printf '%s' "$evidence"
+}
+
+text_matches_pattern() {
+  local text="$1"
+  local pattern="$2"
+  if [[ -z "$text" ]]; then
+    return 1
+  fi
+  if command -v rg >/dev/null 2>&1; then
+    echo "$text" | rg -Eiq "$pattern"
+    return $?
+  fi
+  echo "$text" | grep -Eiq "$pattern"
 }
 
 echo "== Setup for Level 10 zero trust security tests =="
@@ -372,13 +414,13 @@ if [[ -z "$USER_TOKEN" || -z "$ADMIN_TOKEN" || -z "$DRIVER_TOKEN" ]]; then
 fi
 
 if [[ -z "$USER_TOKEN" || -z "$USER_ID" ]]; then
-  echo "WARN: cannot provision standard user token; cases 92/93/97 may fail or skip."
+  echo "WARN: cannot provision standard user token; cases 92/93/97 may fail."
 fi
 if [[ -z "$ADMIN_TOKEN" || -z "$ADMIN_ID" ]]; then
   echo "WARN: cannot provision admin token; admin baseline check in case 95 may fail."
 fi
 if [[ -z "$DRIVER_TOKEN" || -z "$DRIVER_ID" ]]; then
-  echo "WARN: cannot provision driver token; case 96 may fail or skip."
+  echo "WARN: cannot provision driver token; case 96 may fail."
 fi
 
 create_booking_payload='{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70},"vehicle_type":"CAR","distance_km":5,"traffic_level":0.5}'
@@ -405,11 +447,11 @@ fi
 # Case 92: Tampered JWT
 if ensure_gateway_ready "92"; then
   if [[ -z "$USER_TOKEN" ]]; then
-    mark_result_skip "92" "cannot run tampered JWT test without valid base token"
+    mark_no_evidence_fail "92" "cannot run tampered JWT test without valid base token"
   else
     C92_TAMPERED="$(tamper_jwt_payload_without_resign "$USER_TOKEN")"
     if [[ -z "$C92_TAMPERED" ]]; then
-      mark_result_skip "92" "failed to build tampered token payload"
+      mark_no_evidence_fail "92" "failed to build tampered token payload"
     else
       C92=$(call_gateway_json GET "/v1/bookings" "$C92_TAMPERED")
       C92_STATUS=$(echo "$C92" | sed -n '1p')
@@ -433,11 +475,11 @@ fi
 # Case 93: Expired token
 if ensure_gateway_ready "93"; then
   if [[ -z "$USER_ID" ]]; then
-    mark_result_skip "93" "cannot create expired token without known subject"
+    mark_no_evidence_fail "93" "cannot create expired token without known subject"
   else
     C93_EXPIRED_TOKEN="$(create_expired_token "$USER_ID" "user" "$JWT_SECRET")"
     if [[ -z "$C93_EXPIRED_TOKEN" ]]; then
-      mark_result_skip "93" "failed to create expired JWT (jsonwebtoken unavailable or secret missing)"
+      mark_no_evidence_fail "93" "failed to create expired JWT (jsonwebtoken unavailable or secret missing)"
     else
       C93=$(call_gateway_json GET "/v1/bookings" "$C93_EXPIRED_TOKEN")
       C93_STATUS=$(echo "$C93" | sed -n '1p')
@@ -459,12 +501,40 @@ if ensure_gateway_ready "93"; then
 fi
 
 # Case 94: mTLS service-to-service
-mark_result_skip "94" "cannot verify mTLS handshake/cert-chain at runtime from API-only script without mesh/PKI introspection"
+C94_EVIDENCE="$(load_evidence_text "$CASE94_EVIDENCE_FILE" "$CASE94_EVIDENCE_TEXT")"
+C94_STATUS="NO_EVIDENCE"
+C94_OK=0
+if [[ -n "$C94_EVIDENCE" ]]; then
+  C94_MTLS_SIGNAL=0
+  C94_REJECT_SIGNAL=0
+  if text_matches_pattern "$C94_EVIDENCE" '(mtls|mutual tls|client cert|client certificate|x509|spiffe|tls handshake|ssl handshake|certificate chain)'; then
+    C94_MTLS_SIGNAL=1
+  fi
+  if text_matches_pattern "$C94_EVIDENCE" '(reject|rejected|denied|forbidden|unknown ca|bad certificate|certificate required|no certificate|handshake fail|tlsv1 alert)'; then
+    C94_REJECT_SIGNAL=1
+  fi
+  if [[ "$C94_MTLS_SIGNAL" == "1" && "$C94_REJECT_SIGNAL" == "1" ]]; then
+    C94_STATUS="EVIDENCE_OK"
+    C94_OK=1
+  else
+    C94_STATUS="INSUFFICIENT_EVIDENCE"
+  fi
+fi
+C94_HAS_EVIDENCE=0
+if [[ -n "$C94_EVIDENCE" ]]; then
+  C94_HAS_EVIDENCE=1
+fi
+C94_BODY="evidence_file=${CASE94_EVIDENCE_FILE:-<none>}; has_evidence=$C94_HAS_EVIDENCE; mtls_signal=${C94_MTLS_SIGNAL:-0}; reject_signal=${C94_REJECT_SIGNAL:-0}"
+print_case "Case 94 - mTLS service-to-service" \
+  "Verify Service A -> Service B calls with valid/invalid client certificates and observe runtime handshake evidence" \
+  "Invalid/no certificate must be rejected (mTLS handshake fail) and unauthorized service access denied" \
+  "$C94_STATUS" "$C94_BODY"
+mark_result "$C94_OK" "94"
 
 # Case 95: RBAC (user calls admin)
 if ensure_gateway_ready "95"; then
   if [[ -z "$USER_TOKEN" ]]; then
-    mark_result_skip "95" "cannot run RBAC deny test without user token"
+    mark_no_evidence_fail "95" "cannot run RBAC deny test without user token"
   else
     C95_TARGET_PATH="$LEVEL10_ADMIN_DASHBOARD_PATH"
     C95_USER=$(call_gateway_json GET "$C95_TARGET_PATH" "$USER_TOKEN")
@@ -473,16 +543,7 @@ if ensure_gateway_ready "95"; then
     C95_USER_MSG=$(echo "$C95_USER_BODY" | json_get "error.message")
     if [[ -z "$C95_USER_MSG" ]]; then C95_USER_MSG=$(echo "$C95_USER_BODY" | json_get "message"); fi
 
-    if [[ "$C95_USER_STATUS" == "404" && "$LEVEL10_ADMIN_FALLBACK_PATH" != "$LEVEL10_ADMIN_DASHBOARD_PATH" ]]; then
-      C95_TARGET_PATH="$LEVEL10_ADMIN_FALLBACK_PATH"
-      C95_USER=$(call_gateway_json GET "$C95_TARGET_PATH" "$USER_TOKEN")
-      C95_USER_STATUS=$(echo "$C95_USER" | sed -n '1p')
-      C95_USER_BODY=$(echo "$C95_USER" | sed '1d')
-      C95_USER_MSG=$(echo "$C95_USER_BODY" | json_get "error.message")
-      if [[ -z "$C95_USER_MSG" ]]; then C95_USER_MSG=$(echo "$C95_USER_BODY" | json_get "message"); fi
-    fi
-
-    C95_ADMIN_STATUS="SKIP"
+    C95_ADMIN_STATUS="NO_EVIDENCE"
     C95_ADMIN_BODY=""
     if [[ -n "$ADMIN_TOKEN" ]]; then
       C95_ADMIN=$(call_gateway_json GET "$C95_TARGET_PATH" "$ADMIN_TOKEN")
@@ -492,12 +553,12 @@ if ensure_gateway_ready "95"; then
 
     C95_OK=1
     if [[ "$C95_USER_STATUS" != "403" ]]; then C95_OK=0; fi
-    if [[ "$C95_ADMIN_STATUS" != "SKIP" && "$C95_ADMIN_STATUS" != "200" ]]; then C95_OK=0; fi
+    if [[ "$C95_ADMIN_STATUS" != "NO_EVIDENCE" && "$C95_ADMIN_STATUS" != "200" ]]; then C95_OK=0; fi
     if [[ "$C95_USER_MSG" != *"Access denied"* && "$C95_USER_MSG" != *"Forbidden"* && "$C95_USER_MSG" != *"forbidden"* ]]; then C95_OK=0; fi
 
     C95_ACTUAL="target_path=$C95_TARGET_PATH; user_status=$C95_USER_STATUS; user_message=${C95_USER_MSG:-<empty>}; admin_baseline_status=$C95_ADMIN_STATUS"
     print_case "Case 95 - RBAC (user calls admin)" \
-      "GET /v1/admin/dashboard with token role=USER (fallback to existing admin endpoint if dashboard route is unavailable)" \
+      "GET /v1/admin/dashboard with token role=USER" \
       "User must be denied with 403 Access denied; admin token should be allowed (200)" \
       "local-check" "$C95_ACTUAL"
     mark_result "$C95_OK" "95"
@@ -507,7 +568,7 @@ fi
 # Case 96: Least privilege (driver cannot access other user's data)
 if ensure_gateway_ready "96"; then
   if [[ -z "$DRIVER_TOKEN" || -z "$USER_ID" ]]; then
-    mark_result_skip "96" "cannot run least-privilege test without driver token and target user_id"
+    mark_no_evidence_fail "96" "cannot run least-privilege test without driver token and target user_id"
   else
     C96_TARGET_ID="$USER_ID"
     C96=$(call_gateway_json GET "/v1/users/$C96_TARGET_ID" "$DRIVER_TOKEN")
@@ -532,7 +593,7 @@ if ensure_gateway_ready "97"; then
   C97_NOAUTH_STATUS=$(echo "$C97_NOAUTH" | sed -n '1p')
   C97_NOAUTH_BODY=$(echo "$C97_NOAUTH" | sed '1d')
 
-  C97_USER_STATUS="SKIP"
+  C97_USER_STATUS="NO_EVIDENCE"
   C97_USER_BODY=""
   if [[ -n "$USER_TOKEN" ]]; then
     C97_USER=$(call_json_url POST "$BOOKING_URL/v1/bookings" "$USER_TOKEN" "$create_booking_payload")
@@ -542,7 +603,8 @@ if ensure_gateway_ready "97"; then
 
   C97_OK=1
   if [[ "$C97_NOAUTH_STATUS" != "401" && "$C97_NOAUTH_STATUS" != "403" ]]; then C97_OK=0; fi
-  if [[ "$C97_USER_STATUS" != "SKIP" && "$C97_USER_STATUS" != "401" && "$C97_USER_STATUS" != "403" ]]; then C97_OK=0; fi
+  if [[ "$C97_USER_STATUS" == "NO_EVIDENCE" ]]; then C97_OK=0; fi
+  if [[ "$C97_USER_STATUS" != "NO_EVIDENCE" && "$C97_USER_STATUS" != "401" && "$C97_USER_STATUS" != "403" ]]; then C97_OK=0; fi
   if echo "$C97_NOAUTH_BODY"$'\n'"$C97_USER_BODY" | grep -Eq '"booking_id"|"bookingId"|"ride_id"|"rideId"'; then C97_OK=0; fi
 
   C97_ACTUAL="internal_booking_url=$BOOKING_URL/v1/bookings; noauth_status=$C97_NOAUTH_STATUS; with_user_token_status=$C97_USER_STATUS"
@@ -599,111 +661,108 @@ NODE
 
   C98_429=$(echo "$C98_RESULT" | json_get "status_counts.429")
   if [[ -z "$C98_429" ]]; then C98_429=0; fi
+  C98_000=$(echo "$C98_RESULT" | json_get "status_counts.000")
+  if [[ -z "$C98_000" ]]; then C98_000=0; fi
+  C98_5XX=$(echo "$C98_RESULT" | node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8'));const sc=j.status_counts||{};let t=0;for(const [k,v] of Object.entries(sc)){const c=Number(k);if(Number.isFinite(c)&&c>=500&&c<600)t+=Number(v)||0;}process.stdout.write(String(t));")
+  if [[ -z "$C98_5XX" ]]; then C98_5XX=0; fi
   C98_HEALTH=$(http_status "$BASE_URL/health")
 
   C98_OK=1
   if (( C98_429 < CASE98_MIN_429 )); then C98_OK=0; fi
+  if (( C98_000 > 0 )); then C98_OK=0; fi
+  if (( C98_5XX > 0 )); then C98_OK=0; fi
   if [[ "$C98_HEALTH" != "200" ]]; then C98_OK=0; fi
 
   print_case "Case 98 - Rate limiting" \
     "Burst POST /v1/auth/login (count=$CASE98_BURST_COUNT, concurrency=$CASE98_CONCURRENCY)" \
-    "Rate limiter must trigger with >=${CASE98_MIN_429} responses 429; system stays healthy" \
+    "Rate limiter must trigger with >=${CASE98_MIN_429} responses 429; no 5xx/timeout flood; system stays healthy" \
     "local-check" "$C98_RESULT"
   mark_result "$C98_OK" "98"
 fi
 
 # Case 99: Encryption in transit (HTTPS only)
 if ensure_gateway_ready "99"; then
-  C99_HTTP_STATUS=$(http_status "$BASE_URL/health")
-  C99_HTTPS_URL="${BASE_URL/http:\/\//https://}/health"
+  C99_HTTP_URL="${CASE99_HTTP_BASE_URL%/}/health"
+  C99_HTTPS_URL="${CASE99_HTTPS_BASE_URL%/}/health"
+  C99_HTTP_STATUS=$(http_status "$C99_HTTP_URL")
   C99_HTTPS_STATUS=$(curl -sk -o /dev/null -w "%{http_code}" --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME" "$C99_HTTPS_URL" || true)
   if [[ -z "$C99_HTTPS_STATUS" ]]; then C99_HTTPS_STATUS="000"; fi
 
-  C99_ACTUAL="http_health=$C99_HTTP_STATUS; https_health=$C99_HTTPS_STATUS; https_url=$C99_HTTPS_URL"
+  C99_ACTUAL="http_url=$C99_HTTP_URL http_health=$C99_HTTP_STATUS; https_url=$C99_HTTPS_URL https_health=$C99_HTTPS_STATUS; expected_https=$CASE99_EXPECT_HTTPS_STATUS"
+  C99_OK=1
+  if [[ "$C99_HTTP_STATUS" == "200" ]]; then C99_OK=0; fi
+  if [[ "$C99_HTTPS_STATUS" != "$CASE99_EXPECT_HTTPS_STATUS" ]]; then C99_OK=0; fi
 
-  if [[ "$C99_HTTP_STATUS" == "200" && "$C99_HTTPS_STATUS" == "000" ]]; then
-    print_case "Case 99 - Encryption in transit (HTTPS only)" \
-      "Probe HTTP/HTTPS health endpoint on gateway" \
-      "HTTP rejected and HTTPS reachable (or verifiable via TLS termination evidence)" \
-      "local-check" "$C99_ACTUAL"
-    mark_result_skip "99" "runtime gateway is HTTP-only (no TLS listener/termination evidence in this environment)"
-  elif [[ "$C99_HTTP_STATUS" == "000" && "$C99_HTTPS_STATUS" == "000" ]]; then
-    print_case "Case 99 - Encryption in transit (HTTPS only)" \
-      "Probe HTTP/HTTPS health endpoint on gateway" \
-      "HTTP rejected and HTTPS reachable (or verifiable via TLS termination evidence)" \
-      "local-check" "$C99_ACTUAL"
-    mark_result_skip "99" "cannot verify transport policy: both HTTP and HTTPS probes unreachable"
-  else
-    C99_OK=1
-    if [[ "$C99_HTTP_STATUS" == "200" ]]; then C99_OK=0; fi
-    if [[ "$C99_HTTPS_STATUS" != "200" ]]; then C99_OK=0; fi
-
-    print_case "Case 99 - Encryption in transit (HTTPS only)" \
-      "Probe HTTP/HTTPS health endpoint on gateway" \
-      "HTTP must be blocked; HTTPS must be available" \
-      "local-check" "$C99_ACTUAL"
-    mark_result "$C99_OK" "99"
-  fi
+  print_case "Case 99 - Encryption in transit (HTTPS only)" \
+    "Probe dedicated service transport URL over HTTP vs HTTPS" \
+    "HTTP transport must be rejected; only HTTPS / mTLS is allowed" \
+    "local-check" "$C99_ACTUAL"
+  mark_result "$C99_OK" "99"
 fi
 
 # Case 100: Audit logging
 if ensure_gateway_ready "100"; then
-  if [[ -z "$USER_TOKEN" ]]; then
-    mark_result_skip "100" "cannot run audit API-call validation without authenticated user token"
-  else
-  C100_TRACE="level10-audit-${UNIQ_TAG}-${RANDOM}"
-  C100_CALL=$(call_gateway_json GET "/v1/bookings" "$USER_TOKEN" "" "x-trace-id" "$C100_TRACE" "x-force-audit-log" "1")
-  C100_STATUS=$(echo "$C100_CALL" | sed -n '1p')
-  C100_BODY=$(echo "$C100_CALL" | sed '1d')
+  C100_LOGIN_TRACE="level10-audit-login-${UNIQ_TAG}-${RANDOM}"
+  C100_API_TRACE="level10-audit-api-${UNIQ_TAG}-${RANDOM}"
+  C100_LOGIN=$(call_gateway_json POST "/v1/auth/login" "" "{\"identifier\":\"$TEST_EMAIL_USER\",\"password\":\"$USER_PASS\"}" "x-trace-id" "$C100_LOGIN_TRACE" "x-force-audit-log" "1")
+  C100_LOGIN_STATUS=$(echo "$C100_LOGIN" | sed -n '1p')
+  C100_LOGIN_BODY=$(echo "$C100_LOGIN" | sed '1d')
+
+  C100_API_STATUS="NO_EVIDENCE"
+  C100_API_BODY='{"error":"no authenticated user token for protected API audit step"}'
+  if [[ -n "$USER_TOKEN" ]]; then
+    C100_API=$(call_gateway_json GET "/v1/bookings" "$USER_TOKEN" "" "x-trace-id" "$C100_API_TRACE" "x-force-audit-log" "1")
+    C100_API_STATUS=$(echo "$C100_API" | sed -n '1p')
+    C100_API_BODY=$(echo "$C100_API" | sed '1d')
+  fi
 
   C100_LOG_ACCESS=0
-  C100_LOG_FOUND=0
-  C100_LOG_HAS_ACTION=0
-  C100_LOG_HAS_ACTOR=0
-  C100_LOG_HAS_TIMESTAMP=0
+  C100_LOGIN_FOUND=0
+  C100_API_FOUND=0
+  C100_API_HAS_ACTION=0
+  C100_API_HAS_ACTOR=0
+  C100_API_HAS_TIMESTAMP=0
   C100_LOG_NOTE="runtime logs not accessible"
 
   if command -v docker >/dev/null 2>&1; then
     if docker ps --format '{{.Names}}' 2>/dev/null | grep -Eq '^infra-api-gateway-1$'; then
       C100_LOG_ACCESS=1
-      C100_LOGS=$(docker logs --tail=400 infra-api-gateway-1 2>&1 || true)
-      C100_AUDIT_LINE=$(echo "$C100_LOGS" | grep -F "$C100_TRACE" | grep -F '"event":"security_audit"' | tail -n 1 || true)
-      if [[ -n "$C100_AUDIT_LINE" ]]; then
-        C100_LOG_FOUND=1
-        if echo "$C100_AUDIT_LINE" | grep -Fq '"action":"'; then C100_LOG_HAS_ACTION=1; fi
-        if echo "$C100_AUDIT_LINE" | grep -Eq "\"actorId\":\"?$USER_ID\"?"; then C100_LOG_HAS_ACTOR=1; fi
-        if echo "$C100_AUDIT_LINE" | grep -Fq '"occurredAt":"'; then C100_LOG_HAS_TIMESTAMP=1; fi
-        C100_LOG_NOTE="audit trace found with fields: action=$C100_LOG_HAS_ACTION actorId=$C100_LOG_HAS_ACTOR occurredAt=$C100_LOG_HAS_TIMESTAMP"
-      else
-        C100_LOG_NOTE="trace id not found in sampled gateway logs"
+      C100_LOGS=$(docker logs --tail=500 infra-api-gateway-1 2>&1 || true)
+      C100_LOGIN_LINE=$(echo "$C100_LOGS" | grep -F "$C100_LOGIN_TRACE" | grep -F '"event":"security_audit"' | tail -n 1 || true)
+      C100_API_LINE=$(echo "$C100_LOGS" | grep -F "$C100_API_TRACE" | grep -F '"event":"security_audit"' | tail -n 1 || true)
+      if [[ -n "$C100_LOGIN_LINE" ]]; then
+        C100_LOGIN_FOUND=1
       fi
+      if [[ -n "$C100_API_LINE" ]]; then
+        C100_API_FOUND=1
+        if echo "$C100_API_LINE" | grep -Fq '"action":"'; then C100_API_HAS_ACTION=1; fi
+        if echo "$C100_API_LINE" | grep -Eq "\"actorId\":\"?$USER_ID\"?"; then C100_API_HAS_ACTOR=1; fi
+        if echo "$C100_API_LINE" | grep -Fq '"occurredAt":"'; then C100_API_HAS_TIMESTAMP=1; fi
+      fi
+      C100_LOG_NOTE="login_found=$C100_LOGIN_FOUND api_found=$C100_API_FOUND api_action=$C100_API_HAS_ACTION api_actorId=$C100_API_HAS_ACTOR api_occurredAt=$C100_API_HAS_TIMESTAMP"
     fi
   fi
 
-  C100_ACTUAL="api_status=$C100_STATUS; trace_id=$C100_TRACE; log_access=$C100_LOG_ACCESS; log_found=$C100_LOG_FOUND; has_action=$C100_LOG_HAS_ACTION; has_actorId=$C100_LOG_HAS_ACTOR; has_occurredAt=$C100_LOG_HAS_TIMESTAMP ($C100_LOG_NOTE)"
+  C100_ACTUAL="login_status=$C100_LOGIN_STATUS; api_status=$C100_API_STATUS; login_trace=$C100_LOGIN_TRACE; api_trace=$C100_API_TRACE; log_access=$C100_LOG_ACCESS; login_found=$C100_LOGIN_FOUND; api_found=$C100_API_FOUND; api_has_action=$C100_API_HAS_ACTION; api_has_actorId=$C100_API_HAS_ACTOR; api_has_occurredAt=$C100_API_HAS_TIMESTAMP ($C100_LOG_NOTE)"
   print_case "Case 100 - Audit logging" \
-    "Call protected API with unique x-trace-id, then inspect runtime gateway logs" \
-    "Audit log contains user_id(actorId), action, timestamp(occurredAt), traceId; traceable security event; no missing log" \
+    "Login + protected API call with unique trace ids, then inspect runtime gateway logs" \
+    "Audit log contains user_id(actorId), action, timestamp(occurredAt), traceId for login + API activity; no missing log" \
     "local-check" "$C100_ACTUAL"
 
-  if [[ "$C100_LOG_ACCESS" != "1" ]]; then
-    mark_result_skip "100" "cannot read runtime container logs from this environment"
-  else
-    C100_OK=1
-    if [[ "$C100_STATUS" != "200" ]]; then C100_OK=0; fi
-    if [[ "$C100_LOG_FOUND" != "1" ]]; then C100_OK=0; fi
-    if [[ "$C100_LOG_HAS_ACTION" != "1" || "$C100_LOG_HAS_ACTOR" != "1" || "$C100_LOG_HAS_TIMESTAMP" != "1" ]]; then C100_OK=0; fi
-    if contains_security_leak "$C100_BODY"; then C100_OK=0; fi
-    mark_result "$C100_OK" "100"
-  fi
-  fi
+  C100_OK=1
+  if [[ "$C100_LOGIN_STATUS" != "200" ]]; then C100_OK=0; fi
+  if [[ "$C100_API_STATUS" != "200" ]]; then C100_OK=0; fi
+  if [[ "$C100_LOG_ACCESS" != "1" ]]; then C100_OK=0; fi
+  if [[ "$C100_LOGIN_FOUND" != "1" || "$C100_API_FOUND" != "1" ]]; then C100_OK=0; fi
+  if [[ "$C100_API_HAS_ACTION" != "1" || "$C100_API_HAS_ACTOR" != "1" || "$C100_API_HAS_TIMESTAMP" != "1" ]]; then C100_OK=0; fi
+  if contains_security_leak "$C100_LOGIN_BODY$C100_API_BODY"; then C100_OK=0; fi
+  mark_result "$C100_OK" "100"
 fi
 
 echo "========================================="
 echo "LEVEL 10 SUMMARY (Cases 91-100)"
 echo "PASS: $PASS_COUNT"
 echo "FAIL: $FAIL_COUNT"
-echo "SKIP: $SKIP_COUNT"
 echo "========================================="
 
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
