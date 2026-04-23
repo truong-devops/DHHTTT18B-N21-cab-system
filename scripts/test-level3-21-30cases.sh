@@ -528,9 +528,30 @@ C25_TOPIC=$(echo "$C25_BODY" | json_get "additionalEvents.0.topic")
 C25_EVENT=$(echo "$C25_BODY" | json_get "additionalEvents.0.eventType")
 C25_QUEUED=$(echo "$C25_BODY" | json_bool "additionalEvents.0.queued")
 C25_STATUS_VALUE=$(echo "$C25_BODY" | json_get "booking.status")
-print_case "Case 25 - publish ride_requested" "201 + booking REQUESTED + topic ride_events + eventType ride_requested + queued=true" "$C25_STATUS" "$C25_BODY"
+C25_RIDE_ID=$(echo "$C25_BODY" | json_get "booking.ride_id")
+if [[ -z "$C25_RIDE_ID" ]]; then C25_RIDE_ID=$(echo "$C25_BODY" | json_get "booking.rideId"); fi
+C25_USER_ID=$(echo "$C25_BODY" | json_get "booking.user_id")
+if [[ -z "$C25_USER_ID" ]]; then C25_USER_ID=$(echo "$C25_BODY" | json_get "booking.userId"); fi
+C25_PICKUP_LAT=$(echo "$C25_BODY" | json_get "booking.pickup.lat")
+if [[ -z "$C25_PICKUP_LAT" ]]; then C25_PICKUP_LAT=$(echo "$C25_BODY" | json_get "booking.pickup_lat"); fi
+C25_PICKUP_LNG=$(echo "$C25_BODY" | json_get "booking.pickup.lng")
+if [[ -z "$C25_PICKUP_LNG" ]]; then C25_PICKUP_LNG=$(echo "$C25_BODY" | json_get "booking.pickup_lng"); fi
+C25_CREATED_AT=$(echo "$C25_BODY" | json_get "booking.created_at")
+if [[ -z "$C25_CREATED_AT" ]]; then C25_CREATED_AT=$(echo "$C25_BODY" | json_get "booking.createdAt"); fi
+C25_EVENT_ID=$(echo "$C25_BODY" | json_get "additionalEvents.0.eventId")
+C25_COORD_TIME_OK=0
+if node -e "const lat=Number('$C25_PICKUP_LAT');const lng=Number('$C25_PICKUP_LNG');const ts=Date.parse('$C25_CREATED_AT');process.exit(Number.isFinite(lat)&&Number.isFinite(lng)&&Number.isFinite(ts)?0:1)"; then
+  C25_COORD_TIME_OK=1
+fi
+C25_EVENT_ID_UUID=0
+if node -e "const s='$C25_EVENT_ID';process.exit(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)?0:1)"; then
+  C25_EVENT_ID_UUID=1
+fi
+print_case "Case 25 - publish ride_requested" "201 + booking REQUESTED + ride_requested queued on ride_events + payload evidence (booking/ride/user/pickup/timestamp/eventId-uuid)" "$C25_STATUS" "$C25_BODY"
 if [[ "$C25_STATUS" == "201" ]] && [[ -n "$C25_BOOKING_ID" ]] && [[ "$C25_STATUS_VALUE" == "REQUESTED" ]] \
-  && [[ "$C25_TOPIC" == "ride_events" ]] && [[ "$C25_EVENT" == "ride_requested" ]] && [[ "$C25_QUEUED" == "1" ]]; then
+  && [[ -n "$C25_RIDE_ID" ]] && [[ -n "$C25_USER_ID" ]] \
+  && [[ "$C25_TOPIC" == "ride_events" ]] && [[ "$C25_EVENT" == "ride_requested" ]] && [[ "$C25_QUEUED" == "1" ]] \
+  && [[ "$C25_COORD_TIME_OK" == "1" ]] && [[ "$C25_EVENT_ID_UUID" == "1" ]]; then
   mark_result 1 "25"
 else
   mark_result 0 "25"
@@ -541,7 +562,19 @@ echo "-- Running Case 26 and Case 27"
 if [[ -z "$C25_BOOKING_ID" ]]; then
   C26_STATUS="000"
   C26_BODY='{"error":"missing booking id from case 25"}'
+  C27_BEFORE_HTTP="000"
+  C27_BEFORE_BODY='{"error":"missing booking id from case 25"}'
+  C27_AFTER_HTTP="000"
+  C27_AFTER_BODY='{"error":"missing booking id from case 25"}'
 else
+  C27_BEFORE=$(call_json GET "/v1/bookings/$C25_BOOKING_ID" "$C25_TOKEN")
+  C27_BEFORE_HTTP=$(echo "$C27_BEFORE" | sed -n '1p')
+  C27_BEFORE_BODY=$(echo "$C27_BEFORE" | sed '1d')
+  if [[ "$C27_BEFORE_HTTP" != "200" ]]; then
+    C27_BEFORE=$(call_json GET "/v1/bookings/$C25_BOOKING_ID" "$ADMIN_TOKEN")
+    C27_BEFORE_HTTP=$(echo "$C27_BEFORE" | sed -n '1p')
+    C27_BEFORE_BODY=$(echo "$C27_BEFORE" | sed '1d')
+  fi
   # Status transition REQUESTED -> ACCEPTED is privileged in production
   # (driver/admin/service). Use admin token in this integration test.
   C26_TOKEN="$ADMIN_TOKEN"
@@ -551,6 +584,14 @@ else
   C26_STATUS=$(echo "$C26" | sed -n '1p')
   C26_BODY=$(echo "$C26" | sed '1d')
   C26_LATENCY_MS=$((END_MS - START_MS))
+  C27_AFTER=$(call_json GET "/v1/bookings/$C25_BOOKING_ID" "$C25_TOKEN")
+  C27_AFTER_HTTP=$(echo "$C27_AFTER" | sed -n '1p')
+  C27_AFTER_BODY=$(echo "$C27_AFTER" | sed '1d')
+  if [[ "$C27_AFTER_HTTP" != "200" ]]; then
+    C27_AFTER=$(call_json GET "/v1/bookings/$C25_BOOKING_ID" "$ADMIN_TOKEN")
+    C27_AFTER_HTTP=$(echo "$C27_AFTER" | sed -n '1p')
+    C27_AFTER_BODY=$(echo "$C27_AFTER" | sed '1d')
+  fi
 fi
 
 C26_NOTI_OK=$(echo "$C26_BODY" | json_bool "notification.ok")
@@ -567,6 +608,14 @@ if [[ -n "$C26_NOTI_ID" ]] && [[ -n "${SELECTED_DRIVER_ID:-}" ]]; then
 fi
 C27_BOOKING_STATUS=$(echo "$C26_BODY" | json_get "booking.status")
 C27_EVENT=$(echo "$C26_BODY" | json_get "publishedEvent.eventType")
+C27_BEFORE_STATUS=$(echo "$C27_BEFORE_BODY" | json_get "booking.status")
+if [[ -z "$C27_BEFORE_STATUS" ]]; then C27_BEFORE_STATUS=$(echo "$C27_BEFORE_BODY" | json_get "data.booking.status"); fi
+if [[ -z "$C27_BEFORE_STATUS" ]]; then C27_BEFORE_STATUS=$(echo "$C27_BEFORE_BODY" | json_get "data.status"); fi
+if [[ -z "$C27_BEFORE_STATUS" ]]; then C27_BEFORE_STATUS=$(echo "$C27_BEFORE_BODY" | json_get "status"); fi
+C27_AFTER_STATUS=$(echo "$C27_AFTER_BODY" | json_get "booking.status")
+if [[ -z "$C27_AFTER_STATUS" ]]; then C27_AFTER_STATUS=$(echo "$C27_AFTER_BODY" | json_get "data.booking.status"); fi
+if [[ -z "$C27_AFTER_STATUS" ]]; then C27_AFTER_STATUS=$(echo "$C27_AFTER_BODY" | json_get "data.status"); fi
+if [[ -z "$C27_AFTER_STATUS" ]]; then C27_AFTER_STATUS=$(echo "$C27_AFTER_BODY" | json_get "status"); fi
 print_case "Case 26 - driver notification on assign" "200 + Notification Service stores message for assigned driver + no large delay" "$C26_STATUS" "$C26_BODY"
 if [[ "$C26_STATUS" == "200" ]] \
   && [[ "$C26_NOTI_OK" == "1" ]] \
@@ -582,8 +631,13 @@ else
   mark_result 0 "26"
 fi
 
-print_case "Case 27 - status REQUESTED -> ACCEPTED" "200 + db status ACCEPTED + ride_accepted" "$C26_STATUS" "$C26_BODY"
-if [[ "$C26_STATUS" == "200" ]] && [[ "$C27_BOOKING_STATUS" == "ACCEPTED" ]] && [[ "$C27_EVENT" == "ride_accepted" ]]; then
+print_case "Case 27 - status REQUESTED -> ACCEPTED" "200 + pre-check REQUESTED + patch response ACCEPTED + read-back ACCEPTED + ride_accepted" "$C26_STATUS" "$C26_BODY"
+if [[ "$C26_STATUS" == "200" ]] \
+  && [[ "$C27_BEFORE_HTTP" == "200" ]] && [[ "$C27_AFTER_HTTP" == "200" ]] \
+  && [[ "$C27_BEFORE_STATUS" == "REQUESTED" ]] \
+  && [[ "$C27_BOOKING_STATUS" == "ACCEPTED" ]] \
+  && [[ "$C27_AFTER_STATUS" == "ACCEPTED" ]] \
+  && [[ "$C27_EVENT" == "ride_accepted" ]]; then
   mark_result 1 "27"
 else
   mark_result 0 "27"
@@ -624,8 +678,18 @@ C29_BODY=$(echo "$C29" | sed '1d')
 C29_BOOKING_ID=$(echo "$C29_BODY" | json_get "booking.booking_id")
 if [[ -z "$C29_BOOKING_ID" ]]; then C29_BOOKING_ID=$(echo "$C29_BODY" | json_get "booking.bookingId"); fi
 if [[ -n "$C29_BOOKING_ID" ]]; then ACTIVE_BOOKING_ID="$C29_BOOKING_ID"; fi
-print_case "Case 29 - API Gateway routes booking correctly" "POST /v1/bookings is routed to booking service and returns valid booking response" "$C29_STATUS" "$C29_BODY"
-if [[ "$C29_STATUS" == "201" ]] && [[ -n "$C29_BOOKING_ID" ]]; then
+C29_BOOKING_STATUS=$(echo "$C29_BODY" | json_get "booking.status")
+C29_PUB_TOPIC=$(echo "$C29_BODY" | json_get "publishedEvent.topic")
+C29_PUB_EVENT_ID=$(echo "$C29_BODY" | json_get "publishedEvent.eventId")
+C29_PUB_QUEUED=$(echo "$C29_BODY" | json_bool "publishedEvent.queued")
+C29_ADD_TOPIC=$(echo "$C29_BODY" | json_get "additionalEvents.0.topic")
+C29_ADD_EVENT=$(echo "$C29_BODY" | json_get "additionalEvents.0.eventType")
+C29_ADD_QUEUED=$(echo "$C29_BODY" | json_bool "additionalEvents.0.queued")
+print_case "Case 29 - API Gateway routes booking correctly" "201 + booking service contract (publishedEvent ride.created + additional ride_requested on ride_events)" "$C29_STATUS" "$C29_BODY"
+if [[ "$C29_STATUS" == "201" ]] && [[ -n "$C29_BOOKING_ID" ]] \
+  && [[ "$C29_BOOKING_STATUS" == "REQUESTED" ]] \
+  && [[ "$C29_PUB_TOPIC" == "ride.created" ]] && [[ -n "$C29_PUB_EVENT_ID" ]] && [[ "$C29_PUB_QUEUED" == "1" ]] \
+  && [[ "$C29_ADD_TOPIC" == "ride_events" ]] && [[ "$C29_ADD_EVENT" == "ride_requested" ]] && [[ "$C29_ADD_QUEUED" == "1" ]]; then
   mark_result 1 "29"
 else
   mark_result 0 "29"
@@ -641,8 +705,16 @@ C30_PRICE=$(echo "$C30_BODY" | json_get "booking.priceSnapshot.estimatedFare")
 if [[ -z "$C30_PRICE" ]]; then C30_PRICE=$(echo "$C30_BODY" | json_get "booking.price_snapshot.estimatedFare"); fi
 C30_SURGE=$(echo "$C30_BODY" | json_get "booking.priceSnapshot.surge")
 if [[ -z "$C30_SURGE" ]]; then C30_SURGE=$(echo "$C30_BODY" | json_get "booking.price_snapshot.surge"); fi
-print_case "Case 30 - pricing timeout retry/fallback" "201 + no crash + price > 0 + surge >= 1" "$C30_STATUS" "$C30_BODY"
+C30_QUOTE_ID=$(echo "$C30_BODY" | json_get "booking.priceSnapshot.quoteId")
+if [[ -z "$C30_QUOTE_ID" ]]; then C30_QUOTE_ID=$(echo "$C30_BODY" | json_get "booking.price_snapshot.quoteId"); fi
+if [[ -z "$C30_QUOTE_ID" ]]; then C30_QUOTE_ID=$(echo "$C30_BODY" | json_get "booking.price_snapshot.quote_id"); fi
+C30_FALLBACK_QUOTE=0
+if [[ "$C30_QUOTE_ID" == quote_local_fallback_* ]]; then
+  C30_FALLBACK_QUOTE=1
+fi
+print_case "Case 30 - pricing timeout retry/fallback" "201 + no crash + price > 0 + surge >= 1 + fallback quoteId evidence" "$C30_STATUS" "$C30_BODY"
 if [[ "$C30_STATUS" == "201" ]] && [[ -n "$C30_PRICE" ]] && [[ -n "$C30_SURGE" ]] \
+  && [[ "$C30_FALLBACK_QUOTE" == "1" ]] \
   && node -e "process.exit(Number('$C30_PRICE')>0 && Number('$C30_SURGE')>=1 ? 0:1)"; then
   mark_result 1 "30"
 else
