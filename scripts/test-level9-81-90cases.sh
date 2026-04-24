@@ -28,6 +28,12 @@ fi
 if [[ -z "$CASE88_EVIDENCE_FILE" && -f "$DEFAULT_CASE88_EVIDENCE_FILE" ]]; then
   CASE88_EVIDENCE_FILE="$DEFAULT_CASE88_EVIDENCE_FILE"
 fi
+if [[ -z "$CASE87_EVIDENCE_FILE" && -f "./scripts/evidence/case87-data-encryption-at-rest.txt" ]]; then
+  CASE87_EVIDENCE_FILE="./scripts/evidence/case87-data-encryption-at-rest.txt"
+fi
+if [[ -z "$CASE88_EVIDENCE_FILE" && -f "./scripts/evidence/case88-mtls-communication.txt" ]]; then
+  CASE88_EVIDENCE_FILE="./scripts/evidence/case88-mtls-communication.txt"
+fi
 
 PASS_COUNT=0
 FAIL_COUNT=0
