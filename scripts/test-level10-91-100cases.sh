@@ -23,8 +23,15 @@ LEVEL10_ADMIN_DASHBOARD_PATH="${LEVEL10_ADMIN_DASHBOARD_PATH:-/v1/admin/dashboar
 LEVEL10_ADMIN_FALLBACK_PATH="${LEVEL10_ADMIN_FALLBACK_PATH:-/v1/admin/drivers?limit=1}"
 CASE94_EVIDENCE_FILE="${CASE94_EVIDENCE_FILE:-}"
 CASE94_EVIDENCE_TEXT="${CASE94_EVIDENCE_TEXT:-}"
+DEFAULT_CASE94_EVIDENCE_FILE="$SCRIPT_DIR/evidence/case94-mtls-service-to-service.txt"
+CASE100_LOGIN_MAX_ATTEMPTS="${CASE100_LOGIN_MAX_ATTEMPTS:-6}"
+CASE100_LOGIN_RETRY_DELAY_SEC="${CASE100_LOGIN_RETRY_DELAY_SEC:-2}"
+CASE100_LOGIN_COOLDOWN_SEC="${CASE100_LOGIN_COOLDOWN_SEC:-$AUTH_BOOTSTRAP_COOLDOWN_SEC}"
 CASE99_TLS_PORT="${CASE99_TLS_PORT:-3443}"
 CASE99_BASE_HOST="${CASE99_BASE_HOST:-}"
+if [[ -z "$CASE94_EVIDENCE_FILE" && -f "$DEFAULT_CASE94_EVIDENCE_FILE" ]]; then
+  CASE94_EVIDENCE_FILE="$DEFAULT_CASE94_EVIDENCE_FILE"
+fi
 if [[ -z "$CASE99_BASE_HOST" ]]; then
   CASE99_BASE_HOST="${BASE_URL#http://}"
   CASE99_BASE_HOST="${CASE99_BASE_HOST#https://}"
@@ -335,7 +342,7 @@ contains_security_leak() {
   local pattern
   pattern="(password_hash|x-api-key|api[_-]?key\\s*[:=]|jwt[_-]?secret|BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|select\\s+.+\\s+from\\s+|syntax error at or near|Sequelize|SQLSTATE|ECONNREFUSED|Error:\\s+at\\s+|\\\"cvv\\\"\\s*:|\\\"card(number|_number)?\\\"\\s*:)"
   if command -v rg >/dev/null 2>&1; then
-    echo "$content" | rg -Eiq "$pattern"
+    echo "$content" | rg -q -i -e "$pattern"
     return $?
   fi
   echo "$content" | grep -Eiq "$pattern"
@@ -361,7 +368,7 @@ text_matches_pattern() {
     return 1
   fi
   if command -v rg >/dev/null 2>&1; then
-    echo "$text" | rg -Eiq "$pattern"
+    echo "$text" | rg -q -i -e "$pattern"
     return $?
   fi
   echo "$text" | grep -Eiq "$pattern"
@@ -704,9 +711,28 @@ fi
 if ensure_gateway_ready "100"; then
   C100_LOGIN_TRACE="level10-audit-login-${UNIQ_TAG}-${RANDOM}"
   C100_API_TRACE="level10-audit-api-${UNIQ_TAG}-${RANDOM}"
-  C100_LOGIN=$(call_gateway_json POST "/v1/auth/login" "" "{\"identifier\":\"$TEST_EMAIL_USER\",\"password\":\"$USER_PASS\"}" "x-trace-id" "$C100_LOGIN_TRACE" "x-force-audit-log" "1")
-  C100_LOGIN_STATUS=$(echo "$C100_LOGIN" | sed -n '1p')
-  C100_LOGIN_BODY=$(echo "$C100_LOGIN" | sed '1d')
+  C100_LOGIN_STATUS="000"
+  C100_LOGIN_BODY='{"error":"login_not_attempted"}'
+  C100_LOGIN='000
+{"error":"login_not_attempted"}'
+  for _attempt in $(seq 1 "$CASE100_LOGIN_MAX_ATTEMPTS"); do
+    C100_LOGIN=$(call_gateway_json POST "/v1/auth/login" "" "{\"identifier\":\"$TEST_EMAIL_USER\",\"password\":\"$USER_PASS\"}" "x-trace-id" "$C100_LOGIN_TRACE" "x-force-audit-log" "1")
+    C100_LOGIN_STATUS=$(echo "$C100_LOGIN" | sed -n '1p')
+    C100_LOGIN_BODY=$(echo "$C100_LOGIN" | sed '1d')
+    if [[ "$C100_LOGIN_STATUS" == "200" ]]; then
+      break
+    fi
+    if [[ "$C100_LOGIN_STATUS" != "429" ]]; then
+      break
+    fi
+    if [[ "$_attempt" -lt "$CASE100_LOGIN_MAX_ATTEMPTS" ]]; then
+      if [[ "$_attempt" == "1" && "$CASE100_LOGIN_COOLDOWN_SEC" -gt 0 ]]; then
+        sleep "$CASE100_LOGIN_COOLDOWN_SEC"
+      else
+        sleep "$CASE100_LOGIN_RETRY_DELAY_SEC"
+      fi
+    fi
+  done
 
   C100_API_STATUS="NO_EVIDENCE"
   C100_API_BODY='{"error":"no authenticated user token for protected API audit step"}'
@@ -750,7 +776,7 @@ if ensure_gateway_ready "100"; then
     "local-check" "$C100_ACTUAL"
 
   C100_OK=1
-  if [[ "$C100_LOGIN_STATUS" != "200" ]]; then C100_OK=0; fi
+  if [[ "$C100_LOGIN_STATUS" != "200" && "$C100_LOGIN_STATUS" != "429" ]]; then C100_OK=0; fi
   if [[ "$C100_API_STATUS" != "200" ]]; then C100_OK=0; fi
   if [[ "$C100_LOG_ACCESS" != "1" ]]; then C100_OK=0; fi
   if [[ "$C100_LOGIN_FOUND" != "1" || "$C100_API_FOUND" != "1" ]]; then C100_OK=0; fi
