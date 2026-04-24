@@ -46,6 +46,11 @@ CASE64_CONSUMER_GROUPS="${CASE64_CONSUMER_GROUPS:-payment-service-group}"
 CASE64_TOPIC_DELTA_MIN_RATIO="${CASE64_TOPIC_DELTA_MIN_RATIO:-1.0}"
 CASE64_MAX_CONSUMER_LAG="${CASE64_MAX_CONSUMER_LAG:-200}"
 CASE64_LAG_SETTLE_SEC="${CASE64_LAG_SETTLE_SEC:-4}"
+CASE64_LAG_WAIT_TIMEOUT_SEC="${CASE64_LAG_WAIT_TIMEOUT_SEC:-45}"
+CASE64_LAG_POLL_INTERVAL_SEC="${CASE64_LAG_POLL_INTERVAL_SEC:-2}"
+CASE64_WAIT_FOR_ACTIVE_GROUP_SEC="${CASE64_WAIT_FOR_ACTIVE_GROUP_SEC:-30}"
+CASE64_TOPIC_WAIT_TIMEOUT_SEC="${CASE64_TOPIC_WAIT_TIMEOUT_SEC:-45}"
+CASE64_TOPIC_POLL_INTERVAL_SEC="${CASE64_TOPIC_POLL_INTERVAL_SEC:-2}"
 CASE64_AUTO_START_KAFKA="${CASE64_AUTO_START_KAFKA:-1}"
 CASE64_KAFKA_COMPOSE_FILE="${CASE64_KAFKA_COMPOSE_FILE:-$SCRIPT_DIR/../infra/docker-compose.dev.yml}"
 
@@ -54,6 +59,7 @@ CASE65_DURATION_SEC="${CASE65_DURATION_SEC:-15}"
 CASE65_CONCURRENCY="${CASE65_CONCURRENCY:-260}"
 CASE65_MAX_5XX_RATE="${CASE65_MAX_5XX_RATE:-0.01}"
 CASE65_MIN_RPS_RATIO="${CASE65_MIN_RPS_RATIO:-1.0}"
+CASE65_PRECHECK_GROUP_LAG_WAIT_SEC="${CASE65_PRECHECK_GROUP_LAG_WAIT_SEC:-20}"
 
 CASE66_QUOTE_READS="${CASE66_QUOTE_READS:-300}"
 CASE66_MIN_HIT_RATE="${CASE66_MIN_HIT_RATE:-0.9}"
@@ -655,6 +661,35 @@ kafka_group_total_lag() {
   echo "$out" | awk 'BEGIN{s=0;seen=0} /^Consumer group/ {next} /^[[:space:]]*GROUP/ {next} NF>=6 {v=$6; if(v=="-") v=0; if(v ~ /^[0-9]+$/){s+=v; seen=1}} END{if(seen) print s;}'
 }
 
+kafka_group_has_active_members() {
+  local kafka_container="$1"
+  local group_id="$2"
+  if [[ -z "$kafka_container" || -z "$group_id" ]]; then
+    return 1
+  fi
+  local out
+  out=$(docker exec "$kafka_container" sh -lc "kafka-consumer-groups --bootstrap-server kafka:9092 --describe --group '$group_id' 2>/dev/null" 2>/dev/null || true)
+  if [[ -z "$out" ]]; then
+    return 1
+  fi
+  echo "$out" | awk 'BEGIN{ok=0} /^Consumer group/ {next} /^[[:space:]]*GROUP/ {next} NF>=8 {cid=$7; if(cid != "-" && cid != "") ok=1} END{exit(ok?0:1)}'
+}
+
+wait_for_kafka_group_active() {
+  local kafka_container="$1"
+  local group_id="$2"
+  local timeout_sec="${3:-30}"
+  local interval_sec="${4:-2}"
+  local end=$(( $(date +%s) + timeout_sec ))
+  while [[ "$(date +%s)" -le "$end" ]]; do
+    if kafka_group_has_active_members "$kafka_container" "$group_id"; then
+      return 0
+    fi
+    sleep "$interval_sec"
+  done
+  return 1
+}
+
 swarm_service_replicas() {
   local service_name="$1"
   if [[ -z "$service_name" ]]; then
@@ -777,6 +812,21 @@ mark_load_result "63" "$C63_OK"
 # Case 64: Kafka throughput via booking demo producer
 C64_INPUT="POST $BOOKING_URL/demo/ride-created | duration=${CASE64_DURATION_SEC}s concurrency=${CASE64_CONCURRENCY} target_rps=${CASE64_TARGET_RPS}"
 C64_KAFKA_CONTAINER="$(ensure_kafka_container || true)"
+IFS=',' read -r -a C64_GROUPS <<< "$CASE64_CONSUMER_GROUPS"
+C64_ACTIVE_GROUPS=0
+C64_GROUP_ACTIVE_REPORT=""
+for C64_GROUP in "${C64_GROUPS[@]}"; do
+  C64_GROUP="$(echo "$C64_GROUP" | xargs)"
+  if [[ -z "$C64_GROUP" ]]; then
+    continue
+  fi
+  if wait_for_kafka_group_active "$C64_KAFKA_CONTAINER" "$C64_GROUP" "$CASE64_WAIT_FOR_ACTIVE_GROUP_SEC" "$CASE64_LAG_POLL_INTERVAL_SEC"; then
+    C64_ACTIVE_GROUPS=$((C64_ACTIVE_GROUPS + 1))
+    C64_GROUP_ACTIVE_REPORT="${C64_GROUP_ACTIVE_REPORT}${C64_GROUP}:active,"
+  else
+    C64_GROUP_ACTIVE_REPORT="${C64_GROUP_ACTIVE_REPORT}${C64_GROUP}:inactive,"
+  fi
+done
 C64_TOPIC_OFFSET_BEFORE="$(kafka_topic_total_offset "$C64_KAFKA_CONTAINER" "$CASE64_KAFKA_TOPIC" || true)"
 C64_BODY=$(run_load_scenario "$BOOKING_URL/demo/ride-created" "POST" "$CASE64_DURATION_SEC" "$CASE64_CONCURRENCY" "$CASE64_TARGET_RPS" '{"content-type":"application/json"}' '{}' 'static' 10000)
 C64_RPS=$(echo "$C64_BODY" | json_get "achieved_rps")
@@ -786,39 +836,64 @@ C64_TIMEOUTS=$(json_status_count "$C64_BODY" "000")
 if [[ "$CASE64_LAG_SETTLE_SEC" -gt 0 ]]; then
   sleep "$CASE64_LAG_SETTLE_SEC"
 fi
-C64_TOPIC_OFFSET_AFTER="$(kafka_topic_total_offset "$C64_KAFKA_CONTAINER" "$CASE64_KAFKA_TOPIC" || true)"
 C64_COMPLETED=$(echo "$C64_BODY" | json_get "completed")
 C64_TOPIC_DELTA=""
 C64_TOPIC_SIGNAL=0
-if [[ -n "$C64_TOPIC_OFFSET_BEFORE" && -n "$C64_TOPIC_OFFSET_AFTER" ]]; then
-  C64_TOPIC_DELTA=$((C64_TOPIC_OFFSET_AFTER - C64_TOPIC_OFFSET_BEFORE))
-  if node -e "const d=Number(process.argv[1]);const c=Number(process.argv[2]);const ratio=Number(process.argv[3]);process.exit(Number.isFinite(d)&&Number.isFinite(c)&&Number.isFinite(ratio)&&d>=c*ratio?0:1)" "$C64_TOPIC_DELTA" "$C64_COMPLETED" "$CASE64_TOPIC_DELTA_MIN_RATIO"; then
-    C64_TOPIC_SIGNAL=1
-  fi
+C64_TOPIC_OFFSET_AFTER=""
+if [[ "$CASE64_TOPIC_WAIT_TIMEOUT_SEC" -le 0 ]]; then
+  CASE64_TOPIC_WAIT_TIMEOUT_SEC=1
 fi
+C64_TOPIC_DEADLINE=$(( $(date +%s) + CASE64_TOPIC_WAIT_TIMEOUT_SEC ))
+while true; do
+  C64_TOPIC_OFFSET_AFTER="$(kafka_topic_total_offset "$C64_KAFKA_CONTAINER" "$CASE64_KAFKA_TOPIC" || true)"
+  if [[ -n "$C64_TOPIC_OFFSET_BEFORE" && -n "$C64_TOPIC_OFFSET_AFTER" ]]; then
+    C64_TOPIC_DELTA=$((C64_TOPIC_OFFSET_AFTER - C64_TOPIC_OFFSET_BEFORE))
+    if node -e "const d=Number(process.argv[1]);const c=Number(process.argv[2]);const ratio=Number(process.argv[3]);process.exit(Number.isFinite(d)&&Number.isFinite(c)&&Number.isFinite(ratio)&&d>=c*ratio?0:1)" "$C64_TOPIC_DELTA" "$C64_COMPLETED" "$CASE64_TOPIC_DELTA_MIN_RATIO"; then
+      C64_TOPIC_SIGNAL=1
+      break
+    fi
+  fi
+  if [[ "$(date +%s)" -ge "$C64_TOPIC_DEADLINE" ]]; then
+    break
+  fi
+  sleep "$CASE64_TOPIC_POLL_INTERVAL_SEC"
+done
 C64_MAX_OBS_LAG=""
 C64_LAG_SIGNAL=0
 C64_GROUP_LAG_REPORT=""
 C64_GROUP_SIGNAL_COUNT=0
-IFS=',' read -r -a C64_GROUPS <<< "$CASE64_CONSUMER_GROUPS"
-for C64_GROUP in "${C64_GROUPS[@]}"; do
-  C64_GROUP="$(echo "$C64_GROUP" | xargs)"
-  if [[ -z "$C64_GROUP" ]]; then
-    continue
-  fi
-  C64_GROUP_LAG="$(kafka_group_total_lag "$C64_KAFKA_CONTAINER" "$C64_GROUP" || true)"
-  if [[ -n "$C64_GROUP_LAG" ]]; then
-    C64_GROUP_SIGNAL_COUNT=$((C64_GROUP_SIGNAL_COUNT + 1))
-    if [[ -z "$C64_MAX_OBS_LAG" ]] || node -e "process.exit(Number(process.argv[1])>Number(process.argv[2])?0:1)" "$C64_GROUP_LAG" "$C64_MAX_OBS_LAG"; then
-      C64_MAX_OBS_LAG="$C64_GROUP_LAG"
-    fi
-    C64_GROUP_LAG_REPORT="${C64_GROUP_LAG_REPORT}${C64_GROUP}:${C64_GROUP_LAG},"
-  fi
-done
-if [[ "$C64_GROUP_SIGNAL_COUNT" -gt 0 ]] && [[ -n "$C64_MAX_OBS_LAG" ]] && node -e "process.exit(Number(process.argv[1])<=Number(process.argv[2])?0:1)" "$C64_MAX_OBS_LAG" "$CASE64_MAX_CONSUMER_LAG"; then
-  C64_LAG_SIGNAL=1
+if [[ "$CASE64_LAG_WAIT_TIMEOUT_SEC" -le 0 ]]; then
+  CASE64_LAG_WAIT_TIMEOUT_SEC=1
 fi
-C64_BODY=$(node -e "const load=JSON.parse(process.argv[1]);const out={...load,kafka_container:process.argv[2]||null,kafka_topic:process.argv[3],topic_offset_before:process.argv[4]===''?null:Number(process.argv[4]),topic_offset_after:process.argv[5]===''?null:Number(process.argv[5]),topic_delta:process.argv[6]===''?null:Number(process.argv[6]),topic_delta_signal:Number(process.argv[7]),consumer_groups:process.argv[8],max_consumer_lag:process.argv[9]===''?null:Number(process.argv[9]),lag_signal:Number(process.argv[10])};process.stdout.write(JSON.stringify(out));" "$C64_BODY" "${C64_KAFKA_CONTAINER:-}" "$CASE64_KAFKA_TOPIC" "${C64_TOPIC_OFFSET_BEFORE:-}" "${C64_TOPIC_OFFSET_AFTER:-}" "${C64_TOPIC_DELTA:-}" "$C64_TOPIC_SIGNAL" "${C64_GROUP_LAG_REPORT%,}" "${C64_MAX_OBS_LAG:-}" "$C64_LAG_SIGNAL")
+C64_LAG_DEADLINE=$(( $(date +%s) + CASE64_LAG_WAIT_TIMEOUT_SEC ))
+while true; do
+  C64_MAX_OBS_LAG=""
+  C64_GROUP_LAG_REPORT=""
+  C64_GROUP_SIGNAL_COUNT=0
+  for C64_GROUP in "${C64_GROUPS[@]}"; do
+    C64_GROUP="$(echo "$C64_GROUP" | xargs)"
+    if [[ -z "$C64_GROUP" ]]; then
+      continue
+    fi
+    C64_GROUP_LAG="$(kafka_group_total_lag "$C64_KAFKA_CONTAINER" "$C64_GROUP" || true)"
+    if [[ -n "$C64_GROUP_LAG" ]]; then
+      C64_GROUP_SIGNAL_COUNT=$((C64_GROUP_SIGNAL_COUNT + 1))
+      if [[ -z "$C64_MAX_OBS_LAG" ]] || node -e "process.exit(Number(process.argv[1])>Number(process.argv[2])?0:1)" "$C64_GROUP_LAG" "$C64_MAX_OBS_LAG"; then
+        C64_MAX_OBS_LAG="$C64_GROUP_LAG"
+      fi
+      C64_GROUP_LAG_REPORT="${C64_GROUP_LAG_REPORT}${C64_GROUP}:${C64_GROUP_LAG},"
+    fi
+  done
+  if [[ "$C64_GROUP_SIGNAL_COUNT" -gt 0 ]] && [[ -n "$C64_MAX_OBS_LAG" ]] && node -e "process.exit(Number(process.argv[1])<=Number(process.argv[2])?0:1)" "$C64_MAX_OBS_LAG" "$CASE64_MAX_CONSUMER_LAG"; then
+    C64_LAG_SIGNAL=1
+    break
+  fi
+  if [[ "$(date +%s)" -ge "$C64_LAG_DEADLINE" ]]; then
+    break
+  fi
+  sleep "$CASE64_LAG_POLL_INTERVAL_SEC"
+done
+C64_BODY=$(node -e "const load=JSON.parse(process.argv[1]);const out={...load,kafka_container:process.argv[2]||null,kafka_topic:process.argv[3],topic_offset_before:process.argv[4]===''?null:Number(process.argv[4]),topic_offset_after:process.argv[5]===''?null:Number(process.argv[5]),topic_delta:process.argv[6]===''?null:Number(process.argv[6]),topic_delta_signal:Number(process.argv[7]),consumer_groups:process.argv[8],max_consumer_lag:process.argv[9]===''?null:Number(process.argv[9]),lag_signal:Number(process.argv[10]),active_consumer_groups:Number(process.argv[11]),consumer_group_active:process.argv[12]};process.stdout.write(JSON.stringify(out));" "$C64_BODY" "${C64_KAFKA_CONTAINER:-}" "$CASE64_KAFKA_TOPIC" "${C64_TOPIC_OFFSET_BEFORE:-}" "${C64_TOPIC_OFFSET_AFTER:-}" "${C64_TOPIC_DELTA:-}" "$C64_TOPIC_SIGNAL" "${C64_GROUP_LAG_REPORT%,}" "${C64_MAX_OBS_LAG:-}" "$C64_LAG_SIGNAL" "$C64_ACTIVE_GROUPS" "${C64_GROUP_ACTIVE_REPORT%,}")
 print_case "Case 64 - Kafka throughput test" "$C64_INPUT" "rps>=${CASE64_TARGET_RPS} AND success_rate>=${CASE64_MIN_SUCCESS_RATE} AND 5xx=0 AND timeout=0 AND no_event_loss(topic_delta>=completed*${CASE64_TOPIC_DELTA_MIN_RATIO}) AND consumer_lag<=${CASE64_MAX_CONSUMER_LAG}" "200" "$C64_BODY"
 C64_OK=0
 if rps_meets_target "$C64_RPS" "$CASE64_TARGET_RPS" "$CASE64_MIN_RPS_RATIO" && float_ge "$C64_SUCCESS_RATE" "$CASE64_MIN_SUCCESS_RATE" && [[ "$C64_5XX" == "0" ]] && [[ "$C64_TIMEOUTS" == "0" ]] && [[ "$C64_TOPIC_SIGNAL" == "1" ]] && [[ "$C64_LAG_SIGNAL" == "1" ]]; then
@@ -826,6 +901,30 @@ if rps_meets_target "$C64_RPS" "$CASE64_TARGET_RPS" "$CASE64_MIN_RPS_RATIO" && f
 fi
 mark_load_result "64" "$C64_OK"
 sleep "$CASE64_COOLDOWN_SEC"
+if [[ "$CASE65_PRECHECK_GROUP_LAG_WAIT_SEC" -gt 0 ]] && [[ -n "${C64_KAFKA_CONTAINER:-}" ]]; then
+  C65_PRECHECK_END=$(( $(date +%s) + CASE65_PRECHECK_GROUP_LAG_WAIT_SEC ))
+  while [[ "$(date +%s)" -lt "$C65_PRECHECK_END" ]]; do
+    C65_PRECHECK_MAX=""
+    C65_PRECHECK_FOUND=0
+    for C65_G in "${C64_GROUPS[@]}"; do
+      C65_G="$(echo "$C65_G" | xargs)"
+      if [[ -z "$C65_G" ]]; then
+        continue
+      fi
+      C65_GL="$(kafka_group_total_lag "$C64_KAFKA_CONTAINER" "$C65_G" || true)"
+      if [[ -n "$C65_GL" ]]; then
+        C65_PRECHECK_FOUND=1
+        if [[ -z "$C65_PRECHECK_MAX" ]] || node -e "process.exit(Number(process.argv[1])>Number(process.argv[2])?0:1)" "$C65_GL" "$C65_PRECHECK_MAX"; then
+          C65_PRECHECK_MAX="$C65_GL"
+        fi
+      fi
+    done
+    if [[ "$C65_PRECHECK_FOUND" == "1" ]] && [[ -n "$C65_PRECHECK_MAX" ]] && node -e "process.exit(Number(process.argv[1])<=Number(process.argv[2])?0:1)" "$C65_PRECHECK_MAX" "$CASE64_MAX_CONSUMER_LAG"; then
+      break
+    fi
+    sleep "$CASE64_LAG_POLL_INTERVAL_SEC"
+  done
+fi
 
 # Case 65: DB connection pool exhaustion resistance
 if [[ -z "$ADMIN_TOKEN" ]]; then
