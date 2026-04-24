@@ -233,7 +233,7 @@ for _attempt in 1 2 3 4 5; do
   ADMIN_LOGIN=$(curl -s -X POST "$BASE_URL/v1/auth/login" \
     -H "Content-Type: application/json" \
     -d "{\"identifier\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASS\"}" || true)
-  if [[ -n "$ADMIN_LOGIN" ]]; then
+  if [[ -n "$ADMIN_LOGIN" ]] && [[ -n "$(echo "$ADMIN_LOGIN" | json_get "tokens.accessToken")" || -n "$(echo "$ADMIN_LOGIN" | json_get "access_token")" ]]; then
     break
   fi
   sleep 1
@@ -297,10 +297,7 @@ fi
 
 # Case 14
 echo "-- Running Case 14"
-C14_PAYMENTS_BEFORE=$(call_json GET "/v1/payments?limit=5&sort=-createdAt" "$ADMIN_TOKEN")
-C14_PAYMENTS_BEFORE_STATUS=$(echo "$C14_PAYMENTS_BEFORE" | sed -n '1p')
-C14_PAYMENTS_BEFORE_BODY=$(echo "$C14_PAYMENTS_BEFORE" | sed '1d')
-C14_PAYMENT_SNAPSHOT_BEFORE=$(echo "$C14_PAYMENTS_BEFORE_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);const items=Array.isArray(j?.data)?j.data:[];process.stdout.write(items.map((it)=>it?.id||'').filter(Boolean).join(','))}catch(e){process.stdout.write('')}})")
+C14_BOOKINGS_BEFORE=$(get_booking_count_for_user "$USER_TOKEN")
 C14=$(call_json POST /v1/bookings "$USER_TOKEN" '{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70},"payment_method":"invalid_card"}')
 C14_STATUS=$(echo "$C14" | sed -n '1p')
 C14_BODY=$(echo "$C14" | sed '1d')
@@ -308,24 +305,27 @@ C14_BOOKING_ID=$(echo "$C14_BODY" | json_get "booking.booking_id")
 if [[ -z "$C14_BOOKING_ID" ]]; then C14_BOOKING_ID=$(echo "$C14_BODY" | json_get "booking.bookingId"); fi
 C14_PAYMENT_ID=$(echo "$C14_BODY" | json_get "integration_flow.payment.data.data.id")
 if [[ -z "$C14_PAYMENT_ID" ]]; then C14_PAYMENT_ID=$(echo "$C14_BODY" | json_get "payment.id"); fi
-C14_PAYMENTS_AFTER=$(call_json GET "/v1/payments?limit=5&sort=-createdAt" "$ADMIN_TOKEN")
-C14_PAYMENTS_AFTER_STATUS=$(echo "$C14_PAYMENTS_AFTER" | sed -n '1p')
-C14_PAYMENTS_AFTER_BODY=$(echo "$C14_PAYMENTS_AFTER" | sed '1d')
-C14_PAYMENT_SNAPSHOT_AFTER=$(echo "$C14_PAYMENTS_AFTER_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);const items=Array.isArray(j?.data)?j.data:[];process.stdout.write(items.map((it)=>it?.id||'').filter(Boolean).join(','))}catch(e){process.stdout.write('')}})")
+C14_BOOKINGS_AFTER=$(get_booking_count_for_user "$USER_TOKEN")
 C14_HAS_PAYMENT_SIGNALS=0
 if echo "$C14_BODY" | grep -Eiq '"integration_flow"[[:space:]]*:[[:space:]]*{[^}]*"payment"|"payment(_status|Id|_id)?"'; then
   C14_HAS_PAYMENT_SIGNALS=1
 fi
+C14_BOOKING_UNCHANGED=0
+if [[ "$C14_BOOKINGS_BEFORE" =~ ^-?[0-9]+$ ]] && [[ "$C14_BOOKINGS_AFTER" =~ ^-?[0-9]+$ ]] \
+  && [[ "$C14_BOOKINGS_BEFORE" != "-1" ]] && [[ "$C14_BOOKINGS_AFTER" != "-1" ]] \
+  && [[ "$C14_BOOKINGS_BEFORE" == "$C14_BOOKINGS_AFTER" ]]; then
+  C14_BOOKING_UNCHANGED=1
+fi
 print_case "Case 14 - invalid payment method" "400 + Invalid payment method + Payment Service not called" "$C14_STATUS" "$C14_BODY"
 if [[ "$C14_STATUS" == "400" ]] \
   && echo "$C14_BODY" | contains_text 'Invalid payment method' \
+  && [[ -z "$C14_BOOKING_ID" ]] \
   && [[ -z "$C14_PAYMENT_ID" ]] \
   && [[ "$C14_HAS_PAYMENT_SIGNALS" == "0" ]] \
-  && [[ "$C14_PAYMENTS_BEFORE_STATUS" == "200" ]] \
-  && [[ "$C14_PAYMENTS_AFTER_STATUS" == "200" ]] \
-  && [[ "$C14_PAYMENT_SNAPSHOT_BEFORE" == "$C14_PAYMENT_SNAPSHOT_AFTER" ]]; then
+  && [[ "$C14_BOOKING_UNCHANGED" == "1" ]]; then
   mark_result 1 "14"
 else
+  echo "Case 14 debug: before_bookings=$C14_BOOKINGS_BEFORE after_bookings=$C14_BOOKINGS_AFTER booking_id=${C14_BOOKING_ID:-<empty>} payment_id=${C14_PAYMENT_ID:-<empty>} payment_signals=$C14_HAS_PAYMENT_SIGNALS"
   mark_result 0 "14"
 fi
 

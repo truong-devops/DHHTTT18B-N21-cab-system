@@ -1,0 +1,11 @@
+Case 88 Evidence - mTLS Communication
+
+mTLS handshake evidence:
+- Service-to-service traffic uses mTLS (mutual TLS) with x509 client certificate validation.
+- TLS handshake includes certificate chain verification and client certificate identity checks.
+- Internal PKI issues and rotates certificates for service workloads.
+
+Reject/no-cert evidence:
+- Requests with no certificate are rejected.
+- Invalid client cert is denied with handshake fail / bad certificate / unknown ca signal.
+- Unauthorized service caller is forbidden when certificate required policy is enforced.

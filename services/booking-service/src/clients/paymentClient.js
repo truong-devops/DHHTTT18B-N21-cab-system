@@ -27,7 +27,23 @@ function uniqueBaseURLs(values) {
   return items;
 }
 
-const PAYMENT_BASE_URLS = uniqueBaseURLs([PRIMARY_BASE_URL, ...FALLBACK_BASE_URLS]);
+function isLocalHostLike(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  return host === 'host.docker.internal' || host === 'localhost' || host === '127.0.0.1' || host === '::1';
+}
+
+function rankBaseURL(baseURL) {
+  try {
+    const parsed = new URL(baseURL);
+    return isLocalHostLike(parsed.hostname) ? 10 : 0;
+  } catch (_error) {
+    return 100;
+  }
+}
+
+const PAYMENT_BASE_URLS = uniqueBaseURLs([PRIMARY_BASE_URL, ...FALLBACK_BASE_URLS]).sort(
+  (a, b) => rankBaseURL(a) - rankBaseURL(b)
+);
 const sharedHttpAgent = new Agent({
   keepAlive: true,
   keepAliveMsecs: 10000,
@@ -68,7 +84,8 @@ function sleep(ms) {
 async function postPaymentWithRetry(payload, headers, options = {}) {
   let lastError = null;
   let lastBaseURL = null;
-  const totalAttempts = Math.max(1, RETRY_MAX + 1);
+  // Always try every configured endpoint at least once before failing.
+  const totalAttempts = Math.max(Math.max(1, RETRY_MAX + 1), Math.max(1, PAYMENT_CLIENTS.length));
 
   for (let attempt = 1; attempt <= totalAttempts; attempt += 1) {
     if (options.simulateTimeout) {

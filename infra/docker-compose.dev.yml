@@ -227,12 +227,13 @@ services:
       ETA_BASE_URL: http://eta-service:3012
       PRICING_BASE_URL: http://pricing-service:3006
       AI_BASE_URL: http://ai-service:3013
-      PAYMENT_BASE_URL: http://host.docker.internal:3007
-      PAYMENT_FALLBACK_BASE_URLS: http://payment-service:3007
+      PAYMENT_BASE_URL: ${PAYMENT_BASE_URL:-http://payment-service:3007}
+      PAYMENT_FALLBACK_BASE_URLS: ${PAYMENT_FALLBACK_BASE_URLS:-}
       PAYMENT_IP_FAMILY: 4
-      PAYMENT_REQUEST_TIMEOUT_MS: 15000
+      PAYMENT_REQUEST_TIMEOUT_MS: 2500
       PAYMENT_HTTP_RETRY_MAX: 0
       PAYMENT_HTTP_RETRY_BACKOFF_MS: 150
+      BOOKING_CASH_PAYMENT_INIT_MODE: ${BOOKING_CASH_PAYMENT_INIT_MODE:-strict}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
     depends_on:
       - kafka

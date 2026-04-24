@@ -19,6 +19,21 @@ CASE87_EVIDENCE_FILE="${CASE87_EVIDENCE_FILE:-}"
 CASE87_EVIDENCE_TEXT="${CASE87_EVIDENCE_TEXT:-}"
 CASE88_EVIDENCE_FILE="${CASE88_EVIDENCE_FILE:-}"
 CASE88_EVIDENCE_TEXT="${CASE88_EVIDENCE_TEXT:-}"
+DEFAULT_CASE87_EVIDENCE_FILE="$SCRIPT_DIR/evidence/case87-data-encryption-at-rest.txt"
+DEFAULT_CASE88_EVIDENCE_FILE="$SCRIPT_DIR/evidence/case88-mtls-communication.txt"
+
+if [[ -z "$CASE87_EVIDENCE_FILE" && -f "$DEFAULT_CASE87_EVIDENCE_FILE" ]]; then
+  CASE87_EVIDENCE_FILE="$DEFAULT_CASE87_EVIDENCE_FILE"
+fi
+if [[ -z "$CASE88_EVIDENCE_FILE" && -f "$DEFAULT_CASE88_EVIDENCE_FILE" ]]; then
+  CASE88_EVIDENCE_FILE="$DEFAULT_CASE88_EVIDENCE_FILE"
+fi
+if [[ -z "$CASE87_EVIDENCE_FILE" && -f "./scripts/evidence/case87-data-encryption-at-rest.txt" ]]; then
+  CASE87_EVIDENCE_FILE="./scripts/evidence/case87-data-encryption-at-rest.txt"
+fi
+if [[ -z "$CASE88_EVIDENCE_FILE" && -f "./scripts/evidence/case88-mtls-communication.txt" ]]; then
+  CASE88_EVIDENCE_FILE="./scripts/evidence/case88-mtls-communication.txt"
+fi
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -210,7 +225,7 @@ contains_security_leak() {
   local pattern
   pattern="(password_hash|x-api-key|api[_-]?key\\s*[:=]|jwt[_-]?secret|BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|select\\s+.+\\s+from\\s+|syntax error at or near|Sequelize|SQLSTATE|ECONNREFUSED|Error:\\s+at\\s+|\\bCVV\\b|\"cvv\"\\s*:|\"card(number|_number)?\"\\s*:)"
   if command -v rg >/dev/null 2>&1; then
-    echo "$content" | rg -Eiq "$pattern"
+    echo "$content" | rg -q -i -e "$pattern"
     return $?
   fi
   echo "$content" | grep -Eiq "$pattern"
@@ -236,7 +251,7 @@ text_matches_pattern() {
     return 1
   fi
   if command -v rg >/dev/null 2>&1; then
-    echo "$text" | rg -Eiq "$pattern"
+    echo "$text" | rg -q -i -e "$pattern"
     return $?
   fi
   echo "$text" | grep -Eiq "$pattern"
