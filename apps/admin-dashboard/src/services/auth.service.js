@@ -105,7 +105,7 @@ export const authService = {
 
     const user = payload?.data;
     return {
-      token: payload?.tokens?.accessToken || payload?.access_token,
+      token: payload?.tokens?.accessToken,
       user: user
         ? {
             id: user.id,

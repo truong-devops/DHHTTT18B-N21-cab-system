@@ -215,7 +215,6 @@ for _attempt in 1 2 3 4 5 6 7 8; do
   sleep 1
 done
 USER_TOKEN=$(echo "$USER_LOGIN" | json_get "tokens.accessToken")
-if [[ -z "$USER_TOKEN" ]]; then USER_TOKEN=$(echo "$USER_LOGIN" | json_get "access_token"); fi
 
 if [[ -z "$USER_TOKEN" ]]; then
   echo "STOP: cannot get user token"
@@ -233,13 +232,12 @@ for _attempt in 1 2 3 4 5; do
   ADMIN_LOGIN=$(curl -s -X POST "$BASE_URL/v1/auth/login" \
     -H "Content-Type: application/json" \
     -d "{\"identifier\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASS\"}" || true)
-  if [[ -n "$ADMIN_LOGIN" ]] && [[ -n "$(echo "$ADMIN_LOGIN" | json_get "tokens.accessToken")" || -n "$(echo "$ADMIN_LOGIN" | json_get "access_token")" ]]; then
+  if [[ -n "$ADMIN_LOGIN" ]] && [[ -n "$(echo "$ADMIN_LOGIN" | json_get "tokens.accessToken")" ]]; then
     break
   fi
   sleep 1
 done
 ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | json_get "tokens.accessToken")
-if [[ -z "$ADMIN_TOKEN" ]]; then ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | json_get "access_token"); fi
 
 # Case 11
 echo "-- Running Case 11"

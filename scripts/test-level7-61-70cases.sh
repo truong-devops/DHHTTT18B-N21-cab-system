@@ -282,11 +282,6 @@ register_and_login_user() {
 
     local token
     token=$(echo "$body" | json_get "tokens.accessToken")
-    if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "access_token"); fi
-    if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "tokens.access_token"); fi
-    if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.tokens.accessToken"); fi
-    if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.access_token"); fi
-    if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.accessToken"); fi
     if [[ -n "$token" ]]; then
       echo "$token"
       return 0

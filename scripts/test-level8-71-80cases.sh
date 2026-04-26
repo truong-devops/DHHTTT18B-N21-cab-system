@@ -191,15 +191,7 @@ call_gateway_json() {
 
 extract_access_token() {
   local body="$1"
-  local token
-  token=$(echo "$body" | json_get "tokens.accessToken")
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "access_token"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "tokens.access_token"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.tokens.accessToken"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.access_token"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.accessToken"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "token"); fi
-  echo "$token"
+  echo "$body" | json_get "tokens.accessToken"
 }
 
 register_and_login_user() {

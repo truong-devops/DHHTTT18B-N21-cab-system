@@ -1,0 +1,916 @@
+{
+  "info": {
+    "_postman_id": "5e48b7fd-f4f4-4b8a-93d8-level9-security",
+    "name": "CAB System - Level 9 Security Cases 81-90",
+    "description": "Postman collection for API-runnable Level 9 security cases. Cases 87 and 88 are evidence/infra checks and are documented in the script, not directly verified by HTTP requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('uniq')) {",
+          "  pm.collectionVariables.set('uniq', Date.now() + '-' + Math.floor(Math.random() * 100000));",
+          "}",
+          "if (!pm.collectionVariables.get('userPass')) {",
+          "  pm.collectionVariables.set('userPass', '123456');",
+          "}",
+          "const uniq = pm.collectionVariables.get('uniq');",
+          "pm.collectionVariables.set('userEmail', 'level9-user-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('driverEmail', 'level9-driver-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('adminEmail', 'level9-admin-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('replayEmail', 'level9-replay-' + uniq + '@test.com');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "userPass",
+      "value": "123456"
+    },
+    {
+      "key": "uniq",
+      "value": ""
+    },
+    {
+      "key": "userEmail",
+      "value": "level9-user-{{uniq}}@test.com"
+    },
+    {
+      "key": "driverEmail",
+      "value": "level9-driver-{{uniq}}@test.com"
+    },
+    {
+      "key": "adminEmail",
+      "value": "level9-admin-{{uniq}}@test.com"
+    },
+    {
+      "key": "replayEmail",
+      "value": "level9-replay-{{uniq}}@test.com"
+    },
+    {
+      "key": "rawCard",
+      "value": "4111111111111111"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Setup",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Gateway is healthy', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{userEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Level9 User {{uniq}}\",\"role\":\"user\"}"
+            },
+            "url": "{{baseUrl}}/v1/auth/register"
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{userEmail}}\",\"password\":\"{{userPass}}\"}"
+            },
+            "url": "{{baseUrl}}/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "const userId = j?.data?.user_id || j?.data?.id || j?.user_id || j?.id;",
+                  "pm.collectionVariables.set('userToken', token || '');",
+                  "pm.collectionVariables.set('userId', userId || '');",
+                  "pm.test('User login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{driverEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Level9 Driver {{uniq}}\",\"role\":\"driver\"}"
+            },
+            "url": "{{baseUrl}}/v1/auth/register"
+          }
+        },
+        {
+          "name": "Login Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{driverEmail}}\",\"password\":\"{{userPass}}\"}"
+            },
+            "url": "{{baseUrl}}/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "pm.collectionVariables.set('driverToken', token || '');",
+                  "pm.test('Driver login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{adminEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Level9 Admin {{uniq}}\",\"role\":\"admin\"}"
+            },
+            "url": "{{baseUrl}}/v1/auth/register"
+          }
+        },
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{adminEmail}}\",\"password\":\"{{userPass}}\"}"
+            },
+            "url": "{{baseUrl}}/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "pm.collectionVariables.set('adminToken', token || '');",
+                  "pm.test('Admin login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Replay User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{replayEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Level9 Replay User {{uniq}}\",\"role\":\"user\"}"
+            },
+            "url": "{{baseUrl}}/v1/auth/register"
+          }
+        },
+        {
+          "name": "Login Replay User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{replayEmail}}\",\"password\":\"{{userPass}}\"}"
+            },
+            "url": "{{baseUrl}}/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "const userId = j?.data?.user_id || j?.data?.id || j?.user_id || j?.id;",
+                  "pm.collectionVariables.set('replayToken', token || '');",
+                  "pm.collectionVariables.set('replayUserId', userId || '');",
+                  "pm.test('Replay user login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Case 81 - SQL Injection Attempt",
+      "item": [
+        {
+          "name": "81A Login SQL Injection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"' OR 1=1 --\",\"password\":\"anything\"}"
+            },
+            "url": "{{baseUrl}}/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Injection login is rejected', function () {",
+                  "  pm.expect([400, 401]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('No sensitive error leak', function () {",
+                  "  pm.expect(pm.response.text()).to.not.match(/password_hash|api[_-]?key|jwt[_-]?secret|SQLSTATE|Sequelize|syntax error|stack|private key/i);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "81B Users Query SQL Injection",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/users?email=%27%20OR%20%271%27=%271"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('SQL injection query is not accepted as valid success', function () {",
+                  "  pm.expect([200, 201]).to.not.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "81C Booking Path SQL Injection",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings/%27%20OR%20%271%27=%271"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('SQL injection path is not accepted as valid success', function () {",
+                  "  pm.expect([200, 201]).to.not.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Case 82 - XSS Input Test",
+      "item": [
+        {
+          "name": "82 Booking With Script Vehicle Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"<script>alert('hack')</script>\",\"distance_km\":5,\"traffic_level\":0.5}"
+            },
+            "url": "{{baseUrl}}/v1/bookings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('XSS payload is rejected or safely handled', function () {",
+                  "  pm.expect([200, 201, 400, 422]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Response does not reflect executable script', function () {",
+                  "  pm.expect(pm.response.text()).to.not.match(/<script|<\\/script>|alert\\(/i);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Case 83 - JWT Tampering",
+      "item": [
+        {
+          "name": "83A Bad Signature Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}x"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/users?limit=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bad signature is rejected', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "83B Role Escalation Tampered Token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function b64urlDecode(input) {",
+                  "  input = input.replace(/-/g, '+').replace(/_/g, '/');",
+                  "  while (input.length % 4) input += '=';",
+                  "  return atob(input);",
+                  "}",
+                  "function b64urlEncode(input) {",
+                  "  return btoa(input).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '');",
+                  "}",
+                  "const token = pm.collectionVariables.get('userToken') || '';",
+                  "const parts = token.split('.');",
+                  "if (parts.length === 3) {",
+                  "  const payload = JSON.parse(b64urlDecode(parts[1]));",
+                  "  payload.role = 'admin';",
+                  "  payload.roles = ['admin'];",
+                  "  pm.collectionVariables.set('tamperedRoleToken', parts[0] + '.' + b64urlEncode(JSON.stringify(payload)) + '.' + parts[2]);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Tampered role token is rejected', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tamperedRoleToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/users?limit=1"
+          }
+        },
+        {
+          "name": "83C Malformed Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer abc.def"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/users?limit=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Malformed token is rejected', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Case 84 - Unauthorized API Access",
+      "item": [
+        {
+          "name": "84 User Calls Admin Drivers API",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/admin/drivers?limit=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('User is forbidden from admin API', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "84 Admin Baseline Calls Admin Drivers API",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/admin/drivers?limit=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Admin is allowed', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Case 85 - Rate Limit Attack",
+      "description": "Postman cannot reproduce the script's Node.js concurrency exactly. Run this request in Collection Runner with many iterations to observe 429 responses, or use the original shell script for the authoritative burst test.",
+      "item": [
+        {
+          "name": "85 Booking Spam Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-load-test",
+                "value": "security-rate-limit"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "c85-{{$timestamp}}-{{$randomInt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.7601,\"lng\":106.6601},\"drop\":{\"lat\":10.7701,\"lng\":106.7001},\"vehicle_type\":\"CAR\",\"distance_km\":5,\"traffic_level\":0.5}"
+            },
+            "url": "{{baseUrl}}/v1/bookings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request does not collapse backend', function () {",
+                  "  pm.expect(pm.response.code).to.not.be.within(500, 599);",
+                  "});",
+                  "pm.test('Rate limit is acceptable if 429 appears during runner burst', function () {",
+                  "  pm.expect([200, 201, 400, 422, 429]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Case 86 - Replay Attack Idempotency",
+      "item": [
+        {
+          "name": "86A Prepare Replay Variables",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('replayRideId', 'ride-replay-' + pm.collectionVariables.get('uniq') + '-' + Math.floor(Math.random() * 100000));",
+                  "pm.collectionVariables.set('replayIdempotencyKey', 'level9-idem-' + pm.collectionVariables.get('uniq') + '-' + Math.floor(Math.random() * 100000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{replayToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/payments?rideId={{replayRideId}}&limit=50"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('replayCountBefore', Array.isArray(j.data) ? j.data.length : 0);",
+                  "pm.test('Can list payments before replay', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "86B First Payment Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{replayToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{replayIdempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"rideId\":\"{{replayRideId}}\",\"amount\":\"50000\",\"currency\":\"VND\",\"userId\":\"{{replayUserId}}\"}"
+            },
+            "url": "{{baseUrl}}/v1/payments"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('replayFirstPaymentId', j?.data?.id || '');",
+                  "pm.test('First payment is created', function () { pm.response.to.have.status(201); });",
+                  "pm.test('First payment id exists', function () { pm.expect(pm.collectionVariables.get('replayFirstPaymentId')).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "86C Replay Same Payment Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{replayToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{replayIdempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"rideId\":\"{{replayRideId}}\",\"amount\":\"50000\",\"currency\":\"VND\",\"userId\":\"{{replayUserId}}\"}"
+            },
+            "url": "{{baseUrl}}/v1/payments"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const secondId = j?.data?.id || '';",
+                  "pm.collectionVariables.set('replaySecondPaymentId', secondId);",
+                  "pm.test('Replay returns success without duplicate charge', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "pm.test('Replay returns same payment id', function () { pm.expect(secondId).to.eql(pm.collectionVariables.get('replayFirstPaymentId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "86D List Payments After Replay",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{replayToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/payments?rideId={{replayRideId}}&limit=50"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const after = Array.isArray(j.data) ? j.data.length : 0;",
+                  "const before = Number(pm.collectionVariables.get('replayCountBefore') || 0);",
+                  "pm.test('Can list payments after replay', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Payment count grew by at most 1', function () { pm.expect(after - before).to.be.at.most(1); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Case 89 - RBAC Enforcement",
+      "item": [
+        {
+          "name": "89 Driver Calls Admin Drivers API",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/admin/drivers?limit=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Driver is forbidden from admin API', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "89 Admin Calls Admin Drivers API",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/admin/drivers?limit=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Admin is allowed', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Admin response has data array', function () { pm.expect(pm.response.json().data).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Case 90 - Sensitive Data Masking",
+      "item": [
+        {
+          "name": "90A Invalid Token Users API",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer fake.jwt.token"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/users?limit=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid token is rejected', function () { pm.expect([401, 403]).to.include(pm.response.code); });",
+                  "pm.test('No sensitive leak', function () { pm.expect(pm.response.text()).to.not.match(/password_hash|api[_-]?key|jwt[_-]?secret|SQLSTATE|Sequelize|private key/i); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "90B Payment With Card-Like Note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "c90-{{uniq}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"rideId\":\"ride_sensitive_test_{{uniq}}\",\"amount\":\"100000\",\"currency\":\"VND\",\"note\":\"card={{rawCard}}\"}"
+            },
+            "url": "{{baseUrl}}/v1/payments"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Response does not expose full card number', function () {",
+                  "  pm.expect(pm.response.text()).to.not.include(pm.collectionVariables.get('rawCard'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "90C Unknown Route",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/v1/nonexistent-domain/anything"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unknown route returns 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('No sensitive leak', function () { pm.expect(pm.response.text()).to.not.match(/password_hash|api[_-]?key|jwt[_-]?secret|SQLSTATE|Sequelize|private key/i); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
