@@ -229,13 +229,7 @@ login_user() {
 
 extract_access_token() {
   local body="$1"
-  local token
-  token=$(echo "$body" | json_get "tokens.accessToken")
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "access_token"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "tokens.access_token"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.tokens.accessToken"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.access_token"); fi
-  echo "$token"
+  echo "$body" | json_get "tokens.accessToken"
 }
 
 register_and_login_user() {
@@ -385,7 +379,7 @@ if [[ -n "$C2_TOKEN" ]]; then
     fi
   fi
 fi
-print_case "Case 2 - Đăng nhập trả JWT hợp lệ" "HTTP 200 OK; Trả về access_token (JWT); Token decode hợp lệ (exp, sub)" "$C2_STATUS" "$C2_BODY"
+print_case "Case 2 - Đăng nhập trả JWT hợp lệ" "HTTP 200 OK; Trả về tokens.accessToken (JWT); Token decode hợp lệ (exp, sub)" "$C2_STATUS" "$C2_BODY"
 if [[ "$C2_STATUS" == "200" ]] && [[ -n "$C2_TOKEN" ]] && [[ -n "$C2_SUB" ]] && [[ "$C2_EXP_VALID" == "1" ]]; then
   mark_result 1 "2"
 else

@@ -1,0 +1,522 @@
+{
+  "info": {
+    "_postman_id": "cab-system-level-5-cases-41-50-1777181935030",
+    "name": "CAB System - Level 5 Cases 41-50",
+    "description": "Postman collection for Level 5 AI/ETA/Pricing model API cases.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('uniq')) pm.collectionVariables.set('uniq', Date.now() + '-' + Math.floor(Math.random() * 100000));",
+          "if (!pm.collectionVariables.get('userPass')) pm.collectionVariables.set('userPass', '123456');",
+          "const uniq = pm.collectionVariables.get('uniq');",
+          "pm.collectionVariables.set('userEmail', 'postman-user-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('adminEmail', 'postman-admin-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('driverEmail', 'postman-driver-' + uniq + '@test.com');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "aiUrl",
+      "value": "http://localhost:3013"
+    },
+    {
+      "key": "etaUrl",
+      "value": "http://localhost:3012"
+    },
+    {
+      "key": "pricingUrl",
+      "value": "http://localhost:3006"
+    },
+    {
+      "key": "bookingUrl",
+      "value": "http://localhost:3002"
+    },
+    {
+      "key": "paymentUrl",
+      "value": "http://localhost:3005"
+    },
+    {
+      "key": "internalApiKey",
+      "value": "dev-internal-key"
+    },
+    {
+      "key": "userPass",
+      "value": "123456"
+    },
+    {
+      "key": "uniq",
+      "value": ""
+    },
+    {
+      "key": "userEmail",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "driverEmail",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Service Health",
+      "item": [
+        {
+          "name": "Gateway Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ETA Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{etaUrl}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AI Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{aiUrl}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pricing Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{pricingUrl}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cases 41-50",
+      "item": [
+        {
+          "name": "41 ETA Range Strict",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{etaUrl}}/v1/eta/estimate",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"distance_km\":5,\"traffic_level\":0.5}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "42 Surge High Demand",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{pricingUrl}}/v1/pricing/estimate",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"distance_km\":5,\"demand_index\":2}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "43 Fraud Score",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/fraud-score",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\":\"u1\",\"driver_id\":\"d1\",\"booking_id\":\"b1\",\"amount\":350000,\"route_risk\":0.9}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "44 Recommend Drivers Top 3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/recommend-drivers",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"vehicle_type\":\"CAR\",\"candidates\":[{\"driver_id\":\"d1\",\"distance_m\":500,\"rating\":4.8,\"eta_min\":3,\"price_score\":0.9,\"online\":true},{\"driver_id\":\"d2\",\"distance_m\":1200,\"rating\":4.6,\"eta_min\":8,\"price_score\":0.8,\"online\":true},{\"driver_id\":\"d3\",\"distance_m\":300,\"rating\":4.7,\"eta_min\":2,\"price_score\":0.95,\"online\":true},{\"driver_id\":\"d4\",\"distance_m\":100,\"rating\":4.9,\"eta_min\":1,\"price_score\":0.9,\"online\":false}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "45 Forecast Demand",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/forecast-demand",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"zone_id\":\"HCM_Q1\",\"horizon_min\":30,\"timestamp\":\"{{$isoTimestamp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "46 Forecast Model v1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/forecast-demand",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"zone_id\":\"HCM_Q1\",\"horizon_min\":30,\"timestamp\":\"{{$isoTimestamp}}\",\"model_version\":\"forecast-v1\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "46 Forecast Model v2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/forecast-demand",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"zone_id\":\"HCM_Q1\",\"horizon_min\":30,\"timestamp\":\"{{$isoTimestamp}}\",\"model_version\":\"forecast-v2\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "47 Forecast Latency Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/forecast-demand",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"zone_id\":\"HCM_Q1\",\"horizon_min\":30,\"timestamp\":\"{{$isoTimestamp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "48 Drift Check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/drift/check",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"model\":\"forecast-v1\",\"features\":{\"hour\":23,\"rain\":1,\"demand_index\":3}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "49 Recommendation Fallback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/recommend-drivers",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"simulate_model_error\":true,\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"vehicle_type\":\"CAR\",\"candidates\":[{\"driver_id\":\"d1\",\"distance_m\":500,\"rating\":4.8,\"eta_min\":3,\"price_score\":0.9,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "50 ETA Abnormal Distance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{etaUrl}}/v1/eta/estimate",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"distance_km\":1000,\"traffic_level\":0.5}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "50 Pricing Abnormal Distance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{pricingUrl}}/v1/pricing/estimate",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"distance_km\":1000,\"demand_index\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

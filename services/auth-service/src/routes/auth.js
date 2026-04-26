@@ -129,13 +129,9 @@ router.post(
       },
       tokens: {
         accessToken,
-        access_token: accessToken,
         refreshToken,
-        refresh_token: refreshToken,
         expiresIn: ACCESS_TOKEN_EXPIRES_IN
-      },
-      access_token: accessToken,
-      refresh_token: refreshToken
+      }
     });
   })
 );
@@ -218,13 +214,9 @@ router.post(
       },
       tokens: {
         accessToken,
-        access_token: accessToken,
         refreshToken,
-        refresh_token: refreshToken,
         expiresIn: ACCESS_TOKEN_EXPIRES_IN
-      },
-      access_token: accessToken,
-      refresh_token: refreshToken
+      }
     });
   })
 );

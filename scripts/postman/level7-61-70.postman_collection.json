@@ -1,0 +1,558 @@
+{
+  "info": {
+    "_postman_id": "cab-system-level-7-cases-61-70-1777181935032",
+    "name": "CAB System - Level 7 Cases 61-70",
+    "description": "Postman probes for Level 7 performance cases. Use Collection Runner for rough checks; original shell script is authoritative for RPS, p95, Kafka lag, Redis stats, and autoscaling.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('uniq')) pm.collectionVariables.set('uniq', Date.now() + '-' + Math.floor(Math.random() * 100000));",
+          "if (!pm.collectionVariables.get('userPass')) pm.collectionVariables.set('userPass', '123456');",
+          "const uniq = pm.collectionVariables.get('uniq');",
+          "pm.collectionVariables.set('userEmail', 'postman-user-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('adminEmail', 'postman-admin-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('driverEmail', 'postman-driver-' + uniq + '@test.com');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "aiUrl",
+      "value": "http://localhost:3013"
+    },
+    {
+      "key": "etaUrl",
+      "value": "http://localhost:3012"
+    },
+    {
+      "key": "pricingUrl",
+      "value": "http://localhost:3006"
+    },
+    {
+      "key": "bookingUrl",
+      "value": "http://localhost:3002"
+    },
+    {
+      "key": "paymentUrl",
+      "value": "http://localhost:3005"
+    },
+    {
+      "key": "internalApiKey",
+      "value": "dev-internal-key"
+    },
+    {
+      "key": "userPass",
+      "value": "123456"
+    },
+    {
+      "key": "uniq",
+      "value": ""
+    },
+    {
+      "key": "userEmail",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "driverEmail",
+      "value": ""
+    },
+    {
+      "key": "quoteId",
+      "value": ""
+    },
+    {
+      "key": "case70AutoscaleTargetUrl",
+      "value": "http://localhost:3002/v1/bookings"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Setup",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{userEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Postman User {{uniq}}\",\"role\":\"user\"}"
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{userEmail}}\",\"password\":\"{{userPass}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "const userId = j?.data?.user_id || j?.data?.id || j?.user_id || j?.id;",
+                  "pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminToken' : pm.info.requestName.includes('Driver') ? 'driverToken' : 'userToken', token || '');",
+                  "if (userId) pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminId' : pm.info.requestName.includes('Driver') ? 'driverUserId' : 'userId', userId);",
+                  "pm.test('Login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cases 61-70 - Performance Probes",
+      "item": [
+        {
+          "name": "61 Booking Load Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-user-id",
+                "value": "load61-{{$randomInt}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "admin"
+              },
+              {
+                "key": "x-user-roles",
+                "value": "admin"
+              },
+              {
+                "key": "x-load-test",
+                "value": "true"
+              },
+              {
+                "key": "x-booking-fast-path",
+                "value": "1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\":\"load61-{{$randomInt}}\",\"pickup\":{\"lat\":10.7601,\"lng\":106.6601},\"drop\":{\"lat\":10.7701,\"lng\":106.7001},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "62 ETA Load Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{etaUrl}}/v1/eta/estimate",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"distance_km\":4.7,\"traffic_level\":0.6}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "63 Pricing Spike Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{pricingUrl}}/v1/pricing/estimate",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"distance_km\":5,\"demand_index\":2}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "64 Kafka Demo Producer Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/demo/ride-created",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "65 DB Pool GET Sample",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-internal-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-user-id",
+                "value": "admin"
+              },
+              {
+                "key": "x-user-role",
+                "value": "admin"
+              },
+              {
+                "key": "x-user-roles",
+                "value": "admin"
+              },
+              {
+                "key": "x-load-test",
+                "value": "true"
+              }
+            ],
+            "url": "{{bookingUrl}}/v1/bookings?user_id=pool65-{{$randomInt}}&limit=50",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "66 Create Pricing Quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{pricingUrl}}/v1/pricing/quotes",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.7601,\"lng\":106.6601},\"dropoff\":{\"lat\":10.7701,\"lng\":106.7001},\"serviceType\":\"STANDARD\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j=pm.response.json(); pm.collectionVariables.set('quoteId', j?.data?.id || j?.id || j?.quote_id || '');",
+                  "pm.test('Quote created', function () { pm.expect([200,201]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "66 Read Pricing Quote",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-internal-key",
+                "value": "{{internalApiKey}}"
+              }
+            ],
+            "url": "{{pricingUrl}}/v1/pricing/quotes/{{quoteId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "67 Gateway Rate Limit Login Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"rate-limit-user@test.com\",\"password\":\"wrong-pass\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "68 Gateway ETA Latency Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "x-load-test",
+                "value": "true"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/eta/estimate",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"distance_km\":5.1,\"traffic_level\":0.5}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "69 Peak Booking Load Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-user-id",
+                "value": "peak69-{{$randomInt}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "admin"
+              },
+              {
+                "key": "x-user-roles",
+                "value": "admin"
+              },
+              {
+                "key": "x-load-test",
+                "value": "true"
+              },
+              {
+                "key": "x-booking-fast-path",
+                "value": "1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\":\"peak69-{{$randomInt}}\",\"pickup\":{\"lat\":10.7603,\"lng\":106.6603},\"drop\":{\"lat\":10.7703,\"lng\":106.7003},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "70 Autoscale Target Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{case70AutoscaleTargetUrl}}",
+            "description": "Set case70AutoscaleTargetUrl to the same target URL used by the shell script.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

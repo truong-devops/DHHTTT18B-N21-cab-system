@@ -290,10 +290,6 @@ register_and_login_user() {
 
   local token
   token=$(echo "$login" | json_get "tokens.accessToken")
-  if [[ -z "$token" ]]; then token=$(echo "$login" | json_get "access_token"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$login" | json_get "tokens.access_token"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$login" | json_get "data.tokens.accessToken"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$login" | json_get "data.access_token"); fi
   echo "$token"
 }
 
@@ -373,7 +369,6 @@ for _attempt in 1 2 3 4 5 6 7 8; do
   sleep 1
 done
 USER_TOKEN=$(echo "$USER_LOGIN" | json_get "tokens.accessToken")
-if [[ -z "$USER_TOKEN" ]]; then USER_TOKEN=$(echo "$USER_LOGIN" | json_get "access_token"); fi
 
 ADMIN_LOGIN=""
 for _attempt in 1 2 3 4 5 6; do
@@ -386,7 +381,6 @@ for _attempt in 1 2 3 4 5 6; do
   sleep 1
 done
 ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | json_get "tokens.accessToken")
-if [[ -z "$ADMIN_TOKEN" ]]; then ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | json_get "access_token"); fi
 
 if [[ -z "$USER_TOKEN" || -z "$ADMIN_TOKEN" ]]; then
   echo "STOP: cannot get user/admin token"
