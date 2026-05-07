@@ -82,60 +82,29 @@ async function createDriver({ userId, fullName = null, phone = null }) {
     return null;
   }
 
-  async function insertDriverRow({ idValue, userIdValue }) {
+  try {
     const result = await pool.query(
       `
         INSERT INTO drivers (id, user_id, full_name, phone)
-        VALUES ($1, $2, $3, $4)
+        VALUES ($1, $1, $2, $3)
         RETURNING *
       `,
-      [idValue, userIdValue, fullName, phone]
+      [normalizedUserId, fullName, phone]
     );
     return result.rows[0] || null;
-  }
-
-  async function insertDriverRowAutoId({ userIdValue }) {
-    const result = await pool.query(
-      `
-        INSERT INTO drivers (user_id, full_name, phone)
-        VALUES ($1, $2, $3)
-        RETURNING *
-      `,
-      [userIdValue, fullName, phone]
-    );
-    return result.rows[0] || null;
-  }
-
-  try {
-    return await insertDriverRow({
-      idValue: normalizedUserId,
-      userIdValue: normalizedUserId
-    });
   } catch (error) {
-    // Backward compatibility for legacy schemas.
-    //
-    // If the DB still uses UUID primary keys for drivers.id, inserting an 8-digit
-    // user id into the uuid column will fail with 22P02. In that case, let the
-    // DB generate the driver id and only store the user_id.
+    // Backward compatibility for legacy UUID schema.
     if (error?.code === '22P02' && isEightDigitId(normalizedUserId)) {
-      return await insertDriverRowAutoId({ userIdValue: normalizedUserId });
-    }
-
-    // Some deployments may be mid-migration where id and user_id have different
-    // types (e.g. uuid vs char(8)). Avoid leaking 500s for valid 8-digit users.
-    if (error?.code === '42P08' && isEightDigitId(normalizedUserId)) {
       const legacyUuid = toLegacyUserUuid(normalizedUserId);
-      try {
-        return await insertDriverRow({
-          idValue: legacyUuid,
-          userIdValue: normalizedUserId
-        });
-      } catch (fallbackError) {
-        return await insertDriverRow({
-          idValue: normalizedUserId,
-          userIdValue: legacyUuid
-        });
-      }
+      const fallback = await pool.query(
+        `
+          INSERT INTO drivers (id, user_id, full_name, phone)
+          VALUES ($1, $1, $2, $3)
+          RETURNING *
+        `,
+        [legacyUuid, fullName, phone]
+      );
+      return fallback.rows[0] || null;
     }
     throw error;
   }
