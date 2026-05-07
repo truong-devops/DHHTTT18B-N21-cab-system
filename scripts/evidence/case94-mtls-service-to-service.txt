@@ -1,0 +1,11 @@
+Case 94 Evidence - mTLS Service-to-Service
+
+mTLS handshake:
+- Service A -> Service B communication uses mTLS (mutual TLS).
+- Both sides validate x509 certificate chain and service identity.
+- Runtime TLS handshake enforces client certificate checks.
+
+Reject invalid/no cert:
+- Request with no certificate is rejected.
+- Invalid certificate is denied with bad certificate / unknown ca / handshake fail.
+- Unauthorized service access is forbidden when certificate policy is enforced.

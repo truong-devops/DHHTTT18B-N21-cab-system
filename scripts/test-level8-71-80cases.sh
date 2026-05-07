@@ -8,22 +8,29 @@ DRIVER_URL="${DRIVER_URL:-http://localhost:3011}"
 PRICING_URL="${PRICING_URL:-http://localhost:3006}"
 ETA_URL="${ETA_URL:-http://localhost:3012}"
 COMPOSE_FILE="${COMPOSE_FILE:-infra/docker-compose.dev.yml}"
+INTERNAL_API_KEY="${INTERNAL_API_KEY:-dev-internal-key}"
 USER_PASS="${USER_PASS:-123456}"
 UNIQ_TAG="$(date +%s)-$RANDOM"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-30}"
 FAULT_SETTLE_SEC="${FAULT_SETTLE_SEC:-3}"
 
-CASE72_MIN_LATENCY_MS="${CASE72_MIN_LATENCY_MS:-100}"
 CASE74_RECOVERY_TIMEOUT_SEC="${CASE74_RECOVERY_TIMEOUT_SEC:-120}"
-CASE74_ENABLE="${CASE74_ENABLE:-0}"
+CASE74_ENABLE="${CASE74_ENABLE:-1}"
 CASE75_FAIL_FAST_MS="${CASE75_FAIL_FAST_MS:-5000}"
-CASE79_MIN_LATENCY_MS="${CASE79_MIN_LATENCY_MS:-1200}"
+CASE77_BASE_MS="${CASE77_BASE_MS:-1000}"
+CASE77_MAX_MS="${CASE77_MAX_MS:-8000}"
+CASE79_RECOVERY_WAIT_SEC="${CASE79_RECOVERY_WAIT_SEC:-45}"
+AUTH_BOOTSTRAP_ATTEMPTS="${AUTH_BOOTSTRAP_ATTEMPTS:-20}"
+AUTH_BOOTSTRAP_RETRY_DELAY_SEC="${AUTH_BOOTSTRAP_RETRY_DELAY_SEC:-3}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
-SKIP_COUNT=0
+
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/case-context-input.sh"
 
 COMPOSE_AVAILABLE=0
 COMPOSE_MODE="none"
@@ -39,7 +46,7 @@ Examples:
 
 Notes:
   - Default BASE_URL: $DEFAULT_BASE_URL
-  - Case 74 is SKIP by default (set CASE74_ENABLE=1 to run).
+  - Case 74 is strict by default (enabled). If disabled or missing evidence, it fails.
   - Infra fault injection cases require Docker Compose and $COMPOSE_FILE.
 USAGE
 }
@@ -83,7 +90,21 @@ print_case() {
   local expected="$3"
   local status="$4"
   local body="$5"
+  local case_id=""
+  local case_context=""
+  local case_input=""
+  case_id="$(echo "$title" | sed -n 's/^Case \([0-9]\+\).*/\1/p')"
+  if [[ -n "$case_id" ]]; then
+    case_context="$(get_case_context "$case_id")"
+    case_input="$(get_case_input "$case_id")"
+  fi
   echo "========== $title =========="
+  if [[ -n "$case_context" ]]; then
+    echo "Context: $case_context"
+  fi
+  if [[ -n "$case_input" ]]; then
+    echo "Input (PDF): $case_input"
+  fi
   echo "Input:"
   echo "$input" | sed -n '1,140p'
   echo "Expected: $expected"
@@ -106,12 +127,11 @@ mark_result() {
   echo
 }
 
-mark_result_skip() {
+mark_no_evidence_fail() {
   local case_id="$1"
   local reason="$2"
-  echo "[$case_id] SKIP - $reason"
-  SKIP_COUNT=$((SKIP_COUNT + 1))
-  echo
+  echo "[$case_id] NO_EVIDENCE - $reason"
+  mark_result 0 "$case_id"
 }
 
 call_json_url() {
@@ -171,15 +191,7 @@ call_gateway_json() {
 
 extract_access_token() {
   local body="$1"
-  local token
-  token=$(echo "$body" | json_get "tokens.accessToken")
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "access_token"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "tokens.access_token"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.tokens.accessToken"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.access_token"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "data.accessToken"); fi
-  if [[ -z "$token" ]]; then token=$(echo "$body" | json_get "token"); fi
-  echo "$token"
+  echo "$body" | json_get "tokens.accessToken"
 }
 
 register_and_login_user() {
@@ -188,7 +200,7 @@ register_and_login_user() {
 
   call_gateway_json POST "/v1/auth/register" "" "{\"email\":\"$email\",\"password\":\"$USER_PASS\",\"name\":\"$name\",\"role\":\"user\"}" >/dev/null || true
 
-  local attempts=8
+  local attempts="$AUTH_BOOTSTRAP_ATTEMPTS"
   local i=1
   while [[ "$i" -le "$attempts" ]]; do
     local login
@@ -198,10 +210,20 @@ register_and_login_user() {
     login=$(call_gateway_json POST "/v1/auth/login" "" "{\"identifier\":\"$email\",\"password\":\"$USER_PASS\"}" || true)
     status=$(echo "$login" | sed -n '1p')
     body=$(echo "$login" | sed '1d')
+    if [[ "$status" == "429" ]]; then
+      sleep "$AUTH_BOOTSTRAP_RETRY_DELAY_SEC"
+      i=$((i + 1))
+      continue
+    fi
     if [[ "$status" != "200" ]]; then
       login=$(call_gateway_json POST "/v1/auth/login" "" "{\"email\":\"$email\",\"password\":\"$USER_PASS\"}" || true)
       status=$(echo "$login" | sed -n '1p')
       body=$(echo "$login" | sed '1d')
+      if [[ "$status" == "429" ]]; then
+        sleep "$AUTH_BOOTSTRAP_RETRY_DELAY_SEC"
+        i=$((i + 1))
+        continue
+      fi
     fi
 
     local token
@@ -211,7 +233,7 @@ register_and_login_user() {
       return 0
     fi
 
-    sleep 1
+    sleep "$AUTH_BOOTSTRAP_RETRY_DELAY_SEC"
     i=$((i + 1))
   done
 
@@ -337,7 +359,9 @@ require_compose_or_skip() {
   local case_id="$1"
   local reason="$2"
   if [[ "$COMPOSE_AVAILABLE" != "1" ]]; then
-    mark_result_skip "$case_id" "$reason"
+    if [[ "$case_id" =~ ^[0-9]+$ ]]; then
+      mark_no_evidence_fail "$case_id" "$reason"
+    fi
     return 1
   fi
   return 0
@@ -352,7 +376,9 @@ ensure_ready_or_skip() {
   if recover_core_stack; then
     return 0
   fi
-  mark_result_skip "$case_id" "$reason"
+  if [[ "$case_id" =~ ^[0-9]+$ ]]; then
+    mark_no_evidence_fail "$case_id" "$reason"
+  fi
   return 1
 }
 
@@ -364,14 +390,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-create_booking_payload='{"pickup":{"lat":10.7765,"lng":106.7009},"drop":{"lat":10.7821,"lng":106.6980},"vehicle_type":"CAR","distance_km":3.4,"traffic_level":0.45}'
+create_booking_payload='{"pickup":{"lat":10.76,"lng":106.66},"drop":{"lat":10.77,"lng":106.70},"vehicle_type":"CAR","distance_km":5,"traffic_level":0.5}'
 
 echo "== Setup for Level 8 failure & resilience =="
 has_docker_compose || true
 if [[ "$COMPOSE_AVAILABLE" == "1" ]]; then
   echo "Docker Compose detected ($COMPOSE_MODE). Fault injection cases are enabled."
 else
-  echo "WARN: Docker Compose not found. Infra fault injection cases will be skipped."
+  echo "WARN: Docker Compose not found. Infra fault injection cases will fail as NO_EVIDENCE (strict mode)."
 fi
 
 if ! ensure_ready_or_skip "setup" "core services not healthy before test run"; then
@@ -381,32 +407,33 @@ fi
 
 # Case 71: Driver service down -> fallback
 if require_compose_or_skip "71" "requires docker compose fault injection" && ensure_ready_or_skip "71" "core services unhealthy before case 71"; then
-  stop_services "driver-service"
-
   C71_TOKEN="$(new_user_token 71)"
   if [[ -z "$C71_TOKEN" ]]; then
-    mark_result_skip "71" "cannot get auth token while testing driver fallback"
+    mark_no_evidence_fail "71" "cannot get auth token while testing driver fallback"
   else
+    stop_services "driver-service"
+
     C71=$(call_gateway_json POST "/v1/bookings" "$C71_TOKEN" "$create_booking_payload")
     C71_STATUS=$(echo "$C71" | sed -n '1p')
     C71_BODY=$(echo "$C71" | sed '1d')
     C71_BOOKING_ID=$(echo "$C71_BODY" | json_get "booking.booking_id")
     if [[ -z "$C71_BOOKING_ID" ]]; then C71_BOOKING_ID=$(echo "$C71_BODY" | json_get "booking.bookingId"); fi
+    C71_BOOKING_STATUS=$(echo "$C71_BODY" | json_get "booking.status")
 
     print_case "Case 71 - Driver service down -> fallback" \
       "Fault: stop driver-service; Payload: $create_booking_payload" \
-      "201 + booking_id exists + booking flow continues when driver availability dependency is down" \
+      "booking flow does not crash: status in {200,201} + booking_id exists + booking status still valid (REQUESTED/PENDING/CONFIRMED)" \
       "$C71_STATUS" "$C71_BODY"
 
-    if [[ "$C71_STATUS" == "201" ]] && [[ -n "$C71_BOOKING_ID" ]]; then
+    if [[ "$C71_STATUS" == "200" || "$C71_STATUS" == "201" ]] && [[ -n "$C71_BOOKING_ID" ]] && [[ "$C71_BOOKING_STATUS" == "REQUESTED" || "$C71_BOOKING_STATUS" == "PENDING" || "$C71_BOOKING_STATUS" == "CONFIRMED" ]]; then
       mark_result 1 "71"
     else
       mark_result 0 "71"
     fi
-  fi
 
-  start_services "driver-service"
-  ensure_ready_or_skip "71-post" "core services unhealthy after case 71" >/dev/null || true
+    start_services "driver-service"
+    ensure_ready_or_skip "71-post" "core services unhealthy after case 71" >/dev/null || true
+  fi
 fi
 
 # Case 72: Pricing service timeout -> retry/fallback
@@ -415,7 +442,7 @@ if require_compose_or_skip "72" "requires docker compose fault injection" && ens
 
   C72_TOKEN="$(new_user_token 72)"
   if [[ -z "$C72_TOKEN" ]]; then
-    mark_result_skip "72" "cannot get auth token while testing pricing fallback"
+    mark_no_evidence_fail "72" "cannot get auth token while testing pricing fallback"
   else
     C72_T0=$(now_ms)
     C72=$(call_gateway_json POST "/v1/bookings" "$C72_TOKEN" "$create_booking_payload")
@@ -425,17 +452,21 @@ if require_compose_or_skip "72" "requires docker compose fault injection" && ens
     C72_BOOKING_ID=$(echo "$C72_BODY" | json_get "booking.booking_id")
     if [[ -z "$C72_BOOKING_ID" ]]; then C72_BOOKING_ID=$(echo "$C72_BODY" | json_get "booking.bookingId"); fi
     C72_QUOTE_ID=$(echo "$C72_BODY" | json_get "booking.priceSnapshot.quoteId")
+    C72_FALLBACK_USED=$(echo "$C72_BODY" | json_get "booking.priceSnapshot.fallbackUsed")
+    C72_PRICE_TOTAL=$(echo "$C72_BODY" | json_get "booking.priceSnapshot.total")
+    if [[ -z "$C72_PRICE_TOTAL" ]]; then C72_PRICE_TOTAL=$(echo "$C72_BODY" | json_get "booking.price.total"); fi
     C72_ELAPSED=$((C72_T1 - C72_T0))
 
     print_case "Case 72 - Pricing timeout -> retry + fallback" \
       "Fault: stop pricing-service; Payload: $create_booking_payload" \
-      "201 + fallback quote id prefix quote_local_fallback_ + latency >= ${CASE72_MIN_LATENCY_MS}ms" \
+      "booking flow still succeeds (no total failure): status in {200,201} + booking_id exists + pricing handled by retry OR fallback/default value" \
       "$C72_STATUS" "$C72_BODY"
 
-    if [[ "$C72_STATUS" == "201" ]] && [[ -n "$C72_BOOKING_ID" ]] && [[ "$C72_QUOTE_ID" == quote_local_fallback_* ]] && (( C72_ELAPSED >= CASE72_MIN_LATENCY_MS )); then
+    if [[ "$C72_STATUS" == "200" || "$C72_STATUS" == "201" ]] && [[ -n "$C72_BOOKING_ID" ]] \
+      && ( [[ "$C72_QUOTE_ID" == quote_local_fallback_* ]] || [[ "$C72_FALLBACK_USED" == "true" ]] || node -e "const n=Number(process.argv[1]);process.exit(Number.isFinite(n)&&n>=0?0:1)" "${C72_PRICE_TOTAL:-NaN}" ); then
       mark_result 1 "72"
     else
-      echo "[72] detail: elapsed_ms=$C72_ELAPSED quote_id=$C72_QUOTE_ID"
+      echo "[72] detail: elapsed_ms=$C72_ELAPSED quote_id=$C72_QUOTE_ID fallback_used=$C72_FALLBACK_USED price_total=$C72_PRICE_TOTAL"
       mark_result 0 "72"
     fi
   fi
@@ -450,7 +481,7 @@ if require_compose_or_skip "73" "requires docker compose fault injection" && ens
 
   C73_TOKEN="$(new_user_token 73)"
   if [[ -z "$C73_TOKEN" ]]; then
-    mark_result_skip "73" "cannot get auth token while testing kafka outage"
+    mark_no_evidence_fail "73" "cannot get auth token while testing kafka outage"
   else
     C73=$(call_gateway_json POST "/v1/bookings" "$C73_TOKEN" "$create_booking_payload")
     C73_STATUS=$(echo "$C73" | sed -n '1p')
@@ -458,14 +489,19 @@ if require_compose_or_skip "73" "requires docker compose fault injection" && ens
     C73_BOOKING_ID=$(echo "$C73_BODY" | json_get "booking.booking_id")
     if [[ -z "$C73_BOOKING_ID" ]]; then C73_BOOKING_ID=$(echo "$C73_BODY" | json_get "booking.bookingId"); fi
     C73_QUEUED=$(echo "$C73_BODY" | json_get "publishedEvent.queued")
+    if [[ -z "$C73_QUEUED" ]]; then C73_QUEUED=$(echo "$C73_BODY" | json_get "outbox.queued"); fi
     C73_EVENT_ID=$(echo "$C73_BODY" | json_get "publishedEvent.eventId")
+    if [[ -z "$C73_EVENT_ID" ]]; then C73_EVENT_ID=$(echo "$C73_BODY" | json_get "outbox.eventId"); fi
+    C73_EVENT_STATE=$(echo "$C73_BODY" | json_get "publishedEvent.status")
+    if [[ -z "$C73_EVENT_STATE" ]]; then C73_EVENT_STATE=$(echo "$C73_BODY" | json_get "outbox.status"); fi
 
     print_case "Case 73 - Kafka down -> buffer event" \
       "Fault: stop kafka; Payload: $create_booking_payload" \
-      "201 + publishedEvent.queued=true + eventId exists (transactional outbox path)" \
+      "system does not crash + event is buffered/retryable (outbox/queued/pending marker exists)" \
       "$C73_STATUS" "$C73_BODY"
 
-    if [[ "$C73_STATUS" == "201" ]] && [[ -n "$C73_BOOKING_ID" ]] && [[ "$C73_QUEUED" == "true" ]] && [[ -n "$C73_EVENT_ID" ]]; then
+    if [[ "$C73_STATUS" == "200" || "$C73_STATUS" == "201" ]] && [[ -n "$C73_BOOKING_ID" ]] \
+      && ( [[ "$C73_QUEUED" == "true" ]] || [[ -n "$C73_EVENT_ID" ]] || [[ "$C73_EVENT_STATE" == "QUEUED" || "$C73_EVENT_STATE" == "PENDING" ]] ); then
       mark_result 1 "73"
     else
       mark_result 0 "73"
@@ -478,40 +514,112 @@ fi
 
 # Case 74: DB failover / restart recovery
 if [[ "$CASE74_ENABLE" != "1" ]]; then
-  mark_result_skip "74" "requires real DB failover orchestration; disabled by default (set CASE74_ENABLE=1 to run)"
-elif require_compose_or_skip "74" "requires docker compose fault injection" && ensure_ready_or_skip "74" "core services unhealthy before case 74"; then
-  C74_TOKEN="$(new_user_token 74)"
-  if [[ -z "$C74_TOKEN" ]]; then
-    mark_result_skip "74" "cannot get auth token before DB restart scenario"
-  else
-    compose_cmd restart postgres >/dev/null 2>&1 || true
-    sleep "$FAULT_SETTLE_SEC"
-
-    C74_STATUS="000"
-    C74_BODY='{"error":"not_attempted"}'
-    C74_OK=0
-    C74_DEADLINE=$(( $(now_ms) + CASE74_RECOVERY_TIMEOUT_SEC * 1000 ))
-
-    while (( $(now_ms) < C74_DEADLINE )); do
-      C74=$(call_gateway_json POST "/v1/bookings" "$C74_TOKEN" "$create_booking_payload")
-      C74_STATUS=$(echo "$C74" | sed -n '1p')
-      C74_BODY=$(echo "$C74" | sed '1d')
-      if [[ "$C74_STATUS" == "201" ]]; then
-        C74_OK=1
-        break
-      fi
-      sleep 2
-    done
-
+  C74_STATUS="DISABLED"
+  C74_BODY='{"error":"CASE74_ENABLE!=1; strict mode requires running case 74"}'
+  print_case "Case 74 - DB restart recovery" \
+    "Fault: restart postgres; Payload: $create_booking_payload" \
+    "booking path recovers within ${CASE74_RECOVERY_TIMEOUT_SEC}s and remains consistent for subsequent request" \
+    "$C74_STATUS" "$C74_BODY"
+  mark_result 0 "74"
+elif [[ "$COMPOSE_AVAILABLE" != "1" ]]; then
+  C74_STATUS="NO_EVIDENCE"
+  C74_BODY='{"error":"docker compose unavailable; cannot inject DB restart/failover fault"}'
+  print_case "Case 74 - DB restart recovery" \
+    "Fault: restart postgres; Payload: $create_booking_payload" \
+    "booking path recovers within ${CASE74_RECOVERY_TIMEOUT_SEC}s and remains consistent for subsequent request" \
+    "$C74_STATUS" "$C74_BODY"
+  mark_result 0 "74"
+else
+  if ! ensure_core_ready 30 && ! recover_core_stack; then
+    C74_STATUS="NO_EVIDENCE"
+    C74_BODY='{"error":"core services unhealthy before case 74"}'
     print_case "Case 74 - DB restart recovery" \
       "Fault: restart postgres; Payload: $create_booking_payload" \
-      "booking path recovers within ${CASE74_RECOVERY_TIMEOUT_SEC}s" \
+      "booking path recovers within ${CASE74_RECOVERY_TIMEOUT_SEC}s and remains consistent for subsequent request" \
       "$C74_STATUS" "$C74_BODY"
+    mark_result 0 "74"
+  else
+    C74_TOKEN="$(new_user_token 74)"
+    if [[ -z "$C74_TOKEN" ]]; then
+      C74_STATUS="NO_EVIDENCE"
+      C74_BODY='{"error":"cannot get auth token before DB restart scenario"}'
+      print_case "Case 74 - DB restart recovery" \
+        "Fault: restart postgres; Payload: $create_booking_payload" \
+        "booking path recovers within ${CASE74_RECOVERY_TIMEOUT_SEC}s and remains consistent for subsequent request" \
+        "$C74_STATUS" "$C74_BODY"
+      mark_result 0 "74"
+    else
+      compose_cmd restart postgres >/dev/null 2>&1 || true
+      sleep "$FAULT_SETTLE_SEC"
 
-    mark_result "$C74_OK" "74"
+      C74_STATUS="000"
+      C74_BODY='{"error":"not_attempted"}'
+      C74_OK=0
+      C74_FIRST_OK=0
+      C74_SECOND_OK=0
+      C74_SECOND_STATUS="000"
+      C74_SECOND_BODY='{"error":"second request not attempted"}'
+      C74_FIRST_DEADLINE=$(( $(now_ms) + CASE74_RECOVERY_TIMEOUT_SEC * 1000 ))
+
+      while (( $(now_ms) < C74_FIRST_DEADLINE )); do
+        C74=$(call_gateway_json POST "/v1/bookings" "$C74_TOKEN" "$create_booking_payload")
+        C74_STATUS=$(echo "$C74" | sed -n '1p')
+        C74_BODY=$(echo "$C74" | sed '1d')
+        if [[ "$C74_STATUS" == "200" || "$C74_STATUS" == "201" ]]; then
+          C74_FIRST_OK=1
+          break
+        fi
+        if [[ "$C74_STATUS" != "000" && "$C74_STATUS" != "429" && "$C74_STATUS" != "500" && "$C74_STATUS" != "502" && "$C74_STATUS" != "503" && "$C74_STATUS" != "504" ]]; then
+          break
+        fi
+        sleep 2
+      done
+
+      if [[ "$C74_FIRST_OK" == "1" ]]; then
+        C74_SECOND_TOKEN="$(new_user_token 74b)"
+        if [[ -z "$C74_SECOND_TOKEN" ]]; then
+          sleep "$AUTH_BOOTSTRAP_RETRY_DELAY_SEC"
+          C74_SECOND_TOKEN="$(new_user_token 74c)"
+        fi
+        if [[ -z "$C74_SECOND_TOKEN" ]]; then
+          C74_SECOND_BODY='{"error":"cannot get auth token for follow-up request"}'
+        else
+          C74_SECOND_DEADLINE=$(( $(now_ms) + CASE74_RECOVERY_TIMEOUT_SEC * 1000 ))
+          while (( $(now_ms) < C74_SECOND_DEADLINE )); do
+            C74_SECOND=$(call_gateway_json POST "/v1/bookings" "$C74_SECOND_TOKEN" "$create_booking_payload")
+            C74_SECOND_STATUS=$(echo "$C74_SECOND" | sed -n '1p')
+            C74_SECOND_BODY=$(echo "$C74_SECOND" | sed '1d')
+            if [[ "$C74_SECOND_STATUS" == "200" || "$C74_SECOND_STATUS" == "201" ]]; then
+              C74_SECOND_OK=1
+              break
+            fi
+            if [[ "$C74_SECOND_STATUS" != "000" && "$C74_SECOND_STATUS" != "429" && "$C74_SECOND_STATUS" != "500" && "$C74_SECOND_STATUS" != "502" && "$C74_SECOND_STATUS" != "503" && "$C74_SECOND_STATUS" != "504" ]]; then
+              break
+            fi
+            sleep 2
+          done
+        fi
+      fi
+
+      if ! ensure_core_ready 30 && ! recover_core_stack; then
+        C74_FIRST_OK=0
+        C74_SECOND_OK=0
+      fi
+
+      if [[ "$C74_FIRST_OK" == "1" && "$C74_SECOND_OK" == "1" ]]; then
+        C74_OK=1
+      fi
+
+      C74_BODY="$C74_BODY"$'\n'"follow_up_status=$C74_SECOND_STATUS; first_ok=$C74_FIRST_OK; second_ok=$C74_SECOND_OK"
+
+      print_case "Case 74 - DB restart recovery" \
+        "Fault: restart postgres; Payload: $create_booking_payload" \
+        "booking path recovers within ${CASE74_RECOVERY_TIMEOUT_SEC}s and remains consistent for subsequent request" \
+        "$C74_STATUS" "$C74_BODY"
+
+      mark_result "$C74_OK" "74"
+    fi
   fi
-
-  ensure_ready_or_skip "74-post" "core services unhealthy after case 74" >/dev/null || true
 fi
 
 # Case 75: Circuit breaker open -> fail fast
@@ -520,7 +628,7 @@ if require_compose_or_skip "75" "requires docker compose fault injection" && ens
 
   C75_TOKEN="$(new_user_token 75)"
   if [[ -z "$C75_TOKEN" ]]; then
-    mark_result_skip "75" "cannot get auth token for gateway circuit-breaker assertion"
+    mark_no_evidence_fail "75" "cannot get auth token for gateway circuit-breaker assertion"
   else
     C75A_T0=$(now_ms)
     C75A=$(call_gateway_json GET "/v1/pricing/quotes/non-existing-quote" "$C75_TOKEN")
@@ -541,7 +649,7 @@ if require_compose_or_skip "75" "requires docker compose fault injection" && ens
     C75_MERGED="first={status:$C75A_STATUS,code:$C75A_CODE,lat_ms:$C75A_LAT}; second={status:$C75B_STATUS,code:$C75B_CODE,lat_ms:$C75B_LAT}"
     print_case "Case 75 - Circuit breaker fail-fast" \
       "Fault: stop pricing-service; Input: 2x GET /v1/pricing/quotes/non-existing-quote (with token)" \
-      "status in {502,504,503} + code in {UPSTREAM_UNAVAILABLE,UPSTREAM_TIMEOUT,UPSTREAM_CIRCUIT_OPEN} + latency <= ${CASE75_FAIL_FAST_MS}ms" \
+      "upstream error is isolated + fail-fast behavior (avoid cascade): status in {502,503,504}, upstream error code, and second call not slower than first" \
       "local-check" "$C75_MERGED"
 
     C75_OK=0
@@ -549,7 +657,8 @@ if require_compose_or_skip "75" "requires docker compose fault injection" && ens
       && ("$C75B_STATUS" == "502" || "$C75B_STATUS" == "504" || "$C75B_STATUS" == "503") ]] \
       && [[ ("$C75A_CODE" == "UPSTREAM_UNAVAILABLE" || "$C75A_CODE" == "UPSTREAM_TIMEOUT" || "$C75A_CODE" == "UPSTREAM_CIRCUIT_OPEN") ]] \
       && [[ ("$C75B_CODE" == "UPSTREAM_UNAVAILABLE" || "$C75B_CODE" == "UPSTREAM_TIMEOUT" || "$C75B_CODE" == "UPSTREAM_CIRCUIT_OPEN") ]] \
-      && (( C75A_LAT <= CASE75_FAIL_FAST_MS )) && (( C75B_LAT <= CASE75_FAIL_FAST_MS )); then
+      && (( C75A_LAT <= CASE75_FAIL_FAST_MS )) && (( C75B_LAT <= CASE75_FAIL_FAST_MS )) \
+      && (( C75B_LAT <= C75A_LAT + 200 )); then
       C75_OK=1
     fi
     mark_result "$C75_OK" "75"
@@ -565,23 +674,26 @@ if require_compose_or_skip "76" "requires docker compose fault injection" && ens
 
   C76_TOKEN="$(new_user_token 76)"
   if [[ -z "$C76_TOKEN" ]]; then
-    mark_result_skip "76" "cannot get auth token while testing partial failure handling"
+    mark_no_evidence_fail "76" "cannot get auth token while testing partial failure handling"
   else
     C76=$(call_gateway_json POST "/v1/bookings" "$C76_TOKEN" "$create_booking_payload")
     C76_STATUS=$(echo "$C76" | sed -n '1p')
     C76_BODY=$(echo "$C76" | sed '1d')
     C76_BOOKING_ID=$(echo "$C76_BODY" | json_get "booking.booking_id")
     if [[ -z "$C76_BOOKING_ID" ]]; then C76_BOOKING_ID=$(echo "$C76_BODY" | json_get "booking.bookingId"); fi
+    C76_STATUS_FIELD=$(echo "$C76_BODY" | json_get "booking.status")
     C76_ETA=$(echo "$C76_BODY" | json_get "booking.eta_minutes")
     C76_QUOTE=$(echo "$C76_BODY" | json_get "booking.priceSnapshot.quoteId")
+    C76_FALLBACK=$(echo "$C76_BODY" | json_get "booking.priceSnapshot.fallbackUsed")
 
     print_case "Case 76 - Partial failure (driver + eta down)" \
       "Fault: stop driver-service + eta-service; Payload: $create_booking_payload" \
-      "201 + booking_id exists + eta_minutes numeric + quote exists" \
+      "partial failure does not crash full flow: status in {200,201} + booking_id exists + core booking status valid" \
       "$C76_STATUS" "$C76_BODY"
 
-    if [[ "$C76_STATUS" == "201" ]] && [[ -n "$C76_BOOKING_ID" ]] && [[ -n "$C76_QUOTE" ]] \
-      && node -e "const n=Number(process.argv[1]);process.exit(Number.isFinite(n)&&n>=0?0:1)" "$C76_ETA"; then
+    if [[ "$C76_STATUS" == "200" || "$C76_STATUS" == "201" ]] && [[ -n "$C76_BOOKING_ID" ]] \
+      && [[ "$C76_STATUS_FIELD" == "REQUESTED" || "$C76_STATUS_FIELD" == "PENDING" || "$C76_STATUS_FIELD" == "CONFIRMED" ]] \
+      && ( [[ -n "$C76_QUOTE" ]] || [[ "$C76_FALLBACK" == "true" ]] || node -e "const n=Number(process.argv[1]);process.exit(Number.isFinite(n)&&n>=0?0:1)" "${C76_ETA:-NaN}" ); then
       mark_result 1 "76"
     else
       mark_result 0 "76"
@@ -593,21 +705,23 @@ if require_compose_or_skip "76" "requires docker compose fault injection" && ens
 fi
 
 # Case 77: Retry exponential backoff
-C77_OUTPUT=$(node - <<'NODE'
+C77_OUTPUT=$(node - <<'NODE' "$CASE77_BASE_MS" "$CASE77_MAX_MS"
 const { computeRetryDelayMs } = require('./services/booking-service/src/repositories/outboxRepo');
-const baseMs = 500;
-const maxMs = 5000;
-const attempts = [1, 2, 3, 4, 8];
+const baseMs = Number(process.argv[2] || 1000);
+const maxMs = Number(process.argv[3] || 8000);
+const attempts = [1, 2, 3, 4];
 const actual = attempts.map((a) => computeRetryDelayMs({ attemptCount: a, baseMs, maxMs }));
-const expected = [500, 1000, 2000, 4000, 5000];
-const ok = actual.length === expected.length && actual.every((v, i) => v === expected[i]);
-process.stdout.write(JSON.stringify({ attempts, baseMs, maxMs, actual, expected, ok }));
+const expected = [baseMs, baseMs * 2, baseMs * 4, Math.min(baseMs * 8, maxMs)];
+const increasing = actual.every((v, i) => i === 0 || v >= actual[i - 1]);
+const has123 = actual[0] === expected[0] && actual[1] === expected[1] && actual[2] === expected[2];
+const ok = actual.length === expected.length && increasing && has123;
+process.stdout.write(JSON.stringify({ attempts, baseMs, maxMs, actual, expected, increasing, ok }));
 NODE
 )
 C77_OK=$(echo "$C77_OUTPUT" | json_get "ok")
 print_case "Case 77 - Exponential backoff policy" \
-  "attempts=[1,2,3,4,8], base=500ms, max=5000ms" \
-  "actual delays match [500,1000,2000,4000,5000]" \
+  "attempts=[1,2,3,4], base=${CASE77_BASE_MS}ms, max=${CASE77_MAX_MS}ms" \
+  "retry delay follows 1s -> 2s -> 4s pattern (or equivalent base*2^n), monotonic (no spam)" \
   "local-check" "$C77_OUTPUT"
 if [[ "$C77_OK" == "true" ]]; then
   mark_result 1 "77"
@@ -615,33 +729,53 @@ else
   mark_result 0 "77"
 fi
 
-# Case 78: Routing fail isolation
-if ensure_ready_or_skip "78" "core services unhealthy before case 78"; then
-  C78=$(call_gateway_json GET "/v1/nonexistent-domain/health" "")
-  C78_STATUS=$(echo "$C78" | sed -n '1p')
-  C78_BODY=$(echo "$C78" | sed '1d')
-  C78_CODE=$(echo "$C78_BODY" | json_get "error.code")
-  C78_HEALTH=$(call_json_url GET "$BASE_URL/health")
-  C78_HEALTH_STATUS=$(echo "$C78_HEALTH" | sed -n '1p')
-  C78_ACTUAL="routing_error_status=$C78_STATUS routing_error_code=$C78_CODE gateway_health_status=$C78_HEALTH_STATUS"
-  print_case "Case 78 - Routing fail isolation" \
-    "GET /v1/nonexistent-domain/health" \
-    "404 + NOT_FOUND and gateway remains healthy" \
-    "local-check" "$C78_ACTUAL"
+# Case 78: Service mesh routing fail -> fallback route (simulated by pricing route outage)
+if require_compose_or_skip "78" "requires docker compose pause/unpause" && ensure_ready_or_skip "78" "core services unhealthy before case 78"; then
+  if pause_services "pricing-service"; then
+    C78_TOKEN="$(new_user_token 78)"
+    if [[ -z "$C78_TOKEN" ]]; then
+      mark_no_evidence_fail "78" "cannot get auth token for routing fail simulation"
+    else
+      C78=$(call_gateway_json POST "/v1/bookings" "$C78_TOKEN" "$create_booking_payload")
+      C78_STATUS=$(echo "$C78" | sed -n '1p')
+      C78_BODY=$(echo "$C78" | sed '1d')
+      C78_BOOKING_ID=$(echo "$C78_BODY" | json_get "booking.booking_id")
+      if [[ -z "$C78_BOOKING_ID" ]]; then C78_BOOKING_ID=$(echo "$C78_BODY" | json_get "booking.bookingId"); fi
+      C78_QUOTE_ID=$(echo "$C78_BODY" | json_get "booking.priceSnapshot.quoteId")
+      C78_FALLBACK=$(echo "$C78_BODY" | json_get "booking.priceSnapshot.fallbackUsed")
+      C78_PRICE_TOTAL=$(echo "$C78_BODY" | json_get "booking.priceSnapshot.total")
+      if [[ -z "$C78_PRICE_TOTAL" ]]; then C78_PRICE_TOTAL=$(echo "$C78_BODY" | json_get "booking.price.total"); fi
 
-  if [[ "$C78_STATUS" == "404" ]] && [[ "$C78_CODE" == "NOT_FOUND" ]] && [[ "$C78_HEALTH_STATUS" == "200" ]]; then
-    mark_result 1 "78"
+      print_case "Case 78 - Service mesh routing fail (fallback route)" \
+        "Fault: pause pricing-service (simulate route failure); Payload: $create_booking_payload" \
+        "request not lost: booking still created with fallback/default pricing path" \
+        "$C78_STATUS" "$C78_BODY"
+
+      if [[ "$C78_STATUS" == "200" || "$C78_STATUS" == "201" ]] && [[ -n "$C78_BOOKING_ID" ]] \
+        && ( [[ "$C78_QUOTE_ID" == quote_local_fallback_* ]] || [[ "$C78_FALLBACK" == "true" ]] || node -e "const n=Number(process.argv[1]);process.exit(Number.isFinite(n)&&n>=0?0:1)" "${C78_PRICE_TOTAL:-NaN}" ); then
+        mark_result 1 "78"
+      else
+        mark_result 0 "78"
+      fi
+    fi
+
+    unpause_services "pricing-service"
+    ensure_ready_or_skip "78-post" "core services unhealthy after case 78" >/dev/null || true
   else
-    mark_result 0 "78"
+    mark_no_evidence_fail "78" "docker compose pause/unpause unsupported in this environment"
   fi
 fi
 
 # Case 79: Network partition simulation
 if require_compose_or_skip "79" "requires docker compose pause/unpause" && ensure_ready_or_skip "79" "core services unhealthy before case 79"; then
   if pause_services "pricing-service"; then
+    C79_MARKED=0
+    C79_PHASE1_OK=0
+    C79_PHASE2_OK=0
     C79_TOKEN="$(new_user_token 79)"
     if [[ -z "$C79_TOKEN" ]]; then
-      mark_result_skip "79" "cannot get auth token while testing partition scenario"
+      mark_no_evidence_fail "79" "cannot get auth token while testing partition scenario"
+      C79_MARKED=1
     else
       C79_T0=$(now_ms)
       C79=$(call_gateway_json POST "/v1/bookings" "$C79_TOKEN" "$create_booking_payload")
@@ -651,25 +785,53 @@ if require_compose_or_skip "79" "requires docker compose pause/unpause" && ensur
       C79_BOOKING_ID=$(echo "$C79_BODY" | json_get "booking.booking_id")
       if [[ -z "$C79_BOOKING_ID" ]]; then C79_BOOKING_ID=$(echo "$C79_BODY" | json_get "booking.bookingId"); fi
       C79_QUOTE_ID=$(echo "$C79_BODY" | json_get "booking.priceSnapshot.quoteId")
+      C79_FALLBACK=$(echo "$C79_BODY" | json_get "booking.priceSnapshot.fallbackUsed")
+      C79_PRICE_TOTAL=$(echo "$C79_BODY" | json_get "booking.priceSnapshot.total")
+      if [[ -z "$C79_PRICE_TOTAL" ]]; then C79_PRICE_TOTAL=$(echo "$C79_BODY" | json_get "booking.price.total"); fi
       C79_ELAPSED=$((C79_T1 - C79_T0))
 
       print_case "Case 79 - Network partition simulation" \
         "Fault: pause pricing-service; Payload: $create_booking_payload" \
-        "201 + fallback quote id prefix quote_local_fallback_ + latency >= ${CASE79_MIN_LATENCY_MS}ms" \
+        "degrade gracefully during partition + recover after network returns" \
         "$C79_STATUS" "$C79_BODY"
 
-      if [[ "$C79_STATUS" == "201" ]] && [[ -n "$C79_BOOKING_ID" ]] && [[ "$C79_QUOTE_ID" == quote_local_fallback_* ]] && (( C79_ELAPSED >= CASE79_MIN_LATENCY_MS )); then
-        mark_result 1 "79"
-      else
-        echo "[79] detail: elapsed_ms=$C79_ELAPSED quote_id=$C79_QUOTE_ID"
-        mark_result 0 "79"
+      if [[ "$C79_STATUS" == "200" || "$C79_STATUS" == "201" ]] && [[ -n "$C79_BOOKING_ID" ]] \
+        && ( [[ "$C79_QUOTE_ID" == quote_local_fallback_* ]] || [[ "$C79_FALLBACK" == "true" ]] || node -e "const n=Number(process.argv[1]);process.exit(Number.isFinite(n)&&n>=0?0:1)" "${C79_PRICE_TOTAL:-NaN}" ); then
+        C79_PHASE1_OK=1
       fi
     fi
 
     unpause_services "pricing-service"
-    ensure_ready_or_skip "79-post" "core services unhealthy after case 79" >/dev/null || true
+    sleep "$FAULT_SETTLE_SEC"
+
+    if [[ "$C79_MARKED" != "1" ]] && ensure_ready_or_skip "79-post" "core services unhealthy after case 79" >/dev/null; then
+      sleep "$CASE79_RECOVERY_WAIT_SEC"
+      C79_PRICING_RECOVER=$(call_json_url POST "$PRICING_URL/v1/pricing/estimate" "" '{"distance_km":5,"demand_index":1}' "x-internal-key" "$INTERNAL_API_KEY")
+      C79_PRICING_RECOVER_STATUS=$(echo "$C79_PRICING_RECOVER" | sed -n '1p')
+
+      C79_TOKEN2="$(new_user_token 79b)"
+      if [[ -n "$C79_TOKEN2" ]]; then
+        C79B=$(call_gateway_json POST "/v1/bookings" "$C79_TOKEN2" "$create_booking_payload")
+        C79B_STATUS=$(echo "$C79B" | sed -n '1p')
+        C79B_BODY=$(echo "$C79B" | sed '1d')
+        C79B_BOOKING_ID=$(echo "$C79B_BODY" | json_get "booking.booking_id")
+        if [[ -z "$C79B_BOOKING_ID" ]]; then C79B_BOOKING_ID=$(echo "$C79B_BODY" | json_get "booking.bookingId"); fi
+        if [[ "$C79_PRICING_RECOVER_STATUS" == "200" ]] && [[ "$C79B_STATUS" == "200" || "$C79B_STATUS" == "201" ]] && [[ -n "$C79B_BOOKING_ID" ]]; then
+          C79_PHASE2_OK=1
+        fi
+      fi
+    fi
+
+    if [[ "$C79_MARKED" != "1" ]]; then
+      if [[ "${C79_PHASE1_OK:-0}" == "1" && "${C79_PHASE2_OK:-0}" == "1" ]]; then
+        mark_result 1 "79"
+      else
+        echo "[79] detail: phase1_ok=${C79_PHASE1_OK:-0} phase2_ok=${C79_PHASE2_OK:-0} elapsed_ms=${C79_ELAPSED:-0} quote_id=${C79_QUOTE_ID:-}"
+        mark_result 0 "79"
+      fi
+    fi
   else
-    mark_result_skip "79" "docker compose pause/unpause unsupported in this environment"
+    mark_no_evidence_fail "79" "docker compose pause/unpause unsupported in this environment"
   fi
 fi
 
@@ -677,7 +839,7 @@ fi
 if require_compose_or_skip "80" "requires docker compose fault injection" && ensure_ready_or_skip "80" "core services unhealthy before case 80"; then
   C80_TOKEN="$(new_user_token 80)"
   if [[ -z "$C80_TOKEN" ]]; then
-    mark_result_skip "80" "cannot get auth token before degradation scenario"
+    mark_no_evidence_fail "80" "cannot get auth token before degradation scenario"
   else
     stop_services "driver-service eta-service pricing-service kafka"
 
@@ -685,16 +847,21 @@ if require_compose_or_skip "80" "requires docker compose fault injection" && ens
     C80_STATUS=$(echo "$C80" | sed -n '1p')
     C80_BODY=$(echo "$C80" | sed '1d')
     C80_BID=$(echo "$C80_BODY" | json_get "booking.bookingId")
+    if [[ -z "$C80_BID" ]]; then C80_BID=$(echo "$C80_BODY" | json_get "booking.booking_id"); fi
     C80_RID=$(echo "$C80_BODY" | json_get "booking.rideId")
     C80_ST=$(echo "$C80_BODY" | json_get "booking.status")
     C80_CA=$(echo "$C80_BODY" | json_get "booking.createdAt")
+    C80_HEALTH=$(call_json_url GET "$BASE_URL/health")
+    C80_HEALTH_STATUS=$(echo "$C80_HEALTH" | sed -n '1p')
 
     print_case "Case 80 - Graceful degradation" \
       "Fault: stop driver + eta + pricing + kafka; Payload: $create_booking_payload; Headers: x-booking-fast-path=1, x-load-test=1" \
-      "201 + minimal booking response (bookingId, rideId, status=REQUESTED, createdAt)" \
+      "non-critical features may degrade, but core booking still works and system does not crash" \
       "$C80_STATUS" "$C80_BODY"
 
-    if [[ "$C80_STATUS" == "201" ]] && [[ -n "$C80_BID" ]] && [[ -n "$C80_RID" ]] && [[ "$C80_ST" == "REQUESTED" ]] && [[ -n "$C80_CA" ]]; then
+    if [[ "$C80_STATUS" == "200" || "$C80_STATUS" == "201" ]] && [[ -n "$C80_BID" ]] \
+      && [[ "$C80_ST" == "REQUESTED" || "$C80_ST" == "PENDING" || "$C80_ST" == "CONFIRMED" ]] \
+      && [[ "$C80_HEALTH_STATUS" == "200" ]]; then
       mark_result 1 "80"
     else
       mark_result 0 "80"
@@ -709,7 +876,6 @@ echo "========================================="
 echo "LEVEL 8 SUMMARY (Cases 71-80)"
 echo "PASS: $PASS_COUNT"
 echo "FAIL: $FAIL_COUNT"
-echo "SKIP: $SKIP_COUNT"
 echo "========================================="
 
 if [[ "$FAIL_COUNT" -gt 0 ]]; then

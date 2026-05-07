@@ -1,0 +1,449 @@
+{
+  "info": {
+    "_postman_id": "cab-system-level-6-cases-51-60-1777181935031",
+    "name": "CAB System - Level 6 Cases 51-60",
+    "description": "Postman collection for Level 6 AI agent decision cases.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('uniq')) pm.collectionVariables.set('uniq', Date.now() + '-' + Math.floor(Math.random() * 100000));",
+          "if (!pm.collectionVariables.get('userPass')) pm.collectionVariables.set('userPass', '123456');",
+          "const uniq = pm.collectionVariables.get('uniq');",
+          "pm.collectionVariables.set('userEmail', 'postman-user-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('adminEmail', 'postman-admin-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('driverEmail', 'postman-driver-' + uniq + '@test.com');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "aiUrl",
+      "value": "http://localhost:3013"
+    },
+    {
+      "key": "etaUrl",
+      "value": "http://localhost:3012"
+    },
+    {
+      "key": "pricingUrl",
+      "value": "http://localhost:3006"
+    },
+    {
+      "key": "bookingUrl",
+      "value": "http://localhost:3002"
+    },
+    {
+      "key": "paymentUrl",
+      "value": "http://localhost:3005"
+    },
+    {
+      "key": "internalApiKey",
+      "value": "dev-internal-key"
+    },
+    {
+      "key": "userPass",
+      "value": "123456"
+    },
+    {
+      "key": "uniq",
+      "value": ""
+    },
+    {
+      "key": "userEmail",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "driverEmail",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Service Health",
+      "item": [
+        {
+          "name": "AI Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{aiUrl}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cases 51-60 - Agent Selection",
+      "item": [
+        {
+          "name": "51 Agent Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"context\":{\"objective\":\"nearest\",\"max_eta_min\":30,\"budget_weight\":0.5,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d51_d1_5km\",\"distance_m\":5000,\"rating\":4.8,\"eta_min\":12,\"price_score\":0.7,\"online\":true},{\"driver_id\":\"d51_d2_2km\",\"distance_m\":2000,\"rating\":4.5,\"eta_min\":6,\"price_score\":0.8,\"online\":true},{\"driver_id\":\"d51_d3_3km\",\"distance_m\":3000,\"rating\":4.7,\"eta_min\":8,\"price_score\":0.75,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "52 Agent Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"context\":{\"objective\":\"highest_rating\",\"max_eta_min\":30,\"budget_weight\":0.5,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d52_d1_near_rating4\",\"distance_m\":2000,\"rating\":4.0,\"eta_min\":5,\"price_score\":0.7,\"online\":true},{\"driver_id\":\"d52_d2_far_rating49\",\"distance_m\":3000,\"rating\":4.9,\"eta_min\":8,\"price_score\":0.75,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "53 Agent Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"context\":{\"objective\":\"balanced_eta_price\",\"max_eta_min\":25,\"budget_weight\":0.75,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d53_option_a_eta5_price50k\",\"distance_m\":1600,\"rating\":4.7,\"eta_min\":5,\"price_score\":0.2,\"online\":true},{\"driver_id\":\"d53_option_b_eta8_price40k\",\"distance_m\":2300,\"rating\":4.8,\"eta_min\":8,\"price_score\":0.6,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "55 Agent Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"context\":{\"objective\":\"auto\",\"max_eta_min\":30,\"budget_weight\":0.5,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d55_missing_eta\",\"distance_m\":250,\"online\":true},{\"driver_id\":\"d55_missing_price\",\"rating\":4.7,\"eta_min\":4,\"online\":true},{\"driver_id\":\"d55_missing_rating\",\"distance_m\":280,\"eta_min\":5,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "56 Agent Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"simulate_tool_error\":true,\"context\":{\"objective\":\"balanced_eta_price\",\"max_eta_min\":20,\"budget_weight\":0.7,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d56_1\",\"distance_m\":200,\"rating\":4.5,\"online\":true},{\"driver_id\":\"d56_2\",\"distance_m\":360,\"rating\":4.8,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "57 Agent Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"context\":{\"objective\":\"nearest\",\"max_eta_min\":30,\"budget_weight\":0.5,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d57_online\",\"distance_m\":200,\"rating\":4.5,\"eta_min\":3,\"price_score\":0.7,\"online\":true},{\"driver_id\":\"d57_offline_nearest\",\"distance_m\":20,\"rating\":5.0,\"eta_min\":1,\"price_score\":0.9,\"online\":false}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "60 Agent Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"simulate_model_error\":true,\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"context\":{\"objective\":\"auto\",\"max_eta_min\":30,\"budget_weight\":0.5,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d60_1\",\"distance_m\":220,\"rating\":4.2,\"eta_min\":3,\"price_score\":0.7,\"online\":true},{\"driver_id\":\"d60_2\",\"distance_m\":120,\"rating\":4.0,\"eta_min\":2,\"price_score\":0.8,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "54 ETA Tool Probe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"context\":{\"objective\":\"nearest\",\"budget_weight\":0.2,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d54_eta_1\",\"distance_m\":220,\"rating\":4.5,\"price_score\":0.82,\"estimated_fare\":18500,\"online\":true},{\"driver_id\":\"d54_eta_2\",\"distance_m\":420,\"rating\":4.9,\"price_score\":0.79,\"estimated_fare\":19200,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "54 Pricing Tool Probe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"context\":{\"objective\":\"highest_rating\",\"budget_weight\":0.7,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d54_price_1\",\"distance_m\":260,\"rating\":4.8,\"eta_min\":4,\"online\":true},{\"driver_id\":\"d54_price_2\",\"distance_m\":340,\"rating\":4.9,\"eta_min\":5,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "58 Decision Logging POST",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-trace-id",
+                "value": "trace58-{{uniq}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"context\":{\"objective\":\"balanced_eta_price\",\"max_eta_min\":15,\"budget_weight\":0.7,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d54_1\",\"distance_m\":220,\"rating\":4.5,\"online\":true},{\"driver_id\":\"d54_2\",\"distance_m\":420,\"rating\":4.9,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "58 Decision Logging Fetch",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{aiUrl}}/v1/ai/agent/decisions/trace58-{{uniq}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "59 Parallel Requests Runner Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{aiUrl}}/v1/ai/agent/select-driver",
+            "description": "Run with Collection Runner iterations/concurrency for an approximate Postman version. Shell script is authoritative.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicle_type\":\"CAR\",\"context\":{\"objective\":\"balanced_eta_price\",\"max_eta_min\":15,\"budget_weight\":0.7,\"latency_budget_ms\":200},\"candidates\":[{\"driver_id\":\"d54_1\",\"distance_m\":220,\"rating\":4.5,\"online\":true},{\"driver_id\":\"d54_2\",\"distance_m\":420,\"rating\":4.9,\"online\":true}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

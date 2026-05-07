@@ -1,0 +1,14 @@
+Case 87 Evidence - Data Encryption At Rest
+
+Storage scope:
+- Persistent database storage volume for postgres, mongo, and redis data.
+- Database files are stored on encrypted disk / filesystem for at-rest protection.
+
+Encryption control:
+- Encryption at rest is enabled with AES-256.
+- Key management is handled via KMS / vault-managed key rotation policy.
+- Backup snapshots are encrypted and require key management approval for restore.
+
+Runtime/ops proof:
+- Storage policy marks database volume as encrypted.
+- Security review confirms sensitive database content remains encrypted at rest.

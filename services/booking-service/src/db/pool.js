@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 const config = require('../config');
+const logger = require('../utils/logger');
 
 const poolOptions = {
   connectionString: config.db.connectionString,
@@ -15,6 +16,20 @@ if (config.db.maxUses > 0) {
 }
 
 const pool = new Pool(poolOptions);
+
+// Postgres restart can emit errors from idle clients.
+// Keep process alive so request handlers can recover once DB is back.
+pool.on('error', (error) => {
+  logger.warn(
+    {
+      err: {
+        message: error?.message || 'postgres pool error',
+        code: error?.code || 'UNKNOWN'
+      }
+    },
+    '[booking-service] postgres pool idle client error'
+  );
+});
 
 function extractUpSql(raw) {
   const lines = raw.split(/\r?\n/);
@@ -104,7 +119,19 @@ async function withTransaction(work) {
     await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      logger.warn(
+        {
+          err: {
+            message: rollbackError?.message || 'rollback failed',
+            code: rollbackError?.code || 'UNKNOWN'
+          }
+        },
+        '[booking-service] rollback failed after transaction error'
+      );
+    }
     throw error;
   } finally {
     client.release();

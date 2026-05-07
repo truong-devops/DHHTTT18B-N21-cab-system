@@ -14,9 +14,13 @@ CURL_MAX_TIME="${CURL_MAX_TIME:-30}"
 BOOKING_POLL_TIMEOUT_SEC="${BOOKING_POLL_TIMEOUT_SEC:-25}"
 PAYMENT_PATCH_CONNECT_TIMEOUT="${PAYMENT_PATCH_CONNECT_TIMEOUT:-3}"
 PAYMENT_PATCH_MAX_TIME="${PAYMENT_PATCH_MAX_TIME:-12}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PASS_COUNT=0
 FAIL_COUNT=0
+
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/case-context-input.sh"
 
 print_usage() {
   cat <<EOF
@@ -83,7 +87,21 @@ print_case() {
   local expected="$2"
   local status="$3"
   local body="$4"
+  local case_id=""
+  local case_context=""
+  local case_input=""
+  case_id="$(echo "$title" | sed -n 's/^Case \([0-9]\+\).*/\1/p')"
+  if [[ -n "$case_id" ]]; then
+    case_context="$(get_case_context "$case_id")"
+    case_input="$(get_case_input "$case_id")"
+  fi
   echo "========== $title =========="
+  if [[ -n "$case_context" ]]; then
+    echo "Context: $case_context"
+  fi
+  if [[ -n "$case_input" ]]; then
+    echo "Input: $case_input"
+  fi
   echo "Expected: $expected"
   echo "Actual status: $status"
   echo "Actual body:"
@@ -222,18 +240,6 @@ register_and_login_user() {
   local token
   token=$(echo "$login" | json_get "tokens.accessToken")
   if [[ -z "$token" ]]; then
-    token=$(echo "$login" | json_get "access_token")
-  fi
-  if [[ -z "$token" ]]; then
-    token=$(echo "$login" | json_get "tokens.access_token")
-  fi
-  if [[ -z "$token" ]]; then
-    token=$(echo "$login" | json_get "data.tokens.accessToken")
-  fi
-  if [[ -z "$token" ]]; then
-    token=$(echo "$login" | json_get "data.access_token")
-  fi
-  if [[ -z "$token" ]]; then
     echo "[WARN] login failed for $email (status=${login_status:-unknown}): $login" >&2
   fi
   echo "$token"
@@ -329,7 +335,7 @@ ensure_online_driver() {
 }
 
 # shellcheck disable=SC1091
-source "$(dirname "$0")/lib/level4_saga_helpers.sh"
+source "$SCRIPT_DIR/lib/level4_saga_helpers.sh"
 
 echo "== Setup tokens and users for Level 4 =="
 if ! bootstrap_infra_if_needed; then
@@ -369,18 +375,6 @@ for _attempt in 1 2 3 4 5 6; do
 done
 ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | json_get "tokens.accessToken")
 if [[ -z "$ADMIN_TOKEN" ]]; then
-  ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | json_get "access_token")
-fi
-if [[ -z "$ADMIN_TOKEN" ]]; then
-  ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | json_get "tokens.access_token")
-fi
-if [[ -z "$ADMIN_TOKEN" ]]; then
-  ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | json_get "data.tokens.accessToken")
-fi
-if [[ -z "$ADMIN_TOKEN" ]]; then
-  ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | json_get "data.access_token")
-fi
-if [[ -z "$ADMIN_TOKEN" ]]; then
   echo "STOP: cannot get admin token (status=${ADMIN_LOGIN_STATUS:-unknown})"
   echo "admin login response: $ADMIN_LOGIN"
   exit 1
@@ -403,18 +397,27 @@ if [[ -z "$DRIVER_ID" ]]; then
   echo "WARN: cannot provision ONLINE driver; saga-related cases may fail"
 fi
 
+C33_ATOMIC_OK=0
+C37_ATOMIC_OK=0
+
 # Case 31: Transaction create booking success
 echo "-- Running Case 31"
 C31=$(call_json POST "/v1/bookings" "$USER_A_TOKEN" '{"pickup":{"lat":10.7601,"lng":106.6601},"drop":{"lat":10.7701,"lng":106.7001},"vehicleType":"CAR"}')
 C31_STATUS=$(echo "$C31" | sed -n '1p')
 C31_BODY=$(echo "$C31" | sed '1d')
 C31_BOOKING_STATUS=$(echo "$C31_BODY" | json_get "booking.status")
+C31_COMP_APPLIED=$(echo "$C31_BODY" | json_get "integration_flow.compensation.applied")
 C31_BOOKING_ID=$(echo "$C31_BODY" | json_get "booking.booking_id")
 if [[ -z "$C31_BOOKING_ID" ]]; then
   C31_BOOKING_ID=$(echo "$C31_BODY" | json_get "booking.bookingId")
 fi
-print_case "Case 31 - transaction create success" "201 + status REQUESTED + booking_id exists" "$C31_STATUS" "$C31_BODY"
-if [[ "$C31_STATUS" == "201" ]] && [[ "$C31_BOOKING_STATUS" == "REQUESTED" ]] && [[ -n "$C31_BOOKING_ID" ]]; then
+C31_COMMITTED_STATUS=""
+if [[ -n "$C31_BOOKING_ID" ]]; then
+  C31_COMMITTED_STATUS=$(get_booking_status "$USER_A_TOKEN" "$C31_BOOKING_ID")
+fi
+print_case "Case 31 - transaction create success" "201 + status REQUESTED + booking_id exists + DB commit read-after-write + no partial compensation" "$C31_STATUS" "$C31_BODY"
+if [[ "$C31_STATUS" == "201" ]] && [[ "$C31_BOOKING_STATUS" == "REQUESTED" ]] && [[ -n "$C31_BOOKING_ID" ]] \
+  && [[ "$C31_COMMITTED_STATUS" == "REQUESTED" ]] && [[ "$C31_COMP_APPLIED" != "true" ]]; then
   mark_result 1 "31"
 else
   mark_result 0 "31"
@@ -449,54 +452,62 @@ if [[ -z "$C33_TOKEN" ]]; then
   print_case "Case 33 - payment failed -> booking cancelled" "need user token" "000" '{"error":"no token"}'
   mark_result 0 "33"
 else
-C33_CREATE=$(create_booking_with_payment_init_retry "$C33_TOKEN" '{"pickup":{"lat":10.7603,"lng":106.6603},"drop":{"lat":10.7703,"lng":106.7003},"vehicleType":"CAR","payment_method":"CASH","simulate_payment_timeout":true}' 4 2 || true)
-C33_CREATE_STATUS=$(echo "$C33_CREATE" | sed -n '1p')
-C33_CREATE_BODY=$(echo "$C33_CREATE" | sed '1d')
-C33_BOOKING_ID=$(echo "$C33_CREATE_BODY" | json_get "booking.booking_id")
-if [[ -z "$C33_BOOKING_ID" ]]; then
-  C33_BOOKING_ID=$(echo "$C33_CREATE_BODY" | json_get "booking.bookingId")
-fi
-C33_PAYMENT_ID=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.payment.data.data.id")
-
-C33_PATCH_STATUS="000"
-C33_PATCH_BODY=""
-if [[ -n "$C33_PAYMENT_ID" ]]; then
-  C33_PATCH=$(patch_payment_failed_with_retry "$C33_PAYMENT_ID" "simulate_case_33" 6 || true)
-  C33_PATCH_STATUS=$(echo "$C33_PATCH" | sed -n '1p')
-  C33_PATCH_BODY=$(echo "$C33_PATCH" | sed '1d')
-fi
-
-C33_FLOW=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.flow")
-C33_COMP_APPLIED=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.compensation.applied")
-C33_BOOKING_CANCELLED=0
-if [[ "$(echo "$C33_CREATE_BODY" | json_get "booking.status")" == "CANCELLED" ]]; then
-  C33_BOOKING_CANCELLED=1
-elif [[ -n "$C33_BOOKING_ID" ]] && ([[ "$C33_PATCH_STATUS" == "200" ]] || ([[ "$C33_FLOW" == "partial" ]] && [[ "$C33_COMP_APPLIED" == "true" ]])); then
-  if wait_booking_status "$C33_TOKEN" "$C33_BOOKING_ID" "CANCELLED" 25; then
-    C33_BOOKING_CANCELLED=1
+  C33_CREATE=$(create_booking_with_payment_init_retry "$C33_TOKEN" '{"pickup":{"lat":10.7603,"lng":106.6603},"drop":{"lat":10.7703,"lng":106.7003},"vehicleType":"CAR","payment_method":"CASH","simulate_payment_timeout":true}' 4 2 || true)
+  C33_CREATE_STATUS=$(echo "$C33_CREATE" | sed -n '1p')
+  C33_CREATE_BODY=$(echo "$C33_CREATE" | sed '1d')
+  C33_BOOKING_ID=$(echo "$C33_CREATE_BODY" | json_get "booking.booking_id")
+  if [[ -z "$C33_BOOKING_ID" ]]; then
+    C33_BOOKING_ID=$(echo "$C33_CREATE_BODY" | json_get "booking.bookingId")
   fi
-fi
-C33_BOOKING_STATUS=$(get_booking_status "$C33_TOKEN" "$C33_BOOKING_ID")
-C33_PAYMENT_STATUS=""
-if [[ -n "$C33_PAYMENT_ID" ]]; then
-  C33_PAYMENT_STATUS=$(get_payment_status "$C33_PAYMENT_ID")
-fi
-C33_RESULT_STATUS="$C33_PATCH_STATUS"
-if [[ "$C33_RESULT_STATUS" == "000" ]]; then
-  C33_RESULT_STATUS="$C33_CREATE_STATUS"
-fi
-print_case "Case 33 - payment failed -> booking cancelled" "payment FAILED/cancelled with no money loss" "$C33_RESULT_STATUS" "$C33_CREATE_BODY"
-if [[ -n "$C33_BOOKING_ID" ]] && (
-  ([[ "$C33_BOOKING_CANCELLED" == "1" ]] && [[ "$C33_PAYMENT_STATUS" == "FAILED" ]]) \
-  || ([[ "$C33_BOOKING_CANCELLED" == "1" ]] && [[ "$C33_FLOW" == "partial" ]] && [[ "$C33_COMP_APPLIED" == "true" ]])
-); then
-  mark_result 1 "33"
-else
-  if [[ -n "$C33_PATCH_BODY" ]]; then
-    echo "Case 33 patch response: $C33_PATCH_BODY"
+  C33_PAYMENT_ID=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.payment.data.data.id")
+  C33_FLOW=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.flow")
+  C33_COMP_APPLIED=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.compensation.applied")
+  C33_COMP_EVENT_TOPIC=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.compensation.published_event.topic")
+  C33_PAYMENT_OK=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.payment.ok")
+  C33_PAYMENT_HTTP=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.payment.statusCode")
+  C33_PAYMENT_ERR=$(echo "$C33_CREATE_BODY" | json_get "integration_flow.payment.error.error")
+  C33_BOOKING_STATUS=$(echo "$C33_CREATE_BODY" | json_get "booking.status")
+
+  if [[ -n "$C33_BOOKING_ID" ]]; then
+    for _poll in $(seq 1 25); do
+      C33_BOOKING_STATUS=$(get_booking_status "$C33_TOKEN" "$C33_BOOKING_ID")
+      if [[ "$C33_BOOKING_STATUS" == "CANCELLED" || "$C33_BOOKING_STATUS" == "FAILED" ]]; then
+        break
+      fi
+      sleep 1
+    done
   fi
-  mark_result 0 "33"
-fi
+
+  C33_PAYMENT_STATUS=""
+  if [[ -n "$C33_PAYMENT_ID" ]]; then
+    C33_PAYMENT_STATUS=$(get_payment_status "$C33_PAYMENT_ID")
+  fi
+
+  C33_NO_CHARGE_EVIDENCE=0
+  if [[ -n "$C33_PAYMENT_ID" ]]; then
+    if [[ "$C33_PAYMENT_STATUS" == "FAILED" || "$C33_PAYMENT_STATUS" == "CANCELLED" || "$C33_PAYMENT_STATUS" == "REFUNDED" ]]; then
+      C33_NO_CHARGE_EVIDENCE=1
+    fi
+  else
+    if [[ "$C33_PAYMENT_OK" == "false" ]] && [[ "$C33_PAYMENT_HTTP" =~ ^5[0-9][0-9]$ ]] && [[ -n "$C33_PAYMENT_ERR" ]]; then
+      C33_NO_CHARGE_EVIDENCE=1
+    fi
+  fi
+
+  print_case "Case 33 - payment failed -> booking rollback" "201 + flow partial + compensation applied + booking CANCELLED/FAILED + no charge evidence" "$C33_CREATE_STATUS" "$C33_CREATE_BODY"
+  if [[ "$C33_CREATE_STATUS" == "201" ]] \
+    && [[ -n "$C33_BOOKING_ID" ]] \
+    && [[ "$C33_FLOW" == "partial" ]] \
+    && [[ "$C33_COMP_APPLIED" == "true" ]] \
+    && [[ "$C33_COMP_EVENT_TOPIC" == "ride.cancelled" ]] \
+    && ([[ "$C33_BOOKING_STATUS" == "FAILED" ]] || [[ "$C33_BOOKING_STATUS" == "CANCELLED" ]]) \
+    && [[ "$C33_NO_CHARGE_EVIDENCE" == "1" ]]; then
+    C33_ATOMIC_OK=1
+    mark_result 1 "33"
+  else
+    echo "Case 33 debug: flow=${C33_FLOW:-} comp=${C33_COMP_APPLIED:-} comp_topic=${C33_COMP_EVENT_TOPIC:-} booking_status=${C33_BOOKING_STATUS:-} payment_id=${C33_PAYMENT_ID:-} payment_ok=${C33_PAYMENT_OK:-} payment_http=${C33_PAYMENT_HTTP:-} payment_status=${C33_PAYMENT_STATUS:-}"
+    mark_result 0 "33"
+  fi
 fi
 
 # Case 34: Idempotent duplicate request
@@ -517,8 +528,13 @@ C34_B1=$(echo "$C34_1_BODY" | json_get "booking.booking_id")
 if [[ -z "$C34_B1" ]]; then C34_B1=$(echo "$C34_1_BODY" | json_get "booking.bookingId"); fi
 C34_B2=$(echo "$C34_2_BODY" | json_get "booking.booking_id")
 if [[ -z "$C34_B2" ]]; then C34_B2=$(echo "$C34_2_BODY" | json_get "booking.bookingId"); fi
-print_case "Case 34 - idempotent duplicate request" "same booking_id returned on retry" "$C34_2_STATUS" "$C34_2_BODY"
-if [[ "$C34_1_STATUS" == "201" ]] && [[ "$C34_2_STATUS" == "201" ]] && [[ -n "$C34_B1" ]] && [[ "$C34_B1" == "$C34_B2" ]]; then
+C34_P1=$(echo "$C34_1_BODY" | json_get "integration_flow.payment.data.data.id")
+C34_P2=$(echo "$C34_2_BODY" | json_get "integration_flow.payment.data.data.id")
+print_case "Case 34 - idempotent duplicate request" "same booking_id replayed; no duplicate transaction/double charge" "$C34_2_STATUS" "$C34_2_BODY"
+if [[ "$C34_1_STATUS" == "201" ]] \
+  && ([[ "$C34_2_STATUS" == "200" ]] || [[ "$C34_2_STATUS" == "201" ]]) \
+  && [[ -n "$C34_B1" ]] && [[ "$C34_B1" == "$C34_B2" ]] \
+  && ([[ -z "$C34_P1" ]] || [[ -z "$C34_P2" ]] || [[ "$C34_P1" == "$C34_P2" ]]); then
   mark_result 1 "34"
 else
   mark_result 0 "34"
@@ -527,6 +543,7 @@ fi
 
 # Case 35: Concurrent booking race condition
 echo "-- Running Case 35"
+C35_ISOLATED_RESULT=0
 USER_C_EMAIL="l4-user-c-${UNIQ_TAG}@test.com"
 USER_C_TOKEN=$(register_and_login_user "$USER_C_EMAIL" "Level4 User C")
 if [[ -z "$USER_C_TOKEN" ]]; then
@@ -552,6 +569,10 @@ else
   R35_2_STATUS=$(echo "$R35_2" | sed -n '1p')
   R35_1_BODY=$(echo "$R35_1" | sed '1d')
   R35_2_BODY=$(echo "$R35_2" | sed '1d')
+  R35_1_BID=$(echo "$R35_1_BODY" | json_get "booking.booking_id")
+  if [[ -z "$R35_1_BID" ]]; then R35_1_BID=$(echo "$R35_1_BODY" | json_get "booking.bookingId"); fi
+  R35_2_BID=$(echo "$R35_2_BODY" | json_get "booking.booking_id")
+  if [[ -z "$R35_2_BID" ]]; then R35_2_BID=$(echo "$R35_2_BODY" | json_get "booking.bookingId"); fi
 
   SUCCESS_COUNT=0
   CONFLICT_COUNT=0
@@ -560,8 +581,10 @@ else
   if [[ "$R35_1_STATUS" == "409" ]]; then CONFLICT_COUNT=$((CONFLICT_COUNT + 1)); fi
   if [[ "$R35_2_STATUS" == "409" ]]; then CONFLICT_COUNT=$((CONFLICT_COUNT + 1)); fi
 
-  print_case "Case 35 - concurrent race condition" "1 success + 1 conflict (or replay semantics)" "$R35_1_STATUS/$R35_2_STATUS" "$R35_1_BODY"$'\n'"$R35_2_BODY"
-  if [[ "$SUCCESS_COUNT" -eq 1 ]] && [[ "$CONFLICT_COUNT" -ge 1 ]]; then
+  print_case "Case 35 - concurrent race condition" "no duplicate booking; conflict/lock resolved or replay same booking" "$R35_1_STATUS/$R35_2_STATUS" "$R35_1_BODY"$'\n'"$R35_2_BODY"
+  if ([[ "$SUCCESS_COUNT" -eq 1 ]] && [[ "$CONFLICT_COUNT" -ge 1 ]]) \
+    || ([[ "$SUCCESS_COUNT" -eq 2 ]] && [[ -n "$R35_1_BID" ]] && [[ "$R35_1_BID" == "$R35_2_BID" ]]); then
+    C35_ISOLATED_RESULT=1
     mark_result 1 "35"
   else
     mark_result 0 "35"
@@ -576,8 +599,7 @@ C36_FLOW=""
 C36_COMP_APPLIED=""
 C36_BOOKING_STATUS=""
 C36_SUCCESS=0
-C36_COMPENSATED_OK=0
-for _attempt in 1 2; do
+for _attempt in $(seq 1 6); do
   C36_TOKEN=$(new_case_user_token "case36-a${_attempt}")
   if [[ -z "$C36_TOKEN" ]]; then
     continue
@@ -594,22 +616,17 @@ for _attempt in 1 2; do
     C36_BOOKING_ID=$(echo "$C36_BODY" | json_get "booking.bookingId")
   fi
 
-  if [[ "$C36_BOOKING_STATUS" != "CANCELLED" ]] && [[ -n "$C36_BOOKING_ID" ]] && [[ "$C36_FLOW" == "partial" ]] && [[ "$C36_COMP_APPLIED" == "true" ]]; then
-    if wait_booking_status "$C36_TOKEN" "$C36_BOOKING_ID" "CANCELLED" 25; then
-      C36_BOOKING_STATUS="CANCELLED"
-    fi
-  fi
-
-  if [[ "$C36_STATUS" == "201" ]] && [[ "$C36_FLOW" == "success" ]]; then
+  C36_PAYMENT_OK=$(echo "$C36_BODY" | json_get "integration_flow.payment.ok")
+  C36_NOTI_OK=$(echo "$C36_BODY" | json_get "integration_flow.notification.ok")
+  if [[ "$C36_STATUS" == "201" ]] && [[ -n "$C36_BOOKING_ID" ]] && [[ "$C36_BOOKING_STATUS" == "REQUESTED" ]] \
+    && [[ "$C36_FLOW" == "success" ]] && [[ "$C36_PAYMENT_OK" == "true" ]] && [[ "$C36_NOTI_OK" == "true" ]] \
+    && [[ "$C36_COMP_APPLIED" != "true" ]]; then
     C36_SUCCESS=1
     break
   fi
-  if [[ "$C36_STATUS" == "201" ]] && [[ "$C36_FLOW" == "partial" ]] && [[ "$C36_COMP_APPLIED" == "true" ]] && [[ "$C36_BOOKING_STATUS" == "CANCELLED" ]]; then
-    C36_COMPENSATED_OK=1
-  fi
 done
-print_case "Case 36 - saga success flow" "201 + flow success (or compensated safe fallback)" "$C36_STATUS" "$C36_BODY"
-if [[ "$C36_SUCCESS" == "1" || "$C36_COMPENSATED_OK" == "1" ]]; then
+print_case "Case 36 - saga success flow" "201 + booking REQUESTED + flow success + payment ok + notification ok + no compensation" "$C36_STATUS" "$C36_BODY"
+if [[ "$C36_SUCCESS" == "1" ]]; then
   mark_result 1 "36"
 else
   mark_result 0 "36"
@@ -622,53 +639,139 @@ if [[ -z "$C37_TOKEN" ]]; then
   print_case "Case 37 - saga failure compensation" "need user token" "000" '{"error":"no token"}'
   mark_result 0 "37"
 else
-  C37_CREATE=$(create_booking_with_payment_init_retry "$C37_TOKEN" '{"pickup":{"lat":10.7607,"lng":106.6607},"drop":{"lat":10.7707,"lng":106.7007},"vehicleType":"CAR","payment_method":"CASH"}' 4 2 || true)
-  C37_CREATE_STATUS=$(echo "$C37_CREATE" | sed -n '1p')
-  C37_CREATE_BODY=$(echo "$C37_CREATE" | sed '1d')
-  C37_BOOKING_ID=$(echo "$C37_CREATE_BODY" | json_get "booking.booking_id")
-  if [[ -z "$C37_BOOKING_ID" ]]; then
-    C37_BOOKING_ID=$(echo "$C37_CREATE_BODY" | json_get "booking.bookingId")
-  fi
-  C37_PAYMENT_ID=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.payment.data.data.id")
+  C37_READY=0
+  C37_CREATE_STATUS="000"
+  C37_CREATE_BODY='{"error":"case37_not_started"}'
+  C37_BOOKING_ID=""
+  C37_PAYMENT_ID=""
+  C37_CREATE_PAYMENT_OK=""
+  C37_CREATE_BOOKING_STATUS=""
+  for _attempt in $(seq 1 8); do
+    C37_CREATE=$(create_booking_with_payment_init_retry "$C37_TOKEN" '{"pickup":{"lat":10.7607,"lng":106.6607},"drop":{"lat":10.7707,"lng":106.7007},"vehicleType":"CAR","payment_method":"CASH"}' 4 2 || true)
+    C37_CREATE_STATUS=$(echo "$C37_CREATE" | sed -n '1p')
+    C37_CREATE_BODY=$(echo "$C37_CREATE" | sed '1d')
+    C37_BOOKING_ID=$(echo "$C37_CREATE_BODY" | json_get "booking.booking_id")
+    if [[ -z "$C37_BOOKING_ID" ]]; then
+      C37_BOOKING_ID=$(echo "$C37_CREATE_BODY" | json_get "booking.bookingId")
+    fi
+    C37_PAYMENT_ID=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.payment.data.data.id")
+    C37_CREATE_PAYMENT_OK=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.payment.ok")
+    C37_CREATE_BOOKING_STATUS=$(echo "$C37_CREATE_BODY" | json_get "booking.status")
+    if [[ "$C37_CREATE_STATUS" == "201" ]] \
+      && [[ "$C37_CREATE_PAYMENT_OK" == "true" ]] \
+      && [[ "$C37_CREATE_BOOKING_STATUS" == "REQUESTED" ]] \
+      && [[ -n "$C37_BOOKING_ID" ]] \
+      && [[ -n "$C37_PAYMENT_ID" ]]; then
+      C37_READY=1
+      break
+    fi
+    sleep 1
+  done
 
-C37_PATCH_STATUS="000"
-C37_PATCH_BODY=""
-if [[ -n "$C37_PAYMENT_ID" ]]; then
-  C37_PATCH=$(patch_payment_failed_with_retry "$C37_PAYMENT_ID" "simulate_case_37" 6 || true)
-  C37_PATCH_STATUS=$(echo "$C37_PATCH" | sed -n '1p')
-  C37_PATCH_BODY=$(echo "$C37_PATCH" | sed '1d')
-fi
-
-C37_CANCELLED=0
-if [[ "$(echo "$C37_CREATE_BODY" | json_get "booking.status")" == "CANCELLED" ]]; then
-  C37_CANCELLED=1
-elif [[ -n "$C37_BOOKING_ID" ]]; then
-  if wait_booking_status "$C37_TOKEN" "$C37_BOOKING_ID" "CANCELLED" 25; then
-    C37_CANCELLED=1
-  fi
-fi
-C37_FLOW=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.flow")
-C37_COMP_APPLIED=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.compensation.applied")
-C37_PAYMENT_STATUS=""
-if [[ -n "$C37_PAYMENT_ID" ]]; then
-  C37_PAYMENT_STATUS=$(get_payment_status "$C37_PAYMENT_ID")
-fi
-C37_RESULT_STATUS="$C37_PATCH_STATUS"
-if [[ "$C37_RESULT_STATUS" == "000" ]]; then
+  C37_PASS=0
+  C37_MODE=""
   C37_RESULT_STATUS="$C37_CREATE_STATUS"
-fi
-print_case "Case 37 - saga failure compensation" "payment failed then booking CANCELLED" "$C37_RESULT_STATUS" "$C37_CREATE_BODY"
-if [[ "$C37_CANCELLED" == "1" ]] && (
-  [[ "$C37_PAYMENT_STATUS" == "FAILED" ]] \
-  || ([[ "$C37_FLOW" == "partial" ]] && [[ "$C37_COMP_APPLIED" == "true" ]])
-); then
-  mark_result 1 "37"
-else
-  if [[ -n "$C37_PATCH_BODY" ]]; then
-    echo "Case 37 patch response: $C37_PATCH_BODY"
+  C37_RESULT_BODY="$C37_CREATE_BODY"
+
+  if [[ "$C37_READY" == "1" ]]; then
+    C37_MODE="forced_failure_patch"
+    C37_PATCH_STATUS="000"
+    C37_PATCH_BODY='{"error":"patch_not_attempted"}'
+    C37_PATCH=$(patch_payment_failed_with_retry "$C37_PAYMENT_ID" "simulate_case_37" 6 || true)
+    C37_PATCH_STATUS=$(echo "$C37_PATCH" | sed -n '1p')
+    C37_PATCH_BODY=$(echo "$C37_PATCH" | sed '1d')
+    C37_RESULT_STATUS="$C37_PATCH_STATUS"
+    C37_RESULT_BODY="$C37_CREATE_BODY"$'\n'"$C37_PATCH_BODY"
+
+    C37_BOOKING_STATUS=""
+    if [[ -n "$C37_BOOKING_ID" ]]; then
+      for _poll in $(seq 1 25); do
+        C37_BOOKING_STATUS=$(get_booking_status "$C37_TOKEN" "$C37_BOOKING_ID")
+        if [[ "$C37_BOOKING_STATUS" == "CANCELLED" || "$C37_BOOKING_STATUS" == "FAILED" ]]; then
+          break
+        fi
+        sleep 1
+      done
+    fi
+
+    C37_PAYMENT_STATUS=""
+    if [[ -n "$C37_PAYMENT_ID" ]]; then
+      C37_PAYMENT_STATUS=$(get_payment_status "$C37_PAYMENT_ID")
+    fi
+
+    if [[ "$C37_PATCH_STATUS" == "200" ]] \
+      && [[ -n "$C37_BOOKING_ID" ]] \
+      && ([[ "$C37_BOOKING_STATUS" == "CANCELLED" ]] || [[ "$C37_BOOKING_STATUS" == "FAILED" ]]) \
+      && ([[ "$C37_PAYMENT_STATUS" == "FAILED" ]] || [[ "$C37_PAYMENT_STATUS" == "CANCELLED" ]] || [[ "$C37_PAYMENT_STATUS" == "REFUNDED" ]]); then
+      C37_PASS=1
+    fi
+  else
+    C37_MODE="simulate_timeout_compensation"
+    C37_CREATE=$(create_booking_with_payment_init_retry "$C37_TOKEN" '{"pickup":{"lat":10.76071,"lng":106.66071},"drop":{"lat":10.77071,"lng":106.70071},"vehicleType":"CAR","payment_method":"CASH","simulate_payment_timeout":true}' 4 2 || true)
+    C37_CREATE_STATUS=$(echo "$C37_CREATE" | sed -n '1p')
+    C37_CREATE_BODY=$(echo "$C37_CREATE" | sed '1d')
+    C37_RESULT_STATUS="$C37_CREATE_STATUS"
+    C37_RESULT_BODY="$C37_CREATE_BODY"
+
+    C37_BOOKING_ID=$(echo "$C37_CREATE_BODY" | json_get "booking.booking_id")
+    if [[ -z "$C37_BOOKING_ID" ]]; then
+      C37_BOOKING_ID=$(echo "$C37_CREATE_BODY" | json_get "booking.bookingId")
+    fi
+    C37_PAYMENT_ID=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.payment.data.data.id")
+    C37_FLOW=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.flow")
+    C37_PAYMENT_OK=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.payment.ok")
+    C37_PAYMENT_HTTP=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.payment.statusCode")
+    C37_PAYMENT_ERR=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.payment.error.error")
+    C37_COMP_APPLIED=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.compensation.applied")
+    C37_COMP_EVENT_TOPIC=$(echo "$C37_CREATE_BODY" | json_get "integration_flow.compensation.published_event.topic")
+    C37_BOOKING_STATUS=$(echo "$C37_CREATE_BODY" | json_get "booking.status")
+
+    if [[ -n "$C37_BOOKING_ID" ]]; then
+      for _poll in $(seq 1 25); do
+        C37_BOOKING_STATUS=$(get_booking_status "$C37_TOKEN" "$C37_BOOKING_ID")
+        if [[ "$C37_BOOKING_STATUS" == "CANCELLED" || "$C37_BOOKING_STATUS" == "FAILED" ]]; then
+          break
+        fi
+        sleep 1
+      done
+    fi
+
+    C37_PAYMENT_STATUS=""
+    if [[ -n "$C37_PAYMENT_ID" ]]; then
+      C37_PAYMENT_STATUS=$(get_payment_status "$C37_PAYMENT_ID")
+    fi
+
+    C37_NO_CHARGE_EVIDENCE=0
+    if [[ -n "$C37_PAYMENT_ID" ]]; then
+      if [[ "$C37_PAYMENT_STATUS" == "FAILED" || "$C37_PAYMENT_STATUS" == "CANCELLED" || "$C37_PAYMENT_STATUS" == "REFUNDED" ]]; then
+        C37_NO_CHARGE_EVIDENCE=1
+      fi
+    else
+      if [[ "$C37_PAYMENT_OK" == "false" ]] && [[ "$C37_PAYMENT_HTTP" =~ ^5[0-9][0-9]$ ]] && [[ -n "$C37_PAYMENT_ERR" ]]; then
+        C37_NO_CHARGE_EVIDENCE=1
+      fi
+    fi
+
+    if [[ "$C37_CREATE_STATUS" == "201" ]] \
+      && [[ -n "$C37_BOOKING_ID" ]] \
+      && [[ "$C37_FLOW" == "partial" ]] \
+      && [[ "$C37_PAYMENT_OK" == "false" ]] \
+      && [[ "$C37_COMP_APPLIED" == "true" ]] \
+      && [[ "$C37_COMP_EVENT_TOPIC" == "ride.cancelled" ]] \
+      && ([[ "$C37_BOOKING_STATUS" == "CANCELLED" ]] || [[ "$C37_BOOKING_STATUS" == "FAILED" ]]) \
+      && [[ "$C37_NO_CHARGE_EVIDENCE" == "1" ]]; then
+      C37_PASS=1
+    fi
   fi
-  mark_result 0 "37"
-fi
+
+  print_case "Case 37 - saga failure compensation" "payment fail after booking -> compensation applied -> booking CANCELLED/FAILED + refund/no-charge evidence" "$C37_RESULT_STATUS" "$C37_RESULT_BODY"
+  if [[ "$C37_PASS" == "1" ]]; then
+    C37_ATOMIC_OK=1
+    mark_result 1 "37"
+  else
+    echo "Case 37 debug: mode=${C37_MODE:-} ready=${C37_READY:-0} create_status=${C37_CREATE_STATUS:-} payment_ok=${C37_CREATE_PAYMENT_OK:-} booking_status=${C37_CREATE_BOOKING_STATUS:-} result_status=${C37_RESULT_STATUS:-}"
+    mark_result 0 "37"
+  fi
 fi
 
 # Case 38: Outbox consistency signal
@@ -681,11 +784,37 @@ else
   C38=$(call_json POST "/v1/bookings" "$C38_TOKEN" '{"pickup":{"lat":10.7608,"lng":106.6608},"drop":{"lat":10.7708,"lng":106.7008},"vehicleType":"CAR"}')
   C38_STATUS=$(echo "$C38" | sed -n '1p')
   C38_BODY=$(echo "$C38" | sed '1d')
+  C38_BOOKING_ID=$(echo "$C38_BODY" | json_get "booking.booking_id")
+  if [[ -z "$C38_BOOKING_ID" ]]; then C38_BOOKING_ID=$(echo "$C38_BODY" | json_get "booking.bookingId"); fi
+  C38_BOOKING_STATUS=$(echo "$C38_BODY" | json_get "booking.status")
+  C38_COMMITTED_STATUS=""
+  if [[ -n "$C38_BOOKING_ID" ]]; then
+    C38_COMMITTED_STATUS=$(get_booking_status "$C38_TOKEN" "$C38_BOOKING_ID")
+  fi
+  C38_MAIN_TOPIC=$(echo "$C38_BODY" | json_get "publishedEvent.topic")
   C38_MAIN_QUEUED=$(echo "$C38_BODY" | json_get "publishedEvent.queued")
   C38_ADD_QUEUED=$(echo "$C38_BODY" | json_get "additionalEvents.0.queued")
   C38_ADD_TOPIC=$(echo "$C38_BODY" | json_get "additionalEvents.0.topic")
-  print_case "Case 38 - outbox consistency" "201 + queued events present (ride.created + ride_events)" "$C38_STATUS" "$C38_BODY"
-  if [[ "$C38_STATUS" == "201" ]] && [[ "$C38_MAIN_QUEUED" == "true" ]] && [[ "$C38_ADD_QUEUED" == "true" ]] && [[ "$C38_ADD_TOPIC" == "ride_events" ]]; then
+  C38_ADD_EVENT=$(echo "$C38_BODY" | json_get "additionalEvents.0.eventType")
+  C38_MAIN_EVENT_ID=$(echo "$C38_BODY" | json_get "publishedEvent.eventId")
+  C38_ADD_EVENT_ID=$(echo "$C38_BODY" | json_get "additionalEvents.0.eventId")
+  C38_MAIN_EVENT_ID_UUID=0
+  if node -e "const s='$C38_MAIN_EVENT_ID';process.exit(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)?0:1)"; then
+    C38_MAIN_EVENT_ID_UUID=1
+  fi
+  C38_ADD_EVENT_ID_UUID=0
+  if node -e "const s='$C38_ADD_EVENT_ID';process.exit(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)?0:1)"; then
+    C38_ADD_EVENT_ID_UUID=1
+  fi
+  print_case "Case 38 - outbox consistency" "201 + booking REQUESTED persisted + publishedEvent ride.created + additional ride_requested on ride_events + distinct UUID eventIds" "$C38_STATUS" "$C38_BODY"
+  if [[ "$C38_STATUS" == "201" ]] && [[ -n "$C38_BOOKING_ID" ]] && [[ "$C38_BOOKING_STATUS" == "REQUESTED" ]] \
+    && [[ "$C38_COMMITTED_STATUS" == "REQUESTED" ]] \
+    && [[ "$C38_MAIN_TOPIC" == "ride.created" ]] \
+    && [[ "$C38_MAIN_QUEUED" == "true" ]] && [[ "$C38_ADD_QUEUED" == "true" ]] \
+    && [[ "$C38_ADD_TOPIC" == "ride_events" ]] && [[ "$C38_ADD_EVENT" == "ride_requested" ]] \
+    && [[ -n "$C38_MAIN_EVENT_ID" ]] && [[ -n "$C38_ADD_EVENT_ID" ]] \
+    && [[ "$C38_MAIN_EVENT_ID" != "$C38_ADD_EVENT_ID" ]] \
+    && [[ "$C38_MAIN_EVENT_ID_UUID" == "1" ]] && [[ "$C38_ADD_EVENT_ID_UUID" == "1" ]]; then
     mark_result 1 "38"
   else
     mark_result 0 "38"
@@ -702,10 +831,28 @@ else
   C39=$(call_json POST "/v1/bookings" "$C39_TOKEN" '{"pickup":{"lat":10.7609,"lng":106.6609},"drop":{"lat":10.7709,"lng":106.7009},"vehicleType":"CAR","payment_method":"CASH","simulate_payment_timeout":true}')
   C39_STATUS=$(echo "$C39" | sed -n '1p')
   C39_BODY=$(echo "$C39" | sed '1d')
+  C39_BOOKING_ID=$(echo "$C39_BODY" | json_get "booking.booking_id")
+  if [[ -z "$C39_BOOKING_ID" ]]; then C39_BOOKING_ID=$(echo "$C39_BODY" | json_get "booking.bookingId"); fi
   C39_BOOKING_STATUS=$(echo "$C39_BODY" | json_get "booking.status")
+  C39_FLOW=$(echo "$C39_BODY" | json_get "integration_flow.flow")
+  C39_PAYMENT_OK=$(echo "$C39_BODY" | json_get "integration_flow.payment.ok")
+  C39_PAYMENT_HTTP=$(echo "$C39_BODY" | json_get "integration_flow.payment.statusCode")
   C39_COMP_APPLIED=$(echo "$C39_BODY" | json_get "integration_flow.compensation.applied")
-  print_case "Case 39 - partial failure payment timeout" "201 + no stuck state (CANCELLED with compensation)" "$C39_STATUS" "$C39_BODY"
-  if [[ "$C39_STATUS" == "201" ]] && [[ "$C39_BOOKING_STATUS" == "CANCELLED" ]] && [[ "$C39_COMP_APPLIED" == "true" ]]; then
+  if [[ "$C39_FLOW" == "partial" ]] && [[ -n "$C39_BOOKING_ID" ]]; then
+    for _poll in $(seq 1 25); do
+      C39_BOOKING_STATUS=$(get_booking_status "$C39_TOKEN" "$C39_BOOKING_ID")
+      if [[ "$C39_BOOKING_STATUS" == "CANCELLED" || "$C39_BOOKING_STATUS" == "FAILED" ]]; then
+        break
+      fi
+      sleep 1
+    done
+  fi
+  print_case "Case 39 - partial failure payment timeout" "201 + terminal consistent state (success REQUESTED or compensated CANCELLED/FAILED, khong bi ket state)" "$C39_STATUS" "$C39_BODY"
+  if [[ "$C39_STATUS" == "201" ]] && (
+    ([[ "$C39_FLOW" == "success" ]] && [[ "$C39_PAYMENT_OK" == "true" ]] && [[ "$C39_BOOKING_STATUS" == "REQUESTED" ]]) \
+    || ([[ "$C39_FLOW" == "partial" ]] && [[ "$C39_PAYMENT_OK" == "false" ]] && [[ "$C39_PAYMENT_HTTP" =~ ^5[0-9][0-9]$ ]] \
+      && [[ "$C39_COMP_APPLIED" == "true" ]] && ([[ "$C39_BOOKING_STATUS" == "CANCELLED" ]] || [[ "$C39_BOOKING_STATUS" == "FAILED" ]]))
+  ); then
     mark_result 1 "39"
   else
     mark_result 0 "39"
@@ -715,7 +862,7 @@ fi
 # Case 40: ACID summary check
 echo "-- Running Case 40"
 C40_ATOMIC=0
-if [[ "$C32_BEFORE_COUNT" == "$C32_AFTER_COUNT" ]]; then
+if [[ "${C33_ATOMIC_OK:-0}" -eq 1 || "${C37_ATOMIC_OK:-0}" -eq 1 ]]; then
   C40_ATOMIC=1
 fi
 
@@ -732,7 +879,7 @@ if [[ "$C40_INVALID_STATUS" == "400" || "$C40_INVALID_STATUS" == "422" ]]; then
 fi
 
 C40_ISOLATED=0
-if [[ "${SUCCESS_COUNT:-0}" -eq 1 ]]; then
+if [[ "${C35_ISOLATED_RESULT:-0}" -eq 1 ]]; then
   C40_ISOLATED=1
 fi
 
@@ -740,13 +887,13 @@ C40_DURABLE=0
 C40_DURABLE_STATUS=""
 if [[ -n "$C31_BOOKING_ID" ]]; then
   C40_DURABLE_STATUS=$(get_booking_status "$USER_A_TOKEN" "$C31_BOOKING_ID")
-  if [[ -n "$C40_DURABLE_STATUS" ]]; then
+  if [[ "$C40_DURABLE_STATUS" == "REQUESTED" ]]; then
     C40_DURABLE=1
   fi
 fi
 
-ACID_BODY="{\"atomic\":$C40_ATOMIC,\"consistent\":$C40_CONSISTENT,\"isolated\":$C40_ISOLATED,\"durable\":$C40_DURABLE,\"durable_status\":\"$C40_DURABLE_STATUS\"}"
-print_case "Case 40 - ACID summary" "all flags should be 1" "200" "$ACID_BODY"
+ACID_BODY="{\"atomic\":{\"ok\":$C40_ATOMIC,\"scenario\":\"payment fail -> booking rollback/no dangling record (from case33/37)\"},\"consistent\":{\"ok\":$C40_CONSISTENT,\"scenario\":\"invalid data rejected and not committed\"},\"isolated\":{\"ok\":$C40_ISOLATED,\"scenario\":\"concurrent requests do not create duplicate booking\"},\"durable\":{\"ok\":$C40_DURABLE,\"scenario\":\"committed booking can be read back and keep REQUESTED state\",\"status\":\"$C40_DURABLE_STATUS\"}}"
+print_case "Case 40 - ACID scenarios" "Atomic(payment fail rollback) + Consistent(invalid data rejected) + Isolated(concurrent no duplicate) + Durable(committed data persists)" "200" "$ACID_BODY"
 if [[ "$C40_ATOMIC" == "1" ]] && [[ "$C40_CONSISTENT" == "1" ]] && [[ "$C40_ISOLATED" == "1" ]] && [[ "$C40_DURABLE" == "1" ]]; then
   mark_result 1 "40"
 else

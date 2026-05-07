@@ -208,6 +208,14 @@ async function upsertVehicle(userId, vehicleInput) {
   return { vehicle: mapVehicle(vehicle) };
 }
 
+async function assertOnlinePrerequisites(driverId) {
+  const vehicle = await vehicleRepository.getActiveVehicleByDriverId(driverId);
+  if (!vehicle) {
+    throw new ApiError(409, 'VEHICLE_REQUIRED', 'Driver must register an active vehicle before going online');
+  }
+  return vehicle;
+}
+
 async function setOnline(userId, initialLocation) {
   const driver = await driverRepository.getDriverByUserId(userId);
   if (!driver) {
@@ -220,6 +228,8 @@ async function setOnline(userId, initialLocation) {
   if (!canTransitionOnlineStatus(driver.online_status, ONLINE_STATUS.ONLINE)) {
     throw new ApiError(409, 'CONFLICT', 'Invalid online status transition');
   }
+
+  await assertOnlinePrerequisites(driver.id);
 
   const updated = await driverRepository.updateOnlineStatus(driver.id, [ONLINE_STATUS.OFFLINE], ONLINE_STATUS.ONLINE);
   if (!updated) {
@@ -256,6 +266,8 @@ async function setOnlineByDriverId(driverId, initialLocation) {
   if (!canTransitionOnlineStatus(driver.online_status, ONLINE_STATUS.ONLINE)) {
     throw new ApiError(409, 'CONFLICT', 'Invalid online status transition');
   }
+
+  await assertOnlinePrerequisites(driver.id);
 
   const updated = await driverRepository.updateOnlineStatus(driver.id, [ONLINE_STATUS.OFFLINE], ONLINE_STATUS.ONLINE);
   if (!updated) {
@@ -655,6 +667,34 @@ async function listDriversAdmin({ status, onlineStatus, page = 1, limit = 20 }) 
   };
 }
 
+async function getAdminDashboardSummary() {
+  const [driverStats, kycStats] = await Promise.all([driverRepository.getDashboardStats(), kycRepository.getSubmissionStats()]);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    drivers: {
+      total: driverStats.totalDrivers,
+      status: {
+        approved: driverStats.approvedDrivers,
+        pending: driverStats.pendingDrivers,
+        suspended: driverStats.suspendedDrivers
+      },
+      availability: {
+        online: driverStats.onlineDrivers,
+        offline: driverStats.offlineDrivers,
+        busy: driverStats.busyDrivers
+      }
+    },
+    kyc: {
+      total: kycStats.totalSubmissions,
+      pending: kycStats.pendingSubmissions,
+      approved: kycStats.approvedSubmissions,
+      rejected: kycStats.rejectedSubmissions,
+      available: kycStats.available !== false
+    }
+  };
+}
+
 async function getLocationSnapshot(driverId) {
   const redisLocation = await getRedisLocation(driverId);
   if (redisLocation) {
@@ -786,6 +826,7 @@ module.exports = {
   approveDriver,
   suspendDriver,
   listDriversAdmin,
+  getAdminDashboardSummary,
   listKycSubmissionsAdmin,
   approveKycSubmission,
   rejectKycSubmission

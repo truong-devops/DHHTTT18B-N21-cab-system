@@ -1,11 +1,72 @@
-const { Kafka } = require('kafkajs');
+const { Kafka, logLevel } = require('kafkajs');
 const config = require('../config');
 const monitoring = require('../monitoring');
+const { logger } = require('../utils/logger');
+
+function sanitizeKafkaText(value) {
+  if (typeof value !== 'string') {
+    return value;
+  }
+  return value
+    .replace(/ECONNREFUSED/gi, 'CONNECTION_REFUSED')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function toKafkaLogLevel(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'nothing' || normalized === 'silent') {
+    return logLevel.NOTHING;
+  }
+  if (normalized === 'error') {
+    return logLevel.ERROR;
+  }
+  if (normalized === 'warn' || normalized === 'warning') {
+    return logLevel.WARN;
+  }
+  if (normalized === 'info') {
+    return logLevel.INFO;
+  }
+  if (normalized === 'debug') {
+    return logLevel.DEBUG;
+  }
+  return logLevel.ERROR;
+}
+
+function kafkaLogCreator() {
+  return ({ namespace, level, log }) => {
+    const payload = { namespace };
+    const safeLog = log && typeof log === 'object' ? { ...log } : {};
+    const rawMessage = sanitizeKafkaText(String(safeLog.message || `[kafkajs] ${namespace}`));
+    delete safeLog.message;
+    delete safeLog.stack;
+
+    for (const [key, value] of Object.entries(safeLog)) {
+      payload[key] = typeof value === 'string' ? sanitizeKafkaText(value) : value;
+    }
+
+    if (level === logLevel.ERROR) {
+      logger.error(payload, rawMessage);
+      return;
+    }
+    if (level === logLevel.WARN) {
+      logger.warn(payload, rawMessage);
+      return;
+    }
+    if (level === logLevel.INFO) {
+      logger.info(payload, rawMessage);
+      return;
+    }
+    logger.debug(payload, rawMessage);
+  };
+}
 
 const kafka = new Kafka({
   clientId: config.kafka.clientId,
   brokers: config.kafka.brokers,
-  retry: config.kafka.retry
+  retry: config.kafka.retry,
+  logLevel: toKafkaLogLevel(process.env.KAFKA_LOG_LEVEL || 'error'),
+  logCreator: kafkaLogCreator
 });
 
 let producer;

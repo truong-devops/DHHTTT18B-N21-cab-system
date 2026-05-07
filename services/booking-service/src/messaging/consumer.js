@@ -12,7 +12,9 @@ const logger = require('../utils/logger');
 const kafka = new Kafka({
   clientId: config.kafka.clientId,
   brokers: config.kafka.brokers,
-  retry: config.kafka.consumerRetry
+  retry: config.kafka.consumerRetry,
+  requestTimeout: config.kafka.requestTimeoutMs,
+  connectionTimeout: config.kafka.connectionTimeoutMs
 });
 
 function headerValueToString(value) {
@@ -192,7 +194,15 @@ async function startConsumer() {
   }
 
   const consumer = kafka.consumer({
-    groupId: config.kafka.consumerGroupId
+    groupId: config.kafka.consumerGroupId,
+    sessionTimeout: config.kafka.sessionTimeout,
+    rebalanceTimeout: config.kafka.rebalanceTimeout,
+    heartbeatInterval: config.kafka.heartbeatInterval,
+    maxBytesPerPartition: config.kafka.maxBytesPerPartition,
+    minBytes: config.kafka.minBytes,
+    maxBytes: config.kafka.maxBytes,
+    maxWaitTimeInMs: config.kafka.maxWaitTimeInMs,
+    retry: config.kafka.consumerRetry
   });
 
   await consumer.connect();

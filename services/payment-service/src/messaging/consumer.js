@@ -2,9 +2,23 @@ const config = require('../config');
 const { getConsumer } = require('./kafka');
 const { publishToDlq } = require('./dlq');
 const { validateEnvelope } = require('./schemaRegistry');
+const topics = require('./topics');
 const { insertInboxEvent, markInboxProcessed } = require('../repositories/inboxRepo');
+const { compensatePaymentForRideCancelled } = require('../services/paymentService');
 const { logger, withTrace } = require('../utils/logger');
 const monitoring = require('../monitoring');
+
+const CONSUMER_EVENT_LOG_SAMPLE_RATE = (() => {
+  const raw = Number(process.env.CONSUMER_EVENT_LOG_SAMPLE_RATE || 0);
+  if (!Number.isFinite(raw)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(1, raw));
+})();
+
+function shouldLogConsumedEvent() {
+  return CONSUMER_EVENT_LOG_SAMPLE_RATE > 0 && Math.random() < CONSUMER_EVENT_LOG_SAMPLE_RATE;
+}
 
 function headerValueToString(value) {
   if (value == null) {
@@ -74,7 +88,8 @@ async function processConsumedMessage({ topic, message }) {
 
   const eventId = envelope.eventId;
   const traceId = envelope.traceId || headerValueToString(message.headers?.['x-trace-id']) || 'no-trace';
-  const log = withTrace(traceId);
+  const requestId = headerValueToString(message.headers?.['x-request-id']) || null;
+  const log = withTrace(traceId, requestId);
   const inserted = await insertInboxEvent(null, {
     eventId,
     traceId: envelope.traceId,
@@ -96,7 +111,28 @@ async function processConsumedMessage({ topic, message }) {
   }
 
   try {
-    log.info({ eventId, topic, type: envelope.type }, 'Received event');
+    let businessResult = null;
+    if (topic === topics.RideCancelled && envelope.type === 'RideCancelled') {
+      businessResult = await compensatePaymentForRideCancelled({
+        rideId: envelope.payload?.rideId,
+        reason: envelope.payload?.reason,
+        traceId,
+        requestId
+      });
+      log.info(
+        {
+          eventId,
+          topic,
+          rideId: envelope.payload?.rideId || null,
+          compensation: businessResult
+        },
+        'Ride cancellation compensation processed'
+      );
+    }
+
+    if (shouldLogConsumedEvent()) {
+      log.info({ eventId, topic, type: envelope.type }, 'Received event');
+    }
     await markInboxProcessed(eventId);
     monitoring.recordDependencyRequest({
       dependencyType: 'kafka',
@@ -105,7 +141,11 @@ async function processConsumedMessage({ topic, message }) {
       outcome: 'success',
       durationMs: Date.now() - startedAt
     });
-    return { handled: true, reason: 'processed' };
+    return {
+      handled: true,
+      reason: businessResult?.reason || 'processed',
+      result: businessResult || undefined
+    };
   } catch (err) {
     monitoring.recordDependencyRequest({
       dependencyType: 'kafka',

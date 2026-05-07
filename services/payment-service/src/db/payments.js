@@ -130,6 +130,20 @@ async function getPaymentByPayosOrderCode(orderCode) {
   return mapPaymentRow(result.rows[0]);
 }
 
+async function getLatestPaymentByRideIdForUpdate(client, rideId) {
+  const executor = client || pool;
+  const result = await executor.query(
+    `SELECT *
+       FROM payments
+      WHERE ride_id = $1
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+      FOR UPDATE`,
+    [rideId]
+  );
+  return mapPaymentRow(result.rows[0]);
+}
+
 async function updatePaymentStatus(client, paymentId, status, failureReason) {
   const executor = client || pool;
   const result = await executor.query(
@@ -202,6 +216,7 @@ module.exports = {
   insertStatusHistory,
   getPaymentById,
   getPaymentByPayosOrderCode,
+  getLatestPaymentByRideIdForUpdate,
   updatePaymentStatus,
   listPayments,
   listPendingPayosPayments,

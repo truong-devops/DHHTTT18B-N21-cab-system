@@ -1,0 +1,616 @@
+{
+  "info": {
+    "_postman_id": "cab-system-level-10-cases-91-100-1777181935033",
+    "name": "CAB System - Level 10 Cases 91-100",
+    "description": "Postman collection for API-runnable Level 10 security cases. Cases 94, 99, and parts of 100 require evidence/TLS/log access outside normal Postman requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('uniq')) pm.collectionVariables.set('uniq', Date.now() + '-' + Math.floor(Math.random() * 100000));",
+          "if (!pm.collectionVariables.get('userPass')) pm.collectionVariables.set('userPass', '123456');",
+          "const uniq = pm.collectionVariables.get('uniq');",
+          "pm.collectionVariables.set('userEmail', 'postman-user-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('adminEmail', 'postman-admin-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('driverEmail', 'postman-driver-' + uniq + '@test.com');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "aiUrl",
+      "value": "http://localhost:3013"
+    },
+    {
+      "key": "etaUrl",
+      "value": "http://localhost:3012"
+    },
+    {
+      "key": "pricingUrl",
+      "value": "http://localhost:3006"
+    },
+    {
+      "key": "bookingUrl",
+      "value": "http://localhost:3002"
+    },
+    {
+      "key": "paymentUrl",
+      "value": "http://localhost:3005"
+    },
+    {
+      "key": "internalApiKey",
+      "value": "dev-internal-key"
+    },
+    {
+      "key": "userPass",
+      "value": "123456"
+    },
+    {
+      "key": "uniq",
+      "value": ""
+    },
+    {
+      "key": "userEmail",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "driverEmail",
+      "value": ""
+    },
+    {
+      "key": "expiredToken",
+      "value": "replace-with-expired-jwt"
+    },
+    {
+      "key": "httpsBaseUrl",
+      "value": "https://localhost:3443"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Setup",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{userEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Postman User {{uniq}}\",\"role\":\"user\"}"
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{userEmail}}\",\"password\":\"{{userPass}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "const userId = j?.data?.user_id || j?.data?.id || j?.user_id || j?.id;",
+                  "pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminToken' : pm.info.requestName.includes('Driver') ? 'driverToken' : 'userToken', token || '');",
+                  "if (userId) pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminId' : pm.info.requestName.includes('Driver') ? 'driverUserId' : 'userId', userId);",
+                  "pm.test('Login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{adminEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Postman Admin {{uniq}}\",\"role\":\"admin\"}"
+            }
+          }
+        },
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{adminEmail}}\",\"password\":\"{{userPass}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "const userId = j?.data?.user_id || j?.data?.id || j?.user_id || j?.id;",
+                  "pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminToken' : pm.info.requestName.includes('Driver') ? 'driverToken' : 'userToken', token || '');",
+                  "if (userId) pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminId' : pm.info.requestName.includes('Driver') ? 'driverUserId' : 'userId', userId);",
+                  "pm.test('Login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{driverEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Postman Driver {{uniq}}\",\"role\":\"driver\"}"
+            }
+          }
+        },
+        {
+          "name": "Login Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{driverEmail}}\",\"password\":\"{{userPass}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "const userId = j?.data?.user_id || j?.data?.id || j?.user_id || j?.id;",
+                  "pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminToken' : pm.info.requestName.includes('Driver') ? 'driverToken' : 'userToken', token || '');",
+                  "if (userId) pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminId' : pm.info.requestName.includes('Driver') ? 'driverUserId' : 'userId', userId);",
+                  "pm.test('Login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cases 91-100 - Security Probes",
+      "item": [
+        {
+          "name": "91 Missing Token Bookings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 401 or 403', function () { pm.expect([401,403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "92 Tampered JWT",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}x"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 401', function () { pm.expect([401]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "93 Expired Token Placeholder",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{expiredToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 401', function () { pm.expect([401]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "94 mTLS Evidence Note",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "Case 94 is evidence-based in the shell script: scripts/evidence/case94-mtls-service-to-service.txt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "95 User Calls Admin API",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/admin/drivers?limit=1",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 403', function () { pm.expect([403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "95 Admin Baseline",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/admin/drivers?limit=1",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "96 Driver Gets Other User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/users/{{userId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 401 or 403 or 404', function () { pm.expect([401,403,404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "97 Direct Booking Service No Auth",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 401 or 403 or 404', function () { pm.expect([401,403,404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "97 Direct Booking Service With User Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 401 or 403 or 404', function () { pm.expect([401,403,404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "98 Auth Login Rate Limit Sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "Run in Collection Runner for a rough 429 check; shell script is authoritative.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"rate-limit-user@test.com\",\"password\":\"wrong-pass\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "99 HTTPS Health Probe",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{httpsBaseUrl}}/health",
+            "description": "Set httpsBaseUrl to the TLS endpoint, e.g. https://localhost:3443. Postman cannot prove HTTPS-only redirect policy by itself."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "100 Login With Audit Trace",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-trace-id",
+                "value": "audit-login-{{uniq}}"
+              },
+              {
+                "key": "x-force-audit-log",
+                "value": "1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{userEmail}}\",\"password\":\"{{userPass}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "100 API With Audit Trace",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "x-trace-id",
+                "value": "audit-api-{{uniq}}"
+              },
+              {
+                "key": "x-force-audit-log",
+                "value": "1"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200 or 204', function () { pm.expect([200,204]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

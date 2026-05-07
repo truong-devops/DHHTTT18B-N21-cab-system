@@ -88,7 +88,17 @@ const config = {
     timeoutMs: Number(process.env.PAYMENT_GATEWAY_TIMEOUT_MS || 8000)
   },
   services: {
-    ride: process.env.RIDE_SERVICE_URL || 'http://localhost:3005'
+    ride: process.env.RIDE_SERVICE_URL || 'http://localhost:3005',
+    booking: process.env.BOOKING_SERVICE_URL || 'http://localhost:3003'
+  },
+  saga: {
+    bookingCompensationOnPaymentFailed: {
+      enabled: parseBoolean(process.env.PAYMENT_BOOKING_COMPENSATION_ON_FAILED, true),
+      path: process.env.PAYMENT_BOOKING_COMPENSATION_PATH || '/v1/bookings/internal/payment-failed-compensation',
+      timeoutMs: parseNumber(process.env.PAYMENT_BOOKING_COMPENSATION_TIMEOUT_MS, 2500),
+      maxAttempts: Math.max(1, parseNumber(process.env.PAYMENT_BOOKING_COMPENSATION_MAX_ATTEMPTS, 2)),
+      retryBackoffMs: Math.max(0, parseNumber(process.env.PAYMENT_BOOKING_COMPENSATION_RETRY_BACKOFF_MS, 200))
+    }
   },
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379'

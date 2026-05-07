@@ -117,6 +117,33 @@ async function markProcessed(id) {
   );
 }
 
+async function markProcessedByEventId({ eventId, consumer }) {
+  if (!eventId || !consumer) {
+    return false;
+  }
+  const db = await getDb();
+  const now = new Date();
+  const result = await db.collection('inbox_events').updateOne(
+    {
+      event_id: eventId,
+      consumer,
+      state: { $in: ['pending', 'retry', 'processing'] }
+    },
+    {
+      $set: {
+        state: 'processed',
+        processed_at: now,
+        processing_started_at: null,
+        processing_owner: null,
+        error_message: null,
+        updated_at: now
+      }
+    }
+  );
+
+  return Number(result.modifiedCount || 0) > 0;
+}
+
 async function markFailed(id, errorMessage) {
   const db = await getDb();
   const now = new Date();
@@ -184,10 +211,86 @@ async function markFailed(id, errorMessage) {
   };
 }
 
+async function markFailedByEventId({ eventId, consumer, errorMessage }) {
+  if (!eventId || !consumer) {
+    return null;
+  }
+  const db = await getDb();
+  const now = new Date();
+  const increment = await db.collection('inbox_events').findOneAndUpdate(
+    {
+      event_id: eventId,
+      consumer,
+      state: { $in: ['pending', 'retry', 'processing'] }
+    },
+    {
+      $inc: { attempt_count: 1 },
+      $set: {
+        error_message: errorMessage || 'failed',
+        processing_started_at: null,
+        processing_owner: null,
+        updated_at: now
+      }
+    },
+    { returnDocument: 'after' }
+  );
+
+  const doc = increment && Object.prototype.hasOwnProperty.call(increment, 'value') ? increment.value : increment;
+  if (!doc) {
+    return null;
+  }
+
+  const attemptCount = Number(doc.attempt_count || 0);
+  const maxAttempts = Number(doc.max_attempts || DEFAULT_MAX_ATTEMPTS);
+  if (attemptCount >= maxAttempts) {
+    await db.collection('inbox_events').updateOne(
+      { _id: doc._id },
+      {
+        $set: {
+          state: 'dead',
+          processed_at: now,
+          updated_at: now
+        }
+      }
+    );
+    return {
+      status: 'dead',
+      attemptCount,
+      maxAttempts,
+      eventId: doc.event_id,
+      topic: doc.topic
+    };
+  }
+
+  const delayMs = computeBackoffMs(attemptCount);
+  const nextRetryAt = new Date(Date.now() + delayMs);
+  await db.collection('inbox_events').updateOne(
+    { _id: doc._id },
+    {
+      $set: {
+        state: 'retry',
+        next_retry_at: nextRetryAt,
+        updated_at: now
+      }
+    }
+  );
+
+  return {
+    status: 'retry',
+    retryInMs: delayMs,
+    attemptCount,
+    maxAttempts,
+    eventId: doc.event_id,
+    topic: doc.topic
+  };
+}
+
 module.exports = {
   insertInboxEvent,
   claimPendingEvents,
   countInboxBacklog,
   markProcessed,
-  markFailed
+  markProcessedByEventId,
+  markFailed,
+  markFailedByEventId
 };

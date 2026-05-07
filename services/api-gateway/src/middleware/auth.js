@@ -8,6 +8,10 @@ const AUTH_VERIFY_ENABLED = String(process.env.AUTH_VERIFY_ENABLED || 'true') !=
 const AUTH_VERIFY_CACHE_TTL_MS = Number(process.env.AUTH_VERIFY_CACHE_TTL_MS || 15000);
 const AUTH_VERIFY_NEGATIVE_CACHE_TTL_MS = Number(process.env.AUTH_VERIFY_NEGATIVE_CACHE_TTL_MS || 3000);
 const AUTH_LOCAL_JWT_CACHE_TTL_MS = Number(process.env.AUTH_LOCAL_JWT_CACHE_TTL_MS || 5000);
+const AUTH_VERIFY_SKIP_PREFIXES = String(process.env.AUTH_VERIFY_SKIP_PREFIXES || '/v1/payments')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
 
 const verifyCache = new Map();
 const verifyInFlight = new Map();
@@ -66,14 +70,16 @@ function verifyTokenWithAuthService(authServiceUrl, token, traceId) {
 
   const verifyUrl = `${authServiceUrl.replace(/\/$/, '')}/auth/verify`;
   const timeoutMs = Number(process.env.AUTH_VERIFY_TIMEOUT_MS || 1200);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 1200);
   const request = fetch(verifyUrl, {
     method: 'GET',
     agent: authHttpAgent,
+    signal: controller.signal,
     headers: {
       authorization: `Bearer ${token}`,
       'x-trace-id': traceId || ''
-    },
-    timeout: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 1200
+    }
   })
     .then((verifyRes) => {
       const valid = verifyRes.status === 200;
@@ -81,6 +87,7 @@ function verifyTokenWithAuthService(authServiceUrl, token, traceId) {
       return valid;
     })
     .finally(() => {
+      clearTimeout(timer);
       verifyInFlight.delete(token);
     });
 
@@ -167,7 +174,8 @@ function authMiddleware(req, res, next) {
     }
 
     const authServiceUrl = process.env.AUTH_SERVICE_URL || '';
-    if (!AUTH_VERIFY_ENABLED || !authServiceUrl) {
+    const shouldSkipRemoteVerify = AUTH_VERIFY_SKIP_PREFIXES.some((prefix) => req.path.startsWith(prefix));
+    if (!AUTH_VERIFY_ENABLED || !authServiceUrl || shouldSkipRemoteVerify) {
       return next();
     }
 

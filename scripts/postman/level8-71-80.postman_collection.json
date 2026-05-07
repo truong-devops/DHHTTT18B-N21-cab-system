@@ -1,0 +1,500 @@
+{
+  "info": {
+    "_postman_id": "cab-system-level-8-cases-71-80-1777181935032",
+    "name": "CAB System - Level 8 Cases 71-80",
+    "description": "Postman probes for Level 8 resilience cases. Docker compose fault injection, pause/unpause, DB restart, and network partition checks remain shell-script responsibilities.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('uniq')) pm.collectionVariables.set('uniq', Date.now() + '-' + Math.floor(Math.random() * 100000));",
+          "if (!pm.collectionVariables.get('userPass')) pm.collectionVariables.set('userPass', '123456');",
+          "const uniq = pm.collectionVariables.get('uniq');",
+          "pm.collectionVariables.set('userEmail', 'postman-user-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('adminEmail', 'postman-admin-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('driverEmail', 'postman-driver-' + uniq + '@test.com');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "aiUrl",
+      "value": "http://localhost:3013"
+    },
+    {
+      "key": "etaUrl",
+      "value": "http://localhost:3012"
+    },
+    {
+      "key": "pricingUrl",
+      "value": "http://localhost:3006"
+    },
+    {
+      "key": "bookingUrl",
+      "value": "http://localhost:3002"
+    },
+    {
+      "key": "paymentUrl",
+      "value": "http://localhost:3005"
+    },
+    {
+      "key": "internalApiKey",
+      "value": "dev-internal-key"
+    },
+    {
+      "key": "userPass",
+      "value": "123456"
+    },
+    {
+      "key": "uniq",
+      "value": ""
+    },
+    {
+      "key": "userEmail",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "driverEmail",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Setup",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{userEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Postman User {{uniq}}\",\"role\":\"user\"}"
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{userEmail}}\",\"password\":\"{{userPass}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "const userId = j?.data?.user_id || j?.data?.id || j?.user_id || j?.id;",
+                  "pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminToken' : pm.info.requestName.includes('Driver') ? 'driverToken' : 'userToken', token || '');",
+                  "if (userId) pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminId' : pm.info.requestName.includes('Driver') ? 'driverUserId' : 'userId', userId);",
+                  "pm.test('Login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cases 71-80 - Resilience Probes",
+      "item": [
+        {
+          "name": "71 Booking While Driver Service Fault Injected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "72 Booking While Pricing Timeout Injected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "73 Booking While Kafka Down Injected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "74 Booking After DB Recovery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "75 Pricing Quote Fail-Fast Probe A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/pricing/quotes/non-existing-quote",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "75 Pricing Quote Fail-Fast Probe B",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/pricing/quotes/non-existing-quote",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "76 Booking During Partial Failure",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "77 Exponential Backoff Policy Note",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "Case 77 in script validates computed backoff policy locally; Postman only checks service health."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "78 Booking During Mesh Route Fault",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "79 Pricing Recovery After Partition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{pricingUrl}}/v1/pricing/estimate",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"distance_km\":5,\"demand_index\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "80 Graceful Degradation Fast Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "x-booking-fast-path",
+                "value": "1"
+              },
+              {
+                "key": "x-load-test",
+                "value": "1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No 5xx backend collapse', function () { pm.expect(pm.response.code).to.not.be.within(500, 599); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

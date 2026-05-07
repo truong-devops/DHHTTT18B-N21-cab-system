@@ -89,7 +89,7 @@ function requireRole(...roles) {
     const rolesToCheck = normalizeRoleList(req.user.roles && req.user.roles.length ? req.user.roles : req.user.role || null);
     const hasRole = rolesToCheck.some((role) => allowed.includes(role));
     if (!hasRole) {
-      return next(new ApiError(403, 'FORBIDDEN', 'Insufficient role'));
+      return next(new ApiError(403, 'FORBIDDEN', 'Access denied'));
     }
 
     return next();

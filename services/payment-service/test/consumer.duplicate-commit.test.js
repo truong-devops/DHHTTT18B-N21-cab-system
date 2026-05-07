@@ -9,6 +9,7 @@ const mockGetConsumer = jest.fn(async () => ({
 const mockInsertInboxEvent = jest.fn();
 const mockMarkInboxProcessed = jest.fn();
 const mockPublishToDlq = jest.fn();
+const mockCompensateRideCancelled = jest.fn();
 const mockConfig = {
   kafka: {
     consumeTopics: ['ride.created'],
@@ -34,6 +35,10 @@ jest.mock('../src/messaging/dlq', () => ({
   publishToDlq: (...args) => mockPublishToDlq(...args)
 }));
 
+jest.mock('../src/services/paymentService', () => ({
+  compensatePaymentForRideCancelled: (...args) => mockCompensateRideCancelled(...args)
+}));
+
 jest.mock('../src/messaging/schemaRegistry', () => ({
   validateEnvelope: jest.fn(() => ({ valid: true, errors: [] }))
 }));
@@ -51,6 +56,10 @@ function buildBatchMessage(envelope, offset = '0') {
 describe('payment consumer duplicate + commit semantics', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCompensateRideCancelled.mockResolvedValue({
+      handled: true,
+      reason: 'refunded'
+    });
   });
 
   test('commits offset for duplicate event after idempotency check', async () => {

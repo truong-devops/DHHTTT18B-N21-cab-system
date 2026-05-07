@@ -1,0 +1,595 @@
+{
+  "info": {
+    "_postman_id": "cab-system-level-2-cases-11-20-1777181935028",
+    "name": "CAB System - Level 2 Cases 11-20",
+    "description": "Postman collection for Level 2 validation and error-path cases.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('uniq')) pm.collectionVariables.set('uniq', Date.now() + '-' + Math.floor(Math.random() * 100000));",
+          "if (!pm.collectionVariables.get('userPass')) pm.collectionVariables.set('userPass', '123456');",
+          "const uniq = pm.collectionVariables.get('uniq');",
+          "pm.collectionVariables.set('userEmail', 'postman-user-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('adminEmail', 'postman-admin-' + uniq + '@test.com');",
+          "pm.collectionVariables.set('driverEmail', 'postman-driver-' + uniq + '@test.com');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "aiUrl",
+      "value": "http://localhost:3013"
+    },
+    {
+      "key": "etaUrl",
+      "value": "http://localhost:3012"
+    },
+    {
+      "key": "pricingUrl",
+      "value": "http://localhost:3006"
+    },
+    {
+      "key": "bookingUrl",
+      "value": "http://localhost:3002"
+    },
+    {
+      "key": "paymentUrl",
+      "value": "http://localhost:3005"
+    },
+    {
+      "key": "internalApiKey",
+      "value": "dev-internal-key"
+    },
+    {
+      "key": "userPass",
+      "value": "123456"
+    },
+    {
+      "key": "uniq",
+      "value": ""
+    },
+    {
+      "key": "userEmail",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "driverEmail",
+      "value": ""
+    },
+    {
+      "key": "expiredToken",
+      "value": "replace-with-expired-jwt"
+    },
+    {
+      "key": "case19BookingId1",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Setup",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{userEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Postman User {{uniq}}\",\"role\":\"user\"}"
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{userEmail}}\",\"password\":\"{{userPass}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "const userId = j?.data?.user_id || j?.data?.id || j?.user_id || j?.id;",
+                  "pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminToken' : pm.info.requestName.includes('Driver') ? 'driverToken' : 'userToken', token || '');",
+                  "if (userId) pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminId' : pm.info.requestName.includes('Driver') ? 'driverUserId' : 'userId', userId);",
+                  "pm.test('Login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{adminEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Postman Admin {{uniq}}\",\"role\":\"admin\"}"
+            }
+          }
+        },
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{adminEmail}}\",\"password\":\"{{userPass}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "const userId = j?.data?.user_id || j?.data?.id || j?.user_id || j?.id;",
+                  "pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminToken' : pm.info.requestName.includes('Driver') ? 'driverToken' : 'userToken', token || '');",
+                  "if (userId) pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminId' : pm.info.requestName.includes('Driver') ? 'driverUserId' : 'userId', userId);",
+                  "pm.test('Login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cases 11-18 - Validation/Error Paths",
+      "item": [
+        {
+          "name": "11 Missing Pickup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"drop\":{\"lat\":10.77,\"lng\":106.70}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 400 or 422', function () { pm.expect([400,422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 Invalid Lat Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":\"abc\",\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 400 or 422', function () { pm.expect([400,422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 No Drivers Online Area",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":21.0278,\"lng\":105.8342},\"drop\":{\"lat\":21.0285,\"lng\":105.8350},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200 or 201 or 404 or 409', function () { pm.expect([200,201,404,409]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 Invalid Payment Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"payment_method\":\"invalid_card\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 400 or 422', function () { pm.expect([400,422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 ETA Distance Zero",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/eta/estimate",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"distance_km\":0}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 Pricing Demand Zero",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/pricing/estimate",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"distance_km\":5,\"demand_index\":0,\"supply_index\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 Fraud Missing Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/fraud/check",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\":\"USR123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 400 or 422', function () { pm.expect([400,422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 Expired Token Placeholder",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{expiredToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 401', function () { pm.expect([401]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cases 19-20 - Idempotency and Payload Size",
+      "item": [
+        {
+          "name": "19 First Idempotent Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "case19-{{uniq}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.7601,\"lng\":106.6601},\"drop\":{\"lat\":10.7701,\"lng\":106.7001},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j=pm.response.json(); pm.collectionVariables.set('case19BookingId1', j?.booking?.booking_id || j?.booking?.bookingId || j?.data?.id || '');",
+                  "pm.test('First request accepted', function () { pm.expect([200,201]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "19 Replay Same Idempotent Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "case19-{{uniq}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.7601,\"lng\":106.6601},\"drop\":{\"lat\":10.7701,\"lng\":106.7001},\"vehicleType\":\"CAR\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200 or 201', function () { pm.expect([200,201]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "20 Payload Too Large Manual",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickup\":{\"lat\":10.76,\"lng\":106.66},\"drop\":{\"lat\":10.77,\"lng\":106.70},\"huge\":\"Replace this value with >1MB string for exact script parity\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 400 or 413 or 422', function () { pm.expect([400,413,422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

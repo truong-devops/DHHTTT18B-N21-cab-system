@@ -49,8 +49,8 @@ if (process.env.OTEL_ENABLED !== 'false') {
       .then(() => {
         console.log(`[${serviceName}] OTel started`);
       })
-      .catch((err) => {
-        console.error(`[${serviceName}] OTel start error`, err);
+      .catch(() => {
+        console.error(`[${serviceName}] OTel start error`);
       });
   } else {
     console.log(`[${serviceName}] OTel started`);

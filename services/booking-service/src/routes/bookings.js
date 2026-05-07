@@ -24,6 +24,16 @@ const router = express.Router();
 const PRIVILEGED_ROLES = new Set(['admin', 'service', 'ops']);
 const ACTIVE_BOOKING_STATUSES = new Set(['PENDING', 'REQUESTED', 'ACCEPTED', 'CONFIRMED']);
 const TERMINAL_RIDE_STATUSES = new Set(['COMPLETED', 'CANCELLED']);
+const TRANSIENT_DB_ERROR_CODES = new Set([
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'EPIPE',
+  '57P01',
+  '57P02',
+  '57P03',
+  '53300'
+]);
 
 function normalizeUserId(value, { allowCoerce = false } = {}) {
   if (value === undefined || value === null) {
@@ -67,6 +77,24 @@ function hasAnyRole(req, allowedRoles) {
 
 function normalizeStatus(value) {
   return String(value || '').toUpperCase();
+}
+
+function isTransientDbOrInfraError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  if (code && TRANSIENT_DB_ERROR_CODES.has(code)) {
+    return true;
+  }
+  const message = String(error?.message || '').toLowerCase();
+  if (!message) {
+    return false;
+  }
+  return (
+    message.includes('connection terminated due to connection timeout') ||
+    message.includes('connection timeout') ||
+    message.includes('timeout acquiring') ||
+    message.includes('sorry, too many clients already') ||
+    message.includes('terminating connection due to administrator command')
+  );
 }
 
 function isActiveBookingStatus(value) {
@@ -297,6 +325,21 @@ function normalizePaymentMethod(paymentMethod) {
   return 'CASH';
 }
 
+function shouldDeferCashPaymentInit(paymentMethod, { simulatePaymentTimeout = false } = {}) {
+  if (normalizePaymentMethod(paymentMethod) !== 'CASH') {
+    return false;
+  }
+  // Explicit timeout simulation must always exercise real payment init path.
+  if (simulatePaymentTimeout) {
+    return false;
+  }
+
+  const mode = String(process.env.BOOKING_CASH_PAYMENT_INIT_MODE || 'strict')
+    .trim()
+    .toLowerCase();
+  return mode === 'deferred';
+}
+
 function resolveAmountFromQuote(quote) {
   const amount = Number(quote?.estimatedFare);
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -426,7 +469,7 @@ async function resolveQuoteAndEta({
   return { quote, eta };
 }
 
-async function buildAiDriverDecision({ pickup, vehicleType, authorization, traceId }) {
+async function buildAiDriverDecision({ pickup, vehicleType, authorization, traceId, allowVehicleTypeFallback = true }) {
   let drivers = await listAvailableDrivers({
     pickup,
     vehicleType,
@@ -436,7 +479,7 @@ async function buildAiDriverDecision({ pickup, vehicleType, authorization, trace
   });
 
   // Fallback for partially onboarded drivers that are ONLINE but missing vehicle metadata.
-  if (!drivers.length && vehicleType) {
+  if (!drivers.length && vehicleType && allowVehicleTypeFallback) {
     drivers = await listAvailableDrivers({
       pickup,
       vehicleType: null,
@@ -487,22 +530,39 @@ async function runBookingIntegrationFlow({ booking, quote, paymentMethod, author
     notification: null,
     flow: 'skipped'
   };
-
-  const paymentResult = await createPayment({
-    rideId: booking.rideId,
-    amount: resolveAmountFromQuote(quote),
-    currency: quote?.currency || 'VND',
-    method: normalizePaymentMethod(paymentMethod),
-    userId: booking.userId,
-    authorization,
-    traceId,
-    idempotencyKey: `booking-payment-${booking.bookingId}`,
-    simulateTimeout: simulatePaymentTimeout
+  const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
+  const deferCashPaymentInit = shouldDeferCashPaymentInit(normalizedPaymentMethod, {
+    simulatePaymentTimeout
   });
+
+  const paymentResult = deferCashPaymentInit
+    ? {
+      ok: true,
+      statusCode: 202,
+      data: {
+        status: 'DEFERRED',
+        method: normalizedPaymentMethod,
+        deferred: true,
+        reason: 'CASH_COLLECT_ON_RIDE_COMPLETION'
+      }
+    }
+    : await createPayment({
+      rideId: booking.rideId,
+      amount: resolveAmountFromQuote(quote),
+      currency: quote?.currency || 'VND',
+      method: normalizedPaymentMethod,
+      userId: booking.userId,
+      authorization,
+      traceId,
+      idempotencyKey: `booking-payment-${booking.bookingId}`,
+      simulateTimeout: simulatePaymentTimeout
+    });
   integrations.payment = paymentResult;
 
-  const notificationMessage = paymentResult.ok
-    ? `Booking ${booking.bookingId} created. Payment initialized`
+  const notificationMessage = paymentResult.ok && paymentResult?.data?.deferred
+    ? `Booking ${booking.bookingId} created. Cash payment is deferred until ride completion`
+    : paymentResult.ok
+      ? `Booking ${booking.bookingId} created. Payment initialized`
     : `Booking ${booking.bookingId} created. Payment initialization pending`;
 
   const notificationResult = await sendNotification({
@@ -823,6 +883,8 @@ router.post('/', async (req, res) => {
       normalizedBody?.simulate_tx_failure_after_insert === true || normalizedBody?.simulateTransactionFailureAfterInsert === true;
 
     let noDriversAvailable = false;
+    let noDriversReason = null;
+    let precomputedAiDecision = null;
     if (!bookingFastPathEnabled) {
       const availability = await getDriverAvailability({
         pickup,
@@ -843,6 +905,28 @@ router.post('/', async (req, res) => {
       authorization,
       fastPathHint: bookingFastPathHint
     });
+    if (!bookingFastPathEnabled) {
+      precomputedAiDecision = await buildAiDriverDecision({
+        pickup,
+        vehicleType,
+        authorization,
+        traceId,
+        allowVehicleTypeFallback: false
+      });
+    }
+    const hasAiSelectedDriver = Boolean(precomputedAiDecision?.selectedDriver);
+    const hasAiAvailableDrivers =
+      Array.isArray(precomputedAiDecision?.availableDrivers) && precomputedAiDecision.availableDrivers.length > 0;
+    const noMatchedDrivers = !hasAiSelectedDriver && !hasAiAvailableDrivers;
+    const noDriversResolved = !bookingFastPathEnabled && (noDriversAvailable || noMatchedDrivers);
+    if (!bookingFastPathEnabled && noDriversResolved) {
+      if (noDriversAvailable) {
+        noDriversReason = 'NO_MATCHING_DRIVER_FOR_VEHICLE_TYPE';
+      } else {
+        noDriversReason = 'NO_AVAILABLE_DRIVER';
+      }
+    }
+    const initialBookingStatus = noDriversResolved ? 'PENDING' : 'REQUESTED';
 
     const resolvedDistanceKm = Number.isFinite(distance_km)
       ? distance_km
@@ -867,7 +951,7 @@ router.post('/', async (req, res) => {
         distanceKm: resolvedDistanceKm,
         etaMinutes: eta.etaMinutes,
         priceSnapshot: persistedQuote,
-        status: 'REQUESTED',
+        status: initialBookingStatus,
         createdAt
       };
       const skipPersistInLoadMode = loadTestRequest && hasPrivilegedRole(req) && isLoadSkipPersistEnabled();
@@ -932,7 +1016,7 @@ router.post('/', async (req, res) => {
           distanceKm: resolvedDistanceKm,
           etaMinutes: eta.etaMinutes,
           priceSnapshot: persistedQuote,
-          status: 'REQUESTED',
+          status: initialBookingStatus,
           createdAt
         });
 
@@ -1079,12 +1163,13 @@ router.post('/', async (req, res) => {
     }
 
     if (!result.replay && responsePayload?.booking && !bookingFastPathEnabled) {
-      const aiDecision = await buildAiDriverDecision({
+      const aiDecision = precomputedAiDecision || (await buildAiDriverDecision({
         pickup,
         vehicleType,
         authorization,
-        traceId
-      });
+        traceId,
+        allowVehicleTypeFallback: false
+      }));
       responsePayload.ai_driver_decision = {
         available_drivers: aiDecision.availableDrivers,
         selected_driver: aiDecision.selectedDriver
@@ -1092,8 +1177,11 @@ router.post('/', async (req, res) => {
 
       const hasSelectedDriver = Boolean(aiDecision?.selectedDriver);
       const hasAvailableDrivers = Array.isArray(aiDecision?.availableDrivers) && aiDecision.availableDrivers.length > 0;
-      if (noDriversAvailable && !hasSelectedDriver && !hasAvailableDrivers) {
+      if (noDriversResolved && !hasSelectedDriver && !hasAvailableDrivers) {
         responsePayload.message = 'No drivers available';
+      }
+      if (noDriversResolved && noDriversReason) {
+        responsePayload.no_drivers_reason = noDriversReason;
       }
 
       if (parsed.data.payment_method) {
@@ -1220,6 +1308,24 @@ router.post('/', async (req, res) => {
       return res.status(e.statusCode).json({
         error: e.message,
         code: e.code
+      });
+    }
+    if (isTransientDbOrInfraError(e)) {
+      monitoring.recordBookingStatus('created', 'error', {
+        reason: 'service_busy'
+      });
+      logger.withTrace(req).warn(
+        {
+          err: {
+            message: e.message,
+            code: e.code || 'UNKNOWN'
+          }
+        },
+        'booking create hit transient infra/db error; returning service busy'
+      );
+      return res.status(429).json({
+        error: 'Service busy, please retry',
+        code: 'SERVICE_BUSY'
       });
     }
 
@@ -1575,6 +1681,112 @@ router.patch('/:id/status', async (req, res) => {
     }
     logger.withTrace(req).error({ err: { message: error.message, code: error.code || 'UNKNOWN' } }, 'failed to update booking status');
     return res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/internal/payment-failed-compensation', async (req, res) => {
+  try {
+    if (!hasAnyRole(req, ['service', 'admin', 'ops'])) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const traceId = req.traceId || req.header('x-trace-id');
+    const rideId = String(req.body?.rideId || req.body?.ride_id || '').trim();
+    const failureReason = String(req.body?.reason || 'PAYMENT_FAILED').trim().slice(0, 255) || 'PAYMENT_FAILED';
+    if (!rideId) {
+      return res.status(400).json({ error: 'rideId is required' });
+    }
+
+    const result = await withTransaction(async (client) => {
+      const existing = await bookingRepo.getByRideIdForUpdate(client, rideId);
+      if (!existing) {
+        return {
+          status: 'NOT_FOUND',
+          booking: null,
+          publishedEvent: null
+        };
+      }
+
+      const currentStatus = String(existing.status || '').toUpperCase();
+      if (currentStatus === 'CANCELLED') {
+        return {
+          status: 'ALREADY_CANCELLED',
+          booking: existing,
+          publishedEvent: null
+        };
+      }
+      if (!isActiveBookingStatus(currentStatus)) {
+        return {
+          status: 'TERMINAL_STATUS',
+          booking: existing,
+          publishedEvent: null
+        };
+      }
+
+      const cancelled = await bookingRepo.cancel(client, existing.bookingId);
+      const eventId = crypto.randomUUID();
+      const envelope = buildEnvelope({
+        eventId,
+        traceId,
+        type: 'RideCancelled',
+        payload: {
+          rideId: cancelled.rideId,
+          reason: failureReason,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      await outboxRepo.insertOutboxEvent(
+        client,
+        buildOutboxRecord({
+          eventId,
+          topic: topics.RideCancelled,
+          eventType: 'RideCancelled',
+          aggregateId: cancelled.bookingId,
+          partitionKey: cancelled.rideId,
+          envelope
+        })
+      );
+
+      return {
+        status: 'CANCELLED',
+        booking: cancelled,
+        publishedEvent: {
+          topic: topics.RideCancelled,
+          eventId,
+          queued: true
+        }
+      };
+    });
+
+    if (result.status === 'NOT_FOUND') {
+      return res.status(404).json({
+        applied: false,
+        code: 'BOOKING_NOT_FOUND',
+        ride_id: rideId
+      });
+    }
+
+    return res.status(200).json({
+      applied: result.status === 'CANCELLED',
+      code: result.status,
+      booking: result.booking ? mapBookingCompat(result.booking) : null,
+      publishedEvent: result.publishedEvent
+    });
+  } catch (error) {
+    logger.withTrace(req).error(
+      {
+        err: {
+          message: error.message,
+          code: error.code || 'UNKNOWN'
+        }
+      },
+      'failed internal payment-failed compensation'
+    );
+    return res.status(500).json({
+      error: error.message,
+      code: 'INTERNAL_COMPENSATION_FAILED'
+    });
   }
 });
 

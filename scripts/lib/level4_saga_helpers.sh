@@ -41,19 +41,40 @@ wait_booking_status() {
 
 get_payment_status() {
   local payment_id="$1"
-  local resp
-  resp=$(call_json GET "/v1/payments/$payment_id" "$ADMIN_TOKEN")
-  local status
-  local body
-  status=$(echo "$resp" | sed -n '1p')
-  body=$(echo "$resp" | sed '1d')
-  if [[ "$status" != "200" ]]; then
-    echo ""
-    return
-  fi
-  local payment_status
-  payment_status=$(echo "$body" | json_get "data.status")
-  echo "$payment_status"
+  local max_attempts="${2:-5}"
+  local attempt=1
+
+  while [[ "$attempt" -le "$max_attempts" ]]; do
+    local resp
+    resp=$(call_json GET "/v1/payments/$payment_id" "$ADMIN_TOKEN")
+    local status
+    local body
+    status=$(echo "$resp" | sed -n '1p')
+    body=$(echo "$resp" | sed '1d')
+
+    if [[ "$status" == "200" ]]; then
+      local payment_status
+      payment_status=$(echo "$body" | json_get "data.status")
+      if [[ -z "$payment_status" ]]; then
+        payment_status=$(echo "$body" | json_get "status")
+      fi
+      if [[ -n "$payment_status" ]]; then
+        echo "$payment_status"
+        return
+      fi
+    fi
+
+    if [[ "$status" != "000" && "$status" != "502" && "$status" != "504" && "$status" != "429" ]]; then
+      break
+    fi
+
+    if [[ "$attempt" -lt "$max_attempts" ]]; then
+      sleep 1
+    fi
+    attempt=$((attempt + 1))
+  done
+
+  echo ""
 }
 
 patch_payment_failed_with_retry() {

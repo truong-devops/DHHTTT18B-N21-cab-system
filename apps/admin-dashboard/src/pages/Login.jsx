@@ -14,8 +14,8 @@ export default function Login() {
 
     try {
       const res = await api.post('/v1/auth/login', { identifier, password });
-      const accessToken = res?.data?.tokens?.accessToken || res?.data?.access_token || '';
-      const refreshToken = res?.data?.tokens?.refreshToken || res?.data?.refresh_token || '';
+      const accessToken = res?.data?.tokens?.accessToken || '';
+      const refreshToken = res?.data?.tokens?.refreshToken || '';
 
       if (!accessToken) {
         throw new Error('Missing access token');

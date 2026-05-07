@@ -1,7 +1,10 @@
 const mockRedisGet = jest.fn();
 const mockRedisSet = jest.fn();
 const mockInsertInboxEvent = jest.fn();
+const mockMarkProcessedByEventId = jest.fn();
+const mockMarkFailedByEventId = jest.fn();
 const mockPublishToDlq = jest.fn();
+const mockProcessRow = jest.fn();
 
 jest.mock('../src/cache/redis', () => ({
   get: (...args) => mockRedisGet(...args),
@@ -9,11 +12,17 @@ jest.mock('../src/cache/redis', () => ({
 }));
 
 jest.mock('../src/repository/inboxEventsRepository', () => ({
-  insertInboxEvent: (...args) => mockInsertInboxEvent(...args)
+  insertInboxEvent: (...args) => mockInsertInboxEvent(...args),
+  markProcessedByEventId: (...args) => mockMarkProcessedByEventId(...args),
+  markFailedByEventId: (...args) => mockMarkFailedByEventId(...args)
 }));
 
 jest.mock('../src/messaging/producer', () => ({
   publishToDlq: (...args) => mockPublishToDlq(...args)
+}));
+
+jest.mock('../src/messaging/inboxProcessor', () => ({
+  processRow: (...args) => mockProcessRow(...args)
 }));
 
 const { processConsumedMessage } = require('../src/messaging/consumer');

@@ -44,12 +44,13 @@ describe('payment status transitions', () => {
     expect(canTransition(STATUSES.INITIATED, STATUSES.PROCESSING)).toBe(true);
     expect(canTransition(STATUSES.PROCESSING, STATUSES.PAID)).toBe(true);
     expect(canTransition(STATUSES.PROCESSING, STATUSES.FAILED)).toBe(true);
+    expect(canTransition(STATUSES.PAID, STATUSES.REFUNDED)).toBe(true);
     expect(canTransition(STATUSES.FAILED, STATUSES.REFUNDED)).toBe(true);
   });
 
   test('rejects invalid transitions', () => {
     expect(canTransition(STATUSES.INITIATED, STATUSES.PAID)).toBe(false);
-    expect(canTransition(STATUSES.PAID, STATUSES.REFUNDED)).toBe(false);
+    expect(canTransition(STATUSES.REFUNDED, STATUSES.PAID)).toBe(false);
   });
 
   test('allows idempotent transitions', () => {

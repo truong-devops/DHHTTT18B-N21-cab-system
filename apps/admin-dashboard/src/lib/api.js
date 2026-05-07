@@ -33,8 +33,8 @@ api.interceptors.response.use(
         }
 
         const refreshRes = await axios.post(`${baseURL}/v1/auth/refresh`, { refreshToken }, { withCredentials: true });
-        const nextAccessToken = refreshRes.data?.tokens?.accessToken || refreshRes.data?.accessToken;
-        const nextRefreshToken = refreshRes.data?.tokens?.refreshToken || refreshRes.data?.refreshToken || refreshToken;
+        const nextAccessToken = refreshRes.data?.tokens?.accessToken;
+        const nextRefreshToken = refreshRes.data?.tokens?.refreshToken || refreshToken;
 
         if (!nextAccessToken) {
           throw new Error('Refresh response missing access token');

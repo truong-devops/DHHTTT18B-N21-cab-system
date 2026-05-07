@@ -1,6 +1,7 @@
 const mockInsertInboxEvent = jest.fn();
 const mockMarkInboxProcessed = jest.fn();
 const mockPublishToDlq = jest.fn();
+const mockCompensateRideCancelled = jest.fn();
 
 jest.mock('../src/repositories/inboxRepo', () => ({
   insertInboxEvent: (...args) => mockInsertInboxEvent(...args),
@@ -11,11 +12,19 @@ jest.mock('../src/messaging/dlq', () => ({
   publishToDlq: (...args) => mockPublishToDlq(...args)
 }));
 
+jest.mock('../src/services/paymentService', () => ({
+  compensatePaymentForRideCancelled: (...args) => mockCompensateRideCancelled(...args)
+}));
+
 const { processConsumedMessage } = require('../src/messaging/consumer');
 
 describe('payment consumer contract guard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCompensateRideCancelled.mockResolvedValue({
+      handled: true,
+      reason: 'refunded'
+    });
   });
 
   test('topic/type mismatch is routed to DLQ and not inserted', async () => {
