@@ -636,13 +636,13 @@
       "name": "Cases 26-30 - Status, MCP, Gateway, Timeout",
       "item": [
         {
-          "name": "26-27 Accept Booking Status",
+          "name": "26 Driver Accept Booking (REQUESTED -> ACCEPTED)",
           "request": {
             "method": "PATCH",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}"
+                "value": "Bearer {{driverToken}}"
               },
               {
                 "key": "Content-Type",
@@ -653,7 +653,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\"booking_id\":\"{{level3BookingId}}\",\"status\":\"ACCEPTED\",\"driver_id\":\"driver_fallback\"}"
+              "raw": "{\"booking_id\":\"{{level3BookingId}}\",\"status\":\"ACCEPTED\",\"driver_id\":\"{{driverUserId}}\"}"
             }
           },
           "event": [
@@ -662,7 +662,67 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Expected status 200 or 403', function () { pm.expect([200,403]).to.include(pm.response.code); });"
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('level3RideAcceptedEventId', j?.publishedEvent?.eventId || '');",
+                  "pm.collectionVariables.set('level3NotificationId', j?.notification?.data?.id || j?.notification?.id || '');",
+                  "pm.test('Status 200', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.test('Booking status ACCEPTED', function () { pm.expect(j?.booking?.status || j?.booking?.booking?.status).to.eql('ACCEPTED'); });",
+                  "pm.test('ride_accepted event queued', function () { pm.expect(j?.publishedEvent?.queued).to.eql(true); pm.expect(j?.publishedEvent?.eventType).to.eql('ride_accepted'); });",
+                  "pm.test('Notification queued ok', function () { pm.expect(j?.notification?.ok).to.eql(true); pm.expect(pm.collectionVariables.get('level3NotificationId')).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "27 Driver Receives Notification + Booking Status Persisted",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/notifications/{{level3NotificationId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test('Notification fetch 200', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.test('Notification belongs to driver', function () { pm.expect(j?.data?.userId || j?.data?.user_id).to.eql(pm.collectionVariables.get('driverUserId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "27b Booking Status Is ACCEPTED",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings/{{level3BookingId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test('Booking fetch 200', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.test('Booking status ACCEPTED', function () { pm.expect(j?.data?.status || j?.booking?.status).to.eql('ACCEPTED'); });"
                 ]
               }
             }
