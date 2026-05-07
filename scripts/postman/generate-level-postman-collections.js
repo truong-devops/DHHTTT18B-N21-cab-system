@@ -139,6 +139,17 @@ function setupFolder({ user = true, admin = true, driver = false } = {}) {
   return { name: '00 Setup', item: items };
 }
 
+function driverInventorySetupFolder() {
+  return { name: '00 Driver Inventory Setup', item: [
+    request('Create Driver Profile', 'POST', '{{baseUrl}}/v1/admin/drivers', { headers: [bearer('adminToken')], body: '{"userId":"{{driverUserId}}","fullName":"Postman Driver {{uniq}}","phone":"0900000000"}', event: tests(["if (pm.response.code < 300) { const j=pm.response.json(); pm.collectionVariables.set('driverId', j?.data?.driver?.id || j?.data?.id || j?.driver?.id || j?.id || ''); }", "pm.test('Create driver accepted or already exists', function () { pm.expect([200,201,409]).to.include(pm.response.code); });"]) }),
+    request('Approve Driver Profile', 'PATCH', '{{baseUrl}}/v1/admin/drivers/{{driverId}}/approve', { headers: [bearer('adminToken')], body: '{}', event: basicStatus(200) }),
+    request('Register Driver Vehicle', 'PUT', '{{baseUrl}}/v1/driver/me/vehicle', { headers: [bearer('driverToken')], body: '{"vehicleType":"CAR","plateNumber":"PM-{{uniq}}"}', event: basicStatus(200) }),
+    request('Reset Driver Offline', 'POST', '{{baseUrl}}/v1/driver/status', { headers: [bearer('adminToken')], body: '{"driver_id":"{{driverId}}","status":"OFFLINE"}', event: basicStatus(200, 409) }),
+    request('Set Driver Online Near Pickup', 'POST', '{{baseUrl}}/v1/driver/status', { headers: [bearer('adminToken')], body: '{"driver_id":"{{driverId}}","status":"ONLINE","initial_location":{"lat":10.76,"lng":106.66}}', event: basicStatus(200) }),
+    request('Verify Driver Availability', 'GET', '{{baseUrl}}/v1/driver/availability?lat=10.76&lng=106.66&limit=5', { headers: [bearer('userToken')], event: basicStatus(200) })
+  ] };
+}
+
 function write(file, data) {
   fs.writeFileSync(path.join(outDir, file), `${JSON.stringify(data, null, 2)}\n`);
 }
@@ -150,7 +161,7 @@ write('level1-1-10.postman_collection.json', collection(
   'CAB System - Level 1 Cases 1-10',
   'Postman collection for API-runnable Level 1 baseline cases.',
   [
-    setupFolder({ user: false, admin: true }),
+    setupFolder({ user: false, admin: true, driver: true }),
     { name: 'Case 1-2 - Register and Login User', item: [
       request('01 Register User', 'POST', '{{baseUrl}}/v1/auth/register', { body: '{"email":"{{userEmail}}","username":"postman{{uniq}}","password":"{{userPass}}","name":"Postman User {{uniq}}"}', event: basicStatus(201, 200, 409) }),
       request('02 Login User', 'POST', '{{baseUrl}}/v1/auth/login', { body: '{"identifier":"{{userEmail}}","password":"{{userPass}}"}', event: tests(extractToken) })
@@ -160,7 +171,9 @@ write('level1-1-10.postman_collection.json', collection(
       request('04 List User Bookings', 'GET', '{{baseUrl}}/v1/bookings?user_id={{userId}}', { headers: [bearer('userToken')], event: basicStatus(200) })
     ] },
     { name: 'Case 5 - Driver Online', item: [
-      request('05 Create Driver Profile', 'POST', '{{baseUrl}}/v1/admin/drivers', { headers: [bearer('adminToken')], body: '{"userId":"{{driverUserId}}","fullName":"Postman Driver {{uniq}}","phone":"0900000000"}', event: tests(["if (pm.response.code < 300) { const j=pm.response.json(); pm.collectionVariables.set('driverId', j?.data?.id || j?.driver?.id || j?.id || ''); }", "pm.test('Create driver accepted or already exists', function () { pm.expect([200,201,409]).to.include(pm.response.code); });"]) }),
+      request('05 Create Driver Profile', 'POST', '{{baseUrl}}/v1/admin/drivers', { headers: [bearer('adminToken')], body: '{"userId":"{{driverUserId}}","fullName":"Postman Driver {{uniq}}","phone":"0900000000"}', event: tests(["if (pm.response.code < 300) { const j=pm.response.json(); pm.collectionVariables.set('driverId', j?.data?.driver?.id || j?.data?.id || j?.driver?.id || j?.id || ''); }", "pm.test('Create driver accepted or already exists', function () { pm.expect([200,201,409]).to.include(pm.response.code); });"]) }),
+      request('05 Approve Driver Profile', 'PATCH', '{{baseUrl}}/v1/admin/drivers/{{driverId}}/approve', { headers: [bearer('adminToken')], body: '{}', event: basicStatus(200) }),
+      request('05 Register Driver Vehicle', 'PUT', '{{baseUrl}}/v1/driver/me/vehicle', { headers: [bearer('driverToken')], body: '{"vehicleType":"CAR","plateNumber":"PM-{{uniq}}"}', event: basicStatus(200) }),
       request('05 Set Driver Online', 'POST', '{{baseUrl}}/v1/driver/status', { headers: [bearer('adminToken')], body: '{"driver_id":"{{driverId}}","status":"ONLINE","initial_location":{"lat":10.76,"lng":106.66}}', event: basicStatus(200) }),
       request('05 Availability Check', 'GET', '{{baseUrl}}/v1/driver/availability?lat=10.76&lng=106.66&limit=5', { headers: [bearer('userToken')], event: basicStatus(200) })
     ] },
@@ -204,7 +217,8 @@ write('level3-21-30.postman_collection.json', collection(
   'CAB System - Level 3 Cases 21-30',
   'Postman collection for Level 3 service integration cases.',
   [
-    setupFolder({ user: true, admin: true }),
+    setupFolder({ user: true, admin: true, driver: true }),
+    driverInventorySetupFolder(),
     { name: 'Cases 21-25 - Booking Integration Flow', item: [
       request('21 Booking Calls ETA', 'POST', '{{baseUrl}}/v1/bookings', { headers: [bearer('userToken')], body: bookingPayload, event: basicStatus(200, 201) }),
       request('22 Booking Calls Pricing', 'POST', '{{baseUrl}}/v1/bookings', { headers: [bearer('userToken')], body: '{"pickup":{"lat":10.7602,"lng":106.6602},"drop":{"lat":10.7702,"lng":106.7002},"vehicleType":"CAR"}', event: basicStatus(200, 201) }),
@@ -219,7 +233,7 @@ write('level3-21-30.postman_collection.json', collection(
       request('30 Pricing Timeout Retry/Fallback', 'POST', '{{baseUrl}}/v1/bookings', { headers: [bearer('userToken')], body: '{"pickup":{"lat":10.7605,"lng":106.6605},"drop":{"lat":10.7705,"lng":106.7005},"vehicleType":"CAR","simulate_pricing_timeout":true}', event: basicStatus(200, 201, 504) })
     ] }
   ],
-  [{ key: 'level3BookingId', value: '' }]
+  [{ key: 'level3BookingId', value: '' }, { key: 'driverId', value: '' }, { key: 'driverUserId', value: '' }]
 ));
 
 write('level4-31-40.postman_collection.json', collection(
