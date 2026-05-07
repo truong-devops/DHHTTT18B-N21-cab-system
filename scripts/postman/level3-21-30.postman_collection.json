@@ -73,6 +73,14 @@
     {
       "key": "level3BookingId",
       "value": ""
+    },
+    {
+      "key": "driverId",
+      "value": ""
+    },
+    {
+      "key": "driverUserId",
+      "value": ""
     }
   ],
   "item": [
@@ -198,6 +206,254 @@
                   "pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminToken' : pm.info.requestName.includes('Driver') ? 'driverToken' : 'userToken', token || '');",
                   "if (userId) pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminId' : pm.info.requestName.includes('Driver') ? 'driverUserId' : 'userId', userId);",
                   "pm.test('Login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{driverEmail}}\",\"password\":\"{{userPass}}\",\"name\":\"Postman Driver {{uniq}}\",\"role\":\"driver\"}"
+            }
+          }
+        },
+        {
+          "name": "Login Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"identifier\":\"{{driverEmail}}\",\"password\":\"{{userPass}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const token = j?.tokens?.accessToken;",
+                  "const userId = j?.data?.user_id || j?.data?.id || j?.user_id || j?.id;",
+                  "pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminToken' : pm.info.requestName.includes('Driver') ? 'driverToken' : 'userToken', token || '');",
+                  "if (userId) pm.collectionVariables.set(pm.info.requestName.includes('Admin') ? 'adminId' : pm.info.requestName.includes('Driver') ? 'driverUserId' : 'userId', userId);",
+                  "pm.test('Login returns token', function () { pm.expect(token).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "00 Driver Inventory Setup",
+      "item": [
+        {
+          "name": "Create Driver Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/admin/drivers",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"userId\":\"{{driverUserId}}\",\"fullName\":\"Postman Driver {{uniq}}\",\"phone\":\"0900000000\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) { const j=pm.response.json(); pm.collectionVariables.set('driverId', j?.data?.driver?.id || j?.data?.id || j?.driver?.id || j?.id || ''); }",
+                  "pm.test('Create driver accepted or already exists', function () { pm.expect([200,201,409]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve Driver Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/admin/drivers/{{driverId}}/approve",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Driver Vehicle",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/driver/me/vehicle",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"vehicleType\":\"CAR\",\"plateNumber\":\"PM-{{uniq}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset Driver Offline",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/driver/status",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"driver_id\":\"{{driverId}}\",\"status\":\"OFFLINE\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200 or 409', function () { pm.expect([200,409]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Driver Online Near Pickup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/driver/status",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"driver_id\":\"{{driverId}}\",\"status\":\"ONLINE\",\"initial_location\":{\"lat\":10.76,\"lng\":106.66}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Driver Availability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/driver/availability?lat=10.76&lng=106.66&limit=5",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status 200', function () { pm.expect([200]).to.include(pm.response.code); });"
                 ]
               }
             }
@@ -380,13 +636,13 @@
       "name": "Cases 26-30 - Status, MCP, Gateway, Timeout",
       "item": [
         {
-          "name": "26-27 Accept Booking Status",
+          "name": "26 Driver Accept Booking (REQUESTED -> ACCEPTED)",
           "request": {
             "method": "PATCH",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}"
+                "value": "Bearer {{driverToken}}"
               },
               {
                 "key": "Content-Type",
@@ -397,7 +653,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\"booking_id\":\"{{level3BookingId}}\",\"status\":\"ACCEPTED\",\"driver_id\":\"driver_fallback\"}"
+              "raw": "{\"booking_id\":\"{{level3BookingId}}\",\"status\":\"ACCEPTED\",\"driver_id\":\"{{driverUserId}}\"}"
             }
           },
           "event": [
@@ -406,7 +662,67 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Expected status 200 or 403', function () { pm.expect([200,403]).to.include(pm.response.code); });"
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('level3RideAcceptedEventId', j?.publishedEvent?.eventId || '');",
+                  "pm.collectionVariables.set('level3NotificationId', j?.notification?.data?.id || j?.notification?.id || '');",
+                  "pm.test('Status 200', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.test('Booking status ACCEPTED', function () { pm.expect(j?.booking?.status || j?.booking?.booking?.status).to.eql('ACCEPTED'); });",
+                  "pm.test('ride_accepted event queued', function () { pm.expect(j?.publishedEvent?.queued).to.eql(true); pm.expect(j?.publishedEvent?.eventType).to.eql('ride_accepted'); });",
+                  "pm.test('Notification queued ok', function () { pm.expect(j?.notification?.ok).to.eql(true); pm.expect(pm.collectionVariables.get('level3NotificationId')).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "27 Driver Receives Notification + Booking Status Persisted",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/notifications/{{level3NotificationId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test('Notification fetch 200', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.test('Notification belongs to driver', function () { pm.expect(j?.data?.userId || j?.data?.user_id).to.eql(pm.collectionVariables.get('driverUserId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "27b Booking Status Is ACCEPTED",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/bookings/{{level3BookingId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test('Booking fetch 200', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.test('Booking status ACCEPTED', function () { pm.expect(j?.data?.status || j?.booking?.status).to.eql('ACCEPTED'); });"
                 ]
               }
             }

@@ -356,7 +356,7 @@ services:
       context: ..
       dockerfile: services/payment-service/Dockerfile
     ports:
-      - '3007:3007'
+      - '${PAYMENT_SERVICE_HOST_PORT:-3007}:3007'
     environment:
       SERVICE_NAME: payment-service
       OTEL_SERVICE_NAME: payment-service
