@@ -1,0 +1,193 @@
+{
+  "info": {
+    "_postman_id": "cab-system-truong-non-postman-cases-1778209573343",
+    "name": "CAB System - Truong - Non-Postman Cases",
+    "description": "Cases not suitable for Postman-only testing. Folders intentionally left empty by request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('uniq')) pm.collectionVariables.set('uniq', Date.now() + '-' + Math.floor(Math.random() * 100000));",
+          "if (!pm.collectionVariables.get('userPass')) pm.collectionVariables.set('userPass', '123456');",
+          "const uniq = pm.collectionVariables.get('uniq');",
+          "pm.collectionVariables.set('userEmail', pm.collectionVariables.get('userEmail') || ('postman-user-' + uniq + '@test.com'));",
+          "pm.collectionVariables.set('adminEmail', pm.collectionVariables.get('adminEmail') || ('postman-admin-' + uniq + '@test.com'));",
+          "pm.collectionVariables.set('driverEmail', pm.collectionVariables.get('driverEmail') || ('postman-driver-' + uniq + '@test.com'));",
+          "pm.collectionVariables.set('replayEmail', pm.collectionVariables.get('replayEmail') || ('postman-replay-' + uniq + '@test.com'));"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "httpsBaseUrl",
+      "value": "https://localhost:3443"
+    },
+    {
+      "key": "authUrl",
+      "value": "http://localhost:4001"
+    },
+    {
+      "key": "bookingUrl",
+      "value": "http://localhost:3003"
+    },
+    {
+      "key": "driverUrl",
+      "value": "http://localhost:3011"
+    },
+    {
+      "key": "etaUrl",
+      "value": "http://localhost:3012"
+    },
+    {
+      "key": "pricingUrl",
+      "value": "http://localhost:3006"
+    },
+    {
+      "key": "aiUrl",
+      "value": "http://localhost:3013"
+    },
+    {
+      "key": "paymentUrl",
+      "value": "http://localhost:3007"
+    },
+    {
+      "key": "notificationUrl",
+      "value": "http://localhost:3010"
+    },
+    {
+      "key": "prometheusUrl",
+      "value": "http://localhost:9090"
+    },
+    {
+      "key": "grafanaUrl",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "jaegerUrl",
+      "value": "http://localhost:16686"
+    },
+    {
+      "key": "internalApiKey",
+      "value": "dev-internal-key"
+    },
+    {
+      "key": "userPass",
+      "value": "123456"
+    },
+    {
+      "key": "uniq",
+      "value": ""
+    },
+    {
+      "key": "userEmail",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "driverEmail",
+      "value": ""
+    },
+    {
+      "key": "replayEmail",
+      "value": ""
+    },
+    {
+      "key": "expiredToken",
+      "value": "replace-with-expired-token"
+    }
+  ],
+  "item": [
+    {
+      "name": "Case 0",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 61",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 62",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 63",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 64",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 65",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 66",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 68",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 69",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 70",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 101",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 106",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 107",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 108",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 109",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    },
+    {
+      "name": "Case 110",
+      "description": "Not suitable for Postman-only verification. Use k6/load tools and infra-level validation (Kafka/DB/K8s/monitoring).",
+      "item": []
+    }
+  ]
+}
