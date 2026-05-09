@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   k6:
     image: grafana/k6:latest
     working_dir: /work
     volumes:
-      - ./scripts/postman-truong/k6:/work
+      - ./:/work
     environment:
       BASE_URL: ${BASE_URL:-http://host.docker.internal:3000}
       BOOKING_URL: ${BOOKING_URL:-http://host.docker.internal:3003}

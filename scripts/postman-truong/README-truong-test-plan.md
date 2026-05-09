@@ -9,7 +9,9 @@ Trong thư mục `scripts/postman-truong`:
 - `truong-non-postman.postman_collection.json`
 - `truong-local.postman_environment.json`
 - `k6/case61-63-load.js`
+- `k6/case35-47-59-concurrency-latency.js`
 - `k6/case64-66-kafka-db-cache.js`
+- `k6/case67-85-98-rate-limit.js`
 - `k6/case68-70-latency-ramp.js`
 - `k6/docker-compose.k6.yml`
 
@@ -122,6 +124,13 @@ docker compose -f scripts/postman-truong/k6/docker-compose.k6.yml run --rm k6 ru
 
 ```bash
 BASE_URL=http://host.docker.internal:3000 \
+AI_URL=http://host.docker.internal:3013 \
+USER_TOKEN='<your_user_jwt>' \
+docker compose -f scripts/postman-truong/k6/docker-compose.k6.yml run --rm k6 run /work/case35-47-59-concurrency-latency.js
+```
+
+```bash
+BASE_URL=http://host.docker.internal:3000 \
 USER_TOKEN='<your_user_jwt>' \
 docker compose -f scripts/postman-truong/k6/docker-compose.k6.yml run --rm k6 run /work/case64-66-kafka-db-cache.js
 ```
@@ -132,12 +141,23 @@ USER_TOKEN='<your_user_jwt>' \
 docker compose -f scripts/postman-truong/k6/docker-compose.k6.yml run --rm k6 run /work/case68-70-latency-ramp.js
 ```
 
+```bash
+BASE_URL=http://host.docker.internal:3000 \
+USER_EMAIL='rate-limit-user@test.com' \
+USER_PASS='123456' \
+USER_TOKEN='<your_user_jwt>' \
+docker compose -f scripts/postman-truong/k6/docker-compose.k6.yml run --rm k6 run /work/case67-85-98-rate-limit.js
+```
+
 ## 5.3 Cách đối chiếu theo case non-postman
 
 - `61-63`: lấy k6 report (`http_req_failed`, `p95`, throughput).
+- `35,59`: chạy script concurrency để tạo request song song (race/conflict evidence).
+- `47`: lấy nhiều latency samples, chốt theo p95.
 - `64`: sau k6 phải check Kafka lag/offset.
 - `65`: sau k6 phải check DB connection/pool logs.
 - `66`: sau k6 check hit ratio cache (Redis + app metrics).
+- `67,85,98`: dùng k6 burst, thống kê tỷ lệ `429` và `5xx`.
 - `68-70`: dùng k6 làm tải + check Grafana/K8s HPA để kết luận.
 - `101,106-110`: đây là deploy/rollout/rollback/config; không dùng Postman, k6 chỉ làm smoke/load sau deploy.
 
