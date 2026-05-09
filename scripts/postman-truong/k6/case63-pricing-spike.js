@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check } from 'k6';
 import { Counter, Rate } from 'k6/metrics';
+import { ensureUserToken } from './auto-auth.js';
 
 const BASE_URL = __ENV.BASE_URL || 'http://host.docker.internal:3000';
 const USER_TOKEN = __ENV.USER_TOKEN || '';
@@ -10,6 +11,11 @@ const timeoutRate = new Rate('case63_timeout_rate');
 const serverErrorRate = new Rate('case63_server_error_rate');
 const invalidPriceRate = new Rate('case63_invalid_price_rate');
 const timeoutCount = new Counter('case63_timeout_total');
+
+export function setup() {
+  const autoToken = ensureUserToken(BASE_URL, 'case63');
+  return { autoToken };
+}
 
 function isValidPricingResponse(body) {
   const data = body?.data;
@@ -56,7 +62,7 @@ export const options = {
   }
 };
 
-export default function () {
+export default function (data) {
   const demandProfile = [1.2, 2, 5];
   const demandIndex = demandProfile[__ITER % demandProfile.length];
   const payload = JSON.stringify({
@@ -66,7 +72,8 @@ export default function () {
   });
 
   const headers = { 'Content-Type': 'application/json' };
-  if (USER_TOKEN) headers.Authorization = `Bearer ${USER_TOKEN}`;
+  const token = USER_TOKEN || data?.autoToken || '';
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = http.post(`${BASE_URL}/v1/pricing/estimate`, payload, {
     headers: {

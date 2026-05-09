@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate } from 'k6/metrics';
+import { ensureUserToken } from './auto-auth.js';
 
 const BASE_URL = __ENV.BASE_URL || 'http://host.docker.internal:3000';
 const USER_TOKEN = __ENV.USER_TOKEN || '';
@@ -11,6 +12,11 @@ const successRate = new Rate('case68_success_rate');
 const timeoutRate = new Rate('case68_timeout_rate');
 const overP95SlaRate = new Rate('case68_over_p95_sla_rate');
 const overP99SlaRate = new Rate('case68_over_p99_sla_rate');
+
+export function setup() {
+  const autoToken = ensureUserToken(BASE_URL, 'case68');
+  return { autoToken };
+}
 
 export const options = {
   scenarios: {
@@ -38,14 +44,15 @@ export const options = {
   }
 };
 
-export default function () {
+export default function (data) {
   const payload = JSON.stringify({
     distance_km: 6,
     traffic_level: 0.7
   });
 
   const headers = { 'Content-Type': 'application/json' };
-  if (USER_TOKEN) headers.Authorization = `Bearer ${USER_TOKEN}`;
+  const token = USER_TOKEN || data?.autoToken || '';
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = http.post(`${BASE_URL}/v1/eta/estimate`, payload, {
     headers,

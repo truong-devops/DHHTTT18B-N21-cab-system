@@ -1,10 +1,33 @@
 import http from 'k6/http';
+import encoding from 'k6/encoding';
 import { check, sleep } from 'k6';
 import { Rate } from 'k6/metrics';
+import { ensureUserTokens } from './auto-auth.js';
 
 const BASE_URL = __ENV.BASE_URL || 'http://host.docker.internal:3000';
 const USER_TOKEN = __ENV.USER_TOKEN || '';
 const INTERNAL_API_KEY = __ENV.INTERNAL_API_KEY || 'dev-internal-key';
+
+function decodeJwtPayload(token) {
+  try {
+    const parts = String(token).split('.');
+    if (parts.length < 2) return null;
+    const raw = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = raw + '='.repeat((4 - (raw.length % 4)) % 4);
+    const json = encoding.b64decode(padded, 'std', 's');
+    return JSON.parse(json);
+  } catch (_e) {
+    return null;
+  }
+}
+
+function isFreshToken(token) {
+  if (!token) return false;
+  const payload = decodeJwtPayload(token);
+  if (!payload || !payload.exp) return true;
+  const nowSec = Math.floor(Date.now() / 1000);
+  return Number(payload.exp) > nowSec + 60;
+}
 
 function parseTokens() {
   if (__ENV.CASE69_TOKENS_FILE) {
@@ -12,13 +35,13 @@ function parseTokens() {
       const raw = open(__ENV.CASE69_TOKENS_FILE);
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((t) => String(t)).filter(Boolean);
+        return parsed.map((t) => String(t)).filter((t) => Boolean(t) && isFreshToken(t));
       }
     } catch (_e) {
       // fallback below
     }
   }
-  return USER_TOKEN ? [USER_TOKEN] : [];
+  return USER_TOKEN && isFreshToken(USER_TOKEN) ? [USER_TOKEN] : [];
 }
 
 const TOKENS = parseTokens();
@@ -26,6 +49,15 @@ const TOKENS = parseTokens();
 const successRate = new Rate('case69_success_rate');
 const timeoutRate = new Rate('case69_timeout_rate');
 const serverErrorRate = new Rate('case69_server_error_rate');
+
+export function setup() {
+  if (TOKENS.length > 0) {
+    return { autoTokens: [] };
+  }
+  const tokenCount = Number(__ENV.CASE69_TOKEN_COUNT || 600);
+  const autoTokens = ensureUserTokens(BASE_URL, 'case69', tokenCount);
+  return { autoTokens };
+}
 
 export const options = {
   scenarios: {
@@ -53,14 +85,16 @@ export const options = {
   }
 };
 
-export default function () {
+export default function (data) {
   const payload = JSON.stringify({
     pickup: { lat: 10.762622, lng: 106.660172 },
     drop: { lat: 10.780403, lng: 106.700928 },
     vehicleType: 'CAR'
   });
 
-  const token = TOKENS.length > 0 ? TOKENS[(__VU + __ITER) % TOKENS.length] : '';
+  const setupTokens = Array.isArray(data?.autoTokens) ? data.autoTokens : [];
+  const activeTokens = TOKENS.length > 0 ? TOKENS : setupTokens;
+  const token = activeTokens.length > 0 ? activeTokens[(__VU + __ITER) % activeTokens.length] : '';
   const headers = {
     'Content-Type': 'application/json',
     'X-Load-Test': '1',

@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Counter, Rate } from 'k6/metrics';
+import { ensureUserToken } from './auto-auth.js';
 
 const BASE_URL = __ENV.BASE_URL || __ENV.ETA_URL || 'http://host.docker.internal:3000';
 const USER_TOKEN = __ENV.USER_TOKEN || '';
@@ -9,6 +10,11 @@ const successRate = new Rate('case62_success_rate');
 const timeoutRate = new Rate('case62_timeout_rate');
 const invalidPayloadRate = new Rate('case62_invalid_payload_rate');
 const timeoutCount = new Counter('case62_timeout_total');
+
+export function setup() {
+  const autoToken = ensureUserToken(BASE_URL, 'case62');
+  return { autoToken };
+}
 
 function isValidEtaResponse(body) {
   const data = body?.data;
@@ -47,14 +53,15 @@ export const options = {
   }
 };
 
-export default function () {
+export default function (data) {
   const payload = JSON.stringify({
     distance_km: 4.7,
     traffic_level: 0.6
   });
 
   const headers = { 'Content-Type': 'application/json' };
-  if (USER_TOKEN) headers.Authorization = `Bearer ${USER_TOKEN}`;
+  const token = USER_TOKEN || data?.autoToken || '';
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = http.post(`${BASE_URL}/v1/eta/estimate`, payload, {
     headers: {
