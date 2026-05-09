@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate } from 'k6/metrics';
+import { ensureUserToken } from './auto-auth.js';
 
 const BASE_URL = __ENV.BASE_URL || 'http://host.docker.internal:3000';
 const USER_TOKEN = __ENV.USER_TOKEN || '';
@@ -12,6 +13,11 @@ const unexpectedStatusRate = new Rate('case85_unexpected_status_rate');
 const healthOkRate = new Rate('case85_health_ok_rate');
 
 const bookingExpectedStatuses = http.expectedStatuses(200, 201, 202, 409, 422, 429);
+
+export function setup() {
+  const autoToken = ensureUserToken(BASE_URL, 'case85');
+  return { autoToken };
+}
 
 export const options = {
   scenarios: {
@@ -45,7 +51,7 @@ export const options = {
   }
 };
 
-export function bookingAttack() {
+export function bookingAttack(data) {
   const payload = JSON.stringify({
     pickup: { lat: 10.762622, lng: 106.660172 },
     drop: { lat: 10.780403, lng: 106.700928 },
@@ -56,8 +62,9 @@ export function bookingAttack() {
     'Content-Type': 'application/json',
     'X-Load-Test': 'case85-rate-limit-attack'
   };
-  if (USER_TOKEN) {
-    headers.Authorization = `Bearer ${USER_TOKEN}`;
+  const token = USER_TOKEN || data?.autoToken || '';
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   const res = http.post(`${BASE_URL}/v1/bookings`, payload, {
